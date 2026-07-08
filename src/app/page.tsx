@@ -74,29 +74,57 @@ export default function Home() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-            <div className="md:col-span-8 bg-[#3B1E43] border border-[#5A2E65] p-8 rounded-2xl flex flex-col justify-between min-h-[400px] relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-8 opacity-20 group-hover:opacity-40 transition-opacity">
-                 <span className="text-8xl">✦</span>
-              </div>
-              <div className="relative z-10 space-y-4">
-                <h3 className="text-2xl font-['Bukra'] font-bold text-white">HUB PESSOAL MK7</h3>
-                <p className="text-[#F5F5F5]/80 max-w-md">Sistema integral de gerenciamento acadêmico e pesquisa, utilizando Next.js 14, Supabase e estilos em Roxo e Dourado.</p>
-              </div>
-              <div className="relative z-10 mt-12">
-                <span className="inline-block px-3 py-1 bg-[#121212]/50 text-[#FFCC00] text-xs font-bold rounded-md">
-                  Em Desenvolvimento
-                </span>
-              </div>
-            </div>
             
-            <div className="md:col-span-4 bg-[#1E1E1E] border border-[#2D2D2D] p-8 rounded-2xl flex flex-col justify-between min-h-[400px] hover:border-[#FFCC00]/50 transition-colors">
+            <a href="https://hub-lab-div.vercel.app" target="_blank" rel="noreferrer" className="md:col-span-4 bg-[#1E1E1E] border border-[#2D2D2D] p-8 rounded-2xl flex flex-col justify-between min-h-[320px] group hover:border-[#F14343] transition-colors">
               <div className="space-y-4">
-                <h3 className="text-2xl font-['Bukra'] font-bold text-white">API LABDIV</h3>
-                <p className="text-[#A0A0A0]">Integração de serviços e ferramentas para todos os pesquisadores e membros do laboratório.</p>
+                <div className="w-12 h-12 bg-[#F14343] text-white rounded-full flex items-center justify-center mb-6">
+                  <span className="font-bold text-xl">1</span>
+                </div>
+                <h3 className="text-2xl font-['Bukra'] font-bold text-white">O HUB Acadêmico</h3>
+                <p className="text-[#A0A0A0] font-medium">Acesse o sistema integral de gerenciamento e pesquisa.</p>
               </div>
-              <a href="/labdiv" className="w-full py-4 mt-8 border-t border-[#2D2D2D] text-[#FFCC00] text-sm font-bold flex justify-between items-center group">
-                Explorar Documentação
-                <span className="group-hover:translate-x-1 transition-transform">→</span>
+              <div className="mt-8 border-t border-[#2D2D2D] group-hover:border-[#F14343]/50 pt-4 flex justify-between items-center text-[#F14343] font-bold transition-colors">
+                Acessar Plataforma
+                <span className="text-xl group-hover:translate-x-2 transition-transform">→</span>
+              </div>
+            </a>
+
+            <a href="https://hub-lab-div.vercel.app/apresentacao" target="_blank" rel="noreferrer" className="md:col-span-4 bg-[#1E1E1E] border border-[#2D2D2D] p-8 rounded-2xl flex flex-col justify-between min-h-[320px] group hover:border-[#FFCC00] transition-colors">
+              <div className="space-y-4">
+                <div className="w-12 h-12 bg-[#FFCC00] text-[#121212] rounded-full flex items-center justify-center mb-6">
+                  <span className="font-bold text-xl">2</span>
+                </div>
+                <h3 className="text-2xl font-['Bukra'] font-bold text-white">Apresentação</h3>
+                <p className="text-[#A0A0A0] font-medium">Conheça a visão, arquitetura e proposta do projeto.</p>
+              </div>
+              <div className="mt-8 border-t border-[#2D2D2D] group-hover:border-[#FFCC00]/50 pt-4 flex justify-between items-center text-[#FFCC00] font-bold transition-colors">
+                Ver Apresentação
+                <span className="text-xl group-hover:translate-x-2 transition-transform">→</span>
+              </div>
+            </a>
+
+            <a href="https://hub-lab-div.vercel.app/labdiv" target="_blank" rel="noreferrer" className="md:col-span-4 bg-[#1E1E1E] border border-[#2D2D2D] p-8 rounded-2xl flex flex-col justify-between min-h-[320px] group hover:border-[#0F4780] transition-colors">
+              <div className="space-y-4">
+                <div className="w-12 h-12 bg-[#0F4780] text-white rounded-full flex items-center justify-center mb-6">
+                  <span className="font-bold text-xl">3</span>
+                </div>
+                <h3 className="text-2xl font-['Bukra'] font-bold text-white">Página do LabDiv</h3>
+                <p className="text-[#A0A0A0] font-medium">Explore a documentação, ferramentas e interações.</p>
+              </div>
+              <div className="mt-8 border-t border-[#2D2D2D] group-hover:border-[#0F4780]/50 pt-4 flex justify-between items-center text-[#5fa8ff] font-bold transition-colors">
+                Explorar Padrão Ouro
+                <span className="text-xl group-hover:translate-x-2 transition-transform">→</span>
+              </div>
+            </a>
+
+            <div className="md:col-span-12 bg-[#121212] border border-[#2D2D2D] p-8 rounded-2xl flex flex-col md:flex-row justify-between items-center min-h-[150px] hover:border-[#3B1E43] transition-colors gap-6">
+              <div className="space-y-2 text-center md:text-left">
+                <h3 className="text-xl font-['Bukra'] font-bold text-white">Acervo Acadêmico (Drive)</h3>
+                <p className="text-[#A0A0A0] max-w-2xl">Pasta da graduação contendo livros, artigos e materiais de pesquisa estruturados para consulta rápida.</p>
+              </div>
+              <a href="https://drive.google.com/drive/folders/1RoiZANniDllDSuJiDkgoZLuRVGetej7b?usp=drive_link" target="_blank" rel="noreferrer" className="shrink-0 px-8 py-3 bg-[#3B1E43] text-white text-sm font-bold rounded-md hover:bg-[#5A2E65] transition-colors flex items-center gap-2">
+                Acessar Drive
+                <span>→</span>
               </a>
             </div>
           </div>
