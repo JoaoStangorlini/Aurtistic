@@ -663,12 +663,12 @@ export function TasksView({ initialTasks: rawInitialTasks }: { initialTasks: Tas
             {processedTasks.map(task => (
               <tr 
                 key={task.id} 
-                draggable={sortBy === 'manual'}
-                onDragStart={(e) => handleDragStart(e, task.id)}
-                onDragOver={(e) => handleDragOver(e, task.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, task.id)}
-                onDragEnd={() => setDropTargetId(null)}
+                draggable={sortBy === 'manual' ? true : undefined}
+                onDragStart={sortBy === 'manual' ? (e) => handleDragStart(e, task.id) : undefined}
+                onDragOver={sortBy === 'manual' ? (e) => handleDragOver(e, task.id) : undefined}
+                onDragLeave={sortBy === 'manual' ? handleDragLeave : undefined}
+                onDrop={sortBy === 'manual' ? (e) => handleDrop(e, task.id) : undefined}
+                onDragEnd={sortBy === 'manual' ? () => setDropTargetId(null) : undefined}
                 onClick={(e) => handleRowClick(e, task.id)}
                 className={`transition-colors group ${selectedTasks.has(task.id) ? 'bg-[#9D4EDD]/10' : 'hover:bg-[#252525]'} ${draggedTaskId === task.id ? 'opacity-50' : ''} ${dropTargetId === task.id ? (dropPosition === 'top' ? 'border-t-2 border-[#9D4EDD]' : 'border-b-2 border-[#9D4EDD]') : 'border-b border-[#FFCC00]/30 hover:border-[#9D4EDD]'}`}
               >
@@ -714,16 +714,16 @@ export function TasksView({ initialTasks: rawInitialTasks }: { initialTasks: Tas
       </div>
 
       {/* Mobile View (Cards) */}
-      <div ref={mobileContainerRef} className="md:hidden flex-1 overflow-y-auto space-y-4 pb-20 mt-4">
+      <div ref={mobileContainerRef} className="md:hidden flex-1 overflow-y-auto touch-pan-y space-y-4 pb-20 mt-4">
         {processedTasks.map(task => (
           <div 
             key={task.id} 
-            draggable={sortBy === 'manual'}
-            onDragStart={(e) => handleDragStart(e, task.id)}
-            onDragOver={(e) => handleDragOver(e, task.id)}
-            onDragLeave={handleDragLeave}
-            onDrop={(e) => handleDrop(e, task.id)}
-            onDragEnd={() => setDropTargetId(null)}
+            draggable={sortBy === 'manual' ? true : undefined}
+            onDragStart={sortBy === 'manual' ? (e) => handleDragStart(e, task.id) : undefined}
+            onDragOver={sortBy === 'manual' ? (e) => handleDragOver(e, task.id) : undefined}
+            onDragLeave={sortBy === 'manual' ? handleDragLeave : undefined}
+            onDrop={sortBy === 'manual' ? (e) => handleDrop(e, task.id) : undefined}
+            onDragEnd={sortBy === 'manual' ? () => setDropTargetId(null) : undefined}
             onClick={(e) => handleRowClick(e, task.id)}
             className={`border rounded-lg p-4 flex flex-col gap-3 relative transition-colors ${selectedTasks.has(task.id) ? 'bg-[#9D4EDD]/10 border-[#9D4EDD]/30' : 'bg-[#1A1A1A] border-[#FFCC00]/30 hover:border-[#9D4EDD]'} ${draggedTaskId === task.id ? 'opacity-50' : ''} ${dropTargetId === task.id ? (dropPosition === 'top' ? 'border-t-2 border-[#9D4EDD]' : 'border-b-2 border-[#9D4EDD]') : ''}`}
           >
