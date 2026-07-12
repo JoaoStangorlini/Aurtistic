@@ -7,7 +7,7 @@ import { TaskFormModal } from './TaskFormModal';
 import { BulkEditModal } from './BulkEditModal';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import { updateTaskOrders } from '@/app/(dashboard)/actions';
+import { updateTaskOrders, saveTask } from '@/app/(dashboard)/actions';
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return '-';
@@ -92,6 +92,51 @@ export function TasksView({ initialTasks: rawInitialTasks }: { initialTasks: Tas
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
 
   const [isBulkEditModalOpen, setIsBulkEditModalOpen] = useState(false);
+
+  const [quickEdit, setQuickEdit] = useState<{
+    taskId: string;
+    field: 'status' | 'responsavel';
+    top: number;
+    left: number;
+    value: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setQuickEdit(null);
+    if (quickEdit) {
+      window.addEventListener('click', handleClickOutside);
+    }
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, [quickEdit]);
+
+  const handleBadgeClick = (e: React.MouseEvent, task: Task, field: 'status' | 'responsavel') => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setQuickEdit({
+      taskId: task.id,
+      field,
+      top: rect.bottom + 4,
+      left: rect.left,
+      value: task[field] || ''
+    });
+  };
+
+  const handleQuickSave = async (taskId: string, field: 'status' | 'responsavel', newValue: string) => {
+    setQuickEdit(null);
+    const task = localTasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // Atualização otimista simples
+    const updatedTasks = localTasks.map(t => t.id === taskId ? { ...t, [field]: newValue } : t);
+    setLocalTasks(updatedTasks);
+    
+    try {
+      await saveTask({ ...task, [field]: newValue });
+    } catch (err: any) {
+      alert("Erro ao atualizar: " + err.message);
+    }
+  };
+
 
   // Filters UI State
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
@@ -708,10 +753,10 @@ export function TasksView({ initialTasks: rawInitialTasks }: { initialTasks: Tas
                     </div>
                   )}
                 </td>
-                <td className="p-4"><Badge type="status" value={task.status} /></td>
+                <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'status')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar status"><Badge type="status" value={task.status} /></div></td>
                 <td className="p-4"><Badge type="prioridade" value={task.prioridade} /></td>
                 <td className="p-4"><Badge type="categoria" value={task.categoria} /></td>
-                <td className="p-4"><Badge type="responsavel" value={task.responsavel} /></td>
+                <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'responsavel')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar responsável"><Badge type="responsavel" value={task.responsavel} /></div></td>
                 <td className="p-4 text-xs text-[#A0A0A0]">{formatDate(task.created_at)}</td>
                 <td className="p-4 text-xs text-[#A0A0A0]">{formatDate(task.inicio)}</td>
                 <td className="p-4 text-xs text-[#A0A0A0]">{formatDate(task.prazo)}</td>
@@ -789,10 +834,10 @@ export function TasksView({ initialTasks: rawInitialTasks }: { initialTasks: Tas
                 <span className="text-[9px] text-[#8E8E8E] font-semibold uppercase tracking-wider flex-1 truncate">Dim</span>
               </div>
               <div className="flex justify-between items-center text-center gap-1">
-                <div className="flex-1 flex justify-center overflow-hidden"><Badge type="status" value={task.status} /></div>
+                <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'status')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="status" value={task.status} /></div></div>
                 <div className="flex-1 flex justify-center overflow-hidden"><Badge type="prioridade" value={task.prioridade} /></div>
                 <div className="flex-1 flex justify-center overflow-hidden"><Badge type="categoria" value={task.categoria} /></div>
-                <div className="flex-1 flex justify-center overflow-hidden"><Badge type="responsavel" value={task.responsavel} /></div>
+                <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'responsavel')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="responsavel" value={task.responsavel} /></div></div>
                 <div className="flex-1 flex justify-center overflow-hidden"><Badge type="dimensao" value={task.dimensao} /></div>
               </div>
             </div>
@@ -834,22 +879,41 @@ export function TasksView({ initialTasks: rawInitialTasks }: { initialTasks: Tas
         <span className="material-symbols-outlined">arrow_downward</span>
       </button>
 
-      <TaskFormModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        task={taskToEdit} 
-      />
+      {/* Modals */}
+      <TaskFormModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} task={taskToEdit} />
+      <BulkEditModal isOpen={isBulkEditModalOpen} onClose={() => setIsBulkEditModalOpen(false)} taskIds={Array.from(selectedTasks)} onSuccess={() => { setIsBulkEditModalOpen(false); setSelectedTasks(new Set()); setLastSelectedTaskId(null); }} />
 
-      <BulkEditModal
-        isOpen={isBulkEditModalOpen}
-        onClose={() => setIsBulkEditModalOpen(false)}
-        taskIds={Array.from(selectedTasks)}
-        onSuccess={() => {
-          setIsBulkEditModalOpen(false);
-          setSelectedTasks(new Set());
-          setLastSelectedTaskId(null);
-        }}
-      />
+      {/* Quick Edit Dropdown */}
+      {quickEdit && (
+        <div 
+          className="fixed z-[100] bg-[#1A1A1A] border border-[#2D2D2D] rounded-md shadow-[0_8px_32px_rgba(0,0,0,0.8)] overflow-hidden min-w-[140px]"
+          style={{ top: quickEdit.top, left: quickEdit.left }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="max-h-[250px] overflow-y-auto flex flex-col py-1">
+            {quickEdit.field === 'status' 
+              ? ["não iniciada","em progresso","falta testar","completa","descartada"].map(option => (
+                  <button 
+                    key={option}
+                    className={`text-left px-3 py-2 text-xs hover:bg-[#252525] transition-colors ${quickEdit.value?.toLowerCase() === option ? 'text-[#9D4EDD] font-bold bg-[#9D4EDD]/10' : 'text-[#E0E0E0]'}`}
+                    onClick={() => handleQuickSave(quickEdit.taskId, 'status', option)}
+                  >
+                    {option.charAt(0).toUpperCase() + option.slice(1)}
+                  </button>
+                ))
+              : ["João","Andy","Leo","Dani","Lorenzo","Nacky"].map(option => (
+                  <button 
+                    key={option}
+                    className={`text-left px-3 py-2 text-xs hover:bg-[#252525] transition-colors ${quickEdit.value === option ? 'text-[#9D4EDD] font-bold bg-[#9D4EDD]/10' : 'text-[#E0E0E0]'}`}
+                    onClick={() => handleQuickSave(quickEdit.taskId, 'responsavel', option)}
+                  >
+                    {option}
+                  </button>
+                ))
+            }
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -39,17 +39,17 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="pt-BR" className={`${openSans.variable} antialiased h-full`}>
+    <html lang="pt-BR" className={`${openSans.variable} antialiased h-full overflow-x-hidden`}>
       <head>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
       </head>
-      <body className="h-full bg-[#121212] flex flex-col overflow-hidden text-[#e5e2e1]">
+      <body className="h-full bg-[#121212] flex flex-col overflow-hidden text-[#e5e2e1] max-w-[100vw]">
         <NextTopLoader color="#FFCC00" height={3} showSpinner={false} shadow="0 0 10px #FFCC00,0 0 5px #FFCC00" />
         <Suspense fallback={null}>
           <GlobalHighlighter />
         </Suspense>
         <Navbar initialRole={userRole} initialTargetHref={targetHref} />
-        <main className="flex-1 flex flex-col overflow-y-auto">
+        <main className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden">
           {children}
         </main>
       </body>
