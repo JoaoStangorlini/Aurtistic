@@ -18,6 +18,7 @@ export function getBadgeColorClass(type: BadgeType, value: string | null): strin
     else if (text.includes('descartada')) colorClass = 'bg-[#db4437]/15 text-[#db4437] border-[#db4437]/30'; // Red
     else if (text.includes('progresso')) colorClass = 'bg-[#4285f4]/15 text-[#4285f4] border-[#4285f4]/30'; // Blue
     else if (text.includes('iniciada')) colorClass = 'bg-[#E0E0E0]/15 text-[#E0E0E0] border-[#E0E0E0]/30'; // Light Gray
+    else if (text.includes('rascunho')) colorClass = 'bg-[#8E8E8E]/15 text-[#8E8E8E] border-[#8E8E8E]/30 text-dashed'; // Gray with different feel
   } 
   else if (type === 'prioridade') {
     if (text === 'baixa') colorClass = 'bg-[#4285f4]/15 text-[#4285f4] border-[#4285f4]/30'; // Blue
@@ -49,6 +50,8 @@ export function getBadgeColorClass(type: BadgeType, value: string | null): strin
     else if (text.includes('tatuagens') || text.includes('tattoo')) colorClass = 'bg-[#D39BFE]/15 text-[#D39BFE] border-[#D39BFE]/30'; // Roxo Claro
     else if (text.includes('cin')) colorClass = 'bg-[#E0E0E0]/15 text-[#E0E0E0] border-[#E0E0E0]/30'; // Cinza Claro
     else if (text.includes('compras')) colorClass = 'bg-[#69F0AE]/15 text-[#69F0AE] border-[#69F0AE]/30'; // Verde Claro
+    else if (text.includes('stangorlini') || text.includes('web')) colorClass = 'bg-[#3b82f6]/15 text-[#3b82f6] border-[#3b82f6]/30'; // Azul Royal
+    else if (text.includes('fotografia') || text.includes('foto')) colorClass = 'bg-[#ec4899]/15 text-[#ec4899] border-[#ec4899]/30'; // Rosa Vibrante
     else if (text.includes('hobbys') || text.includes('hobby')) colorClass = 'bg-[#0f9d58]/15 text-[#0f9d58] border-[#0f9d58]/30'; // Verde Vibrante
     else colorClass = 'bg-[#FFCC00]/15 text-[#FFCC00] border-[#FFCC00]/30'; // Default golden
   }

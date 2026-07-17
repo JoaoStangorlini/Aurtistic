@@ -43,6 +43,88 @@ USING (true)
 WITH CHECK (true);
 
 -- Dados do Excel
+
+  
+-- --- END: tarefas com rls pra HUB ---
+
+-- --- START: correção tasks ---
+-- ==========================================
+-- Migração Mk7: Normatização de Tarefas
+-- ==========================================
+
+-- 1. Atualiza os nomes dos responsáveis para o padrão curto
+UPDATE tasks SET responsavel = 'João' WHERE responsavel = 'Joao Paulo Stangorlini de Carvalho';
+UPDATE tasks SET responsavel = 'Andy' WHERE responsavel = 'Andy Raposo';
+
+-- 2. Traduz e normatiza os Status que vieram em inglês do CSV
+UPDATE tasks SET status = 'completa' WHERE status = 'COMPLETED';
+UPDATE tasks SET status = 'falta testar' WHERE status = 'BACKLOG';
+UPDATE tasks SET status = 'descartada' WHERE status = 'DISCARDED';
+UPDATE tasks SET status = 'em progresso' WHERE status = 'IN_PROGRESS';
+UPDATE tasks SET status = 'não iniciada' WHERE status = 'NOT_STARTED';
+-- 3. Adiciona a coluna concluida_em se ela não existir
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS concluida_em TIMESTAMP WITH TIME ZONE;
+
+-- Nota: Certifique-se de executar este script no painel SQL do Supabase.
+-- Implementação de Drag & Drop (Ordem Manual)
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS ordem_manual INTEGER DEFAULT 0;
+
+
+-- 4. Renomear dimensão 'pessoal' para 'urgente'
+UPDATE tasks SET dimensao = 'urgente' WHERE dimensao = 'pessoal';
+
+-- ==========================================
+-- Migração Mk7: Normatização de Tarefas
+-- ==========================================
+
+-- 1. Atualiza os nomes dos responsáveis para o padrão curto
+UPDATE tasks SET responsavel = 'João' WHERE responsavel = 'Joao Paulo Stangorlini de Carvalho';
+UPDATE tasks SET responsavel = 'Andy' WHERE responsavel = 'Andy Raposo';
+
+-- 2. Traduz e normatiza os Status que vieram em inglês do CSV
+UPDATE tasks SET status = 'completa' WHERE status = 'COMPLETED';
+UPDATE tasks SET status = 'falta testar' WHERE status = 'BACKLOG';
+UPDATE tasks SET status = 'descartada' WHERE status = 'DISCARDED';
+UPDATE tasks SET status = 'em progresso' WHERE status = 'IN_PROGRESS';
+UPDATE tasks SET status = 'não iniciada' WHERE status = 'NOT_STARTED';
+-- 3. Adiciona a coluna concluida_em se ela não existir
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS concluida_em TIMESTAMP WITH TIME ZONE;
+
+-- Nota: Certifique-se de executar este script no painel SQL do Supabase.
+-- Implementação de Drag & Drop (Ordem Manual)
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS ordem_manual INTEGER DEFAULT 0;
+
+
+-- 4. Renomear dimensão 'pessoal' para 'urgente'
+UPDATE tasks SET dimensao = 'urgente' WHERE dimensao = 'pessoal';
+
+-- 5. Adiciona coluna is_favorite
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN DEFAULT false;
+
+
+-- --- END: correção tasks ---
+
+-- Licença: Este é um software livre regido pela licença AGPLv3.
+
+-- ==========================================
+-- Migração Mk8: Sub-tarefas
+-- ==========================================
+
+-- Adiciona a coluna de subtarefas em formato JSONB
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS subtasks JSONB DEFAULT '[]'::jsonb;
+
+-- ==========================================
+-- Migração Mk9: Sub-tarefas Reais
+-- ==========================================
+
+-- Adiciona relação de hierarquia
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES tasks(id) ON DELETE CASCADE;
+
+
+-- NOVAS TAREFAS (via Excel)
+
+
+-- --- START: INSERÇÕES ---
 INSERT INTO tasks (nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao) VALUES ('Adicionar 1 hora de estudos para cada hora de materias', 'completa', 'Baixa', 'Programar', 'Andy Raposo', '2026-03-21 00:00:00Z', NULL, NULL, NULL, 'HUB');
 INSERT INTO tasks (nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao) VALUES ('Ajeitar trilhas do Bach/med', 'completa', 'Média', 'Programar', 'Andy Raposo', '2026-03-21 00:00:00Z', NULL, NULL, NULL, 'HUB');
 INSERT INTO tasks (nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao) VALUES ('Tempo de espera médio para aprovação do adm', 'falta testar', 'Baixa', 'Programar', 'Joao Paulo Stangorlini de Carvalho', NULL, NULL, NULL, NULL, 'HUB');
@@ -191,79 +273,52 @@ INSERT INTO tasks (nome, status, prioridade, categoria, responsavel, inicio, pra
 INSERT INTO tasks (nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao) VALUES ('Marx', 'BACKLOG', 'Baixa', 'outros', 'Joao Paulo Stangorlini de Carvalho', NULL, NULL, NULL, NULL, 'livros');
 INSERT INTO tasks (nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao) VALUES ('Hegel', 'BACKLOG', 'Baixa', 'outros', 'Joao Paulo Stangorlini de Carvalho', NULL, NULL, NULL, NULL, 'livros');
 INSERT INTO tasks (nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao) VALUES ('Kant', 'BACKLOG', 'Baixa', 'outros', 'Joao Paulo Stangorlini de Carvalho', NULL, NULL, NULL, NULL, 'livros');
-
-  
--- --- END: tarefas com rls pra HUB ---
-
--- --- START: correção tasks ---
--- ==========================================
--- Migração Mk7: Normatização de Tarefas
--- ==========================================
-
--- 1. Atualiza os nomes dos responsáveis para o padrão curto
-UPDATE tasks SET responsavel = 'João' WHERE responsavel = 'Joao Paulo Stangorlini de Carvalho';
-UPDATE tasks SET responsavel = 'Andy' WHERE responsavel = 'Andy Raposo';
-
--- 2. Traduz e normatiza os Status que vieram em inglês do CSV
-UPDATE tasks SET status = 'completa' WHERE status = 'COMPLETED';
-UPDATE tasks SET status = 'falta testar' WHERE status = 'BACKLOG';
-UPDATE tasks SET status = 'descartada' WHERE status = 'DISCARDED';
-UPDATE tasks SET status = 'em progresso' WHERE status = 'IN_PROGRESS';
-UPDATE tasks SET status = 'não iniciada' WHERE status = 'NOT_STARTED';
--- 3. Adiciona a coluna concluida_em se ela não existir
-ALTER TABLE tasks ADD COLUMN IF NOT EXISTS concluida_em TIMESTAMP WITH TIME ZONE;
-
--- Nota: Certifique-se de executar este script no painel SQL do Supabase.
--- Implementação de Drag & Drop (Ordem Manual)
-ALTER TABLE tasks ADD COLUMN IF NOT EXISTS ordem_manual INTEGER DEFAULT 0;
-
-
--- 4. Renomear dimensão 'pessoal' para 'urgente'
-UPDATE tasks SET dimensao = 'urgente' WHERE dimensao = 'pessoal';
-
--- ==========================================
--- Migração Mk7: Normatização de Tarefas
--- ==========================================
-
--- 1. Atualiza os nomes dos responsáveis para o padrão curto
-UPDATE tasks SET responsavel = 'João' WHERE responsavel = 'Joao Paulo Stangorlini de Carvalho';
-UPDATE tasks SET responsavel = 'Andy' WHERE responsavel = 'Andy Raposo';
-
--- 2. Traduz e normatiza os Status que vieram em inglês do CSV
-UPDATE tasks SET status = 'completa' WHERE status = 'COMPLETED';
-UPDATE tasks SET status = 'falta testar' WHERE status = 'BACKLOG';
-UPDATE tasks SET status = 'descartada' WHERE status = 'DISCARDED';
-UPDATE tasks SET status = 'em progresso' WHERE status = 'IN_PROGRESS';
-UPDATE tasks SET status = 'não iniciada' WHERE status = 'NOT_STARTED';
--- 3. Adiciona a coluna concluida_em se ela não existir
-ALTER TABLE tasks ADD COLUMN IF NOT EXISTS concluida_em TIMESTAMP WITH TIME ZONE;
-
--- Nota: Certifique-se de executar este script no painel SQL do Supabase.
--- Implementação de Drag & Drop (Ordem Manual)
-ALTER TABLE tasks ADD COLUMN IF NOT EXISTS ordem_manual INTEGER DEFAULT 0;
-
-
--- 4. Renomear dimensão 'pessoal' para 'urgente'
-UPDATE tasks SET dimensao = 'urgente' WHERE dimensao = 'pessoal';
-
--- 5. Adiciona coluna is_favorite
-ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN DEFAULT false;
-
-
--- --- END: correção tasks ---
-
--- Licença: Este é um software livre regido pela licença AGPLv3.
-
--- ==========================================
--- Migração Mk8: Sub-tarefas
--- ==========================================
-
--- Adiciona a coluna de subtarefas em formato JSONB
-ALTER TABLE tasks ADD COLUMN IF NOT EXISTS subtasks JSONB DEFAULT '[]'::jsonb;
-
--- ==========================================
--- Migração Mk9: Sub-tarefas Reais
--- ==========================================
-
--- Adiciona relação de hierarquia
-ALTER TABLE tasks ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES tasks(id) ON DELETE CASCADE;
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '13b5f91c-8ad5-4974-bdeb-2015fe905ed1', now(), 'Mudar o formulário de envio para ele ser em blocos. ', 'completa', 'Média', 'Programar', 'Joao', NULL, NULL, 'Como o bloco de formato, categoria, conteúdo em diferentes formatos, onde a pessoa pode mudar a forma do post miniatura e o em página completa', NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1001, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '6583bfc2-1d4e-4fdd-9f39-5f2f9f283f4f', now(), 'Métricas do post no laboratório pessal', 'completa', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1002, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '77e4a425-7d54-4377-ae53-40df96d138e3', now(), 'Observatório do pesquisador ter também como pedir para adotar o Hub a alguma disciplina', 'não iniciada', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1003, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( 'b381837d-928b-4a9c-88b0-edcdf59d0147', now(), 'SAC no cgif', 'falta testar', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1004, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '1589a8d2-276c-4f77-a384-38416f9596e7', now(), 'Dicas/conselhos de veteranos na ferramentas', 'falta testar', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1005, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '760abf7d-0b9c-4fcd-a182-87973a700ae2', now(), 'Posto sobre a piada do acelerador ', 'não iniciada', 'Média', 'Post', 'Joao', NULL, NULL, '"(num carro tudo é um acelerador (menos a embreagem)"', NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1006, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '399619c9-037a-49f8-a966-ca91f2d28412', now(), 'Um espaço no Cgif para memes', 'descartada', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1007, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( 'dfee53df-0dd6-4076-b24b-b0001818e9ad', now(), 'Uma divisão no envio entre arte/ comunicação científica/logs', 'falta testar', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1008, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '3727c9e1-4d03-4441-80ae-6f449263604a', now(), 'Deixar 5 espaços de rascunho para os posts', 'falta testar', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1009, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( 'e2843e5a-673e-412b-a2aa-5794d327aff5', now(), 'Clarity em um iframe', 'falta testar', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1010, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '133099ae-ac8c-45c5-8e16-5bc7c1223cc9', now(), 'Mapa interativo sumiu', 'completa', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1011, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( 'e41322d7-4232-464d-a67e-42b704ae81e6', now(), 'Acompanhamento de scrool no cgif tem q sumir no mobile', 'completa', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1012, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '8179f8e8-35a8-417c-b9d2-7ce4b545a50b', now(), 'Ter ali um calendário, com opção de fazer um when tô meet tipo o da Dani, uma seção de tarefas q tenha como lançar tarefas, ter ali os links para meu currículo, redes sociais, galeria, projetos e futuramente acesso ao servidor Tudo dourado e roxo', 'completa', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'stangorlini.web', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1013, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '4b126765-dcf1-420d-8584-562a7aa25f7c', now(), 'Ter como voltar um posto pRa o rascunho', 'falta testar', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1014, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( 'a1a399dd-6d2b-4c5c-aaf1-127001965f80', now(), 'criar o stangorlini.web', 'completa', 'Média', 'Programar', 'Joao', NULL, NULL, 'Ter uma navbar para o hub/cara da jaqueta/fotografia/dev/profissional/ Cada menu leva para meus projetos, documentos de apresentação/fala/pesquisa', NULL, 'stangorlini.web', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1015, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( 'e91b212a-a789-4893-9f51-e5d013b6bc0e', now(), 'Contagem de acessos por abas/sub abas/posts', 'falta testar', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1016, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( 'fe84bfce-7483-4c09-a905-7d47d078ccd9', now(), 'Colocar cola quente na extremidade do fixador do pin para q n fique pontudo', 'não iniciada', 'Média', 'touch the grass', 'Joao', NULL, NULL, NULL, NULL, 'hobbys', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1017, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( 'e1fac366-4ef5-46a4-8f11-348832bb7bf6', now(), 'Pac-Man on terminal Linux', 'não iniciada', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'hobbys', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1018, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '6243ba8f-5086-40df-a85a-cf1607c6fcc2', now(), 'Voltar pra Terapia', 'completa', 'Média', 'touch the grass', 'Joao', NULL, NULL, NULL, NULL, 'URGENTE', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1019, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '9489622d-c9d7-4b27-854d-e58b246248ae', now(), 'Login separado Labdiv acessa só o Labdiv, tá com as autorizações iguais', 'completa', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'stangorlini.web', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1020, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '762bc0fc-5cd0-43f7-93fd-10efbba7c9c9', now(), 'Adicionar filtros, ativado por padrão status', 'completa', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'stangorlini.web', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1021, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '2b5c549c-1724-439c-a10c-2b850054bf82', now(), 'Menus de todas/cada dimensão no pessoal', 'completa', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'stangorlini.web', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1022, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '87796e25-34f2-4ac0-a610-3e073b3b9347', now(), 'Traduzir tudo', 'completa', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'stangorlini.web', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1023, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '5a508a79-cc80-42c9-8b93-83f4362e2073', now(), 'Pesquisar limite de 60 lá do supa para ver como ele se comporta se 60 alunos enviarem "ao msm tempo" seus posts', 'não iniciada', 'Média', 'Pesquisar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1024, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '33fb2161-ac99-41d0-9498-50e28924f3d0', now(), 'Colocar um iframe da página do LabDiv no lugar da que eu fiz ):', 'não iniciada', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1025, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( 'c26e8c8e-b116-485d-9f25-33e3c669593f', now(), 'erro no login in app', 'completa', 'Média', 'Programar', 'Joao', NULL, NULL, 'Ao logar abre o navegador in app, e vc loga nele daí o navegador dá o calkback para o site e não para o app', NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1026, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( 'c8807db6-8afa-48a6-ba5f-aa06373c3f3e', now(), 'Coloridato de propranolol', 'completa', 'Média', 'touch the grass', 'Joao', NULL, NULL, NULL, NULL, 'URGENTE', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1027, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '39f6ec9c-4dde-441c-bde6-c2ba88c35f87', now(), 'Baixar os menus e oq der no app, ', 'completa', 'Média', 'Programar', 'Joao', NULL, NULL, 'salvar dados como login, constelações, grade, trilhas localmente com forma de gerenciamento de armazenamento no menu da conta e fzr ele virar um menu de configs mesmo', NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1028, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '798c33b8-c147-4fb5-8ac3-f5cf5c06d507', now(), 'Grade horária só com horários ocupados tipo 17h-19h', 'não iniciada', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1029, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( 'da2b67e3-b1d3-4fa2-a12c-e70c3a91ea83', now(), 'Fazer as logos', 'não iniciada', 'Média', 'touch the grass', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1030, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( 'd9db46a4-4c58-4902-8f42-a8ae4be196de', now(), 'Selecionar e editar fotos', 'não iniciada', 'Média', 'touch the grass', 'Joao', NULL, NULL, NULL, NULL, 'fotografia', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1031, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '691af143-d282-4006-844c-ef91285c4777', now(), 'Terminar pré post', 'em progresso', 'Média', 'touch the grass', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1032, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '6767c6b6-693e-413a-bd67-d5d212c15dba', now(), 'Melhorar tarefas do app, deixar possível favoritar e por prazo', 'falta testar', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'stangorlini.web', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1033, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( 'bb321326-41b4-4081-8486-4b2bccf9084d', now(), 'Notificação n funciona no app e a individual tbm n funciona', 'não iniciada', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1034, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '73dcdb88-9e5f-4616-adae-e3608efab38a', now(), 'Logo na verificação de segurança fica bugada', 'não iniciada', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1035, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '94b36a26-46f9-4230-bd53-0e2539616c14', now(), 'Quadrado amarelo aleatório', 'não iniciada', 'Média', 'Programar', 'Joao', NULL, NULL, ' em volta de alguns elementos da página (texto de intro do HUB), deve ser o NGC de narração ativado por padrao De navegar pelo tab', NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1036, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '7d3a2e92-60b9-473e-a058-99e5cb6965a5', now(), 'Ctrl + clique', 'completa', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'stangorlini.web', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1037, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '3eab560c-3085-47b0-a3fc-08710be679a2', now(), 'Falar com o Cristiano', 'não iniciada', 'Média', 'Reunir', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1038, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '6dda6042-d418-40fa-8acd-c37ef9189c59', now(), 'Reunião com o ortega', 'não iniciada', 'Média', 'Reunir', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1039, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '19894c4c-8a23-4ba9-a9ef-033c1c028c9b', now(), 'Ler os artigos', 'não iniciada', 'Média', 'Pesquisar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1040, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( 'c20108ef-3acc-45f5-9ba4-e8c48ab2107a', now(), 'Pesquisar estudos de caso', 'não iniciada', 'Média', 'Pesquisar', 'Joao', NULL, NULL, NULL, NULL, 'HUB', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1041, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '7cd2210f-0311-44b8-a8dd-d2267c1d3dd9', now(), 'Filtro por prazo', 'completa', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'stangorlini.web', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1042, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '7b259310-78e7-43de-a206-b70515e6fa48', now(), 'Ter como criar uma nova dimensão/categoria', 'completa', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'stangorlini.web', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1043, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '59749ce9-11fa-4479-bd57-8fb20d8c81e6', now(), 'Botão sticky de ir para baixo e de + e de lapiz', 'completa', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'stangorlini.web', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1044, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '6f81c3a5-82bb-46c7-811f-1ffae305dd9d', now(), 'Ir para o topo ao tocar no index', 'completa', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'stangorlini.web', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1045, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( 'fa276e76-986d-4f73-afa3-259ae3fe58f2', now(), 'Widget de tarefas favoritas', 'completa', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'stangorlini.web', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1046, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '29ee6303-2de2-4b61-bfde-c9201da2239b', now(), 'Adicionar subtarefas', 'falta testar', 'Média', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'stangorlini.web', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1047, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '4eb1085d-8cb8-4677-bf8b-5796cdf084b4', now(), 'adicionar favoritas', 'completa', 'Baixa', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'stangorlini.web', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1048, FALSE, NULL );
+INSERT INTO tasks (id, created_at, nome, status, prioridade, categoria, responsavel, inicio, prazo, descricao, frequencia, dimensao, concluida_em, user_id, ordem_manual, is_favorite, parent_id) VALUES ( '09c98f94-fd59-4257-8294-6250fd0d2571', now(), 'adicionar rascunho de tarefas', 'falta testar', 'Baixa', 'Programar', 'Joao', NULL, NULL, NULL, NULL, 'stangorlini.web', NULL, 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 1049, FALSE, NULL );

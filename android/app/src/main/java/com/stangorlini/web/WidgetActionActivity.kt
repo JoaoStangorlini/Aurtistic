@@ -26,7 +26,7 @@ class WidgetActionActivity : Activity() {
             showCreateTaskDialog()
         } else if (action == "open_task" && taskId != null) {
             val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
-            prefs.edit().putString("widget_action_open_task", taskId).apply()
+            prefs.edit().putString("widget_action_open_task", taskId).commit()
             launchMainActivity()
             finish()
         } else {
@@ -173,7 +173,7 @@ class WidgetActionActivity : Activity() {
             val newTask = JSONObject()
             newTask.put("id", taskId)
             newTask.put("nome", taskName)
-            newTask.put("status", "nao_iniciada")
+            newTask.put("status", "rascunho")
             newTask.put("is_favorite", true)
             // Add at the beginning
             val newArr = JSONArray()
@@ -244,6 +244,8 @@ class WidgetActionActivity : Activity() {
             text.contains("tatuagens") || text.contains("tattoo") -> "#D39BFE"
             text.contains("cin") -> "#E0E0E0"
             text.contains("compras") -> "#69F0AE"
+            text.contains("stangorlini") || text.contains("web") -> "#3b82f6"
+            text.contains("fotografia") || text.contains("foto") -> "#ec4899"
             text.contains("hobbys") || text.contains("hobby") -> "#0f9d58"
             else -> "#FFCC00"
         }

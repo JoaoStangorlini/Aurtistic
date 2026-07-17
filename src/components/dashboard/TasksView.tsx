@@ -154,7 +154,7 @@ export function TasksView({ initialTasks: rawInitialTasks }: { initialTasks: Tas
                 const newTask = {
                   id: taskId,
                   nome: taskName,
-                  status: 'nao_iniciada',
+                  status: 'rascunho',
                   is_favorite: true,
                   ordem: 0,
                   prazo: new Date().toISOString()
@@ -313,6 +313,8 @@ export function TasksView({ initialTasks: rawInitialTasks }: { initialTasks: Tas
   const [sortBy, setSortBy] = useState<SortOption>('status');
 
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState<boolean>(false);
+  const [showDraftsOnly, setShowDraftsOnly] = useState<boolean>(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [selectedDimensions, setSelectedDimensions] = useState<string[]>([]);
@@ -579,6 +581,14 @@ export function TasksView({ initialTasks: rawInitialTasks }: { initialTasks: Tas
     if (selectedStatuses.length > 0) {
       tasks = tasks.filter(t => t.status && selectedStatuses.includes(t.status));
     }
+    // 2.5 Filter Favorites
+    if (showFavoritesOnly) {
+      tasks = tasks.filter(t => t.is_favorite);
+    }
+    // 2.6 Filter Drafts
+    if (showDraftsOnly) {
+      tasks = tasks.filter(t => t.status === 'rascunho');
+    }
     // 3. Filter Categories
     if (selectedCategories.length > 0) {
       tasks = tasks.filter(t => t.categoria && selectedCategories.includes(t.categoria));
@@ -701,6 +711,23 @@ export function TasksView({ initialTasks: rawInitialTasks }: { initialTasks: Tas
           {/* Row 2: Status (Visibilidade) */}
           <div className="flex w-full overflow-x-auto hide-scrollbar items-center gap-2 shrink-0 pb-1 justify-start md:justify-end">
             <span className="text-[10px] text-[#8E8E8E] px-1 font-bold uppercase tracking-wider shrink-0">Visibilidade:</span>
+            
+            <button
+                onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                className={`px-3 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 flex items-center gap-1
+                  ${showFavoritesOnly ? 'bg-[#FFCC00]/20 border-[#FFCC00] text-[#FFCC00]' : 'bg-[#1A1A1A] border-[#FFCC00] text-[#8E8E8E] hover:border-[#FFCC00]/50 hover:text-white'}`}
+            >
+                <span className={`material-symbols-outlined text-[14px] ${showFavoritesOnly ? 'text-[#FFCC00]' : ''}`}>star</span>
+            </button>
+
+            <button
+                onClick={() => setShowDraftsOnly(!showDraftsOnly)}
+                className={`px-3 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 flex items-center gap-1
+                  ${showDraftsOnly ? 'bg-[#8E8E8E]/20 border-[#8E8E8E] text-[#8E8E8E]' : 'bg-[#1A1A1A] border-[#FFCC00] text-[#8E8E8E] hover:border-[#8E8E8E]/50 hover:text-white'}`}
+            >
+                <span className={`material-symbols-outlined text-[14px] ${showDraftsOnly ? 'text-[#8E8E8E]' : ''}`}>draft</span> Rascunhos
+            </button>
+            
             {uniqueStatuses.map(s => (
               <button 
                 key={s} 

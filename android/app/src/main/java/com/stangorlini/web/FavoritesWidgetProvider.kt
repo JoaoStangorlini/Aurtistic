@@ -58,6 +58,13 @@ class FavoritesWidgetProvider : AppWidgetProvider() {
             val clickPendingIntentTemplate = PendingIntent.getActivity(context, 2, clickIntentTemplate, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
             views.setPendingIntentTemplate(R.id.widget_list_view, clickPendingIntentTemplate)
 
+            // Setup intent for Background (widget_root)
+            val bgIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            val bgPendingIntent = PendingIntent.getActivity(context, 3, bgIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            views.setOnClickPendingIntent(R.id.widget_root, bgPendingIntent)
+
             // Tell the AppWidgetManager to perform an update on the current app widget
             appWidgetManager.updateAppWidget(appWidgetId, views)
             appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_list_view)

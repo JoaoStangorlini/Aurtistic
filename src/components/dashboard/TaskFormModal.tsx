@@ -212,7 +212,7 @@ export function TaskFormModal({ isOpen, onClose, task, uniqueCategories, uniqueD
               
               const dimOptions = [
                 { value: "", label: "Nenhuma" },
-                ...Array.from(new Set([...(["HUB", "urgente", "USP", "filmes/series", "cin", "tatuagens", "compras", "hobbys", "livros"]), ...(uniqueDimensions || [])])).map(d => ({ value: d, label: d }))
+                ...Array.from(new Set([...(["HUB", "urgente", "USP", "filmes/series", "cin", "tatuagens", "compras", "hobbys", "livros", "stangorlini.web", "fotografia"]), ...(uniqueDimensions || [])])).map(d => ({ value: d, label: d }))
               ];
 
               return (
