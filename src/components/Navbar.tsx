@@ -59,7 +59,6 @@ export default function Navbar({
     { name: 'Currículo', href: '/curriculo' },
     { name: 'Tarefas', href: '/labdiv' },
     { name: 'Servidor', href: '/servidor' },
-    { name: 'Aurtistic', href: '/aurtistic' },
   ];
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,7 +181,6 @@ export default function Navbar({
           else if (link.name === 'Currículo') icon = 'contact_page';
           else if (link.name === 'Tarefas') icon = 'task_alt';
           else if (link.name === 'Servidor') icon = 'dns';
-          else if (link.name === 'Aurtistic') icon = 'psychology';
 
           return (
             <Link 
