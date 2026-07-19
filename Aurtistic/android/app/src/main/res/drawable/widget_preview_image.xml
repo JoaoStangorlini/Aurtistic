@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="250dp"
+    android:height="250dp"
+    android:viewportWidth="250"
+    android:viewportHeight="250">
+    <!-- Fundo escuro com bordas arredondadas -->
+    <path
+        android:fillColor="#1A1A1A"
+        android:pathData="M24,0 L226,0 Q250,0 250,24 L250,226 Q250,250 226,250 L24,250 Q0,250 0,226 L0,24 Q0,0 24,0 Z" />
+    
+    <!-- Texto do cabecalho (mock) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,20 L84,20 L84,32 L24,32 Z" />
+
+    <!-- Botao + (mock) -->
+    <path
+        android:fillColor="#444444"
+        android:pathData="M226,14 Q238,14 238,26 Q238,38 226,38 Q214,38 214,26 Q214,14 226,14 Z" />
+
+    <!-- Tarefa 1 -->
+    <path
+        android:fillColor="#229D4EDD"
+        android:strokeColor="#409D4EDD"
+        android:strokeWidth="1"
+        android:pathData="M24,56 L226,56 Q234,56 234,64 L234,88 Q234,96 226,96 L24,96 Q16,96 16,88 L16,64 Q16,56 24,56 Z" />
+        
+    <!-- Tarefa 2 -->
+    <path
+        android:fillColor="#224DA8FF"
+        android:strokeColor="#404DA8FF"
+        android:strokeWidth="1"
+        android:pathData="M24,112 L226,112 Q234,112 234,120 L234,144 Q234,152 226,152 L24,152 Q16,152 16,144 L16,120 Q16,112 24,112 Z" />
+        
+    <!-- Tarefa 3 -->
+    <path
+        android:fillColor="#22E02424"
+        android:strokeColor="#40E02424"
+        android:strokeWidth="1"
+        android:pathData="M24,168 L226,168 Q234,168 234,176 L234,200 Q234,208 226,208 L24,208 Q16,208 16,200 L16,176 Q16,168 24,168 Z" />
+
+</vector>
