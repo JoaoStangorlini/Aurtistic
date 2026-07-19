@@ -20,14 +20,13 @@
         android:id="@+id/input_task_name"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Nome da tarefa"
+        android:hint="Digite o nome da tarefa"
         android:textColor="#FFFFFF"
-        android:textColorHint="#80FFFFFF"
+        android:textColorHint="#A0A0A0"
         android:inputType="textCapSentences"
-        android:padding="12dp"
-        android:background="@android:drawable/edit_text"
-        android:layout_marginBottom="12dp" />
-
+        android:padding="16dp"
+        android:background="@drawable/bg_input_rounded"
+        android:layout_marginBottom="24dp" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -40,7 +39,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Cancelar"
+            android:textAllCaps="false"
             android:textColor="#AAAAAA"
+            android:layout_marginEnd="8dp"
             android:background="?android:attr/selectableItemBackground"
             style="?android:attr/borderlessButtonStyle" />
             
@@ -48,10 +49,11 @@
             android:id="@+id/btn_save"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Salvar"
+            android:text="Criar"
+            android:textAllCaps="false"
             android:textStyle="bold"
-            android:textColor="#9D4EDD"
-            android:background="?android:attr/selectableItemBackground"
-            style="?android:attr/borderlessButtonStyle" />
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#9D4EDD"
+            style="@style/Widget.AppCompat.Button.Colored" />
     </LinearLayout>
 </LinearLayout>
