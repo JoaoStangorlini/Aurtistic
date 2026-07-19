@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useEffect, useState, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -106,9 +107,14 @@ export default function AurtisticNavbar() {
         
         {/* Left: Logo */}
         <div className="flex justify-start items-center gap-2">
-          <Link href="/aurtistic" className="text-xl font-['Bukra'] font-black tracking-tighter text-[#FFCC00] flex items-center gap-2">
-            <span className="material-symbols-outlined text-[24px]">psychology</span>
-            <span className="hidden sm:inline">Aurtistic Planner</span>
+          <Link href="/aurtistic" className="flex items-center">
+            <Image 
+              src="/feature_graphic_final.png" 
+              alt="Aurtistic Logo" 
+              width={160} 
+              height={78}
+              className="h-8 md:h-10 w-auto object-contain"
+            />
           </Link>
         </div>
 
