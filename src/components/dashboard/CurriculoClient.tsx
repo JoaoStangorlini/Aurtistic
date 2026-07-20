@@ -8,6 +8,7 @@ import Image from 'next/image';
 
 interface CurriculoClientProps {
   initialProfile: any;
+  isReadOnly?: boolean;
 }
 
 
