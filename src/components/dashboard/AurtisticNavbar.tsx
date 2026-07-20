@@ -54,7 +54,7 @@ export default function AurtisticNavbar() {
     } catch (e) {
       console.error(e);
       await supabase.auth.signOut();
-      router.push('/aurtistic/login');
+      router.push('/login');
     }
   };
 
@@ -112,10 +112,10 @@ export default function AurtisticNavbar() {
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário';
 
   const tabMetadata: Record<string, { name: string; href: string }> = {
-    tasks: { name: 'Tarefas', href: '/aurtistic' },
-    resumo: { name: 'Resumo', href: '/aurtistic/resumo' },
-    curriculo: { name: 'Currículo', href: '/aurtistic/curriculo' },
-    portfolio: { name: 'Portfólio', href: '/aurtistic/portfolio' }
+    tasks: { name: 'Tarefas', href: '/' },
+    resumo: { name: 'Resumo', href: '/resumo' },
+    curriculo: { name: 'Currículo', href: '/curriculo' },
+    portfolio: { name: 'Portfólio', href: '/portfolio' }
   };
 
   const activeTabs = profile?.features_config?.active || ['tasks', 'resumo', 'curriculo', 'portfolio'];
@@ -128,7 +128,7 @@ export default function AurtisticNavbar() {
         
         {/* Left: Logo */}
         <div className="flex justify-start items-center gap-2">
-          <Link href="/aurtistic" className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3">
             <Image 
               src="/aurtistic-icon.png" 
               alt="Aurtistic Logo" 
@@ -139,6 +139,7 @@ export default function AurtisticNavbar() {
             <span className="font-['Bukra'] font-black text-lg md:text-xl text-white tracking-tight">Aurtistic</span>
           </Link>
         </div>
+
 
         {/* Center: Dynamic Navigation Links */}
         <nav className="hidden md:flex justify-center gap-4 lg:gap-8 items-center flex-1 mx-4">
@@ -198,7 +199,7 @@ export default function AurtisticNavbar() {
                     </label>
 
                     <Link 
-                      href="/aurtistic/privacy-policy"
+                      href="/privacy-policy"
                       onClick={() => setIsSettingsOpen(false)}
                       className="w-full text-left px-4 py-2 text-sm text-[#E0E0E0] hover:bg-[#2D2D2D] hover:text-white transition-colors flex items-center gap-2"
                     >
@@ -209,7 +210,7 @@ export default function AurtisticNavbar() {
                     <div className="h-[1px] bg-[#2D2D2D] my-1" />
 
                     <Link 
-                      href="/aurtistic/delete-account"
+                      href="/delete-account"
                       onClick={() => setIsSettingsOpen(false)}
                       className="w-full text-left px-4 py-2 text-sm text-[#db4437] hover:bg-[#db4437]/10 transition-colors flex items-center gap-2"
                     >
@@ -231,7 +232,7 @@ export default function AurtisticNavbar() {
             </div>
           ) : (
             <Link 
-              href="/aurtistic/login"
+              href="/login"
               className="bg-[#FFCC00] text-[#121212] px-5 py-2 rounded-md text-sm font-bold hover:bg-[#e6b800] transition-colors"
             >
               Entrar
