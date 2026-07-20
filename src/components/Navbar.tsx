@@ -48,9 +48,10 @@ export default function Navbar({
     };
   }, [router]);
 
-  if (pathname.startsWith('/aurtistic')) {
-    return <AurtisticNavbar />;
+  if (pathname === '/login') {
+    return null;
   }
+  return <AurtisticNavbar />;
 
 
   const navLinks = [

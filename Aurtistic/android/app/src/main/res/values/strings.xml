@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">Aurtistic</string>
-    <string name="title_activity_main">Aurtistic</string>
-    <string name="package_name">com.stangorlini.aurtistic</string>
-    <string name="custom_url_scheme">com.stangorlini.aurtistic</string>
-</resources>

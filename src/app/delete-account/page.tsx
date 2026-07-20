@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { deleteAurtisticProfile, deleteAllTasks } from '@/app/(dashboard)/actions';
+import { deleteAurtisticProfile, deleteAllTasks } from '@/app/(dashboard)/aurtistic/actions';
 
 export default function DeleteAccountPage() {
   const [isDeletingProfile, setIsDeletingProfile] = useState(false);
