@@ -148,7 +148,7 @@ export default function AurtisticNavbar() {
         <div className="flex justify-start items-center gap-2">
           <Link href="/" className="flex items-center">
             <Image 
-              src="/feature_graphic_final_black.png" 
+              src="/feature_graphic_final_white.png" 
               alt="Aurtistic Logo" 
               width={438} 
               height={100}
