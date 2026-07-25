@@ -49,6 +49,12 @@ SHA-256-Digest: WdMvfSqzv5KJZxX7l6ZazXjZgjgZb6UXKFZZWus+Tec=
 Name: base/assets/public/aurtistic_app_icon_v10_white.png
 SHA-256-Digest: a7ehPdi2zsmb1Q5WmJJUN45p+kOCbgS0xALAwCZLaC0=
 
+Name: base/assets/public/aurtistic_logo_white_v2.png
+SHA-256-Digest: EC4CNl8jxy4bA7qwDzTZAs3FmGqb5vWcjWBzAGP8s8w=
+
+Name: base/assets/public/aurtistic_logo_white_v3.png
+SHA-256-Digest: nt/7JMK7q0j3dj3hSHYVr1ptixDF53lEnCGbj1df1YE=
+
 Name: base/assets/public/cordova.js
 SHA-256-Digest: 47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=
 
@@ -101,7 +107,7 @@ Name: base/dex/classes.dex
 SHA-256-Digest: baKOPxdFl7HFLa07W2vTpgo5c1RuJ+9p6ahVG+aA4Ng=
 
 Name: base/manifest/AndroidManifest.xml
-SHA-256-Digest: wpOasDSNBMeRJV1GAGrrNcDMNQV1zVhEr4wcirjs0bo=
+SHA-256-Digest: M0dmou4PyBZvHj3WEjM/g4EYn3J8vF+qvMjTKxPVcEs=
 
 Name: base/res/anim-v21/fragment_fast_out_extra_slow_in.xml
 SHA-256-Digest: mMWWmImvmwVyS8dM8vkjlQs3c3/cqLaEXfDdJ0ALabw=

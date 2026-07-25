@@ -1,6 +1,6 @@
 Signature-Version: 1.0
 Created-By: Signflinger
-SHA-256-Digest-Manifest: XO8mdo5YLQ9UR/KAf1B7jT+3Z4QHpUyzXWAEgAceTTM=
+SHA-256-Digest-Manifest: R6nr+slwopbNTpHmkW7snREuaMRaH5/j9vR9n/FkuaM=
 
 Name: BUNDLE-METADATA/com.android.tools.build.gradle/app-metadata.prop
  erties
@@ -48,6 +48,12 @@ SHA-256-Digest: vG4ii94RUWapNMylLxqz+ha6zaYiH6XBfjJYjfEFvCo=
 
 Name: base/assets/public/aurtistic_app_icon_v10_white.png
 SHA-256-Digest: Dv4cs9Uh7T7kxrtaXasicd4AmSBHyNoXMtpa1wiQlt0=
+
+Name: base/assets/public/aurtistic_logo_white_v2.png
+SHA-256-Digest: tz2QEDyf6XJxxzqgDVk95T4zu0xkZc+F4KmKq5mO/xo=
+
+Name: base/assets/public/aurtistic_logo_white_v3.png
+SHA-256-Digest: jgMOUHQBslw/AntdkoMSyCxdlFBkbbPsn/oerEVOdvI=
 
 Name: base/assets/public/cordova.js
 SHA-256-Digest: bsxk9is4welU5N97Dw54Z82y3rMJEdmRjH61H/Y7Mp4=
@@ -101,7 +107,7 @@ Name: base/dex/classes.dex
 SHA-256-Digest: moIIdQEGweuIzxgKXMYJbMu2yAj3VSrGtdZuuPafNmw=
 
 Name: base/manifest/AndroidManifest.xml
-SHA-256-Digest: fXgbYXdqrdZlamrfiUMowhXkTPlJz3wrFKEdv9r/mow=
+SHA-256-Digest: xrTPwPqeCCXMP42N8ookWouFAbMpUHaZquP4ehzbQyA=
 
 Name: base/res/anim-v21/fragment_fast_out_extra_slow_in.xml
 SHA-256-Digest: jS4uyqNlbcrZhNtn8U31F2m/lpBVY3ruQE7hUwExG/U=
