@@ -165,6 +165,13 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
     return () => window.removeEventListener('online', handleOnline);
   }, [initialTasks]);
 
+  // Keep offline cache in sync with local UI state
+  useEffect(() => {
+    if (localTasks) {
+      saveTasksToCache(localTasks).catch(e => console.error("Erro salvando cache offline", e));
+    }
+  }, [localTasks]);
+
   // Sync Favorites to Native Android Widget
   useEffect(() => {
     const syncFavorites = async () => {

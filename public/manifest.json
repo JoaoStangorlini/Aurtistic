@@ -1,0 +1,17 @@
+{
+  "name": "Aurtistic",
+  "short_name": "Aurtistic",
+  "description": "Gerenciador de Tarefas e Projetos",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "icons": [
+    {
+      "src": "/aurtistic_app_icon_v10_black.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

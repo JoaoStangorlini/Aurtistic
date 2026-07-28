@@ -12,6 +12,7 @@ const openSans = Open_Sans({
 export const metadata: Metadata = {
   title: "Aurtistic",
   description: "Gerenciador de Tarefas e Projetos",
+  manifest: "/manifest.json",
 };
 
 import { createClient } from "@/utils/supabase/server";
