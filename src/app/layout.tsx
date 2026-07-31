@@ -14,9 +14,9 @@ export const metadata: Metadata = {
   description: "Gerenciador de Tarefas e Projetos",
   manifest: "/manifest.json",
   icons: {
-    icon: "/aurtistic_app_icon_v10_black.png",
-    shortcut: "/aurtistic_app_icon_v10_black.png",
-    apple: "/aurtistic_app_icon_v10_black.png",
+    icon: "/aurtistic_app_icon_v11_black.png",
+    shortcut: "/aurtistic_app_icon_v11_black.png",
+    apple: "/aurtistic_app_icon_v11_black.png",
   },
 };
 
