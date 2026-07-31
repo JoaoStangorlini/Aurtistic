@@ -177,18 +177,15 @@ export default function AurtisticNavbar() {
         
         {/* Left: Logo */}
         <div className="flex justify-start items-center gap-2">
-          <Link href="/" className="flex items-center gap-3 group">
+          <Link href="/" className="flex items-center group">
             <Image 
-              src="/aurtistic_app_icon_v11_black.png" 
-              alt="Aurtistic Icon" 
-              width={40} 
-              height={40}
-              className="h-8 w-8 md:h-10 md:w-10 rounded-xl object-cover border border-[#2D2D2D] group-hover:border-[#FFCC00] transition-colors"
+              src="/aurtistic_logo_white_v3.png" 
+              alt="Aurtistic Logo" 
+              width={180} 
+              height={41}
+              className="h-8 md:h-9 w-auto object-contain transition-opacity group-hover:opacity-90"
               priority
             />
-            <span className="text-xl md:text-2xl font-black text-white font-['Bukra'] tracking-tighter">
-              Aurtistic
-            </span>
           </Link>
         </div>
 

@@ -14,9 +14,9 @@ export const metadata: Metadata = {
   description: "Gerenciador de Tarefas e Projetos",
   manifest: "/manifest.json",
   icons: {
-    icon: "/aurtistic_app_icon_v11_black.png",
-    shortcut: "/aurtistic_app_icon_v11_black.png",
-    apple: "/aurtistic_app_icon_v11_black.png",
+    icon: "/aurtistic_app_icon_v12.png",
+    shortcut: "/aurtistic_app_icon_v12.png",
+    apple: "/aurtistic_app_icon_v12.png",
   },
 };
 
@@ -48,6 +48,21 @@ export default async function RootLayout({
     <html lang="pt-BR" className={`${openSans.variable} antialiased h-full overflow-x-hidden`}>
       <head>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+        {process.env.NODE_ENV === 'development' && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for (let registration of registrations) {
+                      registration.unregister();
+                    }
+                  });
+                }
+              `,
+            }}
+          />
+        )}
       </head>
       <body className="h-full bg-[#121212] flex flex-col overflow-hidden text-[#e5e2e1] max-w-[100vw]">
         <NextTopLoader color="#FFCC00" height={3} showSpinner={false} shadow="0 0 10px #FFCC00,0 0 5px #FFCC00" />
