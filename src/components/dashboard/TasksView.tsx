@@ -88,6 +88,14 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
   const globalQuery = searchParams.get('q') || '';
   
   const [columns, setColumns] = useState<TaskColumn[]>(initialColumns);
+  
+  const getColColor = (key: string, val: string | null | undefined) => {
+    const col = columns.find(c => c.key === key);
+    if (!col || !col.options) return undefined;
+    const opt = col.options.find(o => o.value === (val || ''));
+    return opt?.color;
+  };
+
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [calendarCurrentDate, setCalendarCurrentDate] = useState(new Date());
   
@@ -253,12 +261,12 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
                 const { taskId, taskName, taskDimension } = update;
                 const newTask = {
                   id: taskId,
-                  nome: taskName,
+                  nome: taskName || 'Novo Rascunho',
                   status: 'rascunho',
                   is_favorite: true,
                   ordem: 0,
                   prazo: new Date(Date.now() + 7 * 86400000).toISOString(),
-                  dimensao: taskDimension || ''
+                  dimensao: 'Rascunho'
                 };
                 newTasks.unshift(newTask as any);
                 modified = true;
@@ -857,16 +865,23 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
     const survivingParentIds = new Set(tasks.filter(t => !t.parent_id).map(t => t.id));
     tasks = tasks.filter(t => !t.parent_id || survivingParentIds.has(t.parent_id));
 
+    const getColIndex = (key: string, val: string | null | undefined) => {
+      const col = columns.find(c => c.key === key);
+      if (!col || !col.options) return 9999;
+      const idx = col.options.findIndex(opt => opt.value === (val || ''));
+      return idx === -1 ? 9999 : idx;
+    };
+
     // 5. Sort
     tasks.sort((a, b) => {
       let primaryDiff = 0;
       
       switch(sortBy) {
         case 'status':
-          primaryDiff = getStatusWeight(b.status) - getStatusWeight(a.status);
+          primaryDiff = getColIndex('status', a.status) - getColIndex('status', b.status);
           break;
         case 'status_inv':
-          primaryDiff = getStatusWeight(a.status) - getStatusWeight(b.status);
+          primaryDiff = getColIndex('status', b.status) - getColIndex('status', a.status);
           break;
         case 'prazo':
           const pA = a.prazo ? new Date(a.prazo).getTime() : Infinity;
@@ -874,29 +889,21 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
           primaryDiff = pA - pB;
           break;
         case 'categoria':
-          const colCat = columns.find(c => c.key === 'categoria');
-          const cA = a.categoria || '';
-          const cB = b.categoria || '';
-          if (colCat && colCat.options && colCat.options.length > 0) {
-            const idxA = colCat.options.findIndex(opt => opt.value === cA);
-            const idxB = colCat.options.findIndex(opt => opt.value === cB);
-            const finalIdxA = idxA === -1 ? 9999 : idxA;
-            const finalIdxB = idxB === -1 ? 9999 : idxB;
-            primaryDiff = finalIdxA - finalIdxB;
-          } else {
-            primaryDiff = cA.localeCompare(cB);
+          primaryDiff = getColIndex('categoria', a.categoria) - getColIndex('categoria', b.categoria);
+          if (primaryDiff === 0) {
+            primaryDiff = (a.categoria || '').localeCompare(b.categoria || '');
           }
           break;
         case 'prioridade_desc':
-          primaryDiff = getPriorityWeight(b.prioridade) - getPriorityWeight(a.prioridade);
+          primaryDiff = getColIndex('prioridade', a.prioridade) - getColIndex('prioridade', b.prioridade);
           break;
         case 'prioridade_asc':
-          primaryDiff = getPriorityWeight(a.prioridade) - getPriorityWeight(b.prioridade);
+          primaryDiff = getColIndex('prioridade', b.prioridade) - getColIndex('prioridade', a.prioridade);
           break;
         case 'manual':
           primaryDiff = (a.ordem_manual || 0) - (b.ordem_manual || 0);
           if (primaryDiff === 0) {
-            primaryDiff = getStatusWeight(a.status) - getStatusWeight(b.status);
+            primaryDiff = getColIndex('status', a.status) - getColIndex('status', b.status);
           }
           break;
         default:
@@ -1471,7 +1478,14 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
                       </button>
                     )}
                     <div className="flex flex-col">
-                      <HighlightedText text={task.nome} highlight={searchTerm} />
+                      <div className="flex items-center gap-2">
+                        <HighlightedText text={task.nome} highlight={searchTerm} />
+                        {(task as any).custom_fields?.foto_url && (
+                          <a href={(task as any).custom_fields.foto_url} target="_blank" rel="noopener noreferrer" className="text-[#8E8E8E] hover:text-[#9D4EDD] flex items-center transition-colors" title="Ver foto">
+                            <span className="material-symbols-outlined text-[16px]">image</span>
+                          </a>
+                        )}
+                      </div>
                       {task.descricao && (
                         <div className="text-[10px] text-[#A0A0A0] mt-1 line-clamp-1">
                           <HighlightedText text={task.descricao} highlight={searchTerm} />
@@ -1480,10 +1494,10 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
                     </div>
                   </div>
                 </td>
-                <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'status')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar status"><Badge type="status" value={task.status} /></div></td>
-                <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'prioridade')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar prioridade"><Badge type="prioridade" value={task.prioridade} /></div></td>
-                <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'categoria')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar categoria"><Badge type="categoria" value={task.categoria} /></div></td>
-                {!isPersonalScope && <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'responsavel')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar responsável"><Badge type="responsavel" value={task.responsavel} /></div></td>}
+                <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'status')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar status"><Badge type="status" value={task.status} customColor={getColColor('status', task.status)} /></div></td>
+                <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'prioridade')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar prioridade"><Badge type="prioridade" value={task.prioridade} customColor={getColColor('prioridade', task.prioridade)} /></div></td>
+                <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'categoria')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar categoria"><Badge type="categoria" value={task.categoria} customColor={getColColor('categoria', task.categoria)} /></div></td>
+                {!isPersonalScope && <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'responsavel')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar responsável"><Badge type="responsavel" value={task.responsavel} customColor={getColColor('responsavel', task.responsavel)} /></div></td>}
                 <td className="p-4 text-xs text-[#A0A0A0]">{formatDate(task.created_at)}</td>
                 <td className="p-4 text-xs text-[#A0A0A0]">{formatDate(task.inicio)}</td>
                 <td className="p-4 text-xs text-[#A0A0A0]">{formatDate(task.prazo)}</td>
@@ -1508,7 +1522,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
                 )}
                 <td className="p-4 text-xs text-[#A0A0A0]">{formatDate(task.concluida_em)}</td>
                 <td className="p-4 text-xs text-[#A0A0A0]">{task.frequencia || '-'}</td>
-                <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'dimensao')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar dimensão"><Badge type="dimensao" value={task.dimensao} /></div></td>
+                <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'dimensao')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar dimensão"><Badge type="dimensao" value={task.dimensao} customColor={getColColor('dimensao', task.dimensao)} /></div></td>
               </tr>
               </React.Fragment>
             ))}
@@ -1559,7 +1573,14 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
               )}
               <div>
                 <h3 className="text-sm font-bold text-white mb-1">
-                  <HighlightedText text={task.nome} highlight={searchTerm} />
+                  <div className="flex items-center gap-2">
+                    <HighlightedText text={task.nome} highlight={searchTerm} />
+                    {(task as any).custom_fields?.foto_url && (
+                      <a href={(task as any).custom_fields.foto_url} target="_blank" rel="noopener noreferrer" className="text-[#8E8E8E] hover:text-[#9D4EDD] flex items-center transition-colors" title="Ver foto">
+                        <span className="material-symbols-outlined text-[16px]">image</span>
+                      </a>
+                    )}
+                  </div>
                 </h3>
                 {task.descricao && (
                   <p className="text-[11px] text-[#A0A0A0] line-clamp-2">
@@ -1590,11 +1611,11 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
 </div>
               </div>
               <div className="flex justify-between items-center text-center gap-1">
-                <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'status')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="status" value={task.status} /></div></div>
-                <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'prioridade')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="prioridade" value={task.prioridade} /></div></div>
-                <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'categoria')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="categoria" value={task.categoria} /></div></div>
-                <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'responsavel')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="responsavel" value={task.responsavel} /></div></div>
-                <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'dimensao')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="dimensao" value={task.dimensao} /></div></div>
+                <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'status')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="status" value={task.status} customColor={getColColor('status', task.status)} /></div></div>
+                <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'prioridade')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="prioridade" value={task.prioridade} customColor={getColColor('prioridade', task.prioridade)} /></div></div>
+                <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'categoria')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="categoria" value={task.categoria} customColor={getColColor('categoria', task.categoria)} /></div></div>
+                <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'responsavel')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="responsavel" value={task.responsavel} customColor={getColColor('responsavel', task.responsavel)} /></div></div>
+                <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'dimensao')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="dimensao" value={task.dimensao} customColor={getColColor('dimensao', task.dimensao)} /></div></div>
               </div>
             </div>
 

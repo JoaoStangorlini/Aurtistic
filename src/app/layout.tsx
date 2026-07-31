@@ -13,6 +13,11 @@ export const metadata: Metadata = {
   title: "Aurtistic",
   description: "Gerenciador de Tarefas e Projetos",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/aurtistic_app_icon_v10_black.png",
+    shortcut: "/aurtistic_app_icon_v10_black.png",
+    apple: "/aurtistic_app_icon_v10_black.png",
+  },
 };
 
 import { createClient } from "@/utils/supabase/server";

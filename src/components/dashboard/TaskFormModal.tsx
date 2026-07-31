@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Task, TaskColumn } from '@/types';
 import { saveTask, deleteTask } from '@/lib/offlineActions';
-import { getBadgeColorClass } from './Badge';
+import { Badge, getBadgeColorClass } from './Badge';
 import { CustomSelect } from './CustomSelect';
+import { createClient } from '@/utils/supabase/client';
 
 interface TaskFormModalProps {
   isOpen: boolean;
@@ -25,6 +26,10 @@ export function TaskFormModal({ isOpen, onClose, task, uniqueCategories, uniqueD
   const [localSubtasks, setLocalSubtasks] = useState<Partial<Task>[]>([]);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const generatedIdRef = useRef(crypto.randomUUID());
+  
+  const [selectedDimensions, setSelectedDimensions] = useState<string[]>([]);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const [formData, setFormData] = useState<Partial<Task>>({
     id: generatedIdRef.current,
@@ -73,6 +78,8 @@ export function TaskFormModal({ isOpen, onClose, task, uniqueCategories, uniqueD
       setFreqType(fType);
       setFreqDetail(fDetail);
       setLocalSubtasks(task.subtasks || []);
+      setSelectedDimensions(task.dimensao ? [task.dimensao] : ['HUB']);
+      setSelectedFile(null);
     } else {
       generatedIdRef.current = crypto.randomUUID();
       setFormData({
@@ -91,6 +98,8 @@ export function TaskFormModal({ isOpen, onClose, task, uniqueCategories, uniqueD
       setFreqType('');
       setFreqDetail('');
       setLocalSubtasks([]);
+      setSelectedDimensions(['HUB']);
+      setSelectedFile(null);
     }
   }, [task, isOpen]);
 
@@ -100,38 +109,86 @@ export function TaskFormModal({ isOpen, onClose, task, uniqueCategories, uniqueD
     e.preventDefault();
     setLoading(true);
     try {
-      const parentId = formData.id;
-      // 1. Save the parent task
-      await saveTask(formData);
+      let photoUrl = formData.custom_fields?.foto_url || null;
       
-      // 2. Save all local subtasks
-      for (const st of localSubtasks) {
-        let subtaskToSave: Partial<Task>;
+      if (selectedFile) {
+        setUploadingImage(true);
+        const supabase = createClient();
+        const fileExt = selectedFile.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+        const filePath = `${fileName}`;
         
-        if (!st.created_at) {
-          // New subtask: inherit everything from parent
-          subtaskToSave = {
-            ...formData,
-            ...st,
-            parent_id: parentId,
-          };
-          if (!st.status) subtaskToSave.status = formData.status || 'não iniciada';
-        } else {
-          // Existing subtask: backend handles propagation, we only save what the modal edits
-          subtaskToSave = {
-            id: st.id,
-            nome: st.nome,
-            status: st.status || 'não iniciada',
-            parent_id: parentId,
-          };
+        const { error: uploadError } = await supabase.storage
+          .from('task_images')
+          .upload(filePath, selectedFile);
+          
+        if (uploadError) {
+          throw new Error('Erro ao fazer upload da imagem: ' + uploadError.message);
         }
         
-        await saveTask(subtaskToSave);
+        const { data: { publicUrl } } = supabase.storage
+          .from('task_images')
+          .getPublicUrl(filePath);
+          
+        photoUrl = publicUrl;
+        setUploadingImage(false);
+      }
+
+      const baseCustomFields = { ...(formData.custom_fields || {}) };
+      if (photoUrl) {
+        baseCustomFields.foto_url = photoUrl;
+      }
+      
+      const dimsToSave = selectedDimensions.length > 0 ? selectedDimensions : [formData.dimensao || 'HUB'];
+      
+      for (let i = 0; i < dimsToSave.length; i++) {
+        const currentDim = dimsToSave[i];
+        
+        // Se for a primeira dimensão e estamos editando uma tarefa existente, mantém o ID original
+        // Caso contrário (é uma cópia para outra dimensão, ou uma nova tarefa), gera novo ID.
+        const isFirst = i === 0;
+        const taskId = (isFirst && task) ? formData.id : crypto.randomUUID();
+        
+        const taskDataToSave = {
+          ...formData,
+          id: taskId,
+          dimensao: currentDim,
+          custom_fields: Object.keys(baseCustomFields).length > 0 ? baseCustomFields : undefined
+        };
+        
+        await saveTask(taskDataToSave);
+        
+        // Salva as subtarefas
+        for (const st of localSubtasks) {
+          let subtaskToSave: Partial<Task>;
+          
+          if (!st.created_at || !isFirst) {
+            // Nova subtarefa ou subtarefa copiada para uma nova dimensão
+            subtaskToSave = {
+              ...taskDataToSave,
+              ...st,
+              id: crypto.randomUUID(), // Novo ID
+              parent_id: taskId,
+            };
+            if (!st.status) subtaskToSave.status = taskDataToSave.status || 'não iniciada';
+          } else {
+            // Subtarefa existente sendo editada
+            subtaskToSave = {
+              id: st.id,
+              nome: st.nome,
+              status: st.status || 'não iniciada',
+              parent_id: taskId,
+            };
+          }
+          
+          await saveTask(subtaskToSave);
+        }
       }
       
       onClose();
     } catch (err) {
       alert('Erro ao salvar tarefa: ' + String(err));
+      setUploadingImage(false);
     } finally {
       setLoading(false);
     }
@@ -302,47 +359,96 @@ export function TaskFormModal({ isOpen, onClose, task, uniqueCategories, uniqueD
               <input required name="nome" value={formData.nome || ''} onChange={handleChange} className="w-full bg-[#121212] border border-[#2D2D2D] rounded-md px-4 py-2 text-white focus:outline-none focus:border-[#FFCC00]" />
             </div>
 
-            <>
-              <div>
-                <label className="block text-xs text-[#8E8E8E] uppercase tracking-wider mb-2">Status</label>
-                <CustomSelect 
-                  name="status" 
-                  value={formData.status || 'não iniciada'} 
-                  options={statusOptions} 
-                  onChange={e => setFormData({ ...formData, status: e.target.value })}
-                  type="status"
-                  onEditColumn={columns.find(c => c.key === 'status') ? () => handleEditCol('status') : undefined}
-                />
-              </div>
+            <div>
+              <label className="block text-xs text-[#8E8E8E] uppercase tracking-wider mb-2">Status</label>
+              <CustomSelect 
+                name="status" 
+                value={formData.status || 'não iniciada'} 
+                options={statusOptions} 
+                onChange={e => setFormData({ ...formData, status: e.target.value })}
+                type="status"
+                onEditColumn={columns.find(c => c.key === 'status') ? () => handleEditCol('status') : undefined}
+              />
+            </div>
 
-              <div>
-                <label className="block text-xs text-[#8E8E8E] uppercase tracking-wider mb-2">Prioridade</label>
-                <CustomSelect name="prioridade" value={formData.prioridade || ''} onChange={handleChange} type="prioridade" options={prioridadeOptions} allowCustom={true} onEditColumn={columns.find(c => c.key === 'prioridade') ? () => handleEditCol('prioridade') : undefined} />
-              </div>
+            <div>
+              <label className="block text-xs text-[#8E8E8E] uppercase tracking-wider mb-2">Prioridade</label>
+              <CustomSelect name="prioridade" value={formData.prioridade || ''} onChange={handleChange} type="prioridade" options={prioridadeOptions} allowCustom={true} onEditColumn={columns.find(c => c.key === 'prioridade') ? () => handleEditCol('prioridade') : undefined} />
+            </div>
 
-              <div>
-                <label className="block text-xs text-[#8E8E8E] uppercase tracking-wider mb-2">Categoria</label>
-                <CustomSelect name="categoria" value={formData.categoria || ''} onChange={handleChange} type="categoria" options={categoriaOptions} allowCustom={true} onEditColumn={columns.find(c => c.key === 'categoria') ? () => handleEditCol('categoria') : undefined} />
-              </div>
+            <div>
+              <label className="block text-xs text-[#8E8E8E] uppercase tracking-wider mb-2">Categoria</label>
+              <CustomSelect name="categoria" value={formData.categoria || ''} onChange={handleChange} type="categoria" options={categoriaOptions} allowCustom={true} onEditColumn={columns.find(c => c.key === 'categoria') ? () => handleEditCol('categoria') : undefined} />
+            </div>
 
-              <div>
-                <label className="block text-xs text-[#8E8E8E] uppercase tracking-wider mb-2">Responsável</label>
-                <CustomSelect name="responsavel" value={formData.responsavel || ''} onChange={handleChange} type="responsavel" options={responsavelOptions} allowCustom={true} onEditColumn={columns.find(c => c.key === 'responsavel') ? () => handleEditCol('responsavel') : undefined} />
-              </div>
+            <div>
+              <label className="block text-xs text-[#8E8E8E] uppercase tracking-wider mb-2">Responsável</label>
+              <CustomSelect name="responsavel" value={formData.responsavel || ''} onChange={handleChange} type="responsavel" options={responsavelOptions} allowCustom={true} onEditColumn={columns.find(c => c.key === 'responsavel') ? () => handleEditCol('responsavel') : undefined} />
+            </div>
 
-              <div>
-                <label className="block text-xs text-[#8E8E8E] uppercase tracking-wider mb-2">Dimensão</label>
-                <CustomSelect 
-                  name="dimensao" 
-                  value={formData.dimensao || ''} 
-                  options={dimensaoOptions} 
-                  onChange={e => setFormData({ ...formData, dimensao: e.target.value })}
-                  type="dimensao"
-                  allowCustom
-                  onEditColumn={columns.find(c => c.key === 'dimensao') ? () => handleEditCol('dimensao') : undefined}
-                />
+            <div>
+              <label className="block text-xs text-[#8E8E8E] uppercase tracking-wider mb-2">Dimensão</label>
+              <div className="flex flex-wrap gap-2 bg-[#121212] border border-[#2D2D2D] rounded-md p-2 min-h-[42px] max-h-[120px] overflow-y-auto">
+                {dimensaoOptions.map(opt => {
+                  const isSelected = selectedDimensions.includes(opt.value);
+                  return (
+                    <div 
+                      key={opt.value}
+                      onClick={() => {
+                        if (isSelected) {
+                          setSelectedDimensions(prev => prev.filter(d => d !== opt.value));
+                        } else {
+                          setSelectedDimensions(prev => [...prev, opt.value]);
+                        }
+                      }}
+                      className={`cursor-pointer transition-all border ${isSelected ? 'border-[#FFCC00] ring-1 ring-[#FFCC00]' : 'border-transparent opacity-60 hover:opacity-100'} rounded-md`}
+                    >
+                      <Badge type="dimensao" value={opt.label} customColor={opt.color} />
+                    </div>
+                  );
+                })}
+                {dimensaoOptions.length === 0 && <span className="text-sm text-[#8E8E8E] p-1">Nenhuma dimensão disponível</span>}
               </div>
-            </>
+              <div className="mt-1 text-[10px] text-[#A0A0A0]">Selecione múltiplas para criar cópias desta tarefa.</div>
+            </div>
+            
+            <div>
+              <label className="block text-xs text-[#8E8E8E] uppercase tracking-wider mb-2">Foto / Anexo</label>
+              <div className="flex items-center gap-2">
+                <label className="flex-1 cursor-pointer bg-[#121212] border border-[#2D2D2D] rounded-md px-4 py-2 hover:border-[#FFCC00] transition-colors flex items-center justify-between group">
+                  <span className="text-sm text-[#8E8E8E] group-hover:text-white truncate">
+                    {selectedFile ? selectedFile.name : formData.custom_fields?.foto_url ? 'Substituir foto atual...' : 'Escolher arquivo...'}
+                  </span>
+                  <span className="material-symbols-outlined text-[#8E8E8E] group-hover:text-[#FFCC00] text-[20px]">upload</span>
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    className="hidden" 
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setSelectedFile(e.target.files[0]);
+                      }
+                    }}
+                  />
+                </label>
+                {(selectedFile || formData.custom_fields?.foto_url) && (
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setSelectedFile(null);
+                      setFormData(prev => ({
+                        ...prev,
+                        custom_fields: { ...(prev.custom_fields || {}), foto_url: null }
+                      }));
+                    }}
+                    className="p-2 text-[#db4437] hover:bg-[#db4437]/10 rounded-md transition-colors"
+                    title="Remover foto"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">delete</span>
+                  </button>
+                )}
+              </div>
+            </div>
 
             <div>
               <label className="block text-xs text-[#8E8E8E] uppercase tracking-wider mb-2">Frequência</label>
