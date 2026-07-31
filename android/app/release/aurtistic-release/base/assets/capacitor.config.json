@@ -1,9 +1,0 @@
-{
-	"appId": "com.stangorlini.aurtistic",
-	"appName": "Aurtistic",
-	"webDir": "public",
-	"server": {
-		"url": "https://aurtistic.vercel.app/",
-		"cleartext": true
-	}
-}
