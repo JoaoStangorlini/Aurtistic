@@ -71,12 +71,21 @@ class FavoritesWidgetFactory(private val context: Context) : RemoteViewsService.
         val colorsJson = prefs.getString("status_colors", "{}")
         val selectedDim = prefs.getString("widget_filter_dimension", "") ?: ""
         
+        val hideCompleted = prefs.getString("widget_hide_completed", "true") == "true"
+        
         try {
             statusColorsMap = org.json.JSONObject(colorsJson ?: "{}")
             val allTasks = JSONArray(tasksJson)
             val filteredList = mutableListOf<org.json.JSONObject>()
             for (i in 0 until allTasks.length()) {
                 val task = allTasks.getJSONObject(i)
+                val statusStr = task.optString("status", "").lowercase()
+                
+                // 1. Filtrar concluídas/descartadas se configurado
+                if (hideCompleted && (statusStr.contains("completa") || statusStr.contains("descartada"))) {
+                    continue
+                }
+
                 if (selectedDim.isEmpty() || selectedDim == "Todas") {
                     filteredList.add(task)
                 } else if (selectedDim == "Favoritas") {

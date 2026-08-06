@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Task, TaskColumn } from '@/types';
+import { Task, TaskColumn, AgendaEvent } from '@/types';
 import { Badge, getBadgeColorClass } from './Badge';
 import { TaskFormModal } from './TaskFormModal';
+import { EventFormModal } from './EventFormModal';
 import { BulkEditModal } from './BulkEditModal';
 import { OptionsEditorModal } from './OptionsEditorModal';
 import TaskCalendar from './TaskCalendar';
@@ -19,10 +20,10 @@ import { syncTaskNotifications } from '@/lib/notifications';
 import { downloadICS } from '@/utils/ics';
 import { downloadCSV } from '@/utils/csv';
 
-interface WidgetPluginPlugin {
+export interface WidgetPluginPlugin {
   updateWidget(): Promise<void>;
 }
-const WidgetPlugin = registerPlugin<WidgetPluginPlugin>('WidgetPlugin');
+export const WidgetPlugin = registerPlugin<WidgetPluginPlugin>('WidgetPlugin');
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return '-';
@@ -82,7 +83,7 @@ const HighlightedText = ({ text, highlight }: { text: string | null, highlight: 
   );
 };
 
-export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], isPersonalScope = false, userId, initialQuickFilters = ['responsavel', 'dimensao'], initialQuickSorts = ['status', 'prazo', 'prioridade', 'manual'] }: { initialTasks: Task[], initialColumns?: TaskColumn[], isPersonalScope?: boolean, userId?: string, initialQuickFilters?: string[], initialQuickSorts?: string[] }) {
+export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], displayMode = 'tarefas', initialColumns = [], isPersonalScope = false, userId, initialQuickFilters = ['responsavel', 'dimensao'], initialQuickSorts = ['status', 'prazo', 'prioridade', 'manual'] }: { initialTasks: Task[], initialEvents?: AgendaEvent[], displayMode?: 'tarefas' | 'eventos' | 'ambos', initialColumns?: TaskColumn[], isPersonalScope?: boolean, userId?: string, initialQuickFilters?: string[], initialQuickSorts?: string[] }) {
 
   const searchParams = useSearchParams();
   const globalQuery = searchParams.get('q') || '';
@@ -96,7 +97,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
     return opt?.color;
   };
 
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'weekly' | 'monthly'>('list');
   const [calendarCurrentDate, setCalendarCurrentDate] = useState(new Date());
   
   // Normalizar os dados que vêm do banco (migração temporária na UI)
@@ -109,6 +110,8 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
   [rawInitialTasks]);
   
   const [localTasks, setLocalTasks] = useState(initialTasks);
+  const [localEvents, setLocalEvents] = useState(initialEvents);
+  const [isDailyFollowup, setIsDailyFollowup] = useState(false);
 
 
   const [visibleExtraCols, setVisibleExtraCols] = useState<string[]>(userId === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e' ? ['responsavel', 'concluida_em', 'frequencia'] : []);
@@ -131,6 +134,14 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
+
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const [eventToEdit, setEventToEdit] = useState<AgendaEvent | null>(null);
+
+  const handleNewEvent = () => {
+    setEventToEdit(null);
+    setIsEventModalOpen(true);
+  };
   const [isBulkEditModalOpen, setIsBulkEditModalOpen] = useState(false);
   const [editingColumn, setEditingColumn] = useState<TaskColumn | null>(null);
   
@@ -185,14 +196,50 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
     const syncFavorites = async () => {
       if (!Capacitor.isNativePlatform()) return;
       try {
-        const activeTasks = localTasks.filter(t => t.status !== 'completa' && t.status !== 'descartada');
-        const widgetTasks = activeTasks.map(t => ({
+        // Ler preferências de filtro
+        let hiddenStatuses = ['completa', 'descartada', 'concluída'];
+        let sortOrder = 'recentes';
+        let hiddenTaskIds: string[] = [];
+        
+        try {
+          const { value: hiddenStatsVal } = await Preferences.get({ key: 'widget_hidden_statuses' });
+          if (hiddenStatsVal) hiddenStatuses = JSON.parse(hiddenStatsVal);
+          
+          const { value: sortOrderVal } = await Preferences.get({ key: 'widget_sort_order' });
+          if (sortOrderVal) sortOrder = sortOrderVal;
+
+          const { value: hiddenIdsVal } = await Preferences.get({ key: 'widget_hidden_task_ids' });
+          if (hiddenIdsVal) hiddenTaskIds = JSON.parse(hiddenIdsVal);
+        } catch (e) { console.warn('Erro ao ler prefs do widget em TasksView', e); }
+
+        let filteredTasks = localTasks.filter(t => 
+          !hiddenStatuses.includes(t.status || 'não iniciada') && 
+          !hiddenTaskIds.includes(t.id)
+        );
+
+        // Aplicar ordenação
+        if (sortOrder === 'recentes') {
+          filteredTasks.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+        } else if (sortOrder === 'antigas') {
+          filteredTasks.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+        } else if (sortOrder === 'alfabetica') {
+          filteredTasks.sort((a, b) => a.nome.localeCompare(b.nome));
+        } else if (sortOrder === 'prazo_asc') {
+          filteredTasks.sort((a, b) => {
+            if (!a.prazo) return 1;
+            if (!b.prazo) return -1;
+            return new Date(a.prazo).getTime() - new Date(b.prazo).getTime();
+          });
+        }
+
+        const widgetTasks = filteredTasks.map(t => ({
           id: t.id,
           nome: t.nome,
           prazo: t.prazo,
           status: t.status,
           dimensao: t.dimensao,
-          is_favorite: t.is_favorite
+          is_favorite: t.is_favorite,
+          created_at: t.created_at || new Date().toISOString()
         }));
         await Preferences.set({
           key: 'favorite_tasks',
@@ -816,10 +863,40 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
       return { ...prev, [key]: updated };
     });
   };
+  // Process Events: Filter
+  const processedEvents = (() => {
+    let evts = [...localEvents];
+    if (isDailyFollowup && displayMode !== 'tarefas') {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const todayName = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][new Date().getDay()];
+      evts = evts.filter(e => {
+        if (e.data_inicio && e.data_inicio.startsWith(todayStr)) return true;
+        if (e.horarios_semanais && (e.horarios_semanais as any)[todayName]) {
+          const evtStart = e.data_inicio ? new Date(e.data_inicio) : null;
+          const evtEnd = e.data_fim ? new Date(e.data_fim) : null;
+          const cellTime = new Date().getTime();
+          const isAfterStart = !evtStart || cellTime >= evtStart.getTime();
+          const isBeforeEnd = !evtEnd || cellTime <= evtEnd.getTime();
+          if (isAfterStart && isBeforeEnd) return true;
+        }
+        return false;
+      });
+    }
+    return evts;
+  })();
 
   // Process Tasks: Filter and Sort
   const processedTasks = (() => {
     let tasks = [...localTasks];
+
+    if (isDailyFollowup && displayMode !== 'eventos') {
+      const today = new Date().toISOString().split('T')[0];
+      tasks = tasks.filter(t => {
+        const isToday = t.prazo && t.prazo.startsWith(today);
+        const isPending = t.status === 'não iniciada' || t.status === 'falta testar' || t.status === 'em progresso';
+        return isToday || isPending;
+      });
+    }
 
     // 1. Filter Search
     if (searchTerm.trim()) {
@@ -975,7 +1052,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
         <div className="flex flex-col items-end gap-3 w-full mb-2">
           
           {/* Row 1: Ordenação dinâmica */}
-          {quickSorts.length > 0 && (
+          {displayMode !== 'eventos' && quickSorts.length > 0 && (
             <div className="flex w-full overflow-x-auto hide-scrollbar items-center justify-start gap-3 shrink-0 pb-1">
               <span className="text-[10px] text-[#8E8E8E] px-1 font-bold uppercase tracking-wider shrink-0">Ordem:</span>
               
@@ -1022,6 +1099,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
           )}
 
           {/* Row 2: Status (Visibilidade) */}
+          {displayMode !== 'eventos' && (
           <div className="flex w-full overflow-x-auto hide-scrollbar items-center gap-2 shrink-0 pb-1 justify-start">
             <span className="text-[10px] text-[#8E8E8E] px-1 font-bold uppercase tracking-wider shrink-0">Visibilidade:</span>
             
@@ -1052,9 +1130,10 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
               </button>
             ))}
           </div>
+          )}
 
           {/* Filtros Customizados baseados no quickFilters */}
-          {quickFilters.map(filterKey => {
+          {displayMode !== 'eventos' && quickFilters.map(filterKey => {
             const col = columns.find(c => c.key === filterKey);
             // Casos nativos que usam unique do hook
             let options: string[] = [];
@@ -1130,24 +1209,25 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
             );
           })}
 
-          {/* Titulo Tarefas e View Mode */}
-          <div className="w-full flex items-center justify-between mt-4 mb-2 border-b border-[#2D2D2D] pb-2">
-            <h2 className="text-sm font-bold text-[#8E8E8E] uppercase tracking-wider">Tarefas</h2>
-            <div className="flex bg-[#1A1A1A] border border-[#2D2D2D] rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('list')}
-                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${viewMode === 'list' ? 'bg-[#333333] text-white' : 'text-[#8E8E8E] hover:text-white'}`}
+
+          {/* Filtro extra de Acompanhamento para Eventos e Ambos */}
+          {(displayMode === 'eventos' || displayMode === 'ambos') && (
+            <div className="flex w-full overflow-x-auto hide-scrollbar items-center gap-2 shrink-0 pb-1 justify-start">
+              <span className="text-[10px] text-[#8E8E8E] px-1 font-bold uppercase tracking-wider shrink-0">
+                Acompanhamento:
+              </span>
+              <button 
+                onClick={() => setIsDailyFollowup(!isDailyFollowup)}
+                className={`h-[26px] px-3 text-[11px] rounded-md border transition-colors font-bold flex items-center justify-center gap-1 shrink-0
+                  ${isDailyFollowup ? 'bg-[#9D4EDD] text-white border-[#9D4EDD]' : 'bg-[#1A1A1A] border-[#FFCC00] text-[#8E8E8E] hover:border-[#9D4EDD]/50 hover:text-white'}`}
               >
-                Lista
-              </button>
-              <button
-                onClick={() => setViewMode('calendar')}
-                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${viewMode === 'calendar' ? 'bg-[#333333] text-white' : 'text-[#8E8E8E] hover:text-white'}`}
-              >
-                Calendário
+                <span className="material-symbols-outlined text-[12px]">today</span>
+                Hoje & Pendentes
               </button>
             </div>
-          </div>
+          )}
+
+
 
           {/* Row 4: Botão de Filtros */}
           <div className="flex flex-col md:flex-row w-full items-end md:items-center justify-end gap-3 shrink-0 pb-1 z-30">
@@ -1174,6 +1254,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
             </div>
 
             <div className="flex items-center gap-3 order-1 md:order-2 w-full md:w-auto justify-end shrink-0 flex-wrap md:flex-nowrap">
+              {displayMode !== 'eventos' && (
               <div className="relative shrink-0" ref={filterMenuRef}>
               <button 
                 onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
@@ -1290,7 +1371,9 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
               </div>
             )}
             </div>
+            )}
             
+              {displayMode !== 'eventos' && (
               <div className="relative">
                 <button 
                   onClick={() => setIsColumnsMenuOpen(!isColumnsMenuOpen)}
@@ -1345,13 +1428,24 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
                     </button>
                   </div>
                 )}
-              </div>
-              <button 
-                onClick={handleNew}
-                className={`bg-[#FFCC00] text-[#121212] font-bold text-sm px-4 py-2 rounded-md hover:bg-[#e6b800] transition-colors shadow-sm shrink-0 ${localTasks.length === 0 ? 'animate-pulse ring-4 ring-[#FFCC00]/50' : ''}`}
-              >
-                + Nova Tarefa
-              </button>
+                </div>
+              )}
+              {displayMode !== 'eventos' && (
+                <button 
+                  onClick={handleNew}
+                  className={`bg-[#FFCC00] text-[#121212] font-bold text-sm px-4 py-2 rounded-md hover:bg-[#e6b800] transition-colors shadow-sm shrink-0 ${localTasks.length === 0 ? 'animate-pulse ring-4 ring-[#FFCC00]/50' : ''}`}
+                >
+                  + Nova Tarefa
+                </button>
+              )}
+              {displayMode !== 'tarefas' && (
+                <button 
+                  onClick={handleNewEvent}
+                  className={`bg-[#9D4EDD] text-white font-bold text-sm px-4 py-2 rounded-md hover:bg-[#8338c7] transition-colors shadow-sm shrink-0`}
+                >
+                  + Novo Evento
+                </button>
+              )}
             </div>
           </div>
 
@@ -1359,12 +1453,49 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
         </div>
       </div>
 
+      {/* View Mode */}
+      <div className="w-full flex items-center justify-center mt-6 mb-2 pb-2">
+        <div className="flex bg-[#1A1A1A] border border-[#2D2D2D] rounded-full p-1.5 shadow-lg">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-6 py-2 text-sm font-bold rounded-full transition-all flex items-center gap-2 ${
+              viewMode === 'list' 
+                ? 'bg-[#9D4EDD] text-white shadow-md' 
+                : 'text-[#A0A0A0] hover:text-white'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">format_list_bulleted</span>
+            Lista
+          </button>
+          <button
+            onClick={() => setViewMode('weekly')}
+            className={`px-6 py-2 text-sm font-bold rounded-full transition-all flex items-center gap-2 ${
+              viewMode === 'weekly' 
+                ? 'bg-[#9D4EDD] text-white shadow-md' 
+                : 'text-[#A0A0A0] hover:text-white'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">view_week</span>
+            Semanal
+          </button>
+          <button
+            onClick={() => setViewMode('monthly')}
+            className={`px-6 py-2 text-sm font-bold rounded-full transition-all flex items-center gap-2 ${
+              viewMode === 'monthly' 
+                ? 'bg-[#9D4EDD] text-white shadow-md' 
+                : 'text-[#A0A0A0] hover:text-white'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">calendar_month</span>
+            Mensal
+          </button>
+        </div>
+      </div>
 
-      {viewMode === 'list' ? (
-        <>
-          {/* Desktop View (Table) */}
-      <div ref={desktopContainerRef} style={{ overflowAnchor: 'none' }} className="hidden md:block overflow-x-auto bg-[#1A1A1A] border border-[#2D2D2D] rounded-lg relative">
-        <table className="w-full text-left border-collapse min-w-[1400px]">
+      {viewMode === 'list' && displayMode !== 'eventos' && (
+        <div className="flex flex-col gap-2 mt-4 custom-scrollbar overflow-x-auto w-full border border-[#2D2D2D] rounded-lg relative overflow-hidden" style={{ minHeight: '600px' }}>
+          <div ref={desktopContainerRef} style={{ overflowAnchor: 'none' }} className="hidden md:block overflow-x-auto bg-[#1A1A1A] border border-[#2D2D2D] rounded-lg relative">
+            <table className="w-full text-left border-collapse min-w-[1400px]">
           <thead className="bg-[#252525] border-b border-[#2D2D2D] sticky top-0 z-10">
             <tr>
               <th className="p-4 w-[100px] text-center">
@@ -1716,55 +1847,108 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
           </div>
         )}
       </div>
-      </>
-      ) : (
-        <TaskCalendar
-          tasks={processedTasks}
-          currentDate={calendarCurrentDate}
-          onDateChange={setCalendarCurrentDate}
-          onTaskClick={handleEdit}
-        />
+      </div>
       )}
 
-      {/* Floating Bulk Edit Button (Visible only when tasks are selected) */}
-      {selectedTasks.size > 0 && (
+      {viewMode !== 'list' && (
+          <TaskCalendar 
+            currentDate={calendarCurrentDate} 
+            onDateChange={setCalendarCurrentDate} 
+            format={viewMode}
+            tasks={displayMode === 'eventos' ? [] : processedTasks} 
+            events={displayMode === 'tarefas' ? [] : processedEvents}
+            onTaskClick={(t) => { setTaskToEdit(t); setIsModalOpen(true); }}
+            onEventClick={(e) => { setEventToEdit(e); setIsEventModalOpen(true); }}
+          />
+        )}
+        
+        {/* Events List */}
+        {displayMode !== 'tarefas' && (
+          <div className="mt-8 border border-[#2D2D2D] rounded-lg p-4 bg-[#1A1A1A]/50">
+            <h3 className="text-[#8E8E8E] uppercase font-bold text-xs mb-4">Próximos Eventos</h3>
+            {processedEvents.length === 0 ? (
+              <div className="text-sm text-[#8E8E8E]">Nenhum evento programado.</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {processedEvents.map(evt => (
+                  <div key={evt.id} onClick={() => { setEventToEdit(evt); setIsEventModalOpen(true); }} className="flex flex-col p-3 bg-[#252525] border border-[#333333] rounded hover:border-[#9D4EDD]/50 transition-colors cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[#26a69a] text-[16px]">event</span>
+                      <span className="font-bold text-sm text-[#E0E0E0]">{evt.nome}</span>
+                    </div>
+                    {(evt.data_inicio || evt.horarios_semanais) && (
+                      <div className="text-xs text-[#8E8E8E] mt-1 pl-6">
+                        {evt.frequencia === 'Semanal' && evt.horarios_semanais 
+                          ? Object.entries(evt.horarios_semanais).map(([dia, h]: [string, any]) => `${dia} (${h.inicio} - ${h.fim})`).join(', ')
+                          : evt.data_inicio ? new Date(evt.data_inicio).toLocaleDateString() : ''}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <button className="mt-4 px-4 py-2 bg-[#9D4EDD] text-white font-bold text-xs rounded-md hover:bg-[#8534C1] transition-colors" onClick={() => alert('Criar evento - Em breve')}>
+              Novo Evento
+            </button>
+          </div>
+        )}
+
+      {/* Floating Action Buttons Container */}
+      <div className={`fixed right-6 z-[999] flex flex-col items-center gap-4 ${isAurtistic ? 'bottom-40 md:bottom-24' : 'bottom-24 md:bottom-8'}`}>
+        
+        {/* Floating Bulk Edit Button */}
+        {selectedTasks.size > 0 && (
+          <button 
+            onClick={() => setIsBulkEditModalOpen(true)}
+            className="bg-[#9D4EDD] hover:bg-[#8A3BCE] text-[#FFFFFF] p-3 rounded-full shadow-[0_8px_32px_rgba(157,78,221,0.3)] transition-all duration-300 flex items-center justify-center group"
+            title="Editar Selecionadas"
+          >
+            <span className="material-symbols-outlined font-bold">edit</span>
+          </button>
+        )}
+
+        {/* Floating Scroll to Top Button */}
+        {isAurtistic && (
+          <button 
+            onClick={scrollToTop}
+            className="bg-[#1A1A1A] hover:bg-[#9D4EDD]/10 border border-[#FFCC00]/50 hover:border-[#9D4EDD] text-[#8E8E8E] hover:text-[#9D4EDD] p-3 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center group"
+            title="Ir para o topo"
+          >
+            <span className="material-symbols-outlined">arrow_upward</span>
+          </button>
+        )}
+
+        {/* Floating Novo Evento Button */}
+        {displayMode !== 'tarefas' && (
+          <button 
+            onClick={handleNewEvent}
+            className="bg-[#9D4EDD] hover:bg-[#8338c7] text-[#FFFFFF] p-3 rounded-full shadow-[0_8px_32px_rgba(157,78,221,0.3)] transition-all duration-300 flex items-center justify-center group"
+            title="Novo Evento"
+          >
+            <span className="material-symbols-outlined font-bold">event</span>
+          </button>
+        )}
+
+        {/* Floating Nova Tarefa Button */}
+        {displayMode !== 'eventos' && (
+          <button 
+            onClick={handleNew}
+            className={`bg-[#FFCC00] hover:bg-[#e6b800] text-[#121212] p-3 rounded-full shadow-[0_8px_32px_rgba(255,204,0,0.3)] transition-all duration-300 flex items-center justify-center group ${localTasks.length === 0 ? 'animate-pulse ring-4 ring-[#FFCC00]/50' : ''}`}
+            title="Nova Tarefa"
+          >
+            <span className="material-symbols-outlined font-bold">add</span>
+          </button>
+        )}
+
+        {/* Floating Scroll to Bottom Button */}
         <button 
-          onClick={() => setIsBulkEditModalOpen(true)}
-          className={`fixed right-6 bg-[#9D4EDD] hover:bg-[#8A3BCE] text-[#FFFFFF] p-3 rounded-full shadow-[0_8px_32px_rgba(157,78,221,0.3)] transition-all duration-300 flex items-center justify-center z-[999] group ${isAurtistic ? 'bottom-[22rem] md:bottom-56' : 'bottom-72 md:bottom-40'}`}
-          title="Editar Selecionadas"
+          onClick={scrollToBottom}
+          className="bg-[#1A1A1A] hover:bg-[#9D4EDD]/10 border border-[#FFCC00]/50 hover:border-[#9D4EDD] text-[#8E8E8E] hover:text-[#9D4EDD] p-3 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center group"
+          title="Ir para o fundo (Mais Recentes)"
         >
-          <span className="material-symbols-outlined font-bold">edit</span>
+          <span className="material-symbols-outlined">arrow_downward</span>
         </button>
-      )}
-
-      {/* Floating Add Task Button */}
-      <button 
-        onClick={handleNew}
-        className={`fixed right-6 bg-[#FFCC00] hover:bg-[#e6b800] text-[#121212] p-3 rounded-full shadow-[0_8px_32px_rgba(255,204,0,0.3)] transition-all duration-300 flex items-center justify-center z-[999] group ${isAurtistic ? 'bottom-72 md:bottom-40' : 'bottom-56 md:bottom-24'} ${localTasks.length === 0 ? 'animate-pulse ring-4 ring-[#FFCC00]/50' : ''}`}
-        title="Nova Tarefa"
-      >
-        <span className="material-symbols-outlined font-bold">add</span>
-      </button>
-
-      {/* Floating Scroll to Top Button */}
-      {isAurtistic && (
-        <button 
-          onClick={scrollToTop}
-          className="fixed bottom-56 md:bottom-24 right-6 bg-[#1A1A1A] hover:bg-[#9D4EDD]/10 border border-[#FFCC00]/50 hover:border-[#9D4EDD] text-[#8E8E8E] hover:text-[#9D4EDD] p-3 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center z-[999] group"
-          title="Ir para o topo"
-        >
-          <span className="material-symbols-outlined">arrow_upward</span>
-        </button>
-      )}
-
-      {/* Floating Scroll to Bottom Button */}
-      <button 
-        onClick={scrollToBottom}
-        className="fixed bottom-40 md:bottom-8 right-6 bg-[#1A1A1A] hover:bg-[#9D4EDD]/10 border border-[#FFCC00]/50 hover:border-[#9D4EDD] text-[#8E8E8E] hover:text-[#9D4EDD] p-3 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center z-[999] group"
-        title="Ir para o fundo (Mais Recentes)"
-      >
-        <span className="material-symbols-outlined">arrow_downward</span>
-      </button>
+      </div>
 
       {/* Modals */}
       <TaskFormModal 
@@ -1786,6 +1970,19 @@ export function TasksView({ initialTasks: rawInitialTasks, initialColumns = [], 
         uniqueDimensions={uniqueDimensions}
         columns={columns}
         onEditColumn={(col) => setEditingColumn(col)}
+      />
+
+      <EventFormModal
+        isOpen={isEventModalOpen}
+        onClose={() => setIsEventModalOpen(false)}
+        event={eventToEdit}
+        uniqueDimensions={uniqueDimensions}
+        isLabdivScope={!isPersonalScope}
+        onSuccess={() => {
+          setIsEventModalOpen(false);
+          // O NextJS revalidatePath atualizará a página para mostrar o novo evento
+          window.location.reload(); 
+        }}
       />
       
       {editingColumn && (

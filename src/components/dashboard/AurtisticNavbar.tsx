@@ -184,6 +184,7 @@ export default function AurtisticNavbar() {
               width={180} 
               height={41}
               className="h-8 md:h-9 w-auto object-contain transition-opacity group-hover:opacity-90"
+              style={{ filter: 'none', forcedColorAdjust: 'none' }}
               priority
             />
           </Link>
@@ -248,7 +249,7 @@ export default function AurtisticNavbar() {
                   )}
                 </div>
                 <span className="text-white text-xs font-bold uppercase tracking-wider hidden sm:inline">{displayName}</span>
-                <span className="w-2 h-2 rounded-full bg-[#FFCC00]"></span>
+                <span className="material-symbols-outlined text-[16px] text-[#A0A0A0] hover:text-[#FFCC00] transition-colors">settings</span>
               </div>
 
               {isSettingsOpen && (
@@ -274,6 +275,18 @@ export default function AurtisticNavbar() {
                     >
                       <span className="material-symbols-outlined text-[18px]">notifications_active</span>
                       Notificações
+                    </Link>
+
+                    <Link 
+                      href="/configurar-widget"
+                      onClick={() => setIsSettingsOpen(false)}
+                      className="w-full text-left px-4 py-2 text-sm text-[#E0E0E0] hover:bg-[#2D2D2D] hover:text-[#FFCC00] transition-colors flex items-center justify-between group"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px]">widgets</span>
+                        Configurar Widget
+                      </div>
+                      <span className="material-symbols-outlined text-[16px] text-[#A0A0A0] group-hover:text-[#FFCC00] transition-colors">settings</span>
                     </Link>
 
                     <Link 

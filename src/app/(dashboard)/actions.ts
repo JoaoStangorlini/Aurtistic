@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
-import { Task, TaskColumn } from '@/types';
+import { Task, TaskColumn, AgendaEvent } from '@/types';
 
 export async function updateTaskOrders(updates: { id: string, ordem_manual: number }[]) {
   const supabase = await createClient();
@@ -499,4 +499,75 @@ export async function updateNotificationConfig(notificationsConfig: any) {
 
   revalidatePath('/configurar-notificacoes');
   revalidatePath('/aurtistic');
+}
+
+// ----------------------------------------------------------------------
+// EVENTOS (AGENDA) ACTIONS
+// ----------------------------------------------------------------------
+
+export async function createEvent(eventData: Partial<AgendaEvent>) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuário não autenticado");
+
+  const { error } = await supabase.from('events').insert([
+    {
+      ...eventData,
+      user_id: user.id
+    }
+  ]);
+
+  if (error) {
+    console.error("Erro ao criar evento:", error);
+    throw new Error(error.message);
+  }
+
+  revalidatePath('/');
+  revalidatePath('/aurtistic');
+  revalidatePath('/labdiv');
+  revalidatePath('/servidor');
+}
+
+export async function updateEvent(eventId: string, eventData: Partial<AgendaEvent>) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuário não autenticado");
+
+  const { error } = await supabase
+    .from('events')
+    .update(eventData)
+    .eq('id', eventId)
+    .eq('user_id', user.id); // garantindo RLS adicionalmente
+
+  if (error) {
+    console.error("Erro ao atualizar evento:", error);
+    throw new Error(error.message);
+  }
+
+  revalidatePath('/');
+  revalidatePath('/aurtistic');
+  revalidatePath('/labdiv');
+  revalidatePath('/servidor');
+}
+
+export async function deleteEvent(eventId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuário não autenticado");
+
+  const { error } = await supabase
+    .from('events')
+    .delete()
+    .eq('id', eventId)
+    .eq('user_id', user.id);
+
+  if (error) {
+    console.error("Erro ao deletar evento:", error);
+    throw new Error(error.message);
+  }
+
+  revalidatePath('/');
+  revalidatePath('/aurtistic');
+  revalidatePath('/labdiv');
+  revalidatePath('/servidor');
 }

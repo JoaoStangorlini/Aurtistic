@@ -1,15 +1,18 @@
 import React from 'react';
-import { Task } from '@/types';
+import { Task, AgendaEvent } from '@/types';
 import { Badge, getBadgeColorClass } from './Badge';
 
 interface TaskCalendarProps {
   tasks: Task[];
+  events?: AgendaEvent[];
   currentDate: Date;
+  format?: 'weekly' | 'monthly';
   onDateChange: (date: Date) => void;
   onTaskClick: (task: Task) => void;
+  onEventClick?: (event: AgendaEvent) => void;
 }
 
-export default function TaskCalendar({ tasks, currentDate, onDateChange, onTaskClick }: TaskCalendarProps) {
+export default function TaskCalendar({ tasks, events = [], currentDate, format = 'monthly', onDateChange, onTaskClick, onEventClick }: TaskCalendarProps) {
   const [selectedDateStr, setSelectedDateStr] = React.useState<string | null>(null);
 
   const getDaysInMonth = (year: number, month: number) => {
@@ -26,12 +29,24 @@ export default function TaskCalendar({ tasks, currentDate, onDateChange, onTaskC
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
 
-  const prevMonth = () => {
-    onDateChange(new Date(year, month - 1, 1));
+  const prevPeriod = () => {
+    if (format === 'weekly') {
+      const newDate = new Date(currentDate);
+      newDate.setDate(currentDate.getDate() - 7);
+      onDateChange(newDate);
+    } else {
+      onDateChange(new Date(year, month - 1, 1));
+    }
   };
 
-  const nextMonth = () => {
-    onDateChange(new Date(year, month + 1, 1));
+  const nextPeriod = () => {
+    if (format === 'weekly') {
+      const newDate = new Date(currentDate);
+      newDate.setDate(currentDate.getDate() + 7);
+      onDateChange(newDate);
+    } else {
+      onDateChange(new Date(year, month + 1, 1));
+    }
   };
 
   const goToToday = () => {
@@ -45,28 +60,47 @@ export default function TaskCalendar({ tasks, currentDate, onDateChange, onTaskC
 
   const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
-  const days = [];
-  // Empty cells for days before the 1st of the month
-  for (let i = 0; i < firstDay; i++) {
-    days.push(<div key={`empty-${i}`} className="min-h-[100px] bg-[#1A1A1A]/30 border border-[#2D2D2D] rounded-md p-2"></div>);
+  const datesToRender: { date: Date, isEmpty: boolean }[] = [];
+
+  if (format === 'monthly') {
+    for (let i = 0; i < firstDay; i++) {
+      datesToRender.push({ date: new Date(), isEmpty: true });
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      datesToRender.push({ date: new Date(year, month, d), isEmpty: false });
+    }
+  } else {
+    const currentDay = currentDate.getDay();
+    const startDate = new Date(currentDate);
+    startDate.setDate(currentDate.getDate() - currentDay);
+    for (let i = 0; i < 7; i++) {
+      const cellDate = new Date(startDate);
+      cellDate.setDate(startDate.getDate() + i);
+      datesToRender.push({ date: cellDate, isEmpty: false });
+    }
   }
 
-  // Cells for each day
-  for (let d = 1; d <= daysInMonth; d++) {
-    const cellDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const days = datesToRender.map((item, index) => {
+    if (item.isEmpty) {
+      return <div key={`empty-${index}`} className="min-h-[100px] bg-[#1A1A1A]/30 border border-[#2D2D2D] rounded-md p-2"></div>;
+    }
+
+    const cellDate = item.date;
+    const cYear = cellDate.getFullYear();
+    const cMonth = cellDate.getMonth();
+    const cDate = cellDate.getDate();
+    
+    const cellDateStr = `${cYear}-${String(cMonth + 1).padStart(2, '0')}-${String(cDate).padStart(2, '0')}`;
     const todayStr = new Date().toISOString().split('T')[0];
     const isToday = cellDateStr === todayStr;
 
-    const cellDate = new Date(year, month, d);
     const dayOfWeek = cellDate.getDay();
     const dayOfWeekNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
     const cellDayName = dayOfWeekNames[dayOfWeek];
+    const d = cDate;
 
     const dayTasks = tasks.filter(t => {
-      // Direct match
       if (t.prazo && t.prazo.startsWith(cellDateStr)) return true;
-      
-      // Recurrence match
       if (t.frequencia && t.status !== 'completa' && t.status !== 'descartada') {
         const freq = t.frequencia;
         if (freq === 'Diária') return true;
@@ -78,9 +112,25 @@ export default function TaskCalendar({ tasks, currentDate, onDateChange, onTaskC
 
     const isSelected = selectedDateStr === cellDateStr;
 
-    days.push(
+    const dayEvents = events.filter(e => {
+      if (e.data_inicio && e.data_inicio.startsWith(cellDateStr)) return true;
+      if (e.horarios_semanais && typeof e.horarios_semanais === 'object') {
+        const evtStart = e.data_inicio ? new Date(e.data_inicio) : null;
+        const evtEnd = e.data_fim ? new Date(e.data_fim) : null;
+        const cellTime = cellDate.getTime();
+        const isAfterStart = !evtStart || cellTime >= evtStart.getTime();
+        const isBeforeEnd = !evtEnd || cellTime <= evtEnd.getTime();
+        
+        if (isAfterStart && isBeforeEnd) {
+          if ((e.horarios_semanais as any)[cellDayName]) return true;
+        }
+      }
+      return false;
+    });
+
+    return (
       <div 
-        key={`day-${d}`} 
+        key={`day-${cellDateStr}`} 
         onClick={() => setSelectedDateStr(isSelected ? null : cellDateStr)}
         className={`min-h-[100px] border rounded-md p-1 sm:p-2 flex flex-col gap-1 transition-colors cursor-pointer ${isSelected ? 'border-[#FFCC00] bg-[#FFCC00]/5' : isToday ? 'border-[#9D4EDD] bg-[#9D4EDD]/5' : 'border-[#2D2D2D] bg-[#1A1A1A] hover:border-[#8E8E8E]'}`}
       >
@@ -88,6 +138,17 @@ export default function TaskCalendar({ tasks, currentDate, onDateChange, onTaskC
           {d}
         </div>
         <div className="flex flex-col gap-1 overflow-y-auto max-h-[150px] custom-scrollbar">
+          {dayEvents.map(evt => (
+            <div 
+              key={`evt-${evt.id}`} 
+              onClick={(e) => { e.stopPropagation(); if(onEventClick) onEventClick(evt); }}
+              className="text-[10px] bg-[#004d40] border border-[#00695c] hover:border-[#009688] rounded p-1 cursor-pointer truncate transition-colors flex items-center gap-1"
+              title={evt.nome}
+            >
+              <span className="material-symbols-outlined text-[10px] text-[#26a69a]">event</span>
+              <span className="truncate text-[#e0f2f1] font-bold">{evt.nome}</span>
+            </div>
+          ))}
           {dayTasks.map(task => {
             const dimClass = getBadgeColorClass('dimensao', task.dimensao);
             const match = dimClass.match(/text-\[(#[0-9a-fA-F]{6})\]/);
@@ -108,19 +169,24 @@ export default function TaskCalendar({ tasks, currentDate, onDateChange, onTaskC
         </div>
       </div>
     );
-  }
+  });
 
   return (
     <div className="flex flex-col w-full mt-4 bg-[#121212] rounded-lg border border-[#2D2D2D] overflow-hidden">
       {/* Calendar Header */}
       <div className="flex items-center justify-between p-4 bg-[#1A1A1A] border-b border-[#2D2D2D]">
         <div className="flex items-center gap-2">
-          <button onClick={prevMonth} className="text-[#8E8E8E] hover:text-white transition-colors p-1 rounded hover:bg-[#252525]">
+          <button onClick={prevPeriod} className="text-[#8E8E8E] hover:text-white transition-colors p-1 rounded hover:bg-[#252525]">
             <span className="material-symbols-outlined text-[20px]">chevron_left</span>
           </button>
-          <button onClick={nextMonth} className="text-[#8E8E8E] hover:text-white transition-colors p-1 rounded hover:bg-[#252525]">
+          <button onClick={nextPeriod} className="text-[#8E8E8E] hover:text-white transition-colors p-1 rounded hover:bg-[#252525]">
             <span className="material-symbols-outlined text-[20px]">chevron_right</span>
           </button>
+          <span className="text-[#E0E0E0] font-bold text-sm">
+            {format === 'weekly' 
+              ? `${datesToRender[0].date.getDate()} ${monthNames[datesToRender[0].date.getMonth()].substring(0,3)} - ${datesToRender[6].date.getDate()} ${monthNames[datesToRender[6].date.getMonth()].substring(0,3)} de ${datesToRender[6].date.getFullYear()}`
+              : `${monthNames[month]} de ${year}`}
+          </span>
           <button onClick={goToToday} className="hidden sm:block text-xs font-bold text-[#8E8E8E] hover:text-white transition-colors px-3 py-1.5 rounded border border-[#2D2D2D] hover:border-[#8E8E8E]">
             Hoje
           </button>

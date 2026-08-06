@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { Task, TaskColumn } from '@/types';
+import { Task, TaskColumn, AgendaEvent } from '@/types';
 import { TasksView } from './TasksView';
 import { AurtisticQuickLinks } from './AurtisticQuickLinks';
 import { saveUserProfileData } from '@/app/(dashboard)/actions';
@@ -14,6 +14,9 @@ interface AurtisticWorkspaceClientProps {
   pessoalTasks: Task[];
   servidorTasks: Task[];
   labdivTasks: Task[];
+  pessoalEvents: AgendaEvent[];
+  servidorEvents: AgendaEvent[];
+  labdivEvents: AgendaEvent[];
   columns: TaskColumn[];
   userId: string;
 }
@@ -23,6 +26,9 @@ export default function AurtisticWorkspaceClient({
   pessoalTasks,
   servidorTasks,
   labdivTasks,
+  pessoalEvents,
+  servidorEvents,
+  labdivEvents,
   columns,
   userId
 }: AurtisticWorkspaceClientProps) {
@@ -31,9 +37,7 @@ export default function AurtisticWorkspaceClient({
   const showSwitcher = isJoao; // Only show switcher if user is João (since João has both servidor and labdiv)
 
   const [profile, setProfile] = useState(initialProfile);
-  const [activeTaskScope, setActiveTaskScope] = useState<'pessoal' | 'servidor' | 'labdiv'>(
-    isJoao ? 'servidor' : isAndy ? 'labdiv' : 'pessoal'
-  );
+  const [displayMode, setDisplayMode] = useState<'tarefas' | 'eventos' | 'ambos'>('tarefas');
   const [showConfig, setShowConfig] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showToast, setShowToast] = useState(false);
@@ -58,7 +62,7 @@ export default function AurtisticWorkspaceClient({
     order: ['tasks', 'resumo', 'curriculo', 'portfolio'],
     layout_style: 'default',
     labels: {
-      tasks: 'Tarefas',
+      tasks: 'Agenda',
       resumo: 'Resumo',
       curriculo: 'Currículo',
       portfolio: 'Portfólio',
@@ -72,7 +76,7 @@ export default function AurtisticWorkspaceClient({
   const [activeFeatures, setActiveFeatures] = useState<string[]>(featuresConfig.active || ['tasks', 'resumo', 'curriculo', 'portfolio']);
   const [featuresOrder, setFeaturesOrder] = useState<string[]>(featuresConfig.order || ['tasks', 'resumo', 'curriculo', 'portfolio']);
   const [labels, setLabels] = useState<Record<string, string>>(featuresConfig.labels || {
-    tasks: 'Tarefas',
+    tasks: 'Agenda',
     resumo: 'Resumo',
     curriculo: 'Currículo',
     portfolio: 'Portfólio',
@@ -157,15 +161,15 @@ export default function AurtisticWorkspaceClient({
     }
   };
 
-  // Get current active tasks based on switcher selection
-  const getCurrentTasks = () => {
-    if (activeTaskScope === 'servidor' && isJoao) return servidorTasks;
-    if (activeTaskScope === 'labdiv' && (isJoao || isAndy)) return labdivTasks;
-    return pessoalTasks;
-  };
+  // Unificar tarefas e eventos removendo duplicatas por ID
+  const allTasks = Array.from(new Map([...pessoalTasks, ...servidorTasks, ...labdivTasks].map(item => [item.id, item])).values());
+  const allEvents = Array.from(new Map([...pessoalEvents, ...servidorEvents, ...labdivEvents].map(item => [item.id, item])).values());
+
+  const getCurrentTasks = () => allTasks;
+  const getCurrentEvents = () => allEvents;
 
   const featureLabels: Record<string, string> = {
-    tasks: 'Tarefas (Planner)',
+    tasks: 'Agenda',
     resumo: 'Resumo Profissional',
     curriculo: 'Currículo',
     portfolio: 'Portfólio',
@@ -328,36 +332,43 @@ export default function AurtisticWorkspaceClient({
         </div>
       )}
 
-      {/* Dynamic scope selector switcher (Servidor / LabDiv) */}
-      {showSwitcher && activeFeatures.includes('tasks') && (
+      {/* Dynamic selector switcher (Tarefas / Eventos / Ambos) */}
+      {activeFeatures.includes('tasks') && (
         <div className="flex justify-center mb-6 shrink-0">
           <div className="inline-flex p-1 bg-[#1A1A1A] border border-[#2D2D2D] rounded-full gap-1">
-            {isJoao && (
-              <button 
-                onClick={() => setActiveTaskScope('servidor')}
-                className={`px-5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
-                  activeTaskScope === 'servidor' 
-                    ? 'bg-[#9D4EDD] text-white shadow-md' 
-                    : 'text-[#A0A0A0] hover:text-white'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[14px]">dns</span>
-                Servidor
-              </button>
-            )}
-            {(isJoao || isAndy) && (
-              <button 
-                onClick={() => setActiveTaskScope('labdiv')}
-                className={`px-5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
-                  activeTaskScope === 'labdiv' 
-                    ? 'bg-[#9D4EDD] text-white shadow-md' 
-                    : 'text-[#A0A0A0] hover:text-white'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[14px]">hub</span>
-                LabDiv
-              </button>
-            )}
+            <button 
+              onClick={() => setDisplayMode('tarefas')}
+              className={`px-5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
+                displayMode === 'tarefas' 
+                  ? 'bg-[#9D4EDD] text-white shadow-md' 
+                  : 'text-[#A0A0A0] hover:text-white'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[14px]">task_alt</span>
+              Tarefas
+            </button>
+            <button 
+              onClick={() => setDisplayMode('eventos')}
+              className={`px-5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
+                displayMode === 'eventos' 
+                  ? 'bg-[#9D4EDD] text-white shadow-md' 
+                  : 'text-[#A0A0A0] hover:text-white'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[14px]">event</span>
+              Eventos
+            </button>
+            <button 
+              onClick={() => setDisplayMode('ambos')}
+              className={`px-5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
+                displayMode === 'ambos' 
+                  ? 'bg-[#9D4EDD] text-white shadow-md' 
+                  : 'text-[#A0A0A0] hover:text-white'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[14px]">category</span>
+              Ambos
+            </button>
           </div>
         </div>
       )}
@@ -373,10 +384,11 @@ export default function AurtisticWorkspaceClient({
 
           
           <TasksView 
-            key={activeTaskScope}
             initialTasks={getCurrentTasks()} 
+            initialEvents={getCurrentEvents()}
+            displayMode={displayMode}
             initialColumns={columns} 
-            isPersonalScope={activeTaskScope === 'pessoal'} 
+            isPersonalScope={false} 
             userId={userId}
             initialQuickFilters={profile?.quick_filters || ['responsavel', 'dimensao']} 
             initialQuickSorts={profile?.quick_sorts || ['status', 'prazo', 'prioridade', 'manual']}

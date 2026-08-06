@@ -36,3 +36,22 @@ export interface Task {
   parent_id?: string | null;
   custom_fields?: Record<string, any>;
 }
+
+export interface HorarioSemanal {
+  inicio: string; // formato "HH:mm"
+  fim: string;    // formato "HH:mm"
+}
+
+export interface AgendaEvent {
+  id: string;
+  user_id: string;
+  nome: string;
+  descricao: string | null;
+  data_inicio: string | null; // formato "YYYY-MM-DD"
+  data_fim: string | null;    // formato "YYYY-MM-DD"
+  horarios_semanais: Record<string, HorarioSemanal> | null; // ex: { "Segunda": { "inicio": "19:00", "fim": "21:00" } }
+  frequencia: string | null;
+  dimensao: string | null;
+  is_labdiv: boolean;
+  created_at: string;
+}
