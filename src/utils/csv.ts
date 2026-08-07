@@ -1,4 +1,4 @@
-import { Task } from '@/types';
+import { Task, AgendaEvent } from '@/types';
 
 function escapeCSV(text: string | null | undefined): string {
   if (!text) return '';
@@ -145,4 +145,82 @@ function parseCSVString(text: string): string[][] {
   }
   
   return result;
+}
+
+export function downloadEventsCSV(events: AgendaEvent[], filename: string = 'eventos.csv') {
+  const headers = [
+    'ID', 'Nome', 'Descrição', 'Data Início', 'Data Fim',
+    'Frequência', 'Dimensão', 'Criado Em'
+  ];
+
+  const rows = events.map(event => [
+    escapeCSV(event.id),
+    escapeCSV(event.nome),
+    escapeCSV(event.descricao),
+    escapeCSV(event.data_inicio),
+    escapeCSV(event.data_fim),
+    escapeCSV(event.frequencia),
+    escapeCSV(event.dimensao),
+    escapeCSV(event.created_at ? new Date(event.created_at).toLocaleString() : '')
+  ]);
+
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(row => row.join(','))
+  ].join('\n');
+
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+export function parseEventsFromCSV(file: File): Promise<Partial<AgendaEvent>[]> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      if (!text) return resolve([]);
+      
+      const rows = parseCSVString(text);
+      if (rows.length < 2) return resolve([]);
+
+      const headers = rows[0].map(h => h.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+      const events: Partial<AgendaEvent>[] = [];
+
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (row.length === 1 && row[0].trim() === '') continue;
+        
+        const event: Partial<AgendaEvent> = {
+          id: crypto.randomUUID(),
+          is_labdiv: false,
+        };
+
+        for (let j = 0; j < headers.length; j++) {
+          const header = headers[j];
+          const val = row[j]?.trim();
+          if (val) {
+            // Map header to property
+            if (header === 'nome') event.nome = val;
+            if (header === 'descricao') event.descricao = val;
+            if (header === 'data inicio') event.data_inicio = val;
+            if (header === 'data fim') event.data_fim = val;
+            if (header === 'frequencia') event.frequencia = val;
+            if (header === 'dimensao') event.dimensao = val;
+          }
+        }
+        
+        if (!event.nome) event.nome = 'Evento importado';
+        events.push(event);
+      }
+      resolve(events);
+    };
+    reader.onerror = () => reject(new Error('Falha ao ler o arquivo CSV.'));
+    reader.readAsText(file);
+  });
 }

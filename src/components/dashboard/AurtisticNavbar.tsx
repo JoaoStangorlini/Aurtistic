@@ -89,58 +89,6 @@ export default function AurtisticNavbar() {
     }
   };
 
-  const handleExportCSV = async () => {
-    setIsSettingsOpen(false);
-    if (!user) return;
-    let query = supabase.from('tasks').select('*');
-    
-    if (user.id === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e') {
-      // Admin: Pega tudo dele + compartilhadas
-      query = query.or(`user_id.eq.${user.id},is_personal.is.null,is_personal.eq.false`);
-    } else if (user.id === '7dcfe172-1cf0-4389-9abd-f340b1408386') {
-      // LabDiv: Pega as dele + HUB compartilhadas
-      query = query.or(`user_id.eq.${user.id},and(dimensao.eq.HUB,or(is_personal.is.null,is_personal.eq.false))`);
-    } else {
-      // Normal user: Apenas as pessoais dele
-      query = query.eq('is_personal', true).eq('user_id', user.id);
-    }
-    
-    const { data } = await query;
-    if (data && data.length > 0) {
-      // Import on demand to save bundle size
-      const { downloadCSV } = await import('@/utils/csv');
-      downloadCSV(data, `aurtistic_tarefas_${new Date().toISOString().split('T')[0]}.csv`);
-    } else {
-      alert("Você não possui tarefas para exportar.");
-    }
-  };
-
-  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    setIsSettingsOpen(false);
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-    
-    try {
-      const { parseTasksFromCSV } = await import('@/utils/csv');
-      const tasks = await parseTasksFromCSV(file);
-      if (tasks.length === 0) {
-        alert("O arquivo CSV está vazio ou inválido.");
-        return;
-      }
-      
-      const { saveTask } = await import('@/lib/offlineActions');
-      for (const t of tasks) {
-        await saveTask({ ...t, user_id: user.id });
-      }
-      
-      alert(`${tasks.length} tarefas importadas com sucesso!`);
-      router.refresh();
-    } catch (err) {
-      alert("Erro ao importar CSV: " + String(err));
-    }
-    e.target.value = ''; // Reset input
-  };
-
   const openAuthorProjects = async () => {
     try {
       if (Capacitor.isNativePlatform()) {
@@ -254,20 +202,14 @@ export default function AurtisticNavbar() {
 
               {isSettingsOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-[#1A1A1A] border border-[#2D2D2D] rounded-lg shadow-xl overflow-hidden py-1 z-50">
-                    <button 
-                      onClick={handleExportCSV}
+                    <Link 
+                      href="/exportar-importar"
+                      onClick={() => setIsSettingsOpen(false)}
                       className="w-full text-left px-4 py-2 text-sm text-[#E0E0E0] hover:bg-[#2D2D2D] hover:text-white transition-colors flex items-center gap-2"
                     >
-                      <span className="material-symbols-outlined text-[18px]">download</span>
-                      Baixar tarefas (CSV)
-                    </button>
-                    
-                    <label className="w-full text-left px-4 py-2 text-sm text-[#E0E0E0] hover:bg-[#2D2D2D] hover:text-white transition-colors flex items-center gap-2 cursor-pointer">
-                      <span className="material-symbols-outlined text-[18px]">upload</span>
-                      Importar tarefas (CSV)
-                      <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
-                    </label>
-
+                      <span className="material-symbols-outlined text-[18px]">sync_alt</span>
+                      Exportar / Importar
+                    </Link>
                     <Link 
                       href="/configurar-notificacoes"
                       onClick={() => setIsSettingsOpen(false)}
