@@ -5,7 +5,34 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
-import { WidgetTasksPreview, WidgetCalendarPreview, WidgetEventsPreview } from '@/components/dashboard/WidgetPreviews';
+import { WidgetTasksPreview, WidgetCalendarPreview, WidgetEventsPreview, WidgetWeeklyCalendarPreview } from '@/components/dashboard/WidgetPreviews';
+
+function ToggleButtons({ 
+  showEvents, 
+  showTasks, 
+  onToggleEvents, 
+  onToggleTasks 
+}: { 
+  showEvents: boolean, 
+  showTasks: boolean, 
+  onToggleEvents: () => void, 
+  onToggleTasks: () => void 
+}) {
+  return (
+    <div className="flex bg-[#1A1A1A] p-1 rounded-xl border border-[#2D2D2D] relative w-full mt-2 gap-1 overflow-x-auto custom-scrollbar">
+      <button 
+        onClick={onToggleEvents}
+        className={`flex-1 px-2 py-2 text-[12px] font-bold rounded-lg transition-colors whitespace-nowrap ${showEvents ? 'bg-[#FFCC00] text-[#121212] shadow' : 'text-[#8E8E8E] hover:text-white'}`}>
+        Eventos (E)
+      </button>
+      <button 
+        onClick={onToggleTasks}
+        className={`flex-1 px-2 py-2 text-[12px] font-bold rounded-lg transition-colors whitespace-nowrap ${showTasks ? 'bg-[#9D4EDD] text-white shadow' : 'text-[#8E8E8E] hover:text-white'}`}>
+        Tarefas (T)
+      </button>
+    </div>
+  );
+}
 
 interface WidgetConfigClientProps {
   userId: string;
@@ -21,7 +48,12 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tarefas' | 'calendario' | 'eventos'>('tarefas');
+  const [activeTab, setActiveTab] = useState<'tarefas' | 'calendario' | 'semanal' | 'eventos'>('tarefas');
+  const [calendarShowTasks, setCalendarShowTasks] = useState(true);
+  const [calendarShowEvents, setCalendarShowEvents] = useState(true);
+  const [weeklyShowTasks, setWeeklyShowTasks] = useState(true);
+  const [weeklyShowEvents, setWeeklyShowEvents] = useState(true);
+  const [weeklySplitShifts, setWeeklySplitShifts] = useState(true);
 
   // Extrair dimensões únicas existentes
   const dimensions = Array.from(new Set(tasks.map(t => t.dimensao).filter(Boolean)));
@@ -56,6 +88,21 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
         if (hiddenVal) {
           setHiddenTaskIds(safeParse(hiddenVal, []));
         }
+
+        const { value: showTasksVal } = await Preferences.get({ key: 'widget_calendar_show_tasks' });
+        if (showTasksVal) setCalendarShowTasks(showTasksVal === 'true');
+
+        const { value: showEventsVal } = await Preferences.get({ key: 'widget_calendar_show_events' });
+        if (showEventsVal) setCalendarShowEvents(showEventsVal === 'true');
+
+        const { value: wShowTasksVal } = await Preferences.get({ key: 'widget_weekly_show_tasks' });
+        if (wShowTasksVal) setWeeklyShowTasks(wShowTasksVal === 'true');
+
+        const { value: wShowEventsVal } = await Preferences.get({ key: 'widget_weekly_show_events' });
+        if (wShowEventsVal) setWeeklyShowEvents(wShowEventsVal === 'true');
+        
+        const { value: wSplitVal } = await Preferences.get({ key: 'widget_weekly_split_shifts' });
+        if (wSplitVal) setWeeklySplitShifts(wSplitVal === 'true');
       } catch (err) {
         console.error('Erro ao carregar preferências do widget', err);
       }
@@ -84,6 +131,11 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
       await Preferences.set({ key: 'widget_sort_order', value: sortOrder });
       await Preferences.set({ key: 'widget_filter_dimension', value: selectedDimension });
       await Preferences.set({ key: 'widget_hidden_task_ids', value: JSON.stringify(hiddenTaskIds) });
+      await Preferences.set({ key: 'widget_calendar_show_tasks', value: calendarShowTasks.toString() });
+      await Preferences.set({ key: 'widget_calendar_show_events', value: calendarShowEvents.toString() });
+      await Preferences.set({ key: 'widget_weekly_show_tasks', value: weeklyShowTasks.toString() });
+      await Preferences.set({ key: 'widget_weekly_show_events', value: weeklyShowEvents.toString() });
+      await Preferences.set({ key: 'widget_weekly_split_shifts', value: weeklySplitShifts.toString() });
 
       // Atualizar lista filtrada do Widget imediatamente no storage
       let filteredTasks = tasks;
@@ -189,6 +241,7 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
         {[
           { id: 'tarefas', label: 'Tarefas', icon: 'task_alt' },
           { id: 'calendario', label: 'Calendário', icon: 'calendar_month' },
+          { id: 'semanal', label: 'Semanal', icon: 'view_week' },
           { id: 'eventos', label: 'Eventos', icon: 'event_list' }
         ].map(tab => (
           <button
@@ -259,19 +312,72 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
 
           {activeTab === 'calendario' && (
             <div className="text-[#8E8E8E] text-sm p-4 bg-[#121212] border border-[#2D2D2D] rounded-lg">
-              <h3 className="text-white font-bold mb-4">Configurações do Calendário</h3>
-              <div className="flex flex-col gap-4">
-                <label className="flex items-center justify-between text-white">
-                  <span>Modo de Visualização</span>
-                  <select className="bg-[#1A1A1A] border border-[#2D2D2D] rounded p-2 text-sm font-semibold">
-                    <option>Mensal</option>
-                    <option>Semanal</option>
-                  </select>
-                </label>
-                <label className="flex items-center justify-between text-white">
-                  <span>Mostrar Marcadores de Tarefas</span>
-                  <input type="checkbox" className="accent-[#9D4EDD] w-4 h-4" defaultChecked />
-                </label>
+              <h3 className="text-white font-bold mb-1">Configurações do Calendário Mensal</h3>
+              <p className="text-xs text-[#8E8E8E] mb-3">Escolha o que deseja visualizar no calendário do widget.</p>
+              <ToggleButtons 
+                showEvents={calendarShowEvents}
+                showTasks={calendarShowTasks}
+                onToggleEvents={() => {
+                  setIsDirty(true);
+                  setCalendarShowEvents(!calendarShowEvents);
+                }} 
+                onToggleTasks={() => {
+                  setIsDirty(true);
+                  setCalendarShowTasks(!calendarShowTasks);
+                }} 
+              />
+              
+              <div className="mt-4 p-3 bg-[#1A1A1A] rounded-lg border border-[#2D2D2D]">
+                <h4 className="text-white font-semibold text-xs mb-2">Como funcionam os botões no Widget:</h4>
+                <ul className="text-[11px] space-y-1.5">
+                  <li><strong className="text-[#FFCC00]">E</strong> = Clicar liga/desliga apenas os Eventos.</li>
+                  <li><strong className="text-[#9D4EDD]">T</strong> = Clicar liga/desliga apenas as Tarefas.</li>
+                  <li>Deixe os dois ligados para ver ambos, ou os dois desligados para ver só os dias vazios.</li>
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'semanal' && (
+            <div className="text-[#8E8E8E] text-sm p-4 bg-[#121212] border border-[#2D2D2D] rounded-lg">
+              <h3 className="text-white font-bold mb-1">Configurações do Calendário Semanal</h3>
+              <p className="text-xs text-[#8E8E8E] mb-3">Escolha o que deseja visualizar no calendário do widget.</p>
+              <ToggleButtons 
+                showEvents={weeklyShowEvents}
+                showTasks={weeklyShowTasks}
+                onToggleEvents={() => {
+                  setIsDirty(true);
+                  setWeeklyShowEvents(!weeklyShowEvents);
+                }} 
+                onToggleTasks={() => {
+                  setIsDirty(true);
+                  setWeeklyShowTasks(!weeklyShowTasks);
+                }} 
+              />
+              
+              <label className="flex items-center gap-3 mt-4 mb-2 p-3 bg-[#1A1A1A] rounded-lg border border-[#2D2D2D] cursor-pointer">
+                <input 
+                  type="checkbox"
+                  checked={weeklySplitShifts}
+                  onChange={(e) => {
+                    setIsDirty(true);
+                    setWeeklySplitShifts(e.target.checked);
+                  }}
+                  className="w-4 h-4 rounded border-[#3A3A3C] bg-[#121212] checked:bg-[#9D4EDD] focus:ring-0 focus:ring-offset-0"
+                />
+                <div>
+                  <h4 className="text-white font-semibold text-xs">Dividir em Turnos (12h-12h)</h4>
+                  <p className="text-[#8E8E8E] text-[10px]">Separa visualmente os itens da manhã e da tarde.</p>
+                </div>
+              </label>
+
+              <div className="mt-2 p-3 bg-[#1A1A1A] rounded-lg border border-[#2D2D2D]">
+                <h4 className="text-white font-semibold text-xs mb-2">Como funcionam os botões no Widget:</h4>
+                <ul className="text-[11px] space-y-1.5">
+                  <li><strong className="text-[#FFCC00]">E</strong> = Clicar liga/desliga apenas os Eventos.</li>
+                  <li><strong className="text-[#9D4EDD]">T</strong> = Clicar liga/desliga apenas as Tarefas.</li>
+                  <li>Deixe os dois ligados para ver ambos, ou os dois desligados para ver só os dias vazios.</li>
+                </ul>
               </div>
             </div>
           )}
@@ -296,7 +402,8 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
           </div>
           <div className="flex-1 p-8 flex items-center justify-center bg-[#121212]/50" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\\"20\\" height=\\"20\\" viewBox=\\"0 0 20 20\\" xmlns=\\"http://www.w3.org/2000/svg\\"%3E%3Cg fill=\\"%23252525\\" fill-opacity=\\"0.4\\" fill-rule=\\"evenodd\\"%3E%3Ccircle cx=\\"3\\" cy=\\"3\\" r=\\"1\\"/%3E%3Ccircle cx=\\"13\\" cy=\\"13\\" r=\\"1\\"/%3E%3C/g%3E%3C/svg%3E")' }}>
             {activeTab === 'tarefas' && <WidgetTasksPreview tasks={tasks} config={{ hiddenStatuses, hiddenTaskIds, sortOrder, selectedDimension }} />}
-            {activeTab === 'calendario' && <WidgetCalendarPreview />}
+            {activeTab === 'calendario' && <WidgetCalendarPreview config={{ calendarShowTasks, calendarShowEvents }} />}
+            {activeTab === 'semanal' && <WidgetWeeklyCalendarPreview config={{ weeklyShowTasks, weeklyShowEvents, weeklySplitShifts }} />}
             {activeTab === 'eventos' && <WidgetEventsPreview events={[]} />}
           </div>
         </div>

@@ -7,7 +7,7 @@
 *http://schemas.android.com/apk/res/androidlayout_heightwrap_content"(õ„2:0şÿÿÿÿÿÿÿÿ"R
 *http://schemas.android.com/apk/res/androidorientationvertical"(Ä„2:0"a
 *http://schemas.android.com/apk/res/androidid@+id/topPanel"(Ğ„2
-Æ øid/topPanel0*í
+Ş øid/topPanel0*í
 äLinearLayout"W
 *http://schemas.android.com/apk/res/androidgravitycenter_horizontal"!(¯„2:8"`
 *http://schemas.android.com/apk/res/androidlayout_widthmatch_parent"!(ô„2:0ÿÿÿÿÿÿÿÿÿ"a
@@ -15,7 +15,7 @@
 *http://schemas.android.com/apk/res/androidorientationvertical"!(Ä„2:0"T
 *http://schemas.android.com/apk/res/androidlayout_marginTop24dp"!(ø„2:h0"m
 *http://schemas.android.com/apk/res/androidid@+id/title_template"!(Ğ„2
-Ä øid/title_template0*”
+Ü øid/title_template0*”
 ‹	ImageView"S
 *http://schemas.android.com/apk/res/androidadjustViewBoundstrue"*(‚„2:@"M
 *http://schemas.android.com/apk/res/android	maxHeight24dp"*( ‚„2:h0"`
@@ -39,4 +39,4 @@ visibilitygone"9(Ü„2:0"`
 *http://schemas.android.com/apk/res/androidlayout_height(@dimen/abc_dialog_title_divider_material"9(õ„25
 3¦€˜ø'dimen/abc_dialog_title_divider_material0À€"y
 *http://schemas.android.com/apk/res/androidid@+id/titleDividerNoCustom"9(Ğ„2#
-!Ã øid/titleDividerNoCustom09$.
+!Û øid/titleDividerNoCustom09$.

@@ -36,6 +36,26 @@ class CalendarWidgetProvider : AppWidgetProvider() {
             val appWidgetIds = appWidgetManager.getAppWidgetIds(ComponentName(context, CalendarWidgetProvider::class.java))
             onUpdate(context, appWidgetManager, appWidgetIds)
         }
+        
+        if (action == "ACTION_TOGGLE_EVENTS") {
+            val prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+            val showE = prefs.getString("widget_calendar_show_events", "true") == "true"
+            prefs.edit().putString("widget_calendar_show_events", (!showE).toString()).apply()
+            
+            val appWidgetManager = AppWidgetManager.getInstance(context)
+            val appWidgetIds = appWidgetManager.getAppWidgetIds(ComponentName(context, CalendarWidgetProvider::class.java))
+            onUpdate(context, appWidgetManager, appWidgetIds)
+        }
+        
+        if (action == "ACTION_TOGGLE_TASKS") {
+            val prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+            val showT = prefs.getString("widget_calendar_show_tasks", "true") == "true"
+            prefs.edit().putString("widget_calendar_show_tasks", (!showT).toString()).apply()
+            
+            val appWidgetManager = AppWidgetManager.getInstance(context)
+            val appWidgetIds = appWidgetManager.getAppWidgetIds(ComponentName(context, CalendarWidgetProvider::class.java))
+            onUpdate(context, appWidgetManager, appWidgetIds)
+        }
     }
 
     companion object {
@@ -71,15 +91,50 @@ class CalendarWidgetProvider : AppWidgetProvider() {
             val pendingAdd = PendingIntent.getActivity(context, 2, addIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             views.setOnClickPendingIntent(R.id.btn_add_event, pendingAdd)
 
+            val showEvents = prefs.getString("widget_calendar_show_events", "true") == "true"
+            val showTasks = prefs.getString("widget_calendar_show_tasks", "true") == "true"
+
+            val toggleEventsIntent = Intent(context, CalendarWidgetProvider::class.java).apply { action = "ACTION_TOGGLE_EVENTS" }
+            val pendingToggleEvents = PendingIntent.getBroadcast(context, 3, toggleEventsIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            views.setOnClickPendingIntent(R.id.btn_toggle_events, pendingToggleEvents)
+            if (showEvents) {
+                views.setInt(R.id.btn_toggle_events, "setBackgroundResource", R.drawable.bg_event_pill_default)
+            } else {
+                views.setInt(R.id.btn_toggle_events, "setBackgroundResource", R.drawable.bg_event_pill_disabled)
+            }
+
+            val toggleTasksIntent = Intent(context, CalendarWidgetProvider::class.java).apply { action = "ACTION_TOGGLE_TASKS" }
+            val pendingToggleTasks = PendingIntent.getBroadcast(context, 4, toggleTasksIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            views.setOnClickPendingIntent(R.id.btn_toggle_tasks, pendingToggleTasks)
+            if (showTasks) {
+                views.setInt(R.id.btn_toggle_tasks, "setBackgroundResource", R.drawable.bg_task_pill_default)
+            } else {
+                views.setInt(R.id.btn_toggle_tasks, "setBackgroundResource", R.drawable.bg_task_pill_disabled)
+            }
+
             // Load Events
-            val eventsJson = prefs.getString("user_events", "[]")
             val events = mutableListOf<JSONObject>()
-            try {
-                val arr = JSONArray(eventsJson)
-                for (i in 0 until arr.length()) {
-                    events.add(arr.getJSONObject(i))
-                }
-            } catch (e: Exception) { e.printStackTrace() }
+            if (showEvents) {
+                val eventsJson = prefs.getString("user_events", "[]")
+                try {
+                    val arr = JSONArray(eventsJson)
+                    for (i in 0 until arr.length()) {
+                        events.add(arr.getJSONObject(i))
+                    }
+                } catch (e: Exception) { e.printStackTrace() }
+            }
+
+            // Load Tasks
+            val tasks = mutableListOf<JSONObject>()
+            if (showTasks) {
+                val tasksJson = prefs.getString("favorite_tasks", "[]")
+                try {
+                    val arr = JSONArray(tasksJson)
+                    for (i in 0 until arr.length()) {
+                        tasks.add(arr.getJSONObject(i))
+                    }
+                } catch (e: Exception) { e.printStackTrace() }
+            }
 
             // Clear Grid Container
             views.removeAllViews(R.id.calendar_grid_container)
@@ -113,19 +168,29 @@ class CalendarWidgetProvider : AppWidgetProvider() {
                             cellViews.setTextColor(R.id.cell_day_text, android.graphics.Color.parseColor("#9D4EDD"))
                         }
                         
-                        // Check for events today
+                        // Check for events and tasks today
                         val dayStr = String.format("%04d-%02d-%02d", cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, currentDay)
-                        var eventCount = 0
+                        var itemCount = 0
+                        
                         for (ev in events) {
+                            if (itemCount >= 3) break
                             val dataInicio = ev.optString("data_inicio", "")
                             if (dataInicio.contains(dayStr)) {
-                                if (eventCount < 3) {
-                                    val pillViews = RemoteViews(context.packageName, R.layout.item_calendar_event_pill)
-                                    pillViews.setTextViewText(R.id.event_pill_text, ev.optString("nome", "Evento"))
-                                    // Could set custom color here based on dimension, but default is purple
-                                    cellViews.addView(R.id.cell_events_container, pillViews)
-                                    eventCount++
-                                }
+                                val pillViews = RemoteViews(context.packageName, R.layout.item_calendar_event_pill)
+                                pillViews.setTextViewText(R.id.event_pill_text, ev.optString("nome", "Evento"))
+                                cellViews.addView(R.id.cell_events_container, pillViews)
+                                itemCount++
+                            }
+                        }
+
+                        for (tk in tasks) {
+                            if (itemCount >= 3) break
+                            val prazo = tk.optString("prazo", "")
+                            if (prazo.contains(dayStr)) {
+                                val pillViews = RemoteViews(context.packageName, R.layout.item_calendar_task_pill)
+                                pillViews.setTextViewText(R.id.task_pill_text, tk.optString("nome", "Tarefa"))
+                                cellViews.addView(R.id.cell_events_container, pillViews)
+                                itemCount++
                             }
                         }
 

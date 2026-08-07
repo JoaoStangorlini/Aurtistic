@@ -8,7 +8,7 @@
 *http://schemas.android.com/apk/res/androidlayout_heightmatch_parent"(õ„2:0ÿÿÿÿÿÿÿÿÿ"T
 *http://schemas.android.com/apk/res/androidfitsSystemWindowstrue"(İ„2:@"y
 *http://schemas.android.com/apk/res/androidid@+id/decor_content_parent"(Ğ„2#
-!×€ øid/decor_content_parent0*t
+!ç€ øid/decor_content_parent0*t
 linclude"alayout"@layout/abc_screen_content_include"2/
 -”€¬ø!layout/abc_screen_content_include0ÿÿ;*•
 Œ,androidx.appcompat.widget.ActionBarContainer"I

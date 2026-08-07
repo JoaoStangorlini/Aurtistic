@@ -42,7 +42,44 @@
             android:src="@drawable/ic_arrow_forward"
             android:padding="8dp"
             android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Próximo Mês" />
+            android:contentDescription="Próximo Mês"
+            android:layout_marginEnd="4dp" />
+
+        <TextView
+            android:id="@+id/btn_toggle_events"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:text="E"
+            android:textColor="#FFFFFF"
+            android:gravity="center"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:background="@drawable/bg_event_pill_default"
+            android:layout_marginEnd="2dp" />
+
+        <TextView
+            android:id="@+id/btn_toggle_tasks"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:text="T"
+            android:textColor="#FFFFFF"
+            android:gravity="center"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:background="@drawable/bg_task_pill_default"
+            android:layout_marginEnd="2dp" />
+            
+        <TextView
+            android:id="@+id/btn_toggle_ambos"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:text="A"
+            android:textColor="#121212"
+            android:gravity="center"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:background="@drawable/bg_ambos_pill_default"
+            android:layout_marginEnd="4dp" />
             
         <FrameLayout
             android:id="@+id/btn_add_event"

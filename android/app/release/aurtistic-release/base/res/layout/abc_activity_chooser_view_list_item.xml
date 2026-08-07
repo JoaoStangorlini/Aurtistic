@@ -13,7 +13,7 @@ background?attr/selectableItemBackground"(Ô„2+
 *http://schemas.android.com/apk/res/androidpaddingLeft16dip"(Ö„2:h "O
 *http://schemas.android.com/apk/res/androidminWidth196dip"(¿‚„2:hˆ"c
 *http://schemas.android.com/apk/res/androidid@+id/list_item"(Ğ„2
-ø€ øid/list_item0*ß
+ øid/list_item0*ß
 ÖLinearLayout"`
 *http://schemas.android.com/apk/res/androidlayout_widthwrap_content"(ô„2:0şÿÿÿÿÿÿÿÿ"a
 *http://schemas.android.com/apk/res/androidlayout_heightmatch_parent"(õ„2:0ÿÿÿÿÿÿÿÿÿ"W
@@ -24,7 +24,7 @@ background?attr/selectableItemBackground"(Ô„2+
 *http://schemas.android.com/apk/res/androidlayout_marginRight8dip"&(ù„2:h"W
 *http://schemas.android.com/apk/res/androidduplicateParentStatetrue"&(é„2:@"Y
 *http://schemas.android.com/apk/res/androidid	@+id/icon"&(Ğ„2
-ì€ øid/icon0"\
+ øid/icon0"\
 *http://schemas.android.com/apk/res/androidlayout_gravitycenter_vertical"&(³„2:8&6*ÿ
 öTextView"š
 *http://schemas.android.com/apk/res/androidtextAppearance"?attr/textAppearanceLargePopupMenu"1(´€„2/
@@ -40,5 +40,5 @@ singleLinetrue"1(İ‚„2:@"W
 *http://schemas.android.com/apk/res/androidduplicateParentStatetrue"1(é„2:@"[
 *http://schemas.android.com/apk/res/androidid
 @+id/title"1(Ğ„2
-Â øid/title0"\
+Ú øid/title0"\
 *http://schemas.android.com/apk/res/androidlayout_gravitycenter_vertical"1(³„2:8122E

@@ -7,7 +7,7 @@
 *http://schemas.android.com/apk/res/androidlayout_height%@dimen/notification_large_icon_height"(õ„22
 0ç€˜ø$dimen/notification_large_icon_height0À€"e
 *http://schemas.android.com/apk/res/androidid@+id/icon_group"(Ğ„2
-í€ øid/icon_group0*›
+‚ øid/icon_group0*›
 ’	ImageView"£
 *http://schemas.android.com/apk/res/androidlayout_marginBottom%@dimen/notification_big_circle_margin" (ú„20
 .å€˜ø$dimen/notification_big_circle_margin0@" 
@@ -21,7 +21,7 @@
 *http://schemas.android.com/apk/res/androidlayout_marginStart%@dimen/notification_big_circle_margin" (µ‡„20
 .å€˜ø$dimen/notification_big_circle_margin0@"Y
 *http://schemas.android.com/apk/res/androidid	@+id/icon" (Ğ„2
-ì€ øid/icon0 *ä
+ øid/icon0 *ä
 Û	ImageView"M
 *http://schemas.android.com/apk/res/android
 visibilitygone")(Ü„2:0"V
@@ -33,6 +33,6 @@ visibilitygone")(Ü„2:0"V
 *http://schemas.android.com/apk/res/androidlayout_height#@dimen/notification_right_icon_size")(õ„20
 .ë€˜ø"dimen/notification_right_icon_size0À€"e
 *http://schemas.android.com/apk/res/androidid@+id/right_icon")(Ğ„2
-Š øid/right_icon0"Z
+  øid/right_icon0"Z
 *http://schemas.android.com/apk/res/androidlayout_gravity
 end|bottom")(³„2:8Õ€€)
