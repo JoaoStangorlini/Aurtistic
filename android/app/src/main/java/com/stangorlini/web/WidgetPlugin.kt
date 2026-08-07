@@ -14,14 +14,32 @@ class WidgetPlugin : Plugin() {
     @PluginMethod
     fun updateWidget(call: PluginCall) {
         val context = context
-        val intent = Intent(context, FavoritesWidgetProvider::class.java)
-        intent.action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-        
         val widgetManager = AppWidgetManager.getInstance(context)
-        val ids = widgetManager.getAppWidgetIds(ComponentName(context, FavoritesWidgetProvider::class.java))
-        intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-        
-        context.sendBroadcast(intent)
+
+        // 1. Update Favorites Widget (Tarefas)
+        val favIntent = Intent(context, FavoritesWidgetProvider::class.java).apply {
+            action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+            val ids = widgetManager.getAppWidgetIds(ComponentName(context, FavoritesWidgetProvider::class.java))
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+        }
+        context.sendBroadcast(favIntent)
+
+        // 2. Update Calendar Widget (Calendário)
+        val calIntent = Intent(context, CalendarWidgetProvider::class.java).apply {
+            action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+            val ids = widgetManager.getAppWidgetIds(ComponentName(context, CalendarWidgetProvider::class.java))
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+        }
+        context.sendBroadcast(calIntent)
+
+        // 3. Update Events Widget (Eventos)
+        val evIntent = Intent(context, EventsWidgetProvider::class.java).apply {
+            action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+            val ids = widgetManager.getAppWidgetIds(ComponentName(context, EventsWidgetProvider::class.java))
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+        }
+        context.sendBroadcast(evIntent)
+
         call.resolve()
     }
 }

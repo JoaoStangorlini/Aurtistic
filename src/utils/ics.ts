@@ -85,3 +85,74 @@ export const downloadICS = (tasks: Task[], filename: string = 'tarefas.ics') => 
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url);
 };
+
+export interface ParsedICSEvent {
+  nome: string;
+  descricao: string | null;
+  data_inicio: string | null;
+  data_fim: string | null;
+}
+
+export const parseICSFile = (icsText: string): ParsedICSEvent[] => {
+  const events: ParsedICSEvent[] = [];
+  const veventBlocks = icsText.split('BEGIN:VEVENT');
+
+  for (let i = 1; i < veventBlocks.length; i++) {
+    const block = veventBlocks[i].split('END:VEVENT')[0];
+    
+    let summary = '';
+    let description = '';
+    let dtstart = '';
+    let dtend = '';
+    let location = '';
+
+    const unfolded = block.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '');
+    const lines = unfolded.split(/\r?\n/);
+
+    for (const line of lines) {
+      if (line.startsWith('SUMMARY:')) {
+        summary = line.substring(8).replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\n/gi, '\n');
+      } else if (line.startsWith('DESCRIPTION:')) {
+        description = line.substring(12).replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\n/gi, '\n');
+      } else if (line.startsWith('LOCATION:')) {
+        location = line.substring(9).replace(/\\,/g, ',').replace(/\\;/g, ';');
+      } else if (line.startsWith('DTSTART')) {
+        const val = line.substring(line.indexOf(':') + 1).trim();
+        dtstart = val;
+      } else if (line.startsWith('DTEND')) {
+        const val = line.substring(line.indexOf(':') + 1).trim();
+        dtend = val;
+      }
+    }
+
+    if (summary || dtstart) {
+      const formatICSDateToIso = (icsDateStr: string): string | null => {
+        if (!icsDateStr) return null;
+        const clean = icsDateStr.replace(/[^0-9T]/g, '');
+        if (clean.length >= 8) {
+          const yyyy = clean.substring(0, 4);
+          const mm = clean.substring(4, 6);
+          const dd = clean.substring(6, 8);
+          if (clean.includes('T') && clean.length >= 13) {
+            const hh = clean.substring(9, 11);
+            const min = clean.substring(11, 13);
+            return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+          }
+          return `${yyyy}-${mm}-${dd}`;
+        }
+        return null;
+      };
+
+      const fullDescription = [description, location ? `Local: ${location}` : ''].filter(Boolean).join('\n\n');
+
+      events.push({
+        nome: summary.trim() || 'Evento Importado',
+        descricao: fullDescription || null,
+        data_inicio: formatICSDateToIso(dtstart),
+        data_fim: formatICSDateToIso(dtend)
+      });
+    }
+  }
+
+  return events;
+};

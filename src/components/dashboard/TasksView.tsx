@@ -5,6 +5,7 @@ import { Task, TaskColumn, AgendaEvent } from '@/types';
 import { Badge, getBadgeColorClass } from './Badge';
 import { TaskFormModal } from './TaskFormModal';
 import { EventFormModal } from './EventFormModal';
+import { ImportICSModal } from './ImportICSModal';
 import { BulkEditModal } from './BulkEditModal';
 import { OptionsEditorModal } from './OptionsEditorModal';
 import TaskCalendar from './TaskCalendar';
@@ -23,7 +24,9 @@ import { downloadCSV } from '@/utils/csv';
 export interface WidgetPluginPlugin {
   updateWidget(): Promise<void>;
 }
-export const WidgetPlugin = registerPlugin<WidgetPluginPlugin>('WidgetPlugin');
+export const WidgetPlugin = Capacitor.isPluginAvailable('WidgetPlugin')
+  ? ((Capacitor as any).Plugins.WidgetPlugin as WidgetPluginPlugin)
+  : registerPlugin<WidgetPluginPlugin>('WidgetPlugin');
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return '-';
@@ -149,6 +152,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
 
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [eventToEdit, setEventToEdit] = useState<AgendaEvent | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const [expandedTasks, setExpandedTasks] = useState<string[]>([]);
   
@@ -212,25 +216,50 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
     }
   }, [localTasks]);
 
+  // Sync Events to Native Android Widget
+  useEffect(() => {
+    const syncEvents = async () => {
+      try {
+        const { Preferences } = await import('@capacitor/preferences');
+        await Preferences.set({
+          key: 'user_events',
+          value: JSON.stringify(localEvents)
+        });
+        if (Capacitor.isNativePlatform()) {
+          try { await WidgetPlugin.updateWidget(); } catch (err) {}
+        }
+      } catch (e) {
+        console.warn('Erro ao salvar eventos no widget:', e);
+      }
+    };
+    syncEvents();
+  }, [localEvents]);
+
   // Sync Favorites to Native Android Widget
   useEffect(() => {
     const syncFavorites = async () => {
       if (!Capacitor.isNativePlatform()) return;
       try {
+        const { Preferences } = await import('@capacitor/preferences');
         // Ler preferências de filtro
         let hiddenStatuses = ['completa', 'descartada', 'concluída'];
         let sortOrder = 'recentes';
         let hiddenTaskIds: string[] = [];
         
+        const safeParse = (str: string | null, fallback: any) => {
+          if (!str) return fallback;
+          try { return JSON.parse(str); } catch (e) { return fallback; }
+        };
+        
         try {
           const { value: hiddenStatsVal } = await Preferences.get({ key: 'widget_hidden_statuses' });
-          if (hiddenStatsVal) hiddenStatuses = JSON.parse(hiddenStatsVal);
+          if (hiddenStatsVal) hiddenStatuses = safeParse(hiddenStatsVal, []);
           
           const { value: sortOrderVal } = await Preferences.get({ key: 'widget_sort_order' });
           if (sortOrderVal) sortOrder = sortOrderVal;
 
           const { value: hiddenIdsVal } = await Preferences.get({ key: 'widget_hidden_task_ids' });
-          if (hiddenIdsVal) hiddenTaskIds = JSON.parse(hiddenIdsVal);
+          if (hiddenIdsVal) hiddenTaskIds = safeParse(hiddenIdsVal, []);
         } catch (e) { console.warn('Erro ao ler prefs do widget em TasksView', e); }
 
         let filteredTasks = localTasks.filter(t => 
@@ -973,7 +1002,8 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
     }
 
     const fromTasks = localTasks.map(t => t.dimensao).filter(Boolean) as string[];
-    let dims = Array.from(new Set([...predefined, ...fromTasks]));
+    const fromEvents = localEvents.map(e => e.dimensao).filter(Boolean) as string[];
+    let dims = Array.from(new Set([...predefined, ...fromTasks, ...fromEvents]));
 
     // Remove "favoritas" que estava repetido com visibilidade
     dims = dims.filter(d => d !== 'favoritas');
@@ -1599,12 +1629,22 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                 </button>
               )}
               {displayMode !== 'tarefas' && (
-                <button 
-                  onClick={handleNewEvent}
-                  className={`bg-[#9D4EDD] text-white font-bold px-4 py-2 text-sm lg:px-5 lg:py-2.5 lg:text-base rounded-md hover:bg-[#8338c7] transition-colors shadow-sm shrink-0`}
-                >
-                  + Novo Evento
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsImportModalOpen(true)}
+                    className="bg-[#1A1A1A] border border-[#2D2D2D] text-white font-bold px-3 py-2 text-sm lg:px-4 lg:py-2.5 rounded-md hover:bg-[#2A2A2A] hover:border-[#9D4EDD] transition-colors shadow-sm shrink-0 flex items-center gap-1.5"
+                    title="Importar de Google Agenda / .ics"
+                  >
+                    <span className="material-symbols-outlined text-base">file_upload</span>
+                    <span>Importar .ics</span>
+                  </button>
+                  <button
+                    onClick={handleNewEvent}
+                    className={`bg-[#9D4EDD] text-white font-bold px-4 py-2 text-sm lg:px-5 lg:py-2.5 lg:text-base rounded-md hover:bg-[#8338c7] transition-colors shadow-sm shrink-0`}
+                  >
+                    + Novo Evento
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -2178,6 +2218,15 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
           setIsEventModalOpen(false);
           // O NextJS revalidatePath atualizará a página para mostrar o novo evento
           window.location.reload(); 
+        }}
+      />
+
+      <ImportICSModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={() => {
+          setIsImportModalOpen(false);
+          window.location.reload();
         }}
       />
       

@@ -40,8 +40,8 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
-        <!-- Widget Receiver -->
-        <receiver android:name=".FavoritesWidgetProvider" android:exported="true">
+        <!-- Widget Receiver 1: Tarefas -->
+        <receiver android:name=".FavoritesWidgetProvider" android:label="Aurtistic - Tarefas" android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -49,8 +49,30 @@
                 android:resource="@xml/widget_info" />
         </receiver>
 
-        <!-- Widget Service -->
+        <!-- Widget Receiver 2: Calendário -->
+        <receiver android:name=".CalendarWidgetProvider" android:label="Aurtistic - Calendário" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/calendar_widget_info" />
+        </receiver>
+
+        <!-- Widget Receiver 3: Eventos -->
+        <receiver android:name=".EventsWidgetProvider" android:label="Aurtistic - Eventos" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/events_widget_info" />
+        </receiver>
+
+        <!-- Widget Services -->
         <service android:name=".FavoritesWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
+
+        <service android:name=".EventsWidgetService"
             android:permission="android.permission.BIND_REMOTEVIEWS"
             android:exported="false" />
             

@@ -24,6 +24,8 @@ class WidgetActionActivity : Activity() {
             showDimensionDialog()
         } else if (action == "create_task") {
             showCreateTaskDialog()
+        } else if (action == "create_event") {
+            showCreateEventDialog()
         } else if (action == "open_task" && taskId != null) {
             val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
             prefs.edit().putString("widget_action_open_task", taskId).commit()
@@ -150,6 +152,85 @@ class WidgetActionActivity : Activity() {
         // Show keyboard automatically
         inputName.requestFocus()
         dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+    }
+
+    private fun showCreateEventDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_create_event, null)
+        val inputName = dialogView.findViewById<android.widget.EditText>(R.id.input_event_name)
+        val btnCancel = dialogView.findViewById<android.widget.Button>(R.id.btn_cancel)
+        val btnSave = dialogView.findViewById<android.widget.Button>(R.id.btn_save)
+
+        val dialog = android.app.Dialog(this)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        dialog.setContentView(dialogView)
+        dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+        
+        btnCancel.setOnClickListener {
+            dialog.dismiss()
+            finish()
+        }
+        
+        btnSave.setOnClickListener {
+            val eventName = inputName.text.toString().trim()
+            if (eventName.isNotEmpty()) {
+                val tempId = java.util.UUID.randomUUID().toString()
+                savePendingCreateEvent(tempId, eventName)
+                optimisticCreateEvent(tempId, eventName)
+            }
+            dialog.dismiss()
+            finish()
+        }
+        
+        dialog.setOnCancelListener { finish() }
+        dialog.show()
+        
+        inputName.requestFocus()
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+    }
+
+    private fun savePendingCreateEvent(eventId: String, eventName: String) {
+        val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+        val pendingJson = prefs.getString("pending_widget_updates", "[]")
+        try {
+            val arr = JSONArray(pendingJson)
+            val obj = JSONObject()
+            obj.put("action", "create_event")
+            obj.put("eventId", eventId)
+            obj.put("eventName", eventName)
+            arr.put(obj)
+            prefs.edit().putString("pending_widget_updates", arr.toString()).apply()
+        } catch (e: Exception) { e.printStackTrace() }
+    }
+
+    private fun optimisticCreateEvent(eventId: String, eventName: String) {
+        val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+        val eventsJson = prefs.getString("user_events", "[]")
+        try {
+            val arr = JSONArray(eventsJson)
+            val newEvent = JSONObject()
+            newEvent.put("id", eventId)
+            newEvent.put("nome", eventName)
+            
+            // Set date to today
+            val cal = java.util.Calendar.getInstance()
+            val dayStr = String.format("%04d-%02d-%02d", cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1, cal.get(java.util.Calendar.DAY_OF_MONTH))
+            newEvent.put("data_inicio", dayStr)
+
+            val newArr = JSONArray()
+            newArr.put(newEvent)
+            for (i in 0 until arr.length()) {
+                newArr.put(arr.getJSONObject(i))
+            }
+            prefs.edit().putString("user_events", newArr.toString()).apply()
+            
+            val intent = Intent(this, CalendarWidgetProvider::class.java)
+            intent.action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+            val widgetManager = AppWidgetManager.getInstance(this)
+            val ids = widgetManager.getAppWidgetIds(ComponentName(this, CalendarWidgetProvider::class.java))
+            intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+            sendBroadcast(intent)
+            
+        } catch (e: Exception) { e.printStackTrace() }
     }
 
     private fun savePendingCreateUpdate(taskId: String, taskName: String) {

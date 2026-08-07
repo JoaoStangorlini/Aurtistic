@@ -545,6 +545,26 @@ export async function createEvent(eventData: Partial<AgendaEvent>) {
     throw new Error(error.message);
   }
 
+  revalidatePath('/servidor');
+}
+
+export async function createEventsBatch(eventsData: Partial<AgendaEvent>[]) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuário não autenticado");
+
+  const records = eventsData.map(ev => ({
+    ...ev,
+    user_id: user.id
+  }));
+
+  const { error } = await supabase.from('events').insert(records);
+
+  if (error) {
+    console.error("Erro ao criar batch de eventos:", error);
+    throw new Error(error.message);
+  }
+
   revalidatePath('/');
   revalidatePath('/aurtistic');
   revalidatePath('/labdiv');

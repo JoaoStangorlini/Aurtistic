@@ -31,10 +31,15 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
   useEffect(() => {
     // Carregar preferências salvas no Capacitor Preferences
     const loadPrefs = async () => {
+      const safeParse = (str: string | null, fallback: any) => {
+        if (!str) return fallback;
+        try { return JSON.parse(str); } catch (e) { return fallback; }
+      };
+      
       try {
         const { value: hiddenStats } = await Preferences.get({ key: 'widget_hidden_statuses' });
         if (hiddenStats) {
-          setHiddenStatuses(JSON.parse(hiddenStats));
+          setHiddenStatuses(safeParse(hiddenStats, ['completa', 'descartada', 'concluída']));
         }
 
         const { value: orderVal } = await Preferences.get({ key: 'widget_sort_order' });
@@ -49,7 +54,7 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
 
         const { value: hiddenVal } = await Preferences.get({ key: 'widget_hidden_task_ids' });
         if (hiddenVal) {
-          setHiddenTaskIds(JSON.parse(hiddenVal));
+          setHiddenTaskIds(safeParse(hiddenVal, []));
         }
       } catch (err) {
         console.error('Erro ao carregar preferências do widget', err);
@@ -275,10 +280,6 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
             <div className="text-[#8E8E8E] text-sm p-4 bg-[#121212] border border-[#2D2D2D] rounded-lg">
               <h3 className="text-white font-bold mb-4">Configurações de Eventos</h3>
               <div className="flex flex-col gap-4">
-                <label className="flex items-center justify-between text-white">
-                  <span>Quantidade de Eventos</span>
-                  <input type="number" defaultValue={5} min={1} max={10} className="w-20 bg-[#1A1A1A] border border-[#2D2D2D] rounded p-2 text-sm font-semibold text-center" />
-                </label>
                 <label className="flex items-center justify-between text-white">
                   <span>Mostrar Horários</span>
                   <input type="checkbox" className="accent-[#9D4EDD] w-4 h-4" defaultChecked />

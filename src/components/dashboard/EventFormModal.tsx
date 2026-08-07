@@ -144,7 +144,7 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
               <div>
                 <label className="block text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-2">Data de Início</label>
                 <input
-                  type="date"
+                  type="datetime-local"
                   value={dataInicio}
                   onChange={(e) => setDataInicio(e.target.value)}
                   className="w-full bg-[#1A1A1A] border border-[#2D2D2D] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] transition-all color-scheme-dark"
@@ -153,7 +153,7 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
               <div>
                 <label className="block text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-2">Data de Fim (Opcional)</label>
                 <input
-                  type="date"
+                  type="datetime-local"
                   value={dataFim}
                   onChange={(e) => setDataFim(e.target.value)}
                   className="w-full bg-[#1A1A1A] border border-[#2D2D2D] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] transition-all color-scheme-dark"
