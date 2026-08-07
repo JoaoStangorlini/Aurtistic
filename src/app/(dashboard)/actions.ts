@@ -24,10 +24,23 @@ export async function updateTaskOrders(updates: { id: string, ordem_manual: numb
 export async function saveTask(taskData: Partial<Task>) {
   const supabase = await createClient();
 
-  // Se a tarefa foi marcada como "completa" e tem "frequencia", empurra para a frente
-  let dataToSave = { ...taskData };
+  const { data: { user: actionUser } } = await supabase.auth.getUser();
   
-  if (dataToSave.status === 'completa' && dataToSave.frequencia) {
+  // Buscar configuração avançada para status de conclusão
+  let completionStatuses = ['completa', 'concluída', 'concluida'];
+  if (actionUser) {
+    const { data: profile } = await supabase.from('user_profiles').select('features_config').eq('id', actionUser.id).single();
+    if (profile?.features_config?.advanced_settings?.completion_statuses) {
+      completionStatuses = profile.features_config.advanced_settings.completion_statuses.map((s: string) => s.toLowerCase());
+    }
+  }
+
+  // Se a tarefa foi marcada como completa e tem "frequencia", empurra para a frente
+  let dataToSave = { ...taskData };
+  const currentStatusLower = (dataToSave.status || '').toLowerCase();
+  const isCompleted = completionStatuses.includes(currentStatusLower);
+  
+  if (isCompleted && dataToSave.frequencia) {
     const freq = dataToSave.frequencia.toLowerCase();
     let daysToAdd = 0;
     
@@ -51,7 +64,7 @@ export async function saveTask(taskData: Partial<Task>) {
       dataToSave.status = 'não iniciada'; // Reseta o status
       dataToSave.concluida_em = null;
     }
-  } else if (dataToSave.status === 'completa') {
+  } else if (isCompleted) {
     // Se marcou como completa e não é recorrente (ou não tem frequencia)
     dataToSave.concluida_em = new Date().toISOString();
   } else {
@@ -67,9 +80,8 @@ export async function saveTask(taskData: Partial<Task>) {
   });
 
   // user_id will be handled by RLS if possible, but let's grab it explicitly to be safe
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user && !dataToSave.user_id) {
-    dataToSave.user_id = user.id;
+  if (actionUser && !dataToSave.user_id) {
+    dataToSave.user_id = actionUser.id;
   }
 
   if (dataToSave.id) {
@@ -94,8 +106,8 @@ export async function saveTask(taskData: Partial<Task>) {
           }
        });
        
-       if (fieldsToPropagate.status === 'completa') fieldsToPropagate.concluida_em = dataToSave.concluida_em;
-       if (fieldsToPropagate.status && fieldsToPropagate.status !== 'completa') fieldsToPropagate.concluida_em = null;
+       if (fieldsToPropagate.status && completionStatuses.includes(fieldsToPropagate.status.toLowerCase())) fieldsToPropagate.concluida_em = dataToSave.concluida_em;
+       if (fieldsToPropagate.status && !completionStatuses.includes(fieldsToPropagate.status.toLowerCase())) fieldsToPropagate.concluida_em = null;
 
        const customNew = JSON.stringify(dataToSave.custom_fields || {});
        const customOld = JSON.stringify(originalTask.custom_fields || {});
@@ -144,11 +156,22 @@ export async function updateMultipleTasks(taskIds: string[], updates: Partial<Ta
     }
   });
 
+  const { data: { user: multiUser } } = await supabase.auth.getUser();
+  let completionStatuses = ['completa', 'concluída', 'concluida'];
+  if (multiUser) {
+    const { data: profile } = await supabase.from('user_profiles').select('features_config').eq('id', multiUser.id).single();
+    if (profile?.features_config?.advanced_settings?.completion_statuses) {
+      completionStatuses = profile.features_config.advanced_settings.completion_statuses.map((s: string) => s.toLowerCase());
+    }
+  }
+
+  const multiStatusLower = (dataToSave.status || '').toLowerCase();
+  const multiIsCompleted = completionStatuses.includes(multiStatusLower);
+
   // Se marcou o status como "completa" na edição múltipla, vamos tratar o concluida_em simplificadamente.
-  // Note: a lógica complexa de recorrência será ignorada para edições em massa por segurança (para evitar dupes).
-  if (dataToSave.status === 'completa') {
+  if (multiIsCompleted) {
     dataToSave.concluida_em = new Date().toISOString();
-  } else if (dataToSave.status && dataToSave.status !== 'completa') {
+  } else if (dataToSave.status && !multiIsCompleted) {
     dataToSave.concluida_em = null;
   }
 
@@ -570,4 +593,18 @@ export async function deleteEvent(eventId: string) {
   revalidatePath('/aurtistic');
   revalidatePath('/labdiv');
   revalidatePath('/servidor');
+}
+
+export async function updateAdvancedConfig(advancedSettings: any) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: profile } = await supabase.from('user_profiles').select('features_config').eq('id', user.id).single();
+  const features_config = profile?.features_config || {};
+  
+  features_config.advanced_settings = advancedSettings;
+
+  const { error } = await supabase.from('user_profiles').update({ features_config }).eq('id', user.id);
+  if (error) throw new Error(error.message);
 }

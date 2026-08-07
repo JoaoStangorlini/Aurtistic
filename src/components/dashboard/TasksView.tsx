@@ -10,7 +10,7 @@ import { OptionsEditorModal } from './OptionsEditorModal';
 import TaskCalendar from './TaskCalendar';
 import { useSearchParams, usePathname } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import { updateTaskOrders, saveTaskColumn } from '@/app/(dashboard)/actions';
+import { updateTaskOrders, saveTaskColumn, updateEvent } from '@/app/(dashboard)/actions';
 import { saveTask, deleteMultipleTasks, updateMultipleTasks } from '@/lib/offlineActions';
 import { Preferences } from '@capacitor/preferences';
 import { Capacitor, registerPlugin } from '@capacitor/core';
@@ -83,7 +83,9 @@ const HighlightedText = ({ text, highlight }: { text: string | null, highlight: 
   );
 };
 
-export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], displayMode = 'tarefas', initialColumns = [], isPersonalScope = false, userId, initialQuickFilters = ['responsavel', 'dimensao'], initialQuickSorts = ['status', 'prazo', 'prioridade', 'manual'] }: { initialTasks: Task[], initialEvents?: AgendaEvent[], displayMode?: 'tarefas' | 'eventos' | 'ambos', initialColumns?: TaskColumn[], isPersonalScope?: boolean, userId?: string, initialQuickFilters?: string[], initialQuickSorts?: string[] }) {
+export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], displayMode = 'tarefas', initialColumns = [], isPersonalScope = false, userId, initialQuickFilters = ['responsavel', 'dimensao'], initialQuickSorts = ['status', 'prazo', 'prioridade', 'manual'], advancedSettings = {} }: { initialTasks: Task[], initialEvents?: AgendaEvent[], displayMode?: 'tarefas' | 'eventos' | 'ambos', initialColumns?: TaskColumn[], isPersonalScope?: boolean, userId?: string, initialQuickFilters?: string[], initialQuickSorts?: string[], advancedSettings?: any }) {
+  const enableSubtasks = advancedSettings.enable_subtasks !== false;
+  const enableAdminFilters = advancedSettings.enable_admin_filters !== false;
 
   const searchParams = useSearchParams();
   const globalQuery = searchParams.get('q') || '';
@@ -98,6 +100,16 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
   };
 
   const [viewMode, setViewMode] = useState<'list' | 'weekly' | 'monthly'>('list');
+
+  useEffect(() => {
+    if (displayMode === 'eventos') {
+      setViewMode('monthly');
+    } else if (displayMode === 'ambos') {
+      setViewMode('weekly');
+    } else {
+      setViewMode('list');
+    }
+  }, [displayMode]);
   const [calendarCurrentDate, setCalendarCurrentDate] = useState(new Date());
   
   // Normalizar os dados que vêm do banco (migração temporária na UI)
@@ -467,6 +479,18 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
       }
     } catch (err: any) {
       alert("Erro ao atualizar favorito: " + err.message);
+    }
+  };
+
+  const handleEventFavoriteToggle = async (e: React.MouseEvent, event: AgendaEvent) => {
+    e.stopPropagation();
+    const newValue = !event.is_favorite;
+    const updatedEvents = localEvents.map(evt => evt.id === event.id ? { ...evt, is_favorite: newValue } : evt);
+    setLocalEvents(updatedEvents);
+    try {
+      await updateEvent(event.id, { is_favorite: newValue });
+    } catch (err: any) {
+      alert("Erro ao favoritar evento: " + err.message);
     }
   };
 
@@ -1602,7 +1626,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                   </button>
                 </td>
                 <td className="p-4 text-sm font-medium text-white break-words" title={task.descricao || ''}>
-                  <div className={`flex items-center gap-2 ${task.parent_id ? 'pl-4 border-l-2 border-[#2D2D2D] ml-2' : ''}`}>
+                  <div className={`flex items-center gap-2 ${task.parent_id ? 'pl-3 border-l-2 border-[#FFCC00] ml-4 scale-[0.97] origin-left' : ''}`}>
                     {!task.parent_id && localTasks.some(t => t.parent_id === task.id) && (
                       <button onClick={(e) => toggleExpand(e, task.id)} className="text-[#8E8E8E] hover:text-white transition-colors flex items-center justify-center shrink-0">
                         <span className="material-symbols-outlined text-[20px]">{!collapsedTasks.has(task.id) ? 'expand_more' : 'chevron_right'}</span>
@@ -1678,7 +1702,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
             onDrop={sortBy === 'manual' ? (e) => handleDrop(e, task.id) : undefined}
             onDragEnd={sortBy === 'manual' ? () => setDropTargetId(null) : undefined}
             onClick={(e) => handleRowClick(e, task.id)}
-            className={`border rounded-lg p-4 flex flex-col gap-3 relative transition-colors ${selectedTasks.has(task.id) ? 'bg-[#9D4EDD]/10 border-[#9D4EDD]/30' : 'bg-[#1A1A1A] border-[#FFCC00]/30 hover:border-[#9D4EDD]'} ${draggedTaskId === task.id ? 'opacity-50' : ''} ${dropTargetId === task.id ? (dropPosition === 'top' ? 'border-t-2 border-[#9D4EDD]' : 'border-b-2 border-[#9D4EDD]') : ''}`}
+            className={`border rounded-lg p-4 flex flex-col gap-3 relative transition-colors ${selectedTasks.has(task.id) ? 'bg-[#9D4EDD]/10 border-[#9D4EDD]/30' : 'bg-[#1A1A1A] border-[#FFCC00]/30 hover:border-[#9D4EDD]'} ${draggedTaskId === task.id ? 'opacity-50' : ''} ${dropTargetId === task.id ? (dropPosition === 'top' ? 'border-t-2 border-[#9D4EDD]' : 'border-b-2 border-[#9D4EDD]') : ''} ${task.parent_id ? 'border-l-2 border-l-[#FFCC00] ml-4 scale-[0.97] origin-left' : ''}`}
           >
             <div className="absolute top-4 right-4 flex items-center gap-3">
               <button onClick={(e) => handleFavoriteToggle(e, task.id)} className={`transition-colors flex items-center justify-center ${task.is_favorite ? 'text-[#FFCC00]' : 'text-[#8E8E8E] hover:text-[#FFCC00]'}`}>
@@ -1693,7 +1717,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
               </button>
             </div>
             
-            <div className={`pr-16 flex items-start gap-2 ${task.parent_id ? 'pl-4 border-l-2 border-[#2D2D2D] ml-2' : ''}`}>
+            <div className={`pr-16 flex items-start gap-2`}>
               {!task.parent_id && localTasks.some(t => t.parent_id === task.id) && (
                 <button onClick={(e) => toggleExpand(e, task.id)} className="text-[#8E8E8E] hover:text-white transition-colors flex items-center justify-center shrink-0 mt-0.5">
                   <span className="material-symbols-outlined text-[20px]">{!collapsedTasks.has(task.id) ? 'expand_more' : 'chevron_right'}</span>
@@ -1871,10 +1895,15 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
             ) : (
               <div className="flex flex-col gap-2">
                 {processedEvents.map(evt => (
-                  <div key={evt.id} onClick={() => { setEventToEdit(evt); setIsEventModalOpen(true); }} className="flex flex-col p-3 bg-[#252525] border border-[#333333] rounded hover:border-[#9D4EDD]/50 transition-colors cursor-pointer">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[#26a69a] text-[16px]">event</span>
-                      <span className="font-bold text-sm text-[#E0E0E0]">{evt.nome}</span>
+                  <div key={evt.id} onClick={() => { setEventToEdit(evt); setIsEventModalOpen(true); }} className="flex flex-col p-3 bg-[#252525] border border-[#333333] rounded hover:border-[#9D4EDD]/50 transition-colors cursor-pointer relative group">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[#26a69a] text-[16px]">event</span>
+                        <span className="font-bold text-sm text-[#E0E0E0]">{evt.nome}</span>
+                      </div>
+                      <button onClick={(e) => handleEventFavoriteToggle(e, evt)} className={`transition-colors flex items-center justify-center ${evt.is_favorite ? 'text-[#FFCC00]' : 'text-[#8E8E8E] hover:text-[#FFCC00] opacity-0 group-hover:opacity-100'}`}>
+                        <span className={`material-symbols-outlined text-[18px] ${evt.is_favorite ? 'filled' : ''}`} style={evt.is_favorite ? { fontVariationSettings: "'FILL' 1" } : {}}>star</span>
+                      </button>
                     </div>
                     {(evt.data_inicio || evt.horarios_semanais) && (
                       <div className="text-xs text-[#8E8E8E] mt-1 pl-6">

@@ -392,6 +392,7 @@ export default function AurtisticWorkspaceClient({
             userId={userId}
             initialQuickFilters={profile?.quick_filters || ['responsavel', 'dimensao']} 
             initialQuickSorts={profile?.quick_sorts || ['status', 'prazo', 'prioridade', 'manual']}
+            advancedSettings={profile?.features_config?.advanced_settings || {}}
           />
         </div>
       ) : (

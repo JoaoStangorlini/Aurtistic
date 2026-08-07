@@ -53,5 +53,6 @@ export interface AgendaEvent {
   frequencia: string | null;
   dimensao: string | null;
   is_labdiv: boolean;
+  is_favorite?: boolean;
   created_at: string;
 }

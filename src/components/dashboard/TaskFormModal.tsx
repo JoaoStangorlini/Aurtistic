@@ -341,8 +341,8 @@ export function TaskFormModal({ isOpen, onClose, task, uniqueCategories, uniqueD
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="bg-[#1A1A1A] border border-[#2D2D2D] rounded-3xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 p-4 pb-24 sm:pb-4">
+      <div className="bg-[#1A1A1A] border border-[#2D2D2D] rounded-3xl shadow-xl w-full max-w-3xl max-h-[75vh] sm:max-h-[90vh] flex flex-col">
         
         <div className="flex justify-between items-center p-6 border-b border-[#2D2D2D]">
           <h2 className="text-xl font-bold text-[#FFCC00]">{task ? 'Editar Tarefa' : 'Nova Tarefa'}</h2>

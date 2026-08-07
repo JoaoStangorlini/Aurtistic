@@ -101,8 +101,8 @@ export function EventFormModal({ isOpen, onClose, event, uniqueDimensions, isLab
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[1000] p-4 backdrop-blur-sm">
-      <div className="bg-[#121212] border border-[#2D2D2D] rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[2000] p-4 pb-24 sm:pb-4 backdrop-blur-sm">
+      <div className="bg-[#121212] border border-[#2D2D2D] rounded-xl shadow-2xl w-full max-w-2xl max-h-[75vh] sm:max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
         
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-[#2D2D2D] bg-[#1A1A1A]">

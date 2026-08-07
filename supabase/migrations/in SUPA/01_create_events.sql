@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.events (
   frequencia text,
   dimensao text,
   is_labdiv boolean DEFAULT false,
+  is_favorite boolean DEFAULT false,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now())
 );
 

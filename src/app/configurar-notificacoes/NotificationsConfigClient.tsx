@@ -11,6 +11,7 @@ interface NotificationConfig {
   daily_reminders: boolean;
   reminder_time: string;
   muted_task_ids: string[];
+  task_preferences?: Record<string, { style: 'standard' | 'alarm', color: string }>;
 }
 
 export default function NotificationsConfigClient({ 
@@ -24,7 +25,8 @@ export default function NotificationsConfigClient({
 }) {
   const [config, setConfig] = useState<NotificationConfig>({
     ...initialConfig,
-    muted_task_ids: initialConfig.muted_task_ids || []
+    muted_task_ids: initialConfig.muted_task_ids || [],
+    task_preferences: initialConfig.task_preferences || {}
   });
   const [isSaving, setIsSaving] = useState(false);
   const router = useRouter();
@@ -53,6 +55,19 @@ export default function NotificationsConfigClient({
           : [...prev.muted_task_ids, taskId]
       };
     });
+  };
+
+  const handleTaskPrefChange = (taskId: string, field: 'style'|'color', value: string) => {
+    setConfig(prev => ({
+      ...prev,
+      task_preferences: {
+        ...(prev.task_preferences || {}),
+        [taskId]: {
+          ...(prev.task_preferences?.[taskId] || { style: 'standard', color: '#9D4EDD' }),
+          [field]: value
+        }
+      }
+    }));
   };
 
   const handleSave = async () => {
@@ -119,13 +134,36 @@ export default function NotificationsConfigClient({
                   Prazo: {daysText}
                 </p>
               </div>
-              <button 
-                onClick={() => toggleTaskMute(task.id)}
-                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${!isMuted ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}
-                title={isMuted ? "Notificações desativadas para esta tarefa" : "Notificações ativadas para esta tarefa"}
-              >
-                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${!isMuted ? 'translate-x-4.5' : 'translate-x-1'}`} />
-              </button>
+              <div className="flex items-center gap-4">
+                {!isMuted && (
+                  <div className="flex flex-col items-end gap-1">
+                    <select 
+                      value={config.task_preferences?.[task.id]?.style || 'standard'}
+                      onChange={(e) => handleTaskPrefChange(task.id, 'style', e.target.value)}
+                      className="bg-[#2D2D2D] text-[10px] text-white py-1 px-2 rounded border border-[#333333] cursor-pointer"
+                    >
+                      <option value="standard">Notificação Padrão</option>
+                      <option value="alarm">Alarme Urgente</option>
+                    </select>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-[#8E8E8E]">Cor do Alerta:</span>
+                      <input 
+                        type="color" 
+                        value={config.task_preferences?.[task.id]?.color || '#9D4EDD'}
+                        onChange={(e) => handleTaskPrefChange(task.id, 'color', e.target.value)}
+                        className="w-5 h-5 p-0 border-0 rounded cursor-pointer bg-transparent"
+                      />
+                    </div>
+                  </div>
+                )}
+                <button 
+                  onClick={() => toggleTaskMute(task.id)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${!isMuted ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}
+                  title={isMuted ? "Notificações desativadas para esta tarefa" : "Notificações ativadas para esta tarefa"}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${!isMuted ? 'translate-x-4.5' : 'translate-x-1'}`} />
+                </button>
+              </div>
             </div>
           );
         })}

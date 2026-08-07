@@ -242,7 +242,7 @@ export default function AurtisticNavbar() {
                 <div className="w-7 h-7 rounded-full overflow-hidden bg-[#2D2D2D] flex items-center justify-center border border-[#FFCC00] shrink-0">
                   {user?.user_metadata?.avatar_url ? (
                     <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                  ) : user?.id === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e' ? (
+                  ) : (user?.id === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e' && profile?.features_config?.advanced_settings?.sync_curriculum_photo !== false) ? (
                     <img src="/perfil.jpeg" alt="Profile" className="w-full h-full object-cover" />
                   ) : (
                     <span className="material-symbols-outlined text-[16px] text-white">person</span>
@@ -280,13 +280,28 @@ export default function AurtisticNavbar() {
                     <Link 
                       href="/configurar-widget"
                       onClick={() => setIsSettingsOpen(false)}
-                      className="w-full text-left px-4 py-2 text-sm text-[#E0E0E0] hover:bg-[#2D2D2D] hover:text-[#FFCC00] transition-colors flex items-center justify-between group"
+                      className="w-full text-left px-4 py-2 text-sm text-[#E0E0E0] hover:bg-[#2D2D2D] hover:text-[#FFCC00] transition-colors flex items-center gap-2 group"
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[18px]">widgets</span>
-                        Configurar Widget
-                      </div>
-                      <span className="material-symbols-outlined text-[16px] text-[#A0A0A0] group-hover:text-[#FFCC00] transition-colors">settings</span>
+                      <span className="material-symbols-outlined text-[18px]">widgets</span>
+                      Configurar Widget
+                    </Link>
+
+                    <Link 
+                      href="/configuracoes-avancadas"
+                      onClick={() => setIsSettingsOpen(false)}
+                      className="w-full text-left px-4 py-2 text-sm text-[#E0E0E0] hover:bg-[#2D2D2D] hover:text-[#9D4EDD] transition-colors flex items-center gap-2 group"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">tune</span>
+                      Configurações Avançadas
+                    </Link>
+
+                    <Link 
+                      href="/relatar-bug"
+                      onClick={() => setIsSettingsOpen(false)}
+                      className="w-full text-left px-4 py-2 text-sm text-[#E0E0E0] hover:bg-[#2D2D2D] hover:text-[#FFCC00] transition-colors flex items-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">bug_report</span>
+                      Relatar Bug / Feedback
                     </Link>
 
                     <Link 
