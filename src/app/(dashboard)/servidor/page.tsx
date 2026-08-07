@@ -57,7 +57,7 @@ export default async function ServidorPage() {
       </div>
 
       <div>
-        <TasksView initialTasks={tasks || []} initialColumns={columns} initialQuickFilters={profile?.quick_filters || ['responsavel', 'dimensao']} initialQuickSorts={profile?.quick_sorts || ['status', 'prazo', 'prioridade', 'manual']} />
+        <TasksView initialTasks={tasks || []} initialColumns={columns} initialQuickFilters={profile?.quick_filters || ['responsavel', 'dimensao']} initialQuickSorts={profile?.quick_sorts || ['status', 'prazo', 'prioridade', 'manual']} advancedSettings={profile?.features_config?.advanced_settings || {}} />
       </div>
     </div>
   );

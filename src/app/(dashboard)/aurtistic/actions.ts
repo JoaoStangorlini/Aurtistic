@@ -138,3 +138,29 @@ export async function deleteAllTasks() {
 
   revalidatePath('/aurtistic');
 }
+
+export async function checkAurtisticUser(username: string) {
+  const supabase = await createClient();
+  const rawInput = username.trim();
+  
+  let email = '';
+  if (rawInput.includes('@')) {
+    email = rawInput;
+  } else {
+    const sanitizedUsername = rawInput
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9_]/g, "")
+      .toLowerCase();
+      
+    if (!sanitizedUsername) return false;
+    email = `${sanitizedUsername}@aurtistic.local`;
+  }
+  
+  const { data, error } = await supabase.rpc('check_user_exists', { lookup_email: email });
+  if (error) {
+    console.error("Erro ao verificar usuario", error);
+    return false;
+  }
+  return !!data;
+}

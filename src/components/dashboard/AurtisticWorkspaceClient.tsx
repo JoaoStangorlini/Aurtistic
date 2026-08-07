@@ -37,7 +37,8 @@ export default function AurtisticWorkspaceClient({
   const showSwitcher = isJoao; // Only show switcher if user is João (since João has both servidor and labdiv)
 
   const [profile, setProfile] = useState(initialProfile);
-  const [displayMode, setDisplayMode] = useState<'tarefas' | 'eventos' | 'ambos'>('tarefas');
+  const advancedSettings = profile?.features_config?.advanced_settings || {};
+  const [displayMode, setDisplayMode] = useState<'tarefas' | 'eventos' | 'ambos'>(advancedSettings.default_display_mode || 'tarefas');
   const [showConfig, setShowConfig] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showToast, setShowToast] = useState(false);
@@ -378,9 +379,11 @@ export default function AurtisticWorkspaceClient({
       {activeFeatures.includes('tasks') ? (
         <div>
           {/* Quick links block */}
-          <div className="mb-4">
-            <AurtisticQuickLinks initialLinks={profile?.quick_links || []} userId={userId} />
-          </div>
+          {advancedSettings.show_quick_links !== false && (
+            <div className="mb-4">
+              <AurtisticQuickLinks initialLinks={profile?.quick_links || []} userId={userId} />
+            </div>
+          )}
 
           
           <TasksView 

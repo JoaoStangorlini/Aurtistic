@@ -1,4 +1,6 @@
-'use client';
+const fs = require('fs');
+
+const content = `'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -96,7 +98,7 @@ export default function AdvancedConfigClient({
       router.refresh();
       setTimeout(() => setSavedSuccess(false), 3000);
     } catch (err: any) {
-      alert(`Erro ao salvar: ${err.message}`);
+      alert(\`Erro ao salvar: \${err.message}\`);
     } finally {
       setIsSaving(false);
     }
@@ -143,8 +145,8 @@ export default function AdvancedConfigClient({
                     Ativa o painel de Espaços (Workspaces). Se desativado, o Aurtistic será focado em uma única visão central.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('enable_workspaces')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.enable_workspaces ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.enable_workspaces ? 'translate-x-6' : 'translate-x-1'}`} />
+                <button onClick={() => handleToggle('enable_workspaces')} className={\`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors \${config.enable_workspaces ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}\`}>
+                  <span className={\`inline-block h-4 w-4 transform rounded-full bg-white transition-transform \${config.enable_workspaces ? 'translate-x-6' : 'translate-x-1'}\`} />
                 </button>
               </div>
 
@@ -155,8 +157,8 @@ export default function AdvancedConfigClient({
                     Preenche automaticamente a dimensão ao criar uma nova tarefa com base na dimensão que você está filtrando.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('auto_fill_dimension')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.auto_fill_dimension !== false ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.auto_fill_dimension !== false ? 'translate-x-6' : 'translate-x-1'}`} />
+                <button onClick={() => handleToggle('auto_fill_dimension')} className={\`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors \${config.auto_fill_dimension !== false ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}\`}>
+                  <span className={\`inline-block h-4 w-4 transform rounded-full bg-white transition-transform \${config.auto_fill_dimension !== false ? 'translate-x-6' : 'translate-x-1'}\`} />
                 </button>
               </div>
 
@@ -167,8 +169,8 @@ export default function AdvancedConfigClient({
                     Substitui o ícone padrão de usuário pela foto principal cadastrada no seu currículo.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('sync_curriculum_photo')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.sync_curriculum_photo !== false ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.sync_curriculum_photo !== false ? 'translate-x-6' : 'translate-x-1'}`} />
+                <button onClick={() => handleToggle('sync_curriculum_photo')} className={\`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors \${config.sync_curriculum_photo !== false ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}\`}>
+                  <span className={\`inline-block h-4 w-4 transform rounded-full bg-white transition-transform \${config.sync_curriculum_photo !== false ? 'translate-x-6' : 'translate-x-1'}\`} />
                 </button>
               </div>
 
@@ -179,8 +181,8 @@ export default function AdvancedConfigClient({
                     O sistema sempre abrirá com as tarefas futuras ocultadas e o botão Foco Diário ativado.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('start_in_daily_followup')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.start_in_daily_followup ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.start_in_daily_followup ? 'translate-x-6' : 'translate-x-1'}`} />
+                <button onClick={() => handleToggle('start_in_daily_followup')} className={\`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors \${config.start_in_daily_followup ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}\`}>
+                  <span className={\`inline-block h-4 w-4 transform rounded-full bg-white transition-transform \${config.start_in_daily_followup ? 'translate-x-6' : 'translate-x-1'}\`} />
                 </button>
               </div>
 
@@ -191,8 +193,8 @@ export default function AdvancedConfigClient({
                     Desligue para ocultar o painel superior de botões de atalho.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('show_quick_links')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.show_quick_links !== false ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.show_quick_links !== false ? 'translate-x-6' : 'translate-x-1'}`} />
+                <button onClick={() => handleToggle('show_quick_links')} className={\`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors \${config.show_quick_links !== false ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}\`}>
+                  <span className={\`inline-block h-4 w-4 transform rounded-full bg-white transition-transform \${config.show_quick_links !== false ? 'translate-x-6' : 'translate-x-1'}\`} />
                 </button>
               </div>
 
@@ -203,8 +205,8 @@ export default function AdvancedConfigClient({
                     Desligue para ocultar completamente a barra superior de filtros de Status, Responsável, etc.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('show_quick_filters')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.show_quick_filters !== false ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.show_quick_filters !== false ? 'translate-x-6' : 'translate-x-1'}`} />
+                <button onClick={() => handleToggle('show_quick_filters')} className={\`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors \${config.show_quick_filters !== false ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}\`}>
+                  <span className={\`inline-block h-4 w-4 transform rounded-full bg-white transition-transform \${config.show_quick_filters !== false ? 'translate-x-6' : 'translate-x-1'}\`} />
                 </button>
               </div>
 
@@ -215,8 +217,8 @@ export default function AdvancedConfigClient({
                     Exibe o texto completo de descrições longas sem precisar clicar em "Ver mais".
                   </p>
                 </div>
-                <button onClick={() => handleToggle('auto_expand_descriptions')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.auto_expand_descriptions ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.auto_expand_descriptions ? 'translate-x-6' : 'translate-x-1'}`} />
+                <button onClick={() => handleToggle('auto_expand_descriptions')} className={\`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors \${config.auto_expand_descriptions ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}\`}>
+                  <span className={\`inline-block h-4 w-4 transform rounded-full bg-white transition-transform \${config.auto_expand_descriptions ? 'translate-x-6' : 'translate-x-1'}\`} />
                 </button>
               </div>
 
@@ -227,8 +229,8 @@ export default function AdvancedConfigClient({
                     Mantém tarefas com estrela sempre posicionadas no topo da lista independente da ordenação.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('pin_favorites_to_top')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.pin_favorites_to_top ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.pin_favorites_to_top ? 'translate-x-6' : 'translate-x-1'}`} />
+                <button onClick={() => handleToggle('pin_favorites_to_top')} className={\`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors \${config.pin_favorites_to_top ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}\`}>
+                  <span className={\`inline-block h-4 w-4 transform rounded-full bg-white transition-transform \${config.pin_favorites_to_top ? 'translate-x-6' : 'translate-x-1'}\`} />
                 </button>
               </div>
 
@@ -239,8 +241,8 @@ export default function AdvancedConfigClient({
                     Permite alterar Status, Prioridade, Categoria ou Responsável clicando diretamente nas etiquetas coloridas.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('enable_badge_quick_edit')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.enable_badge_quick_edit !== false ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.enable_badge_quick_edit !== false ? 'translate-x-6' : 'translate-x-1'}`} />
+                <button onClick={() => handleToggle('enable_badge_quick_edit')} className={\`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors \${config.enable_badge_quick_edit !== false ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}\`}>
+                  <span className={\`inline-block h-4 w-4 transform rounded-full bg-white transition-transform \${config.enable_badge_quick_edit !== false ? 'translate-x-6' : 'translate-x-1'}\`} />
                 </button>
               </div>
 
@@ -251,8 +253,8 @@ export default function AdvancedConfigClient({
                     Exibe botões de download CSV e exportação para o Google Agenda dentro do menu de filtros.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('show_export_buttons')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.show_export_buttons !== false ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.show_export_buttons !== false ? 'translate-x-6' : 'translate-x-1'}`} />
+                <button onClick={() => handleToggle('show_export_buttons')} className={\`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors \${config.show_export_buttons !== false ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}\`}>
+                  <span className={\`inline-block h-4 w-4 transform rounded-full bg-white transition-transform \${config.show_export_buttons !== false ? 'translate-x-6' : 'translate-x-1'}\`} />
                 </button>
               </div>
 
@@ -263,8 +265,8 @@ export default function AdvancedConfigClient({
                     Exibe um popup de confirmação antes de apagar qualquer tarefa permanentemente.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('confirm_on_delete')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.confirm_on_delete !== false ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.confirm_on_delete !== false ? 'translate-x-6' : 'translate-x-1'}`} />
+                <button onClick={() => handleToggle('confirm_on_delete')} className={\`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors \${config.confirm_on_delete !== false ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}\`}>
+                  <span className={\`inline-block h-4 w-4 transform rounded-full bg-white transition-transform \${config.confirm_on_delete !== false ? 'translate-x-6' : 'translate-x-1'}\`} />
                 </button>
               </div>
 
@@ -278,8 +280,8 @@ export default function AdvancedConfigClient({
                     Ao pressionar Delete, a tarefa será movida para o status &quot;Descartada&quot;. Pressionar Delete em tarefas já descartadas as excluirá permanentemente.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('soft_delete_to_discarded')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.soft_delete_to_discarded ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.soft_delete_to_discarded ? 'translate-x-6' : 'translate-x-1'}`} />
+                <button onClick={() => handleToggle('soft_delete_to_discarded')} className={\`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors \${config.soft_delete_to_discarded ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}\`}>
+                  <span className={\`inline-block h-4 w-4 transform rounded-full bg-white transition-transform \${config.soft_delete_to_discarded ? 'translate-x-6' : 'translate-x-1'}\`} />
                 </button>
               </div>
             </div>
@@ -325,8 +327,8 @@ export default function AdvancedConfigClient({
                     Habilita o uso de valores padrão ao criar novas tarefas. Defina-os abaixo.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('pre_fill_defaults')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.pre_fill_defaults ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.pre_fill_defaults ? 'translate-x-6' : 'translate-x-1'}`} />
+                <button onClick={() => handleToggle('pre_fill_defaults')} className={\`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors \${config.pre_fill_defaults ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}\`}>
+                  <span className={\`inline-block h-4 w-4 transform rounded-full bg-white transition-transform \${config.pre_fill_defaults ? 'translate-x-6' : 'translate-x-1'}\`} />
                 </button>
               </div>
 
@@ -397,8 +399,8 @@ export default function AdvancedConfigClient({
                     Ativa a visualização em árvore com suporte a tarefas mãe/filha. Desligar isso mostrará todas as tarefas como uma lista plana.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('enable_subtasks')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.enable_subtasks ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.enable_subtasks ? 'translate-x-6' : 'translate-x-1'}`} />
+                <button onClick={() => handleToggle('enable_subtasks')} className={\`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors \${config.enable_subtasks ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}\`}>
+                  <span className={\`inline-block h-4 w-4 transform rounded-full bg-white transition-transform \${config.enable_subtasks ? 'translate-x-6' : 'translate-x-1'}\`} />
                 </button>
               </div>
 
@@ -409,8 +411,8 @@ export default function AdvancedConfigClient({
                     Ao concluir todas as subtarefas filhas, a tarefa mãe será concluída automaticamente.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('auto_complete_parent')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.auto_complete_parent ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.auto_complete_parent ? 'translate-x-6' : 'translate-x-1'}`} />
+                <button onClick={() => handleToggle('auto_complete_parent')} className={\`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors \${config.auto_complete_parent ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}\`}>
+                  <span className={\`inline-block h-4 w-4 transform rounded-full bg-white transition-transform \${config.auto_complete_parent ? 'translate-x-6' : 'translate-x-1'}\`} />
                 </button>
               </div>
 
@@ -421,8 +423,8 @@ export default function AdvancedConfigClient({
                     Ao marcar a tarefa mãe como concluída, todas as suas subtarefas filhas serão concluídas.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('auto_complete_subtasks')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.auto_complete_subtasks ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.auto_complete_subtasks ? 'translate-x-6' : 'translate-x-1'}`} />
+                <button onClick={() => handleToggle('auto_complete_subtasks')} className={\`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors \${config.auto_complete_subtasks ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}\`}>
+                  <span className={\`inline-block h-4 w-4 transform rounded-full bg-white transition-transform \${config.auto_complete_subtasks ? 'translate-x-6' : 'translate-x-1'}\`} />
                 </button>
               </div>
 
@@ -433,8 +435,8 @@ export default function AdvancedConfigClient({
                     Ao criar uma subtarefa, ela já virá preenchida com a mesma categoria, dimensão e prazo da tarefa mãe.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('inherit_parent_attributes')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.inherit_parent_attributes ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.inherit_parent_attributes ? 'translate-x-6' : 'translate-x-1'}`} />
+                <button onClick={() => handleToggle('inherit_parent_attributes')} className={\`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors \${config.inherit_parent_attributes ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}\`}>
+                  <span className={\`inline-block h-4 w-4 transform rounded-full bg-white transition-transform \${config.inherit_parent_attributes ? 'translate-x-6' : 'translate-x-1'}\`} />
                 </button>
               </div>
 
@@ -445,8 +447,8 @@ export default function AdvancedConfigClient({
                     Exibe um aviso se você tentar concluir uma tarefa mãe que ainda possui subtarefas não concluídas.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('prevent_parent_completion_if_subtasks_pending')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.prevent_parent_completion_if_subtasks_pending ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.prevent_parent_completion_if_subtasks_pending ? 'translate-x-6' : 'translate-x-1'}`} />
+                <button onClick={() => handleToggle('prevent_parent_completion_if_subtasks_pending')} className={\`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors \${config.prevent_parent_completion_if_subtasks_pending ? 'bg-[#9D4EDD]' : 'bg-[#2D2D2D]'}\`}>
+                  <span className={\`inline-block h-4 w-4 transform rounded-full bg-white transition-transform \${config.prevent_parent_completion_if_subtasks_pending ? 'translate-x-6' : 'translate-x-1'}\`} />
                 </button>
               </div>
             </div>
@@ -466,11 +468,11 @@ export default function AdvancedConfigClient({
                   <button
                     key={status}
                     onClick={() => toggleCompletionStatus(status)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all
-                      ${isActive 
+                    className={\`px-4 py-2 rounded-full text-sm font-medium transition-all
+                      \${isActive 
                         ? 'bg-[#9D4EDD] text-white shadow-lg shadow-[#9D4EDD]/20 border border-[#9D4EDD]' 
                         : 'bg-[#121212] text-[#8E8E8E] border border-[#2D2D2D] hover:border-[#9D4EDD]/50 hover:text-white'
-                      }`}
+                      }\`}
                   >
                     {status}
                   </button>
@@ -483,13 +485,13 @@ export default function AdvancedConfigClient({
             <button 
               onClick={handleSave} 
               disabled={isSaving || !hasChanges}
-              className={`px-8 py-3 rounded-lg font-bold text-sm flex items-center gap-2 transition-all shadow-xl ${
+              className={\`px-8 py-3 rounded-lg font-bold text-sm flex items-center gap-2 transition-all shadow-xl \${
                 savedSuccess 
                   ? 'bg-green-500 text-white shadow-green-500/20' 
                   : isSaving || !hasChanges
                     ? 'bg-[#2D2D2D] text-[#8E8E8E] cursor-not-allowed'
                     : 'bg-[#FFCC00] text-[#121212] hover:bg-white shadow-[#FFCC00]/20'
-              }`}
+              }\`}
             >
               {isSaving ? (
                 <>Salvando...</>
@@ -505,3 +507,7 @@ export default function AdvancedConfigClient({
     </>
   );
 }
+`;
+
+fs.writeFileSync('src/app/configuracoes-avancadas/AdvancedConfigClient.tsx', content);
+console.log('AdvancedConfigClient.tsx recuperado com sucesso!');

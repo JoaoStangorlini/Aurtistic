@@ -45,10 +45,10 @@ export function WidgetCalendarPreview() {
 
 export function WidgetEventsPreview({ events }: { events: any[] }) {
   return (
-    <div className="bg-[#1A202C] rounded-[24px] border border-[#2D3748] p-4 w-[280px] h-[340px] shadow-lg flex flex-col mx-auto overflow-hidden">
+    <div className="bg-[#121212] rounded-[24px] border border-[#2D2D2D] p-4 w-[280px] h-[340px] shadow-lg flex flex-col mx-auto overflow-hidden">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-white font-bold text-sm">Próximos Eventos</h3>
-        <button className="w-8 h-8 rounded-full bg-[#4299E1] text-white flex items-center justify-center transition-transform hover:scale-105 shadow">
+        <button className="w-8 h-8 rounded-full bg-[#9D4EDD] text-white flex items-center justify-center transition-transform hover:scale-105 shadow">
           <span className="material-symbols-outlined text-[20px]">add</span>
         </button>
       </div>
@@ -58,17 +58,17 @@ export function WidgetEventsPreview({ events }: { events: any[] }) {
         <div className="flex flex-col gap-2">
           <h4 className="text-white font-bold text-[13px] mb-1">Qui., 6 de ago.</h4>
           
-          <div className="bg-[#4299E1] rounded-xl p-3 flex flex-col shadow-sm">
+          <div className="bg-[#9D4EDD] rounded-xl p-3 flex flex-col shadow-sm">
             <span className="text-white text-[13px] font-semibold leading-tight mb-1">Inteligência Artificial</span>
             <span className="text-white/80 text-[11px] font-medium">16:00 - 18:00</span>
           </div>
           
-          <div className="bg-[#1A202C] border border-[#4299E1] rounded-xl p-3 flex flex-col shadow-sm">
-            <span className="text-[#4299E1] text-[13px] font-semibold leading-tight mb-1">PRG0010-TurmaA</span>
-            <span className="text-[#4299E1]/80 text-[11px] font-medium">16:00 - 18:00</span>
+          <div className="bg-[#1A1A1A] border border-[#9D4EDD] rounded-xl p-3 flex flex-col shadow-sm">
+            <span className="text-[#9D4EDD] text-[13px] font-semibold leading-tight mb-1">PRG0010-TurmaA</span>
+            <span className="text-[#9D4EDD]/80 text-[11px] font-medium">16:00 - 18:00</span>
           </div>
           
-          <div className="bg-[#48BB78] rounded-xl p-3 flex flex-col shadow-sm">
+          <div className="bg-[#8534C1] rounded-xl p-3 flex flex-col shadow-sm">
             <span className="text-white text-[13px] font-semibold leading-tight mb-1">Mecânica</span>
             <span className="text-white/80 text-[11px] font-medium">19:00 - 21:00</span>
           </div>
@@ -78,9 +78,9 @@ export function WidgetEventsPreview({ events }: { events: any[] }) {
         <div className="flex flex-col gap-2 mt-2">
           <h4 className="text-white font-bold text-[13px] mb-1">Sex., 7 de ago.</h4>
           
-          <div className="bg-[#ECC94B] rounded-xl p-3 flex flex-col shadow-sm">
-            <span className="text-[#744210] text-[13px] font-semibold leading-tight mb-1">Elementos e Estratégia</span>
-            <span className="text-[#744210]/80 text-[11px] font-medium">08:00 - 10:00</span>
+          <div className="bg-[#FFCC00] rounded-xl p-3 flex flex-col shadow-sm">
+            <span className="text-[#121212] text-[13px] font-bold leading-tight mb-1">Elementos e Estratégia</span>
+            <span className="text-[#121212]/80 text-[11px] font-bold">08:00 - 10:00</span>
           </div>
         </div>
       </div>

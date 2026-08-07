@@ -20,6 +20,7 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
   const [hiddenTaskIds, setHiddenTaskIds] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
   const [activeTab, setActiveTab] = useState<'tarefas' | 'calendario' | 'eventos'>('tarefas');
 
   // Extrair dimensões únicas existentes
@@ -58,12 +59,14 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
   }, []);
 
   const toggleTaskVisibility = (taskId: string) => {
+    setIsDirty(true);
     setHiddenTaskIds(prev => 
       prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
     );
   };
 
   const toggleStatusVisibility = (status: string) => {
+    setIsDirty(true);
     setHiddenStatuses(prev => 
       prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
     );
@@ -118,6 +121,7 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
       }
 
       setSavedSuccess(true);
+      setIsDirty(false);
       if (typeof window !== 'undefined') {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
@@ -131,7 +135,20 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
   };
 
   return (
-    <div className="max-w-6xl mx-auto bg-[#1A1A1A] border border-[#2D2D2D] rounded-xl p-6 md:p-8 shadow-2xl flex flex-col">
+    <>
+      {isDirty && !savedSuccess && (
+        <div className="fixed top-24 right-4 md:right-8 z-50 bg-[#9D4EDD] text-white px-4 py-3 rounded shadow-2xl flex items-center gap-3 border border-[#9D4EDD]/50 animate-pulse">
+          <span className="material-symbols-outlined">save</span>
+          <div className="flex flex-col">
+            <span className="font-bold text-sm">Alterações não salvas</span>
+            <span className="text-xs font-medium">Lembre-se de salvar!</span>
+          </div>
+          <button onClick={handleSave} disabled={isSaving} className="ml-2 bg-[#121212] text-[#9D4EDD] px-3 py-1.5 rounded text-xs font-bold hover:bg-[#2D2D2D] transition-colors disabled:opacity-50">
+            {isSaving ? 'Salvando...' : 'Salvar'}
+          </button>
+        </div>
+      )}
+      <div className="max-w-6xl mx-auto bg-[#1A1A1A] border border-[#2D2D2D] rounded-xl p-6 md:p-8 shadow-2xl flex flex-col">
       
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between md:items-center pb-6 border-b border-[#2D2D2D] mb-6 gap-4">
@@ -210,10 +227,10 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
               <div className="p-4 bg-[#121212] border border-[#2D2D2D] rounded-lg">
                 <h3 className="text-base font-bold text-white mb-1 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[#4285f4] text-[20px]">sort</span>
-                  Ordem de Exibição
+                  <label className="text-[#A0A0A0] text-sm font-bold uppercase tracking-wider mb-2 block">Critério de Ordenação</label>
                 </h3>
-                <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="w-full mt-2 bg-[#1A1A1A] border border-[#2D2D2D] text-white px-4 py-2.5 rounded-lg text-sm font-semibold">
-                  <option value="recentes">Mais recentes primeiro</option>
+                <select value={sortOrder} onChange={(e) => { setIsDirty(true); setSortOrder(e.target.value); }} className="w-full mt-2 bg-[#1A1A1A] border border-[#2D2D2D] text-white px-4 py-2.5 rounded-lg text-sm font-semibold">
+                  <option value="recentes">Criados Recentemente</option>
                   <option value="antigas">Mais antigas primeiro</option>
                   <option value="prazo_asc">Prazo mais próximo</option>
                   <option value="alfabetica">Ordem alfabética (A-Z)</option>
@@ -224,10 +241,10 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
               <div className="p-4 bg-[#121212] border border-[#2D2D2D] rounded-lg">
                 <h3 className="text-base font-bold text-white mb-1 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[#FFCC00] text-[20px]">category</span>
-                  Dimensão Padrão
+                  <label className="text-[#A0A0A0] text-sm font-bold uppercase tracking-wider mb-2 block">Filtrar por Dimensão</label>
                 </h3>
-                <select value={selectedDimension} onChange={(e) => setSelectedDimension(e.target.value)} className="w-full mt-2 bg-[#1A1A1A] border border-[#2D2D2D] text-white px-4 py-2.5 rounded-lg text-sm font-semibold">
-                  <option value="Todas">Todas as Dimensões</option>
+                <select value={selectedDimension} onChange={(e) => { setIsDirty(true); setSelectedDimension(e.target.value); }} className="w-full mt-2 bg-[#1A1A1A] border border-[#2D2D2D] text-white px-4 py-2.5 rounded-lg text-sm font-semibold">
+                  <option value="Todas">Todas as Tarefas</option>
                   <option value="Favoritas">Apenas Favoritas (★)</option>
                   {dimensions.map(dim => <option key={dim} value={dim}>{dim}</option>)}
                 </select>
@@ -316,5 +333,6 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
       </div>
 
     </div>
+    </>
   );
 }

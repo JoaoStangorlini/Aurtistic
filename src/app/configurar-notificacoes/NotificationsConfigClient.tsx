@@ -29,7 +29,15 @@ export default function NotificationsConfigClient({
     task_preferences: initialConfig.task_preferences || {}
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [savedSuccess, setSavedSuccess] = useState(false);
   const router = useRouter();
+
+  const safeInitialConfig = {
+    ...initialConfig,
+    muted_task_ids: initialConfig.muted_task_ids || [],
+    task_preferences: initialConfig.task_preferences || {}
+  };
+  const hasChanges = JSON.stringify(config) !== JSON.stringify(safeInitialConfig);
 
   const handleToggle = (field: keyof NotificationConfig) => {
     setConfig(prev => ({
@@ -74,9 +82,9 @@ export default function NotificationsConfigClient({
     setIsSaving(true);
     try {
       await updateNotificationConfig(config);
-
-      alert('Configurações de notificação salvas com sucesso!');
+      setSavedSuccess(true);
       router.refresh();
+      setTimeout(() => setSavedSuccess(false), 3000);
     } catch (err: any) {
       alert(`Erro ao salvar: ${err.message}`);
     } finally {
@@ -172,7 +180,20 @@ export default function NotificationsConfigClient({
   };
 
   return (
-    <div className="bg-[#1A1A1A] border border-[#2D2D2D] rounded-xl p-6 shadow-xl">
+    <>
+      {hasChanges && !savedSuccess && (
+        <div className="fixed top-24 right-4 md:right-8 z-50 bg-[#9D4EDD] text-white px-4 py-3 rounded shadow-2xl flex items-center gap-3 border border-[#9D4EDD]/50 animate-pulse">
+          <span className="material-symbols-outlined">save</span>
+          <div className="flex flex-col">
+            <span className="font-bold text-sm">Alterações não salvas</span>
+            <span className="text-xs font-medium">Lembre-se de salvar!</span>
+          </div>
+          <button onClick={handleSave} disabled={isSaving} className="ml-2 bg-[#121212] text-[#9D4EDD] px-3 py-1.5 rounded text-xs font-bold hover:bg-[#2D2D2D] transition-colors disabled:opacity-50">
+            {isSaving ? 'Salvando...' : 'Salvar'}
+          </button>
+        </div>
+      )}
+      <div className="bg-[#1A1A1A] border border-[#2D2D2D] rounded-xl p-6 shadow-xl">
       <div className="space-y-8">
         
         {/* Main Toggle */}
@@ -283,6 +304,7 @@ export default function NotificationsConfigClient({
         </button>
       </div>
 
-    </div>
+      </div>
+    </>
   );
 }

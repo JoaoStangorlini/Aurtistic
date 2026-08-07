@@ -99,7 +99,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
     return opt?.color;
   };
 
-  const [viewMode, setViewMode] = useState<'list' | 'weekly' | 'monthly'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'weekly' | 'monthly'>(advancedSettings.default_view_mode || 'list');
 
   useEffect(() => {
     if (displayMode === 'eventos') {
@@ -107,9 +107,9 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
     } else if (displayMode === 'ambos') {
       setViewMode('weekly');
     } else {
-      setViewMode('list');
+      setViewMode(advancedSettings.default_view_mode || 'list');
     }
-  }, [displayMode]);
+  }, [displayMode, advancedSettings.default_view_mode]);
   const [calendarCurrentDate, setCalendarCurrentDate] = useState(new Date());
   
   // Normalizar os dados que vêm do banco (migração temporária na UI)
@@ -123,7 +123,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
   
   const [localTasks, setLocalTasks] = useState(initialTasks);
   const [localEvents, setLocalEvents] = useState(initialEvents);
-  const [isDailyFollowup, setIsDailyFollowup] = useState(false);
+  const [isDailyFollowup, setIsDailyFollowup] = useState(advancedSettings.start_in_daily_followup || false);
 
 
   const [visibleExtraCols, setVisibleExtraCols] = useState<string[]>(userId === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e' ? ['responsavel', 'concluida_em', 'frequencia'] : []);
@@ -149,6 +149,15 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
 
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [eventToEdit, setEventToEdit] = useState<AgendaEvent | null>(null);
+
+  const [expandedTasks, setExpandedTasks] = useState<string[]>([]);
+  
+  const toggleTaskExpansion = (taskId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedTasks(prev => 
+      prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
+    );
+  };
 
   const handleNewEvent = () => {
     setEventToEdit(null);
@@ -433,6 +442,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
 
   const handleBadgeClick = (e: React.MouseEvent, task: Task, field: 'status' | 'responsavel' | 'prioridade' | 'categoria' | 'dimensao') => {
     e.stopPropagation();
+    if (advancedSettings?.enable_badge_quick_edit === false) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceNeeded = 250;
@@ -500,7 +510,67 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
     const isBulkEdit = selectedTasks.has(taskId) && selectedTasks.size > 1;
     const taskIdsToUpdate = isBulkEdit ? Array.from(selectedTasks) : [taskId];
 
-    const updatedTasks = localTasks.map(t => taskIdsToUpdate.includes(t.id) ? { ...t, [field]: newValue } : t);
+    const completionStatuses = (advancedSettings?.completion_statuses || ['completa', 'concluída', 'descartada']).map((s: string) => s.toLowerCase());
+    const isNewCompleted = completionStatuses.includes(newValue.toLowerCase());
+
+    // Se a regra de alertar subtarefas pendentes estiver ativa
+    if (field === 'status' && isNewCompleted && advancedSettings?.prevent_parent_completion_if_subtasks_pending) {
+      for (const id of taskIdsToUpdate) {
+        const subtasks = localTasks.filter(t => t.parent_id === id);
+        const pendingSubtasks = subtasks.filter(st => !completionStatuses.includes((st.status || '').toLowerCase()));
+        if (pendingSubtasks.length > 0) {
+          const confirmComp = confirm(`Esta tarefa possui ${pendingSubtasks.length} subtarefa(s) pendente(s). Deseja realmente marcá-la como concluída?`);
+          if (!confirmComp) return;
+        }
+      }
+    }
+
+    let updatedTasks = localTasks.map(t => taskIdsToUpdate.includes(t.id) ? { ...t, [field]: newValue } : t);
+    let autoTasksToSave: Task[] = [];
+
+    if (field === 'status') {
+      const autoCompleteParent = advancedSettings?.auto_complete_parent !== false;
+      const autoCompleteSubtasks = advancedSettings?.auto_complete_subtasks === true;
+      const primaryCompletion = completionStatuses[0] || 'completa';
+
+      // Regra 1: Ao concluir a tarefa mãe, se auto_complete_subtasks tiver ativo, conclui todas as filhas
+      if (autoCompleteSubtasks && isNewCompleted) {
+        taskIdsToUpdate.forEach(parentId => {
+          const subs = updatedTasks.filter(t => t.parent_id === parentId);
+          subs.forEach(sub => {
+            if (!completionStatuses.includes((sub.status || '').toLowerCase())) {
+              const updatedSub = { ...sub, status: newValue };
+              updatedTasks = updatedTasks.map(t => t.id === sub.id ? updatedSub : t);
+              autoTasksToSave.push(updatedSub);
+            }
+          });
+        });
+      }
+
+      // Regra 2: Ao alterar status de subtarefa, se todas as filhas da mãe estiverem concluídas, conclui a mãe
+      if (autoCompleteParent) {
+        const parentIdsToCheck = new Set<string>();
+        taskIdsToUpdate.forEach(id => {
+          const t = localTasks.find(item => item.id === id);
+          if (t?.parent_id) parentIdsToCheck.add(t.parent_id);
+        });
+
+        parentIdsToCheck.forEach(parentId => {
+          const parentTask = updatedTasks.find(t => t.id === parentId);
+          if (parentTask) {
+            const allSiblings = updatedTasks.filter(t => t.parent_id === parentId);
+            const allCompleted = allSiblings.every(s => completionStatuses.includes((s.status || '').toLowerCase()));
+
+            if (allCompleted && !completionStatuses.includes((parentTask.status || '').toLowerCase())) {
+              const updatedParent = { ...parentTask, status: primaryCompletion };
+              updatedTasks = updatedTasks.map(t => t.id === parentId ? updatedParent : t);
+              autoTasksToSave.push(updatedParent);
+            }
+          }
+        });
+      }
+    }
+
     setLocalTasks(updatedTasks);
     
     try {
@@ -509,6 +579,10 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
       } else {
         const task = localTasks.find(t => t.id === taskId);
         if (task) await saveTask({ ...task, [field]: newValue });
+      }
+
+      for (const autoT of autoTasksToSave) {
+        await saveTask(autoT);
       }
     } catch (err: any) {
       alert("Erro ao atualizar: " + err.message);
@@ -561,6 +635,30 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [lastSelectedTaskId, setLastSelectedTaskId] = useState<string | null>(null);
 
+  const defaultTaskValues = useMemo(() => {
+    let vals = { ...(advancedSettings.default_task_values || {}) };
+    if (advancedSettings.auto_fill_dimension !== false && selectedDimensions.length === 1) {
+      vals.dimensao = selectedDimensions[0];
+    }
+
+    if (vals.prazo) {
+      const today = new Date();
+      if (vals.prazo === 'amanha') {
+        today.setDate(today.getDate() + 1);
+      } else if (vals.prazo === 'proxima_semana') {
+        today.setDate(today.getDate() + 7);
+      } else if (vals.prazo === 'proximo_mes') {
+        today.setMonth(today.getMonth() + 1);
+      }
+      if (['amanha', 'proxima_semana', 'proximo_mes'].includes(vals.prazo)) {
+        today.setHours(12, 0, 0, 0); // Padrão: 12:00
+        vals.prazo = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+      }
+    }
+
+    return vals;
+  }, [advancedSettings, selectedDimensions]);
+
   // Refs for scrolling
   const desktopContainerRef = useRef<HTMLDivElement>(null);
   const mobileContainerRef = useRef<HTMLDivElement>(null);
@@ -594,8 +692,23 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
         const target = e.target as HTMLElement;
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
         if (selectedTasks.size > 0) {
-          if (confirm(`Tem certeza que deseja excluir as ${selectedTasks.size} tarefas selecionadas?`)) {
-            const taskIds = Array.from(selectedTasks);
+          const taskIds = Array.from(selectedTasks);
+          
+          if (advancedSettings?.soft_delete_to_discarded) {
+            const tasksToDelete = localTasks.filter(t => taskIds.includes(t.id));
+            const allDiscarded = tasksToDelete.every(t => t.status?.toLowerCase() === 'descartada');
+            
+            if (!allDiscarded) {
+              updateMultipleTasks(taskIds, { status: 'descartada' }).then(() => {
+                setLocalTasks(prev => prev.map(t => taskIds.includes(t.id) ? { ...t, status: 'descartada' } : t));
+                setSelectedTasks(new Set());
+                setLastSelectedTaskId(null);
+              }).catch(err => alert("Erro ao descartar tarefas: " + err.message));
+              return;
+            }
+          }
+
+          if (advancedSettings?.confirm_on_delete === false || confirm(`Tem certeza que deseja excluir as ${selectedTasks.size} tarefas selecionadas permanentemente?`)) {
             deleteMultipleTasks(taskIds).then(() => {
               setSelectedTasks(new Set());
               setLastSelectedTaskId(null);
@@ -619,7 +732,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isModalOpen, isBulkEditModalOpen, selectedTasks, localTasks]);
+  }, [isModalOpen, isBulkEditModalOpen, selectedTasks, localTasks, advancedSettings]);
 
   const handleEdit = (task: Task) => {
     // Inject subtasks if this is a parent task
@@ -916,9 +1029,14 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
     if (isDailyFollowup && displayMode !== 'eventos') {
       const today = new Date().toISOString().split('T')[0];
       tasks = tasks.filter(t => {
-        const isToday = t.prazo && t.prazo.startsWith(today);
-        const isPending = t.status === 'não iniciada' || t.status === 'falta testar' || t.status === 'em progresso';
-        return isToday || isPending;
+        if (!t.prazo) return false; // Se não tem prazo, não tem como saber se é pra hoje ou atrasada (esconde no modo foco)
+        const taskDate = t.prazo.split('T')[0];
+        const isToday = taskDate === today;
+        const isPast = taskDate < today;
+        const completionStatuses = advancedSettings?.completion_statuses || ['completa', 'descartada'];
+        const isPending = !completionStatuses.includes(t.status || '');
+        
+        return isToday || (isPast && isPending);
       });
     }
 
@@ -975,6 +1093,9 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
 
     // 5. Sort
     tasks.sort((a, b) => {
+      if (advancedSettings?.pin_favorites_to_top) {
+        if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1;
+      }
       let primaryDiff = 0;
       
       switch(sortBy) {
@@ -1063,17 +1184,19 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
       
       {/* Header & Toolbar */}
       <div className="flex flex-col gap-4 mb-6 shrink-0">
-        <div className="flex items-center mb-2 justify-between">
-          <h3 className="text-sm font-bold text-[#8E8E8E] uppercase tracking-wider flex items-center gap-2">
-            Filtros Rápidos
-            <button onClick={() => setIsQuickFiltersModalOpen(true)} className="text-[#A0A0A0] hover:text-[#9D4EDD] transition-colors" title="Configurar Filtros Rápidos">
-              <span className="material-symbols-outlined text-[16px]">settings</span>
-            </button>
-          </h3>
-        </div>
+        {advancedSettings.show_quick_filters !== false && (
+          <>
+            <div className="flex items-center mb-2 justify-between">
+              <h3 className="text-sm font-bold text-[#8E8E8E] uppercase tracking-wider flex items-center gap-2">
+                Filtros Rápidos
+                <button onClick={() => setIsQuickFiltersModalOpen(true)} className="text-[#A0A0A0] hover:text-[#9D4EDD] transition-colors" title="Configurar Filtros Rápidos">
+                  <span className="material-symbols-outlined text-[16px]">settings</span>
+                </button>
+              </h3>
+            </div>
 
-        {/* Toolbar de Filtros Rápidos */}
-        <div className="flex flex-col items-end gap-3 w-full mb-2">
+            {/* Toolbar de Filtros Rápidos */}
+            <div className="flex flex-col items-end gap-3 w-full mb-2">
           
           {/* Row 1: Ordenação dinâmica */}
           {displayMode !== 'eventos' && quickSorts.length > 0 && (
@@ -1250,12 +1373,13 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
               </button>
             </div>
           )}
+          </div>
+          </>
+        )}
 
-
-
-          {/* Row 4: Botão de Filtros */}
-          <div className="flex flex-col md:flex-row w-full items-end md:items-center justify-end gap-3 shrink-0 pb-1 z-30">
-            <div className="flex items-center text-[#8E8E8E] text-[11px] font-bold px-3 shrink-0 bg-[#1A1A1A] rounded-md border border-[#2D2D2D] h-[36px] w-auto justify-center md:justify-start order-2 md:order-1">
+        {/* Row 4: Botão de Filtros */}
+          <div className="flex flex-col w-full items-end gap-2 shrink-0 pb-2 z-30">
+            <div className="flex items-center text-[#8E8E8E] text-[11px] font-bold px-3 shrink-0 bg-[#1A1A1A] rounded-md border border-[#2D2D2D] h-[36px] w-auto justify-start order-2">
               <span className="text-[#FFCC00] text-sm mr-1">{processedTasks.length}</span> 
               <span className="hidden sm:inline">de</span>
               <span className="text-white text-sm mx-1">{localTasks.length}</span> 
@@ -1277,16 +1401,16 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
               )}
             </div>
 
-            <div className="flex items-center gap-3 order-1 md:order-2 w-full md:w-auto justify-end shrink-0 flex-wrap md:flex-nowrap">
-              {displayMode !== 'eventos' && (
+            <div className="flex items-center gap-2 order-1 w-full justify-end shrink-0 flex-wrap">
+              {displayMode !== 'eventos' && advancedSettings.show_quick_filters !== false && (
               <div className="relative shrink-0" ref={filterMenuRef}>
               <button 
                 onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
-              className="flex items-center gap-2 bg-[#9D4EDD] text-white font-bold rounded-md px-4 py-2 text-sm hover:bg-[#8338C7] transition-colors shadow-sm"
+              className="flex items-center gap-1.5 bg-[#9D4EDD] text-white font-bold rounded-md px-3 py-1.5 text-xs hover:bg-[#8338C7] transition-colors shadow-sm"
             >
-              <span className="material-symbols-outlined text-[18px]">filter_list</span>
+              <span className="material-symbols-outlined text-[16px]">filter_list</span>
               Mais filtros
-              <span className="material-symbols-outlined text-[18px]">{isFilterMenuOpen ? 'expand_less' : 'expand_more'}</span>
+              <span className="material-symbols-outlined text-[16px]">{isFilterMenuOpen ? 'expand_less' : 'expand_more'}</span>
             </button>
 
             {isFilterMenuOpen && (
@@ -1381,17 +1505,19 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                 )}
 
                 {/* Section: Exportação */}
-                <div className="p-4 bg-[#1A1A1A]">
-                  <h3 className="text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-3">Exportar ({processedTasks.length} tarefas visíveis)</h3>
-                  <div className="flex gap-2">
-                    <button onClick={() => downloadCSV(processedTasks, 'tarefas_hub.csv')} className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 border border-[#0f9d58]/50 text-[#0f9d58] rounded hover:bg-[#0f9d58]/10 text-xs font-semibold transition-colors" title="Baixar CSV">
-                      <span className="material-symbols-outlined text-[16px]">table</span> CSV
-                    </button>
-                    <button onClick={() => downloadICS(processedTasks, 'tarefas_hub.ics')} className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 border border-[#4285f4]/50 text-[#4285f4] rounded hover:bg-[#4285f4]/10 text-xs font-semibold transition-colors" title="Baixar Google Agenda (ICS)">
-                      <span className="material-symbols-outlined text-[16px]">calendar_month</span> Agenda
-                    </button>
+                {advancedSettings?.show_export_buttons !== false && (
+                  <div className="p-4 bg-[#1A1A1A]">
+                    <h3 className="text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-3">Exportar ({processedTasks.length} tarefas visíveis)</h3>
+                    <div className="flex gap-2">
+                      <button onClick={() => downloadCSV(processedTasks, 'tarefas_hub.csv')} className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 border border-[#0f9d58]/50 text-[#0f9d58] rounded hover:bg-[#0f9d58]/10 text-xs font-semibold transition-colors" title="Baixar CSV">
+                        <span className="material-symbols-outlined text-[16px]">table</span> CSV
+                      </button>
+                      <button onClick={() => downloadICS(processedTasks, 'tarefas_hub.ics')} className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 border border-[#4285f4]/50 text-[#4285f4] rounded hover:bg-[#4285f4]/10 text-xs font-semibold transition-colors" title="Baixar Google Agenda (ICS)">
+                        <span className="material-symbols-outlined text-[16px]">calendar_month</span> Agenda
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
             </div>
@@ -1401,11 +1527,11 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
               <div className="relative">
                 <button 
                   onClick={() => setIsColumnsMenuOpen(!isColumnsMenuOpen)}
-                  className="bg-[#2D2D2D] hover:bg-[#3D3D3D] text-white px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-colors border border-[#404040]"
+                  className="bg-[#FFCC00] text-[#121212] hover:bg-[#e6b800] px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-colors border border-transparent shadow-sm"
                 >
-                  <span className="material-symbols-outlined text-[18px]">view_column</span>
+                  <span className="material-symbols-outlined text-[16px]">view_column</span>
                   Editar Colunas
-                  <span className="material-symbols-outlined text-[18px]">expand_more</span>
+                  <span className="material-symbols-outlined text-[16px]">expand_more</span>
                 </button>
 
                 {isColumnsMenuOpen && (
@@ -1456,8 +1582,18 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
               )}
               {displayMode !== 'eventos' && (
                 <button 
+                  onClick={() => setIsDailyFollowup(!isDailyFollowup)}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-md flex items-center gap-1.5 transition-colors shadow-sm shrink-0 ${isDailyFollowup ? 'bg-[#9D4EDD] text-white' : 'bg-[#2D2D2D] hover:bg-[#3D3D3D] text-white border border-[#404040]'}`}
+                  title="Foco Diário"
+                >
+                  <span className="material-symbols-outlined text-[16px]">track_changes</span>
+                  Foco
+                </button>
+              )}
+              {displayMode !== 'eventos' && (
+                <button 
                   onClick={handleNew}
-                  className={`bg-[#FFCC00] text-[#121212] font-bold text-sm px-4 py-2 rounded-md hover:bg-[#e6b800] transition-colors shadow-sm shrink-0 ${localTasks.length === 0 ? 'animate-pulse ring-4 ring-[#FFCC00]/50' : ''}`}
+                  className={`bg-[#FFCC00] text-[#121212] font-bold px-4 py-2 text-sm lg:px-5 lg:py-2.5 lg:text-base rounded-md hover:bg-[#e6b800] transition-colors shadow-sm shrink-0 ${localTasks.length === 0 ? 'animate-pulse ring-4 ring-[#FFCC00]/50' : ''}`}
                 >
                   + Nova Tarefa
                 </button>
@@ -1465,17 +1601,15 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
               {displayMode !== 'tarefas' && (
                 <button 
                   onClick={handleNewEvent}
-                  className={`bg-[#9D4EDD] text-white font-bold text-sm px-4 py-2 rounded-md hover:bg-[#8338c7] transition-colors shadow-sm shrink-0`}
+                  className={`bg-[#9D4EDD] text-white font-bold px-4 py-2 text-sm lg:px-5 lg:py-2.5 lg:text-base rounded-md hover:bg-[#8338c7] transition-colors shadow-sm shrink-0`}
                 >
                   + Novo Evento
                 </button>
               )}
             </div>
           </div>
-
-
         </div>
-      </div>
+
 
       {/* View Mode */}
       <div className="w-full flex items-center justify-center mt-6 mb-2 pb-2">
@@ -1642,8 +1776,22 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                         )}
                       </div>
                       {task.descricao && (
-                        <div className="text-[10px] text-[#A0A0A0] mt-1 line-clamp-1">
-                          <HighlightedText text={task.descricao} highlight={searchTerm} />
+                        <div className="mt-1 flex flex-col items-start w-full pr-2">
+                          <div className={`text-xs text-[#A0A0A0] transition-all ${(expandedTasks.includes(task.id) || advancedSettings?.auto_expand_descriptions) ? 'whitespace-pre-wrap' : 'line-clamp-1'}`}>
+                            <HighlightedText text={task.descricao} highlight={searchTerm} />
+                          </div>
+                          {(!advancedSettings?.auto_expand_descriptions && (task.descricao.length > 80 || task.descricao.includes('\n'))) && (
+                            <button 
+                              onClick={(e) => toggleTaskExpansion(task.id, e)}
+                              className="text-[#9D4EDD] text-[10px] font-bold mt-1 flex items-center hover:underline"
+                            >
+                              {expandedTasks.includes(task.id) ? (
+                                <>Ver menos <span className="material-symbols-outlined text-[14px]">expand_less</span></>
+                              ) : (
+                                <>Ver mais <span className="material-symbols-outlined text-[14px]">expand_more</span></>
+                              )}
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1738,9 +1886,23 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                   </div>
                 </h3>
                 {task.descricao && (
-                  <p className="text-[11px] text-[#A0A0A0] line-clamp-2">
-                    <HighlightedText text={task.descricao} highlight={searchTerm} />
-                  </p>
+                  <div className="mt-1 flex flex-col items-start w-full">
+                    <p className={`text-[11px] text-[#A0A0A0] transition-all ${(expandedTasks.includes(task.id) || advancedSettings?.auto_expand_descriptions) ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}>
+                      <HighlightedText text={task.descricao} highlight={searchTerm} />
+                    </p>
+                    {(!advancedSettings?.auto_expand_descriptions && (task.descricao.length > 100 || task.descricao.includes('\n'))) && (
+                      <button 
+                        onClick={(e) => toggleTaskExpansion(task.id, e)}
+                        className="text-[#9D4EDD] text-[10px] font-bold mt-1 flex items-center hover:underline"
+                      >
+                        {expandedTasks.includes(task.id) ? (
+                          <>Ver menos <span className="material-symbols-outlined text-[14px]">expand_less</span></>
+                        ) : (
+                          <>Ver mais <span className="material-symbols-outlined text-[14px]">expand_more</span></>
+                        )}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -1916,8 +2078,8 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                 ))}
               </div>
             )}
-            <button className="mt-4 px-4 py-2 bg-[#9D4EDD] text-white font-bold text-xs rounded-md hover:bg-[#8534C1] transition-colors" onClick={() => alert('Criar evento - Em breve')}>
-              Novo Evento
+            <button className="mt-4 px-4 py-2 bg-[#9D4EDD] text-white font-bold text-xs rounded-md hover:bg-[#8534C1] transition-colors shadow-sm" onClick={handleNewEvent}>
+              + Novo Evento
             </button>
           </div>
         )}
@@ -1984,10 +2146,12 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         task={taskToEdit} 
+        defaultValues={defaultTaskValues}
         uniqueCategories={uniqueCategories} 
         uniqueDimensions={uniqueDimensions}
         columns={columns}
         onEditColumn={(col) => setEditingColumn(col)}
+        advancedSettings={advancedSettings}
       />
       <BulkEditModal 
         isOpen={isBulkEditModalOpen} 
@@ -2005,8 +2169,11 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
         isOpen={isEventModalOpen}
         onClose={() => setIsEventModalOpen(false)}
         event={eventToEdit}
+        defaultValues={defaultTaskValues}
         uniqueDimensions={uniqueDimensions}
         isLabdivScope={!isPersonalScope}
+        columns={columns}
+        onEditColumn={(col) => setEditingColumn(col)}
         onSuccess={() => {
           setIsEventModalOpen(false);
           // O NextJS revalidatePath atualizará a página para mostrar o novo evento
@@ -2016,7 +2183,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
       
       {editingColumn && (
         <OptionsEditorModal
-          column={editingColumn}
+          column={editingColumn!}
           onClose={() => setEditingColumn(null)}
           onSave={async (updatedColumn) => {
             await saveTaskColumn(updatedColumn);
@@ -2045,31 +2212,29 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
           onClick={(e) => e.stopPropagation()}
         >
           <div className="max-h-[250px] overflow-y-auto flex flex-col py-1">
-            {quickEdit.field === 'status' && ["não iniciada","em progresso","falta testar","completa","descartada"].map(option => (
-                  <button key={option} className={`text-left px-3 py-2 text-xs hover:bg-[#252525] transition-colors ${quickEdit.value?.toLowerCase() === option ? 'text-[#9D4EDD] font-bold bg-[#9D4EDD]/10' : 'text-[#E0E0E0]'}`} onClick={() => handleQuickSave(quickEdit.taskId, 'status', option)}>
-                    {option.charAt(0).toUpperCase() + option.slice(1)}
+            {(() => {
+              const col = columns.find(c => c.key === quickEdit.field);
+              let opts = (col?.options || []).map((o: any) => o.value || o);
+              
+              // Se for categoria ou dimensão, mescla com os valores únicos existentes nas tarefas para não perder nada
+              if (quickEdit.field === 'categoria') opts = Array.from(new Set([...opts, ...uniqueCategories]));
+              if (quickEdit.field === 'dimensao') opts = Array.from(new Set([...opts, ...uniqueDimensions.filter(d => d !== 'favoritas')]));
+              
+              const displayOpts = Array.from(new Set([...opts, ""])); // Sempre permite limpar (Nenhum)
+
+              return displayOpts.map(option => {
+                const optStr = String(option);
+                return (
+                  <button 
+                    key={optStr} 
+                    className={`text-left px-3 py-2 text-xs hover:bg-[#252525] transition-colors ${quickEdit.value?.toLowerCase() === optStr.toLowerCase() ? 'text-[#9D4EDD] font-bold bg-[#9D4EDD]/10' : 'text-[#E0E0E0]'}`} 
+                    onClick={() => handleQuickSave(quickEdit.taskId, quickEdit.field, optStr)}
+                  >
+                    {optStr === "" ? "Nenhum" : (quickEdit.field === 'status' ? optStr.charAt(0).toUpperCase() + optStr.slice(1) : optStr)}
                   </button>
-            ))}
-            {quickEdit.field === 'responsavel' && ["João","Andy","Leo","Dani","Lorenzo","Nacky"].map(option => (
-                  <button key={option} className={`text-left px-3 py-2 text-xs hover:bg-[#252525] transition-colors ${quickEdit.value === option ? 'text-[#9D4EDD] font-bold bg-[#9D4EDD]/10' : 'text-[#E0E0E0]'}`} onClick={() => handleQuickSave(quickEdit.taskId, 'responsavel', option)}>
-                    {option}
-                  </button>
-            ))}
-            {quickEdit.field === 'prioridade' && ["Alta", "Média", "Baixa", ""].map(option => (
-                  <button key={option} className={`text-left px-3 py-2 text-xs hover:bg-[#252525] transition-colors ${quickEdit.value === option ? 'text-[#9D4EDD] font-bold bg-[#9D4EDD]/10' : 'text-[#E0E0E0]'}`} onClick={() => handleQuickSave(quickEdit.taskId, 'prioridade', option)}>
-                    {option || "Nenhuma"}
-                  </button>
-            ))}
-            {quickEdit.field === 'categoria' && Array.from(new Set([...uniqueCategories, ""])).map(option => (
-                  <button key={option} className={`text-left px-3 py-2 text-xs hover:bg-[#252525] transition-colors ${quickEdit.value === option ? 'text-[#9D4EDD] font-bold bg-[#9D4EDD]/10' : 'text-[#E0E0E0]'}`} onClick={() => handleQuickSave(quickEdit.taskId, 'categoria', option)}>
-                    {option || "Nenhuma"}
-                  </button>
-            ))}
-            {quickEdit.field === 'dimensao' && Array.from(new Set([...uniqueDimensions.filter(d => d !== 'favoritas'), ""])).map(option => (
-                  <button key={option} className={`text-left px-3 py-2 text-xs hover:bg-[#252525] transition-colors ${quickEdit.value === option ? 'text-[#9D4EDD] font-bold bg-[#9D4EDD]/10' : 'text-[#E0E0E0]'}`} onClick={() => handleQuickSave(quickEdit.taskId, 'dimensao', option)}>
-                    {option || "Nenhuma"}
-                  </button>
-            ))}
+                );
+              });
+            })()}
           </div>
         </div>
       )}

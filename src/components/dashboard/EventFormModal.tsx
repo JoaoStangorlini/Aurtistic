@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { AgendaEvent } from '@/types';
+import { AgendaEvent, TaskColumn } from '@/types';
 import { createEvent, updateEvent } from '@/app/(dashboard)/actions';
+import { CustomSelect } from './CustomSelect';
 
 interface EventFormModalProps {
   isOpen: boolean;
@@ -10,12 +11,15 @@ interface EventFormModalProps {
   event?: AgendaEvent | null;
   uniqueDimensions: string[];
   isLabdivScope: boolean;
+  columns?: TaskColumn[];
+  onEditColumn?: (col: TaskColumn) => void;
   onSuccess: () => void;
+  defaultValues?: any;
 }
 
 const DIAS_SEMANA = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 
-export function EventFormModal({ isOpen, onClose, event, uniqueDimensions, isLabdivScope, onSuccess }: EventFormModalProps) {
+export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDimensions, isLabdivScope, columns = [], onEditColumn, onSuccess }: EventFormModalProps) {
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
   const [dataInicio, setDataInicio] = useState('');
@@ -39,7 +43,7 @@ export function EventFormModal({ isOpen, onClose, event, uniqueDimensions, isLab
         setDescricao('');
         setDataInicio('');
         setDataFim('');
-        setDimensao('');
+        setDimensao(defaultValues?.dimensao || '');
         setHorarios({});
       }
     }
@@ -100,6 +104,9 @@ export function EventFormModal({ isOpen, onClose, event, uniqueDimensions, isLab
     }
   };
 
+  const colDimensao = columns.find(c => c.key === 'dimensao');
+  const dimensaoOptions = colDimensao?.options?.map(o => ({ value: o.value, label: o.label || o.value, color: o.color })) || uniqueDimensions.map(d => ({ value: d, label: d }));
+
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[2000] p-4 pb-24 sm:pb-4 backdrop-blur-sm">
       <div className="bg-[#121212] border border-[#2D2D2D] rounded-xl shadow-2xl w-full max-w-2xl max-h-[75vh] sm:max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
@@ -157,16 +164,15 @@ export function EventFormModal({ isOpen, onClose, event, uniqueDimensions, isLab
             {/* Dimensão */}
             <div>
               <label className="block text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-2">Dimensão</label>
-              <select
-                value={dimensao}
-                onChange={(e) => setDimensao(e.target.value)}
-                className="w-full bg-[#1A1A1A] border border-[#2D2D2D] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] transition-all appearance-none"
-              >
-                <option value="">Selecione uma dimensão...</option>
-                {uniqueDimensions.map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
+              <CustomSelect 
+                name="dimensao" 
+                value={dimensao} 
+                onChange={(e) => setDimensao(e.target.value)} 
+                type="dimensao" 
+                options={dimensaoOptions} 
+                allowCustom={true} 
+                onEditColumn={columns.find(c => c.key === 'dimensao') && onEditColumn ? () => onEditColumn(columns.find(c => c.key === 'dimensao')!) : undefined} 
+              />
             </div>
 
             {/* Rotina Semanal */}

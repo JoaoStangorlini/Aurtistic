@@ -11,13 +11,15 @@ interface TaskFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   task?: (Task & { subtasks?: Task[] }) | null;
+  defaultValues?: Partial<Task>;
   uniqueCategories?: string[];
   uniqueDimensions?: string[];
   columns?: TaskColumn[];
   onEditColumn?: (col: TaskColumn) => void;
+  advancedSettings?: any;
 }
 
-export function TaskFormModal({ isOpen, onClose, task, uniqueCategories, uniqueDimensions, columns = [], onEditColumn }: TaskFormModalProps) {
+export function TaskFormModal({ isOpen, onClose, task, defaultValues, uniqueCategories, uniqueDimensions, columns = [], onEditColumn, advancedSettings = {} }: TaskFormModalProps) {
   const [loading, setLoading] = useState(false);
   const [freqType, setFreqType] = useState('');
   const [freqDetail, setFreqDetail] = useState('');
@@ -57,7 +59,7 @@ export function TaskFormModal({ isOpen, onClose, task, uniqueCategories, uniqueD
         responsavel: task.responsavel || '',
         dimensao: task.dimensao || '',
         inicio: task.inicio ? task.inicio.split('T')[0] : '',
-        prazo: task.prazo ? task.prazo.split('T')[0] : '',
+        prazo: task.prazo && !isNaN(new Date(task.prazo).getTime()) ? new Date(new Date(task.prazo).getTime() - (new Date(task.prazo).getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : '',
         descricao: task.descricao || '',
         frequencia: task.frequencia || ''
       });
@@ -82,23 +84,24 @@ export function TaskFormModal({ isOpen, onClose, task, uniqueCategories, uniqueD
       setSelectedFile(null);
     } else {
       generatedIdRef.current = crypto.randomUUID();
+      const initialDimensao = defaultValues?.dimensao || 'HUB';
       setFormData({
         id: generatedIdRef.current,
         nome: '',
-        status: 'não iniciada',
-        prioridade: 'Baixa',
-        categoria: 'Programar',
-        responsavel: 'João',
-        dimensao: 'HUB',
-        inicio: '',
-        prazo: '',
-        descricao: '',
-        frequencia: ''
+        status: defaultValues?.status || 'não iniciada',
+        prioridade: defaultValues?.prioridade || 'Baixa',
+        categoria: defaultValues?.categoria || 'Programar',
+        responsavel: defaultValues?.responsavel || 'João',
+        dimensao: initialDimensao,
+        inicio: defaultValues?.inicio || '',
+        prazo: defaultValues?.prazo || '',
+        descricao: defaultValues?.descricao || '',
+        frequencia: defaultValues?.frequencia || ''
       });
       setFreqType('');
       setFreqDetail('');
       setLocalSubtasks([]);
-      setSelectedDimensions(['HUB']);
+      setSelectedDimensions([initialDimensao]);
       setSelectedFile(null);
     }
   }, [task, isOpen]);
@@ -245,29 +248,50 @@ export function TaskFormModal({ isOpen, onClose, task, uniqueCategories, uniqueD
 
   const handleAddSubtask = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      e.preventDefault();
-      if (newSubtaskTitle.trim() === '') return;
-      
+      const inheritAttrs = advancedSettings?.inherit_parent_attributes !== false;
+
       const newSubtask: Partial<Task> = {
         id: crypto.randomUUID(),
         nome: newSubtaskTitle.trim(),
         status: 'não iniciada',
-        parent_id: formData.id
+        parent_id: formData.id,
+        ...(inheritAttrs ? {
+          categoria: formData.categoria,
+          dimensao: formData.dimensao,
+          responsavel: formData.responsavel,
+          prazo: formData.prazo,
+          prioridade: formData.prioridade
+        } : {})
       };
       
-      setLocalSubtasks([...localSubtasks, newSubtask]);
+      const updatedSubtasks = [...localSubtasks, newSubtask];
+      setLocalSubtasks(updatedSubtasks);
       setNewSubtaskTitle('');
     }
   };
 
   const toggleSubtask = (id: string) => {
-    setLocalSubtasks(localSubtasks.map(st => {
+    const completionStatuses = (advancedSettings?.completion_statuses || ['completa', 'concluída', 'descartada']).map((s: string) => s.toLowerCase());
+    const primaryCompletion = completionStatuses[0] || 'completa';
+    const autoCompleteParent = advancedSettings?.auto_complete_parent !== false;
+
+    const nextSubtasks = localSubtasks.map(st => {
       if (st.id === id) {
-        const isCompleted = st.status === 'completa';
-        return { ...st, status: isCompleted ? 'não iniciada' : 'completa' };
+        const isCompleted = completionStatuses.includes((st.status || '').toLowerCase());
+        return { ...st, status: isCompleted ? 'não iniciada' : primaryCompletion };
       }
       return st;
-    }));
+    });
+
+    setLocalSubtasks(nextSubtasks);
+
+    // Se auto_complete_parent estiver ativado e todas as subtarefas estiverem concluídas
+    if (autoCompleteParent && nextSubtasks.length > 0) {
+      const allCompleted = nextSubtasks.every(st => completionStatuses.includes((st.status || '').toLowerCase()));
+      if (allCompleted) {
+        setFormData(prev => ({ ...prev, status: primaryCompletion }));
+      }
+    }
   };
 
   const deleteSubtask = async (id: string) => {
@@ -518,8 +542,39 @@ export function TaskFormModal({ isOpen, onClose, task, uniqueCategories, uniqueD
             </div>
 
             <div>
-              <label className="block text-xs text-[#8E8E8E] uppercase tracking-wider mb-2">Prazo</label>
-              <input type="date" name="prazo" value={formData.prazo || ''} onChange={handleChange} className="w-full bg-[#121212] border border-[#2D2D2D] rounded-md px-4 py-2 text-white focus:outline-none focus:border-[#FFCC00] [color-scheme:dark]" />
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-xs text-[#8E8E8E] uppercase tracking-wider">Prazo (Data e Hora)</label>
+                <div className="flex gap-2">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const d = new Date(); d.setDate(d.getDate() + 1);
+                      d.setHours(12, 0, 0, 0); // Define 12:00 por padrão
+                      setFormData(prev => ({ ...prev, prazo: new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().slice(0, 16) }))
+                    }}
+                    className="text-[10px] bg-[#2D2D2D] hover:bg-[#9D4EDD] text-white px-2 py-1 rounded transition-colors"
+                  >Amanhã</button>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const d = new Date(); d.setDate(d.getDate() + 7);
+                      d.setHours(12, 0, 0, 0);
+                      setFormData(prev => ({ ...prev, prazo: new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().slice(0, 16) }))
+                    }}
+                    className="text-[10px] bg-[#2D2D2D] hover:bg-[#9D4EDD] text-white px-2 py-1 rounded transition-colors"
+                  >Próx. Sem.</button>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const d = new Date(); d.setMonth(d.getMonth() + 1);
+                      d.setHours(12, 0, 0, 0);
+                      setFormData(prev => ({ ...prev, prazo: new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().slice(0, 16) }))
+                    }}
+                    className="text-[10px] bg-[#2D2D2D] hover:bg-[#9D4EDD] text-white px-2 py-1 rounded transition-colors"
+                  >Próx. Mês</button>
+                </div>
+              </div>
+              <input type="datetime-local" name="prazo" value={formData.prazo || ''} onChange={handleChange} className="w-full bg-[#121212] border border-[#2D2D2D] rounded-md px-4 py-2 text-white focus:outline-none focus:border-[#FFCC00] [color-scheme:dark]" />
             </div>
 
             <div className="md:col-span-2">
