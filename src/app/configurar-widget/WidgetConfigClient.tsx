@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
-import { WidgetTasksPreview, WidgetCalendarPreview, WidgetEventsPreview, WidgetWeeklyCalendarPreview } from '@/components/dashboard/WidgetPreviews';
+import { WidgetTasksPreview, WidgetCalendarPreview, WidgetWeeklyCalendarPreview, WidgetGlobalPreview } from '@/components/dashboard/WidgetPreviews';
 
 function ToggleButtons({ 
   showEvents, 
@@ -48,12 +48,14 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tarefas' | 'calendario' | 'semanal' | 'eventos'>('tarefas');
+  const [activeTab, setActiveTab] = useState<'lista' | 'calendario' | 'semanal' | 'global'>('lista');
   const [calendarShowTasks, setCalendarShowTasks] = useState(true);
   const [calendarShowEvents, setCalendarShowEvents] = useState(true);
   const [weeklyShowTasks, setWeeklyShowTasks] = useState(true);
   const [weeklyShowEvents, setWeeklyShowEvents] = useState(true);
-  const [weeklySplitShifts, setWeeklySplitShifts] = useState(true);
+  const [weeklySplitType, setWeeklySplitType] = useState<string>('12h');
+  const [listShowTasks, setListShowTasks] = useState(true);
+  const [listShowEvents, setListShowEvents] = useState(true);
 
   // Extrair dimensões únicas existentes
   const dimensions = Array.from(new Set(tasks.map(t => t.dimensao).filter(Boolean)));
@@ -101,8 +103,19 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
         const { value: wShowEventsVal } = await Preferences.get({ key: 'widget_weekly_show_events' });
         if (wShowEventsVal) setWeeklyShowEvents(wShowEventsVal === 'true');
         
-        const { value: wSplitVal } = await Preferences.get({ key: 'widget_weekly_split_shifts' });
-        if (wSplitVal) setWeeklySplitShifts(wSplitVal === 'true');
+        const { value: wSplitTypeVal } = await Preferences.get({ key: 'widget_weekly_split_type' });
+        if (wSplitTypeVal) {
+          setWeeklySplitType(wSplitTypeVal);
+        } else {
+          const { value: wSplitVal } = await Preferences.get({ key: 'widget_weekly_split_shifts' });
+          if (wSplitVal) setWeeklySplitType(wSplitVal === 'true' ? '12h' : 'none');
+        }
+
+        const { value: lShowTasksVal } = await Preferences.get({ key: 'widget_list_show_tasks' });
+        if (lShowTasksVal) setListShowTasks(lShowTasksVal === 'true');
+
+        const { value: lShowEventsVal } = await Preferences.get({ key: 'widget_list_show_events' });
+        if (lShowEventsVal) setListShowEvents(lShowEventsVal === 'true');
       } catch (err) {
         console.error('Erro ao carregar preferências do widget', err);
       }
@@ -135,7 +148,9 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
       await Preferences.set({ key: 'widget_calendar_show_events', value: calendarShowEvents.toString() });
       await Preferences.set({ key: 'widget_weekly_show_tasks', value: weeklyShowTasks.toString() });
       await Preferences.set({ key: 'widget_weekly_show_events', value: weeklyShowEvents.toString() });
-      await Preferences.set({ key: 'widget_weekly_split_shifts', value: weeklySplitShifts.toString() });
+      await Preferences.set({ key: 'widget_weekly_split_type', value: weeklySplitType });
+      await Preferences.set({ key: 'widget_list_show_tasks', value: listShowTasks.toString() });
+      await Preferences.set({ key: 'widget_list_show_events', value: listShowEvents.toString() });
 
       // Atualizar lista filtrada do Widget imediatamente no storage
       let filteredTasks = tasks;
@@ -214,7 +229,7 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
             <span className="material-symbols-outlined text-[24px]">widgets</span>
           </div>
           <div>
-            <h1 className="text-2xl font-black text-white font-['Bukra'] tracking-tight">Configurações do Widget</h1>
+            <h1 className="text-2xl font-black text-white font-['Bukra'] tracking-tight">Configurações dos Widgets</h1>
             <p className="text-xs text-[#8E8E8E] mt-0.5">Personalize os widgets que aparecem na tela inicial do seu celular.</p>
           </div>
         </div>
@@ -239,10 +254,10 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-[#2D2D2D] mb-8 pb-1 overflow-x-auto custom-scrollbar">
         {[
-          { id: 'tarefas', label: 'Tarefas', icon: 'task_alt' },
+          { id: 'lista', label: 'Lista', icon: 'view_list' },
           { id: 'calendario', label: 'Calendário', icon: 'calendar_month' },
           { id: 'semanal', label: 'Semanal', icon: 'view_week' },
-          { id: 'eventos', label: 'Eventos', icon: 'event_list' }
+          { id: 'global', label: 'Global (Tudo em Um)', icon: 'dashboard' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -259,8 +274,33 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
         
         {/* Lado Esquerdo: Configurações */}
         <div className="space-y-6">
-          {activeTab === 'tarefas' && (
+          {activeTab === 'lista' && (
             <>
+              <div className="text-[#8E8E8E] text-sm p-4 bg-[#121212] border border-[#2D2D2D] rounded-lg">
+                <h3 className="text-white font-bold mb-1">Visualização da Lista</h3>
+                <p className="text-xs text-[#8E8E8E] mb-3">Escolha o que deseja visualizar na lista principal.</p>
+                <ToggleButtons 
+                  showEvents={listShowEvents}
+                  showTasks={listShowTasks}
+                  onToggleEvents={() => {
+                    setIsDirty(true);
+                    setListShowEvents(!listShowEvents);
+                  }} 
+                  onToggleTasks={() => {
+                    setIsDirty(true);
+                    setListShowTasks(!listShowTasks);
+                  }} 
+                />
+
+                <div className="mt-4 p-3 bg-[#1A1A1A] rounded-lg border border-[#2D2D2D]">
+                  <h4 className="text-white font-semibold text-xs mb-2">Como funcionam os botões no Widget:</h4>
+                  <ul className="text-[11px] space-y-1.5">
+                    <li><strong className="text-[#FFCC00]">E</strong> = Clicar liga/desliga apenas os Eventos.</li>
+                    <li><strong className="text-[#9D4EDD]">T</strong> = Clicar liga/desliga apenas as Tarefas.</li>
+                    <li>Deixe os dois ligados para ver ambos, ou os dois desligados para ver só os dias vazios.</li>
+                  </ul>
+                </div>
+              </div>
               {/* Filtro de Status */}
               <div className="p-4 bg-[#121212] border border-[#2D2D2D] rounded-lg">
                 <h3 className="text-base font-bold text-white mb-1 flex items-center gap-2">
@@ -355,23 +395,7 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
                 }} 
               />
               
-              <label className="flex items-center gap-3 mt-4 mb-2 p-3 bg-[#1A1A1A] rounded-lg border border-[#2D2D2D] cursor-pointer">
-                <input 
-                  type="checkbox"
-                  checked={weeklySplitShifts}
-                  onChange={(e) => {
-                    setIsDirty(true);
-                    setWeeklySplitShifts(e.target.checked);
-                  }}
-                  className="w-4 h-4 rounded border-[#3A3A3C] bg-[#121212] checked:bg-[#9D4EDD] focus:ring-0 focus:ring-offset-0"
-                />
-                <div>
-                  <h4 className="text-white font-semibold text-xs">Dividir em Turnos (12h-12h)</h4>
-                  <p className="text-[#8E8E8E] text-[10px]">Separa visualmente os itens da manhã e da tarde.</p>
-                </div>
-              </label>
-
-              <div className="mt-2 p-3 bg-[#1A1A1A] rounded-lg border border-[#2D2D2D]">
+              <div className="mt-4 p-3 bg-[#1A1A1A] rounded-lg border border-[#2D2D2D]">
                 <h4 className="text-white font-semibold text-xs mb-2">Como funcionam os botões no Widget:</h4>
                 <ul className="text-[11px] space-y-1.5">
                   <li><strong className="text-[#FFCC00]">E</strong> = Clicar liga/desliga apenas os Eventos.</li>
@@ -379,17 +403,68 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
                   <li>Deixe os dois ligados para ver ambos, ou os dois desligados para ver só os dias vazios.</li>
                 </ul>
               </div>
+
+              <div className="mt-4 p-4 bg-[#1A1A1A] border border-[#2D2D2D] rounded-lg">
+                <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#9D4EDD] text-[20px]">view_agenda</span>
+                  Divisão de Turnos
+                </h3>
+                <div className="flex flex-col gap-2">
+                  <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${weeklySplitType === 'none' ? 'border-[#9D4EDD] bg-[#9D4EDD]/10' : 'border-[#2D2D2D] bg-[#121212] hover:border-[#3D3D3D]'}`}>
+                    <input type="radio" name="splitType" value="none" checked={weeklySplitType === 'none'} onChange={() => { setIsDirty(true); setWeeklySplitType('none'); }} className="hidden" />
+                    <div className="flex-1">
+                      <h4 className="text-white font-semibold text-sm">Turno Único</h4>
+                      <p className="text-[#8E8E8E] text-xs">Exibe as tarefas e eventos de forma contínua no dia.</p>
+                    </div>
+                  </label>
+                  <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${weeklySplitType === '12h' ? 'border-[#9D4EDD] bg-[#9D4EDD]/10' : 'border-[#2D2D2D] bg-[#121212] hover:border-[#3D3D3D]'}`}>
+                    <input type="radio" name="splitType" value="12h" checked={weeklySplitType === '12h'} onChange={() => { setIsDirty(true); setWeeklySplitType('12h'); }} className="hidden" />
+                    <div className="flex-1">
+                      <h4 className="text-white font-semibold text-sm">Dividir em 2 Turnos (12h-24h-12h)</h4>
+                      <p className="text-[#8E8E8E] text-xs">Separa os itens em bloco da Manhã e Tarde/Noite.</p>
+                    </div>
+                  </label>
+                  <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${weeklySplitType === '8h' ? 'border-[#9D4EDD] bg-[#9D4EDD]/10' : 'border-[#2D2D2D] bg-[#121212] hover:border-[#3D3D3D]'}`}>
+                    <input type="radio" name="splitType" value="8h" checked={weeklySplitType === '8h'} onChange={() => { setIsDirty(true); setWeeklySplitType('8h'); }} className="hidden" />
+                    <div className="flex-1">
+                      <h4 className="text-white font-semibold text-sm">Dividir em 3 Turnos (8h-16h-24h-8h)</h4>
+                      <p className="text-[#8E8E8E] text-xs">Separa os itens em Manhã, Tarde e Noite.</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
             </div>
           )}
 
-          {activeTab === 'eventos' && (
+          {activeTab === 'global' && (
             <div className="text-[#8E8E8E] text-sm p-4 bg-[#121212] border border-[#2D2D2D] rounded-lg">
-              <h3 className="text-white font-bold mb-4">Configurações de Eventos</h3>
-              <div className="flex flex-col gap-4">
-                <label className="flex items-center justify-between text-white">
-                  <span>Mostrar Horários</span>
-                  <input type="checkbox" className="accent-[#9D4EDD] w-4 h-4" defaultChecked />
-                </label>
+              <h3 className="text-white font-bold mb-1">Configurações do Widget Global</h3>
+              <p className="text-xs text-[#8E8E8E] mb-3">O Widget Global combina o Calendário Mensal e a Lista no topo (50/50) com o Calendário Semanal na parte inferior.</p>
+              
+              <div className="p-3 bg-[#1A1A1A] rounded-lg border border-[#2D2D2D]">
+                <h4 className="text-white font-semibold text-xs mb-2">Estrutura do Widget Global:</h4>
+                <div className="text-[11px] space-y-3 text-[#E0E0E0]">
+                  <div>
+                    <strong className="text-[#9D4EDD] block mb-1">Seção Superior (Cabeçalho Global):</strong>
+                    <ul className="pl-2 space-y-1">
+                      <li>• <strong>Esquerda:</strong> Filtro de Dimensões (Dimensões ▼).</li>
+                      <li>• <strong>Direita:</strong> Botões de controle mestre E, T e +.</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <strong className="text-[#9D4EDD] block mb-1">Seção Central (Dividida em 50/50):</strong>
+                    <ul className="pl-2 space-y-1">
+                      <li>• <strong>Superior Esquerdo:</strong> Mini Calendário Mensal com cabeçalho de mês, dias da semana e grade de dias.</li>
+                      <li>• <strong>Superior Direito:</strong> Lista de Tarefas e Eventos filtrados com barra de rolagem vertical.</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <strong className="text-[#9D4EDD] block mb-1">Seção Inferior (Base):</strong>
+                    <ul className="pl-2 space-y-1">
+                      <li>• <strong>Inferior Horizontal:</strong> Visão Semanal completa com rolagem lateral por deslizamento e o divisor roxo (|) entre as semanas.</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -401,10 +476,10 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
             <span className="text-[#E0E0E0] text-xs font-bold uppercase tracking-wider">Preview do Widget Android</span>
           </div>
           <div className="flex-1 p-8 flex items-center justify-center bg-[#121212]/50" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\\"20\\" height=\\"20\\" viewBox=\\"0 0 20 20\\" xmlns=\\"http://www.w3.org/2000/svg\\"%3E%3Cg fill=\\"%23252525\\" fill-opacity=\\"0.4\\" fill-rule=\\"evenodd\\"%3E%3Ccircle cx=\\"3\\" cy=\\"3\\" r=\\"1\\"/%3E%3Ccircle cx=\\"13\\" cy=\\"13\\" r=\\"1\\"/%3E%3C/g%3E%3C/svg%3E")' }}>
-            {activeTab === 'tarefas' && <WidgetTasksPreview tasks={tasks} config={{ hiddenStatuses, hiddenTaskIds, sortOrder, selectedDimension }} />}
+            {activeTab === 'lista' && <WidgetTasksPreview tasks={tasks} config={{ hiddenStatuses, hiddenTaskIds, sortOrder, selectedDimension }} />}
             {activeTab === 'calendario' && <WidgetCalendarPreview config={{ calendarShowTasks, calendarShowEvents }} />}
-            {activeTab === 'semanal' && <WidgetWeeklyCalendarPreview config={{ weeklyShowTasks, weeklyShowEvents, weeklySplitShifts }} />}
-            {activeTab === 'eventos' && <WidgetEventsPreview events={[]} />}
+            {activeTab === 'semanal' && <WidgetWeeklyCalendarPreview config={{ weeklyShowTasks, weeklyShowEvents, weeklySplitType }} />}
+            {activeTab === 'global' && <WidgetGlobalPreview tasks={tasks} config={{ weeklyShowTasks, weeklyShowEvents, weeklySplitType, selectedDimension }} />}
           </div>
         </div>
         

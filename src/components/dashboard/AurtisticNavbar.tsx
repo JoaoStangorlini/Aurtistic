@@ -225,7 +225,7 @@ export default function AurtisticNavbar() {
                       className="w-full text-left px-4 py-2 text-sm text-[#E0E0E0] hover:bg-[#2D2D2D] hover:text-[#FFCC00] transition-colors flex items-center gap-2 group"
                     >
                       <span className="material-symbols-outlined text-[18px]">widgets</span>
-                      Configurar Widget
+                      Configurar Widgets
                     </Link>
 
                     <Link 

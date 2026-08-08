@@ -75,14 +75,7 @@ class CalendarWidgetProvider : AppWidgetProvider() {
 
             views.setTextViewText(R.id.calendar_month_title, monthTitle)
 
-            // Setup Intents for Navigation
-            val prevIntent = Intent(context, CalendarWidgetProvider::class.java).apply { action = "ACTION_PREV_MONTH" }
-            val nextIntent = Intent(context, CalendarWidgetProvider::class.java).apply { action = "ACTION_NEXT_MONTH" }
-            val pendingPrev = PendingIntent.getBroadcast(context, 0, prevIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-            val pendingNext = PendingIntent.getBroadcast(context, 1, nextIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-            
-            views.setOnClickPendingIntent(R.id.btn_prev_month, pendingPrev)
-            views.setOnClickPendingIntent(R.id.btn_next_month, pendingNext)
+
 
             val addIntent = Intent(context, WidgetActionActivity::class.java).apply {
                 putExtra("action", "create_event")

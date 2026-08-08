@@ -47,6 +47,7 @@ export interface AgendaEvent {
   user_id: string;
   nome: string;
   descricao: string | null;
+  status?: string | null;
   data_inicio: string | null; // formato "YYYY-MM-DD"
   data_fim: string | null;    // formato "YYYY-MM-DD"
   horarios_semanais: Record<string, HorarioSemanal> | null; // ex: { "Segunda": { "inicio": "19:00", "fim": "21:00" } }

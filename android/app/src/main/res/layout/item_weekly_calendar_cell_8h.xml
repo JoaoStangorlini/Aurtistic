@@ -32,11 +32,11 @@
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:layout_marginTop="2dp"
-        android:weightSum="2">
+        android:weightSum="3">
 
-        <!-- Manhã (AM) -->
+        <!-- Turno 1 (00:00 - 08:00) -->
         <LinearLayout
-            android:id="@+id/cell_events_am"
+            android:id="@+id/cell_events_shift1"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
@@ -45,9 +45,21 @@
             android:padding="1dp"
             android:layout_marginBottom="1dp" />
 
-        <!-- Tarde/Noite (PM) -->
+        <!-- Turno 2 (08:00 - 16:00) -->
         <LinearLayout
-            android:id="@+id/cell_events_pm"
+            android:id="@+id/cell_events_shift2"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:background="@drawable/bg_calendar_cell"
+            android:padding="1dp"
+            android:layout_marginBottom="1dp"
+            android:layout_marginTop="1dp" />
+            
+        <!-- Turno 3 (16:00 - 24:00) -->
+        <LinearLayout
+            android:id="@+id/cell_events_shift3"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"

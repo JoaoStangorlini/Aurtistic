@@ -210,6 +210,7 @@ class WidgetActionActivity : Activity() {
             val newEvent = JSONObject()
             newEvent.put("id", eventId)
             newEvent.put("nome", eventName)
+            newEvent.put("status", "rascunho")
             
             // Set date to today
             val cal = java.util.Calendar.getInstance()
@@ -299,14 +300,26 @@ class WidgetActionActivity : Activity() {
     }
     
     private fun updateWidgetUI() {
-        val intent = Intent(this, FavoritesWidgetProvider::class.java)
-        intent.action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-        
         val widgetManager = AppWidgetManager.getInstance(this)
-        val ids = widgetManager.getAppWidgetIds(ComponentName(this, FavoritesWidgetProvider::class.java))
-        intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
         
-        sendBroadcast(intent)
+        val providers = arrayOf(
+            EventsWidgetProvider::class.java,
+            CalendarWidgetProvider::class.java,
+            WeeklyCalendarWidgetProvider::class.java
+        )
+        
+        for (provider in providers) {
+            val intent = Intent(this, provider)
+            intent.action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+            val ids = widgetManager.getAppWidgetIds(ComponentName(this, provider))
+            intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+            sendBroadcast(intent)
+            
+            // For list widget, also notify dataset changed
+            if (provider == EventsWidgetProvider::class.java) {
+                widgetManager.notifyAppWidgetViewDataChanged(ids, R.id.widget_events_list)
+            }
+        }
     }
 
     private fun launchMainActivity() {

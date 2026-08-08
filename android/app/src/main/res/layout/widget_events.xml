@@ -15,22 +15,63 @@
         android:gravity="center_vertical"
         android:paddingBottom="12dp">
 
-        <TextView
-            android:id="@+id/widget_title"
+        <LinearLayout
+            android:id="@+id/widget_title_container"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Próximos Eventos"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="?android:attr/selectableItemBackground">
+
+            <TextView
+                android:id="@+id/widget_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Dimensões"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textSize="14sp" />
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:src="@drawable/ic_arrow_down"
+                android:contentDescription="Selecionar dimensão"
+                android:tint="#A0A0A0"
+                android:layout_marginStart="2dp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/btn_toggle_events"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:text="E"
             android:textColor="#FFFFFF"
+            android:gravity="center"
+            android:textSize="12sp"
             android:textStyle="bold"
-            android:textSize="14sp" />
+            android:background="@drawable/bg_event_pill_default"
+            android:layout_marginEnd="4dp" />
+
+        <TextView
+            android:id="@+id/btn_toggle_tasks"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:text="T"
+            android:textColor="#FFFFFF"
+            android:gravity="center"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:background="@drawable/bg_task_pill_default"
+            android:layout_marginEnd="8dp" />
 
         <ImageView
             android:id="@+id/widget_add_button"
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:src="@android:drawable/ic_input_add"
-            android:contentDescription="Adicionar Evento"
+            android:contentDescription="Adicionar"
             android:tint="#FFFFFF"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:padding="4dp" />

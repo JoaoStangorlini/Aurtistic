@@ -1,26 +1,0 @@
-
-×
-;
-android*http://schemas.android.com/apk/res/android
-CTextView"
-*http://schemas.android.com/apk/res/android
-background&?android:attr/selectableItemBackground"
-(Ô„22
-0†„%android:attr/selectableItemBackground0"`
-*http://schemas.android.com/apk/res/androidlayout_widthmatch_parent"
-(ô„2:0ÿÿÿÿÿÿÿÿÿ"a
-*http://schemas.android.com/apk/res/androidlayout_heightwrap_content"
-(õ„2:0şÿÿÿÿÿÿÿÿ"Q
-*http://schemas.android.com/apk/res/androidpaddingBottom14dp"
-(Ù„2:h"L
-*http://schemas.android.com/apk/res/androidtextSize16sp"
-(•„2:h‚ "S
-*http://schemas.android.com/apk/res/android	textColor#E0E0E0"
-(˜„2:PàÁƒÿ"c
-*http://schemas.android.com/apk/res/androidid@+id/item_text"
-(Ğ„2
-‰ øid/item_text0"N
-*http://schemas.android.com/apk/res/android
-paddingTop14dp"
-(×„2:h
-C

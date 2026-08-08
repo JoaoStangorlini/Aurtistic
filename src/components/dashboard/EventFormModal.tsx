@@ -25,6 +25,7 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
   const [dimensao, setDimensao] = useState('');
+  const [status, setStatus] = useState<'confirmado' | 'rascunho' | 'cancelado'>('confirmado');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [horarios, setHorarios] = useState<Record<string, { inicio: string; fim: string }>>({});
@@ -34,6 +35,7 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
       if (event) {
         setNome(event.nome);
         setDescricao(event.descricao || '');
+        setStatus((event.status as any) || 'confirmado');
         setDataInicio(event.data_inicio || '');
         setDataFim(event.data_fim || '');
         setDimensao(event.dimensao || '');
@@ -41,13 +43,14 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
       } else {
         setNome('');
         setDescricao('');
+        setStatus(defaultValues?.status || 'confirmado');
         setDataInicio('');
         setDataFim('');
         setDimensao(defaultValues?.dimensao || '');
         setHorarios({});
       }
     }
-  }, [isOpen, event]);
+  }, [isOpen, event, defaultValues]);
 
   if (!isOpen) return null;
 
@@ -82,6 +85,7 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
       const payload: Partial<AgendaEvent> = {
         nome,
         descricao: descricao || null,
+        status: status || 'confirmado',
         data_inicio: dataInicio || null,
         data_fim: dataFim || null,
         dimensao: dimensao || null,
@@ -161,18 +165,33 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
               </div>
             </div>
 
-            {/* Dimensão */}
-            <div>
-              <label className="block text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-2">Dimensão</label>
-              <CustomSelect 
-                name="dimensao" 
-                value={dimensao} 
-                onChange={(e) => setDimensao(e.target.value)} 
-                type="dimensao" 
-                options={dimensaoOptions} 
-                allowCustom={true} 
-                onEditColumn={columns.find(c => c.key === 'dimensao') && onEditColumn ? () => onEditColumn(columns.find(c => c.key === 'dimensao')!) : undefined} 
-              />
+            {/* Dimensão & Status */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-2">Dimensão</label>
+                <CustomSelect 
+                  name="dimensao" 
+                  value={dimensao} 
+                  onChange={(e) => setDimensao(e.target.value)} 
+                  type="dimensao" 
+                  options={dimensaoOptions} 
+                  allowCustom={true} 
+                  onEditColumn={columns.find(c => c.key === 'dimensao') && onEditColumn ? () => onEditColumn(columns.find(c => c.key === 'dimensao')!) : undefined} 
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-2">Status do Evento</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as any)}
+                  className="w-full bg-[#1A1A1A] border border-[#2D2D2D] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] transition-all color-scheme-dark font-medium"
+                >
+                  <option value="confirmado">Confirmado</option>
+                  <option value="rascunho">Rascunho</option>
+                  <option value="cancelado">Cancelado</option>
+                </select>
+              </div>
             </div>
 
             {/* Rotina Semanal */}

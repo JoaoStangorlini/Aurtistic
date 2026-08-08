@@ -11,6 +11,15 @@
     android:background="@drawable/bg_calendar_cell">
     
     <TextView
+        android:id="@+id/cell_day_of_week_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:textColor="#8E8E8E"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+        
+    <TextView
         android:id="@+id/cell_day_text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

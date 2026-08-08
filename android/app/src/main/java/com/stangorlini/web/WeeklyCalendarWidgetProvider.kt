@@ -79,16 +79,7 @@ class WeeklyCalendarWidgetProvider : AppWidgetProvider() {
             midWeekCal.add(Calendar.DAY_OF_WEEK, 3)
             val monthTitle = monthFormat.format(midWeekCal.time).replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
 
-            views.setTextViewText(R.id.calendar_week_title, monthTitle)
 
-            // Setup Intents for Navigation
-            val prevIntent = Intent(context, WeeklyCalendarWidgetProvider::class.java).apply { action = "ACTION_PREV_WEEK" }
-            val nextIntent = Intent(context, WeeklyCalendarWidgetProvider::class.java).apply { action = "ACTION_NEXT_WEEK" }
-            val pendingPrev = PendingIntent.getBroadcast(context, 0, prevIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-            val pendingNext = PendingIntent.getBroadcast(context, 1, nextIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-            
-            views.setOnClickPendingIntent(R.id.btn_prev_week, pendingPrev)
-            views.setOnClickPendingIntent(R.id.btn_next_week, pendingNext)
 
             val addIntent = Intent(context, WidgetActionActivity::class.java).apply {
                 putExtra("action", "create_event")
@@ -99,7 +90,8 @@ class WeeklyCalendarWidgetProvider : AppWidgetProvider() {
 
             val showTasks = prefs.getString("widget_weekly_show_tasks", "true") == "true"
             val showEvents = prefs.getString("widget_weekly_show_events", "true") == "true"
-            val splitShifts = prefs.getString("widget_weekly_split_shifts", "true") == "true"
+            
+            val splitType = prefs.getString("widget_weekly_split_type", null) ?: if (prefs.getString("widget_weekly_split_shifts", "true") == "true") "12h" else "none"
 
             val toggleEventsIntent = Intent(context, WeeklyCalendarWidgetProvider::class.java).apply { action = "ACTION_TOGGLE_EVENTS" }
             val pendingToggleEvents = PendingIntent.getBroadcast(context, 3, toggleEventsIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -146,16 +138,21 @@ class WeeklyCalendarWidgetProvider : AppWidgetProvider() {
             // Clear Grid Container
             views.removeAllViews(R.id.calendar_grid_container)
 
-            val rowViews = RemoteViews(context.packageName, R.layout.item_calendar_row)
-            
-            for (dayOfWeek in 0..6) {
-                val cellLayout = if (splitShifts) R.layout.item_weekly_calendar_cell else R.layout.item_calendar_cell
+            for (dayIndex in 0..13) {
+                val dayOfWeek = dayIndex % 7
+                val cellLayout = when (splitType) {
+                    "8h" -> R.layout.item_weekly_calendar_cell_8h
+                    "12h" -> R.layout.item_weekly_calendar_cell
+                    else -> R.layout.item_calendar_cell
+                }
                 val cellViews = RemoteViews(context.packageName, cellLayout)
                 
                 val currentDayOfMonth = cal.get(Calendar.DAY_OF_MONTH)
                 val currentYear = cal.get(Calendar.YEAR)
                 val currentDayOfYear = cal.get(Calendar.DAY_OF_YEAR)
                 
+                val daysOfWeekShort = arrayOf("D", "S", "T", "Q", "Q", "S", "S")
+                cellViews.setTextViewText(R.id.cell_day_of_week_text, daysOfWeekShort[dayOfWeek])
                 cellViews.setTextViewText(R.id.cell_day_text, currentDayOfMonth.toString())
                 
                 if (currentYear == todayYear && currentDayOfYear == todayDay) {
@@ -164,8 +161,9 @@ class WeeklyCalendarWidgetProvider : AppWidgetProvider() {
                 
                 val dayStr = String.format("%04d-%02d-%02d", cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, currentDayOfMonth)
                 
-                val itemsWithTimeAM = mutableListOf<RemoteViews>()
-                val itemsWithTimePM = mutableListOf<RemoteViews>()
+                val itemsShift1 = mutableListOf<RemoteViews>()
+                val itemsShift2 = mutableListOf<RemoteViews>()
+                val itemsShift3 = mutableListOf<RemoteViews>()
                 val itemsWithoutTime = mutableListOf<RemoteViews>()
                 
                 fun getHour(dateStr: String): Int? {
@@ -176,19 +174,30 @@ class WeeklyCalendarWidgetProvider : AppWidgetProvider() {
                     return null
                 }
                 
+                fun categorizeItem(hour: Int?, view: RemoteViews) {
+                    if (hour != null) {
+                        if (splitType == "8h") {
+                            when {
+                                hour < 8 -> itemsShift1.add(view)
+                                hour < 16 -> itemsShift2.add(view)
+                                else -> itemsShift3.add(view)
+                            }
+                        } else {
+                            if (hour < 12) itemsShift1.add(view)
+                            else itemsShift2.add(view)
+                        }
+                    } else {
+                        itemsWithoutTime.add(view)
+                    }
+                }
+                
                 for (ev in events) {
                     val dataInicio = ev.optString("data_inicio", "")
                     if (dataInicio.contains(dayStr)) {
                         val hour = getHour(dataInicio)
                         val pillViews = RemoteViews(context.packageName, R.layout.item_calendar_event_pill)
                         pillViews.setTextViewText(R.id.event_pill_text, ev.optString("nome", "Evento"))
-                        
-                        if (hour != null) {
-                            if (hour >= 12) itemsWithTimePM.add(pillViews)
-                            else itemsWithTimeAM.add(pillViews)
-                        } else {
-                            itemsWithoutTime.add(pillViews)
-                        }
+                        categorizeItem(hour, pillViews)
                     }
                 }
 
@@ -198,46 +207,23 @@ class WeeklyCalendarWidgetProvider : AppWidgetProvider() {
                         val hour = getHour(prazo)
                         val pillViews = RemoteViews(context.packageName, R.layout.item_calendar_task_pill)
                         pillViews.setTextViewText(R.id.task_pill_text, tk.optString("nome", "Tarefa"))
-                        
-                        if (hour != null) {
-                            if (hour >= 12) itemsWithTimePM.add(pillViews)
-                            else itemsWithTimeAM.add(pillViews)
-                        } else {
-                            itemsWithoutTime.add(pillViews)
-                        }
+                        categorizeItem(hour, pillViews)
                     }
                 }
 
-                if (splitShifts) {
+                if (splitType == "8h") {
+                    var s1Count = 0; var s2Count = 0; var s3Count = 0
+                    for (v in itemsShift1) if (s1Count < 1) { cellViews.addView(R.id.cell_events_shift1, v); s1Count++ }
+                    for (v in itemsShift2) if (s2Count < 1) { cellViews.addView(R.id.cell_events_shift2, v); s2Count++ }
+                    for (v in itemsShift3) if (s3Count < 1) { cellViews.addView(R.id.cell_events_shift3, v); s3Count++ }
+                } else if (splitType == "12h") {
                     var amCount = 0
                     var pmCount = 0
-                    
-                    for (v in itemsWithTimeAM) {
-                        if (amCount < 2) { cellViews.addView(R.id.cell_events_am, v); amCount++ }
-                    }
-                    for (v in itemsWithTimePM) {
-                        if (pmCount < 2) { cellViews.addView(R.id.cell_events_pm, v); pmCount++ }
-                    }
-                    
-                    val half = itemsWithoutTime.size / 2
-                    val remainderToAM = itemsWithoutTime.size % 2
-                    var addedToAM = 0
-                    var addedToPM = 0
-                    
-                    for (v in itemsWithoutTime) {
-                        if (addedToAM < half + remainderToAM && amCount < 2) {
-                            cellViews.addView(R.id.cell_events_am, v)
-                            addedToAM++
-                            amCount++
-                        } else if (addedToPM < half && pmCount < 2) {
-                            cellViews.addView(R.id.cell_events_pm, v)
-                            addedToPM++
-                            pmCount++
-                        }
-                    }
+                    for (v in itemsShift1) if (amCount < 2) { cellViews.addView(R.id.cell_events_am, v); amCount++ }
+                    for (v in itemsShift2) if (pmCount < 2) { cellViews.addView(R.id.cell_events_pm, v); pmCount++ }
                 } else {
                     var count = 0
-                    val allItems = itemsWithTimeAM + itemsWithTimePM + itemsWithoutTime
+                    val allItems = itemsShift1 + itemsShift2 + itemsShift3 + itemsWithoutTime
                     for (v in allItems) {
                         if (count < 3) {
                             cellViews.addView(R.id.cell_events_container, v)
@@ -246,11 +232,16 @@ class WeeklyCalendarWidgetProvider : AppWidgetProvider() {
                     }
                 }
 
-                rowViews.addView(R.id.row_container, cellViews)
+                views.addView(R.id.calendar_grid_container, cellViews)
+
+                // Add purple divider after day 6 (end of week 1)
+                if (dayOfWeek == 6 && dayIndex < 13) {
+                    val dividerView = RemoteViews(context.packageName, R.layout.item_week_divider)
+                    views.addView(R.id.calendar_grid_container, dividerView)
+                }
+
                 cal.add(Calendar.DAY_OF_MONTH, 1)
             }
-            
-            views.addView(R.id.calendar_grid_container, rowViews)
 
             appWidgetManager.updateAppWidget(appWidgetId, views)
         }

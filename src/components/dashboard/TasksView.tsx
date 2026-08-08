@@ -11,7 +11,7 @@ import { OptionsEditorModal } from './OptionsEditorModal';
 import TaskCalendar from './TaskCalendar';
 import { useSearchParams, usePathname } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import { updateTaskOrders, saveTaskColumn, updateEvent } from '@/app/(dashboard)/actions';
+import { updateTaskOrders, saveTaskColumn, updateEvent, createEvent } from '@/app/(dashboard)/actions';
 import { saveTask, deleteMultipleTasks, updateMultipleTasks } from '@/lib/offlineActions';
 import { Preferences } from '@capacitor/preferences';
 import { Capacitor, registerPlugin } from '@capacitor/core';
@@ -358,7 +358,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                 const { taskId, taskName, taskDimension } = update;
                 const newTask = {
                   id: taskId,
-                  nome: taskName || 'Novo Rascunho',
+                  nome: taskName || 'Novo Rascunho de Tarefa',
                   status: 'rascunho',
                   is_favorite: true,
                   ordem: 0,
@@ -367,8 +367,19 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                 };
                 newTasks.unshift(newTask as any);
                 modified = true;
-                // Save to Supabase (assuming saveTask creates a new one if UUID is not in DB)
                 saveTask(newTask as any).catch(e => console.error("Erro criando task do widget", e));
+              } else if (update.action === 'create_event') {
+                const { eventId, eventName } = update;
+                const newEvent: Partial<AgendaEvent> = {
+                  id: eventId,
+                  nome: eventName || 'Novo Rascunho de Evento',
+                  status: 'rascunho',
+                  data_inicio: new Date().toISOString(),
+                  dimensao: 'Rascunho',
+                  is_labdiv: !isPersonalScope
+                };
+                setLocalEvents(prev => [newEvent as AgendaEvent, ...prev]);
+                createEvent(newEvent).catch(e => console.error("Erro criando evento do widget", e));
               } else {
                 const { taskId, status } = update;
                 const taskIndex = newTasks.findIndex(t => t.id === taskId);
@@ -692,6 +703,8 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
   const desktopContainerRef = useRef<HTMLDivElement>(null);
   const mobileContainerRef = useRef<HTMLDivElement>(null);
   const filterMenuRef = useRef<HTMLDivElement>(null);
+  const quickCreateMenuRef = useRef<HTMLDivElement>(null);
+  const [isQuickCreateMenuOpen, setIsQuickCreateMenuOpen] = useState(false);
 
   // Close filter menu when clicking outside
   useEffect(() => {
@@ -701,6 +714,9 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
       }
       if (columnsMenuRef.current && !columnsMenuRef.current.contains(event.target as Node)) {
         setIsColumnsMenuOpen(false);
+      }
+      if (quickCreateMenuRef.current && !quickCreateMenuRef.current.contains(event.target as Node)) {
+        setIsQuickCreateMenuOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -877,6 +893,41 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
     setIsModalOpen(true);
   };
 
+  const handleNewDraftTask = async () => {
+    const newTask: any = {
+      id: crypto.randomUUID(),
+      nome: 'Novo Rascunho de Tarefa',
+      status: 'rascunho',
+      is_favorite: true,
+      prazo: new Date(Date.now() + 7 * 86400000).toISOString(),
+      dimensao: selectedDimensions.length === 1 && selectedDimensions[0] !== 'favoritas' ? selectedDimensions[0] : 'Rascunho',
+      is_personal: isPersonalScope
+    };
+    setLocalTasks(prev => [newTask, ...prev]);
+    try {
+      await saveTask(newTask);
+    } catch (e) {
+      console.error("Erro ao salvar rascunho de tarefa", e);
+    }
+  };
+
+  const handleNewDraftEvent = async () => {
+    const newEvent: Partial<AgendaEvent> = {
+      id: crypto.randomUUID(),
+      nome: 'Novo Rascunho de Evento',
+      status: 'rascunho',
+      data_inicio: new Date().toISOString(),
+      dimensao: selectedDimensions.length === 1 && selectedDimensions[0] !== 'favoritas' ? selectedDimensions[0] : 'Rascunho',
+      is_labdiv: !isPersonalScope
+    };
+    setLocalEvents(prev => [newEvent as AgendaEvent, ...prev]);
+    try {
+      await createEvent(newEvent);
+    } catch (e) {
+      console.error("Erro ao salvar rascunho de evento", e);
+    }
+  };
+
   const handleRowClick = (e: React.MouseEvent, taskId: string) => {
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.tagName === 'INPUT' || target.tagName === 'A' || target.textContent === 'drag_indicator') {
@@ -1033,6 +1084,12 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
   // Process Events: Filter
   const processedEvents = (() => {
     let evts = [...localEvents];
+    if (showDraftsOnly) {
+      evts = evts.filter(e => e.status === 'rascunho');
+    }
+    if (selectedStatuses.length > 0) {
+      evts = evts.filter(e => selectedStatuses.includes(e.status || 'confirmado'));
+    }
     if (isDailyFollowup && displayMode !== 'tarefas') {
       const todayStr = new Date().toISOString().split('T')[0];
       const todayName = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][new Date().getDay()];
@@ -1620,32 +1677,70 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                   Foco
                 </button>
               )}
-              {displayMode !== 'eventos' && (
-                <button 
-                  onClick={handleNew}
-                  className={`bg-[#FFCC00] text-[#121212] font-bold px-4 py-2 text-sm lg:px-5 lg:py-2.5 lg:text-base rounded-md hover:bg-[#e6b800] transition-colors shadow-sm shrink-0 ${localTasks.length === 0 ? 'animate-pulse ring-4 ring-[#FFCC00]/50' : ''}`}
+              {displayMode !== 'tarefas' && (
+                <button
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="bg-[#1A1A1A] border border-[#2D2D2D] text-white font-bold px-3 py-2 text-sm lg:px-4 lg:py-2.5 rounded-md hover:bg-[#2A2A2A] hover:border-[#9D4EDD] transition-colors shadow-sm shrink-0 flex items-center gap-1.5"
+                  title="Importar de Google Agenda / .ics"
                 >
-                  + Nova Tarefa
+                  <span className="material-symbols-outlined text-base">file_upload</span>
+                  <span>Importar .ics</span>
                 </button>
               )}
-              {displayMode !== 'tarefas' && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setIsImportModalOpen(true)}
-                    className="bg-[#1A1A1A] border border-[#2D2D2D] text-white font-bold px-3 py-2 text-sm lg:px-4 lg:py-2.5 rounded-md hover:bg-[#2A2A2A] hover:border-[#9D4EDD] transition-colors shadow-sm shrink-0 flex items-center gap-1.5"
-                    title="Importar de Google Agenda / .ics"
-                  >
-                    <span className="material-symbols-outlined text-base">file_upload</span>
-                    <span>Importar .ics</span>
-                  </button>
-                  <button
-                    onClick={handleNewEvent}
-                    className={`bg-[#9D4EDD] text-white font-bold px-4 py-2 text-sm lg:px-5 lg:py-2.5 lg:text-base rounded-md hover:bg-[#8338c7] transition-colors shadow-sm shrink-0`}
-                  >
-                    + Novo Evento
-                  </button>
-                </div>
-              )}
+
+              {/* Menu de Criação Rápida */}
+              <div className="relative shrink-0" ref={quickCreateMenuRef}>
+                <button 
+                  onClick={() => setIsQuickCreateMenuOpen(!isQuickCreateMenuOpen)}
+                  className="bg-gradient-to-r from-[#FFCC00] via-[#FF9900] to-[#9D4EDD] text-[#121212] font-black px-4 py-2 text-sm lg:px-5 lg:py-2.5 rounded-md hover:brightness-110 transition-all shadow-md flex items-center gap-1.5 shrink-0"
+                >
+                  <span className="material-symbols-outlined text-[18px]">bolt</span>
+                  <span>Criação Rápida</span>
+                  <span className="material-symbols-outlined text-[16px]">{isQuickCreateMenuOpen ? 'expand_less' : 'expand_more'}</span>
+                </button>
+
+                {isQuickCreateMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-64 bg-[#1A1A1A] border border-[#2D2D2D] rounded-xl shadow-2xl z-50 overflow-hidden py-1">
+                    <div className="px-3 py-1.5 text-[10px] font-bold text-[#8E8E8E] uppercase tracking-wider border-b border-[#2D2D2D]">
+                      Rascunhos Rápidos
+                    </div>
+                    <button 
+                      onClick={() => { setIsQuickCreateMenuOpen(false); handleNewDraftTask(); }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-white hover:bg-[#9D4EDD]/20 hover:text-[#9D4EDD] transition-colors flex items-center gap-2.5 font-bold"
+                    >
+                      <span className="material-symbols-outlined text-[16px] text-[#FFCC00]">edit_note</span>
+                      Rascunho de Tarefa
+                    </button>
+                    <button 
+                      onClick={() => { setIsQuickCreateMenuOpen(false); handleNewDraftEvent(); }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-white hover:bg-[#9D4EDD]/20 hover:text-[#9D4EDD] transition-colors flex items-center gap-2.5 font-bold"
+                    >
+                      <span className="material-symbols-outlined text-[16px] text-[#9D4EDD]">event_note</span>
+                      Rascunho de Evento
+                    </button>
+
+                    <div className="h-[1px] bg-[#2D2D2D] my-1" />
+
+                    <div className="px-3 py-1.5 text-[10px] font-bold text-[#8E8E8E] uppercase tracking-wider border-b border-[#2D2D2D]">
+                      Formulário Completo
+                    </div>
+                    <button 
+                      onClick={() => { setIsQuickCreateMenuOpen(false); handleNew(); }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-[#E0E0E0] hover:bg-[#252525] hover:text-white transition-colors flex items-center gap-2.5 font-medium"
+                    >
+                      <span className="material-symbols-outlined text-[16px] text-[#FFCC00]">add_task</span>
+                      Nova Tarefa Completa
+                    </button>
+                    <button 
+                      onClick={() => { setIsQuickCreateMenuOpen(false); handleNewEvent(); }}
+                      className="w-full text-left px-4 py-2.5 text-xs text-[#E0E0E0] hover:bg-[#252525] hover:text-white transition-colors flex items-center gap-2.5 font-medium"
+                    >
+                      <span className="material-symbols-outlined text-[16px] text-[#9D4EDD]">calendar_add_on</span>
+                      Novo Evento Completo
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

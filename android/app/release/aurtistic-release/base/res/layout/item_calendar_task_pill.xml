@@ -1,23 +1,0 @@
-
-‡
-;
-android*http://schemas.android.com/apk/res/android;TextView"V
-*http://schemas.android.com/apk/res/androidlayout_marginBottom1dp"(ú„2:h"Œ
-*http://schemas.android.com/apk/res/android
-background@drawable/bg_task_pill_default"(Ô„2)
-'Ø€œødrawable/bg_task_pill_default0"R
-*http://schemas.android.com/apk/res/androidpaddingVertical1dp"(¾Š„2:h"M
-*http://schemas.android.com/apk/res/android
-paddingTop1dp"(×„2:h"P
-*http://schemas.android.com/apk/res/androidpaddingBottom1dp"(Ù„2:h"K
-*http://schemas.android.com/apk/res/android	ellipsizeend"(«„2:0"`
-*http://schemas.android.com/apk/res/androidlayout_widthmatch_parent"(ô„2:0ÿÿÿÿÿÿÿÿÿ"a
-*http://schemas.android.com/apk/res/androidlayout_heightwrap_content"(õ„2:0şÿÿÿÿÿÿÿÿ"K
-*http://schemas.android.com/apk/res/androidtextSize6sp"(•„2:h‚"S
-*http://schemas.android.com/apk/res/android	textColor#E0E0E0"(˜„2:PàÁƒÿ"T
-*http://schemas.android.com/apk/res/androidpaddingHorizontal2dp"(½Š„2:h"N
-*http://schemas.android.com/apk/res/androidpaddingLeft2dp"(Ö„2:h"O
-*http://schemas.android.com/apk/res/androidpaddingRight2dp"(Ø„2:h"H
-*http://schemas.android.com/apk/res/androidmaxLines1"(Ó‚„2:0"m
-*http://schemas.android.com/apk/res/androidid@+id/task_pill_text"(Ğ„2
-Ò øid/task_pill_text0;
