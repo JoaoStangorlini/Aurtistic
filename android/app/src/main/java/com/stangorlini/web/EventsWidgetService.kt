@@ -178,7 +178,7 @@ class EventsWidgetFactory(private val context: Context) : RemoteViewsService.Rem
                 return views
             }
             2 -> {
-                val views = RemoteViews(context.packageName, R.layout.widget_favorites_item)
+                val views = RemoteViews(context.packageName, R.layout.widget_tasks_item)
                 val task = item.obj!!
                 val name = task.optString("nome", "Tarefa")
                 val prazo = task.optString("prazo", "")

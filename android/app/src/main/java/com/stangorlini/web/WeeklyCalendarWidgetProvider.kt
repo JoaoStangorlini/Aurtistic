@@ -138,7 +138,7 @@ class WeeklyCalendarWidgetProvider : AppWidgetProvider() {
             // Clear Grid Container
             views.removeAllViews(R.id.calendar_grid_container)
 
-            for (dayIndex in 0..13) {
+            for (dayIndex in 0..6) {
                 val dayOfWeek = dayIndex % 7
                 val cellLayout = when (splitType) {
                     "8h" -> R.layout.item_weekly_calendar_cell_8h

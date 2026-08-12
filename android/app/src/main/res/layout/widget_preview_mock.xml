@@ -47,13 +47,13 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
         
-        <include layout="@layout/widget_favorites_item" />
+        <include layout="@layout/widget_tasks_item" />
         <Space android:layout_width="match_parent" android:layout_height="8dp" />
         
-        <include layout="@layout/widget_favorites_item" />
+        <include layout="@layout/widget_tasks_item" />
         <Space android:layout_width="match_parent" android:layout_height="8dp" />
         
-        <include layout="@layout/widget_favorites_item" />
+        <include layout="@layout/widget_tasks_item" />
         
     </LinearLayout>
 

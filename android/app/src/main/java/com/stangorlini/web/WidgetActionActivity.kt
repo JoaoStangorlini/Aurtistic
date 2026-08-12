@@ -305,7 +305,8 @@ class WidgetActionActivity : Activity() {
         val providers = arrayOf(
             EventsWidgetProvider::class.java,
             CalendarWidgetProvider::class.java,
-            WeeklyCalendarWidgetProvider::class.java
+            WeeklyCalendarWidgetProvider::class.java,
+            GlobalWidgetProvider::class.java
         )
         
         for (provider in providers) {
@@ -315,9 +316,10 @@ class WidgetActionActivity : Activity() {
             intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
             sendBroadcast(intent)
             
-            // For list widget, also notify dataset changed
             if (provider == EventsWidgetProvider::class.java) {
                 widgetManager.notifyAppWidgetViewDataChanged(ids, R.id.widget_events_list)
+            } else if (provider == GlobalWidgetProvider::class.java) {
+                widgetManager.notifyAppWidgetViewDataChanged(ids, R.id.global_list_view)
             }
         }
     }

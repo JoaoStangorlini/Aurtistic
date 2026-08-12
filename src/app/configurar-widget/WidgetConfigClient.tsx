@@ -257,7 +257,7 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
           { id: 'lista', label: 'Lista', icon: 'view_list' },
           { id: 'calendario', label: 'Calendário', icon: 'calendar_month' },
           { id: 'semanal', label: 'Semanal', icon: 'view_week' },
-          { id: 'global', label: 'Global (Tudo em Um)', icon: 'dashboard' }
+          { id: 'global', label: 'Global', icon: 'dashboard' }
         ].map(tab => (
           <button
             key={tab.id}

@@ -135,20 +135,11 @@
                 <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="S" android:textColor="#8E8E8E" android:textSize="8sp" android:gravity="center" />
             </LinearLayout>
 
-            <HorizontalScrollView
-                android:id="@+id/global_month_scroll_view"
+            <LinearLayout
+                android:id="@+id/global_month_grid_container"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:scrollbars="horizontal"
-                android:fadeScrollbars="false"
-                android:fillViewport="true">
-
-                <LinearLayout
-                    android:id="@+id/global_month_grid_container"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:orientation="horizontal" />
-            </HorizontalScrollView>
+                android:orientation="vertical" />
         </LinearLayout>
 
         <!-- Divider line -->
@@ -193,18 +184,11 @@
         android:background="#2D2D2D"
         android:layout_marginVertical="4dp" />
 
-    <!-- Bottom Half: Weekly Calendar Horizontal (Scrollable, NO ARROWS) -->
-    <HorizontalScrollView
+    <!-- Bottom Half: Weekly Calendar Horizontal -->
+    <LinearLayout
+        android:id="@+id/global_weekly_grid_container"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:scrollbars="horizontal"
-        android:fillViewport="true">
-
-        <LinearLayout
-            android:id="@+id/global_weekly_grid_container"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:orientation="horizontal" />
-    </HorizontalScrollView>
+        android:orientation="horizontal" />
 </LinearLayout>

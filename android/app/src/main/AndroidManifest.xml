@@ -40,16 +40,16 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
-        <!-- Widget Receiver 1: Tarefas -->
-        <receiver android:name=".FavoritesWidgetProvider" android:label="Aurtistic - Tarefas" android:exported="true">
+        <!-- Widget 1: Lista -->
+        <receiver android:name=".EventsWidgetProvider" android:label="Aurtistic - Lista" android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info" />
+                android:resource="@xml/events_widget_info" />
         </receiver>
 
-        <!-- Widget Receiver 2: Calendário -->
+        <!-- Widget 2: Calendário -->
         <receiver android:name=".CalendarWidgetProvider" android:label="Aurtistic - Calendário" android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -58,17 +58,8 @@
                 android:resource="@xml/calendar_widget_info" />
         </receiver>
 
-        <!-- Widget Receiver 3: Eventos -->
-        <receiver android:name=".EventsWidgetProvider" android:label="Aurtistic - Eventos" android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data android:name="android.appwidget.provider"
-                android:resource="@xml/events_widget_info" />
-        </receiver>
-
-        <!-- Widget Receiver 4: Calendário Semanal -->
-        <receiver android:name=".WeeklyCalendarWidgetProvider" android:label="Aurtistic - Calendário Semanal" android:exported="true">
+        <!-- Widget 3: Semanal -->
+        <receiver android:name=".WeeklyCalendarWidgetProvider" android:label="Aurtistic - Semanal" android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -76,8 +67,8 @@
                 android:resource="@xml/weekly_calendar_widget_info" />
         </receiver>
 
-        <!-- Widget Receiver 5: Global -->
-        <receiver android:name=".GlobalWidgetProvider" android:label="Aurtistic - Global (Tudo em Um)" android:exported="true">
+        <!-- Widget 4: Global -->
+        <receiver android:name=".GlobalWidgetProvider" android:label="Aurtistic - Global" android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -86,10 +77,6 @@
         </receiver>
 
         <!-- Widget Services -->
-        <service android:name=".FavoritesWidgetService"
-            android:permission="android.permission.BIND_REMOTEVIEWS"
-            android:exported="false" />
-
         <service android:name=".EventsWidgetService"
             android:permission="android.permission.BIND_REMOTEVIEWS"
             android:exported="false" />

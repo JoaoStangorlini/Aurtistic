@@ -9,6 +9,7 @@ export default function AurtisticLoginPage() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [checkError, setCheckError] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   
@@ -39,10 +40,24 @@ export default function AurtisticLoginPage() {
   const handleBack = () => {
     setStep(1);
     setCheckError('');
+    setIsSubmitting(false);
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-[#121212] flex items-center justify-center p-4">
+    <div className="relative h-full overflow-y-auto bg-[#121212] flex items-center justify-center p-4">
+      {/* Full-Screen Loading Overlay */}
+      {isSubmitting && (
+        <div className="fixed inset-0 z-50 bg-[#121212]/95 backdrop-blur-md flex flex-col items-center justify-center p-6 animate-fadeIn">
+          <div className="w-16 h-16 border-4 border-[#9D4EDD] border-t-transparent rounded-full animate-spin mb-6"></div>
+          <h2 className="text-xl font-bold text-white mb-2">
+            {mode === 'login' ? 'Entrando no Aurtistic...' : 'Criando sua Conta...'}
+          </h2>
+          <p className="text-sm text-[#8E8E8E] text-center max-w-xs">
+            Por favor aguarde um instante enquanto validamos seu acesso.
+          </p>
+        </div>
+      )}
+
       <div className="w-full max-w-md bg-[#1A1A1A] border border-[#2D2D2D] rounded-xl p-8 shadow-[0_16px_40px_rgba(0,0,0,0.8)]">
         
         {/* Header */}
@@ -68,7 +83,9 @@ export default function AurtisticLoginPage() {
               </label>
               <input
                 id="username"
+                name="username"
                 type="text"
+                autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
@@ -89,8 +106,21 @@ export default function AurtisticLoginPage() {
 
         {/* Step 2: Password (and Signup extras) */}
         {step === 2 && (
-          <form className="flex flex-col gap-4" action={mode === 'login' ? loginAurtistic : signupAurtistic}>
-            <input type="hidden" name="username" value={username} />
+          <form 
+            className="flex flex-col gap-4" 
+            action={mode === 'login' ? loginAurtistic : signupAurtistic}
+            onSubmit={() => setIsSubmitting(true)}
+          >
+            {/* Standard username input for password manager pairing */}
+            <input 
+              type="text" 
+              id="username_step2" 
+              name="username" 
+              value={username} 
+              autoComplete="username" 
+              readOnly 
+              className="sr-only opacity-0 h-0 w-0 absolute pointer-events-none" 
+            />
             
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm text-[#8E8E8E]">
@@ -121,6 +151,7 @@ export default function AurtisticLoginPage() {
                 id="password"
                 name="password"
                 type="password"
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 required
                 minLength={6}
                 className="w-full bg-[#131313] border border-[#2D2D2D] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#FFCC00] transition-colors"
@@ -138,6 +169,7 @@ export default function AurtisticLoginPage() {
                     id="confirmPassword"
                     name="confirmPassword"
                     type="password"
+                    autoComplete="new-password"
                     required
                     minLength={6}
                     className="w-full bg-[#131313] border border-[#2D2D2D] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#FFCC00] transition-colors"
@@ -163,9 +195,10 @@ export default function AurtisticLoginPage() {
             
             <button
               type="submit"
-              className={`w-full mt-4 font-bold py-3 rounded-lg transition-colors focus:ring-4 focus:outline-none ${mode === 'login' ? 'bg-[#FFCC00] text-[#121212] hover:bg-[#e6b800] focus:ring-[#FFCC00]/20' : 'bg-[#9D4EDD] text-white hover:bg-[#8836ce] focus:ring-[#9D4EDD]/20'}`}
+              disabled={isSubmitting}
+              className={`w-full mt-4 font-bold py-3 rounded-lg transition-colors focus:ring-4 focus:outline-none disabled:opacity-50 ${mode === 'login' ? 'bg-[#FFCC00] text-[#121212] hover:bg-[#e6b800] focus:ring-[#FFCC00]/20' : 'bg-[#9D4EDD] text-white hover:bg-[#8836ce] focus:ring-[#9D4EDD]/20'}`}
             >
-              {mode === 'login' ? 'Entrar no Aurtistic' : 'Criar minha Conta'}
+              {isSubmitting ? (mode === 'login' ? 'Entrando...' : 'Criando Conta...') : (mode === 'login' ? 'Entrar no Aurtistic' : 'Criar minha Conta')}
             </button>
           </form>
         )}
