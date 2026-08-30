@@ -41,7 +41,7 @@
                 android:layout_marginStart="3dp" />
         </LinearLayout>
 
-        <!-- Global Control Buttons (Afastados no topo) -->
+        <!-- Global Control Buttons -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -89,7 +89,7 @@
         </LinearLayout>
     </LinearLayout>
 
-    <View
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:background="#2D2D2D"
@@ -111,15 +111,30 @@
             android:orientation="vertical"
             android:paddingEnd="4dp">
 
-            <TextView
-                android:id="@+id/global_month_title"
+            <LinearLayout
+                android:id="@+id/global_month_title_container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Agosto"
-                android:textColor="#FFFFFF"
-                android:textStyle="bold"
-                android:textSize="11sp"
-                android:paddingBottom="2dp" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingBottom="2dp">
+
+                <TextView
+                    android:id="@+id/global_month_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Agosto"
+                    android:textColor="#FFFFFF"
+                    android:textStyle="bold"
+                    android:textSize="11sp" />
+
+                <ImageView
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:src="@drawable/ic_arrow_down"
+                    android:tint="#8E8E8E"
+                    android:layout_marginStart="2dp" />
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -138,12 +153,13 @@
             <LinearLayout
                 android:id="@+id/global_month_grid_container"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
                 android:orientation="vertical" />
         </LinearLayout>
 
         <!-- Divider line -->
-        <View
+        <FrameLayout
             android:layout_width="1dp"
             android:layout_height="match_parent"
             android:background="#2D2D2D"
@@ -178,17 +194,56 @@
     </LinearLayout>
 
     <!-- Horizontal Divider -->
-    <View
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:background="#2D2D2D"
         android:layout_marginVertical="4dp" />
 
-    <!-- Bottom Half: Weekly Calendar Horizontal -->
+    <!-- Bottom Half: Weekly Calendar Horizontal with Navigation Controls -->
     <LinearLayout
-        android:id="@+id/global_weekly_grid_container"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:orientation="horizontal" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <!-- Left Navigation Arrow (Semana Anterior) -->
+        <FrameLayout
+            android:id="@+id/global_btn_prev_week"
+            android:layout_width="18dp"
+            android:layout_height="match_parent">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="◀"
+                android:textColor="#8E8E8E"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:layout_gravity="center" />
+        </FrameLayout>
+
+        <!-- 1 Single Week Grid Container (7 Days: Domingo a Sábado) -->
+        <LinearLayout
+            android:id="@+id/global_weekly_grid_container"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="horizontal" />
+
+        <!-- Right Navigation Arrow (Próxima Semana) -->
+        <FrameLayout
+            android:id="@+id/global_btn_next_week"
+            android:layout_width="18dp"
+            android:layout_height="match_parent">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="▶"
+                android:textColor="#8E8E8E"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:layout_gravity="center" />
+        </FrameLayout>
+    </LinearLayout>
 </LinearLayout>

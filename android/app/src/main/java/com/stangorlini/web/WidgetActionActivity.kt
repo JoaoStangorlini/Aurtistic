@@ -9,6 +9,7 @@ import android.content.Intent
 import android.os.Bundle
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Calendar
 
 class WidgetActionActivity : Activity() {
 
@@ -22,6 +23,8 @@ class WidgetActionActivity : Activity() {
             showStatusDialog(taskId)
         } else if (action == "change_dimension") {
             showDimensionDialog()
+        } else if (action == "change_month") {
+            showMonthDialog()
         } else if (action == "create_task") {
             showCreateTaskDialog()
         } else if (action == "create_event") {
@@ -64,6 +67,103 @@ class WidgetActionActivity : Activity() {
             }
             container.addView(itemView)
         }
+        
+        dialog.setOnCancelListener { finish() }
+        dialog.show()
+    }
+
+    private fun showMonthDialog() {
+        val prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+        val currentOffset = prefs.getInt("calendar_widget_month_offset", 0)
+        
+        val cal = Calendar.getInstance()
+        val realCal = Calendar.getInstance()
+        val realYear = realCal.get(Calendar.YEAR)
+        val realMonth = realCal.get(Calendar.MONTH) // 0-based
+        
+        cal.add(Calendar.MONTH, currentOffset)
+        val selectedYear = cal.get(Calendar.YEAR)
+        val selectedMonth = cal.get(Calendar.MONTH)
+        
+        val dialogView = layoutInflater.inflate(R.layout.dialog_custom_menu, null)
+        val titleView = dialogView.findViewById<android.widget.TextView>(R.id.dialog_title)
+        val container = dialogView.findViewById<android.widget.LinearLayout>(R.id.dialog_items_container)
+        titleView.text = "Selecionar Mês"
+
+        val dialog = android.app.Dialog(this)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        dialog.setContentView(dialogView)
+        dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+        
+        val monthNames = arrayOf("Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro")
+        
+        // Option to return to Today (Current Month)
+        val todayItem = layoutInflater.inflate(R.layout.item_dialog_option, container, false) as android.widget.TextView
+        todayItem.text = "★ Mês Atual (${monthNames[realMonth]} $realYear)"
+        todayItem.setTextColor(android.graphics.Color.parseColor("#FFCC00"))
+        todayItem.setTypeface(null, android.graphics.Typeface.BOLD)
+        todayItem.setOnClickListener {
+            prefs.edit().putInt("calendar_widget_month_offset", 0)
+                .putInt("global_month_offset", 0).apply()
+            updateWidgetUI()
+            dialog.dismiss()
+            finish()
+        }
+        container.addView(todayItem)
+        
+        // List months for current selected year
+        for (m in 0..11) {
+            val itemView = layoutInflater.inflate(R.layout.item_dialog_option, container, false) as android.widget.TextView
+            val isCurrentTarget = (m == selectedMonth)
+            val isRealCurrentMonth = (m == realMonth && selectedYear == realYear)
+            
+            itemView.text = "${monthNames[m]} $selectedYear"
+            if (isCurrentTarget) {
+                itemView.setTextColor(android.graphics.Color.parseColor("#9D4EDD"))
+                itemView.setTypeface(null, android.graphics.Typeface.BOLD)
+            } else if (isRealCurrentMonth) {
+                itemView.setTextColor(android.graphics.Color.parseColor("#FFCC00"))
+            } else {
+                itemView.setTextColor(android.graphics.Color.parseColor("#E0E0E0"))
+            }
+            
+            itemView.setOnClickListener {
+                val newOffset = (selectedYear - realYear) * 12 + (m - realMonth)
+                prefs.edit().putInt("calendar_widget_month_offset", newOffset)
+                    .putInt("global_month_offset", newOffset).apply()
+                updateWidgetUI()
+                dialog.dismiss()
+                finish()
+            }
+            container.addView(itemView)
+        }
+        
+        // Previous and Next Year Quick Buttons
+        val prevYearItem = layoutInflater.inflate(R.layout.item_dialog_option, container, false) as android.widget.TextView
+        prevYearItem.text = "◀ Ano Anterior (${selectedYear - 1})"
+        prevYearItem.setTextColor(android.graphics.Color.parseColor("#8E8E8E"))
+        prevYearItem.setOnClickListener {
+            val newOffset = (selectedYear - 1 - realYear) * 12 + (selectedMonth - realMonth)
+            prefs.edit().putInt("calendar_widget_month_offset", newOffset)
+                .putInt("global_month_offset", newOffset).apply()
+            updateWidgetUI()
+            dialog.dismiss()
+            finish()
+        }
+        container.addView(prevYearItem)
+
+        val nextYearItem = layoutInflater.inflate(R.layout.item_dialog_option, container, false) as android.widget.TextView
+        nextYearItem.text = "Ano Seguinte (${selectedYear + 1}) ▶"
+        nextYearItem.setTextColor(android.graphics.Color.parseColor("#8E8E8E"))
+        nextYearItem.setOnClickListener {
+            val newOffset = (selectedYear + 1 - realYear) * 12 + (selectedMonth - realMonth)
+            prefs.edit().putInt("calendar_widget_month_offset", newOffset)
+                .putInt("global_month_offset", newOffset).apply()
+            updateWidgetUI()
+            dialog.dismiss()
+            finish()
+        }
+        container.addView(nextYearItem)
         
         dialog.setOnCancelListener { finish() }
         dialog.show()
@@ -140,7 +240,6 @@ class WidgetActionActivity : Activity() {
                 val tempId = java.util.UUID.randomUUID().toString()
                 savePendingCreateUpdate(tempId, taskName)
                 optimisticCreateUpdate(tempId, taskName)
-                // We do NOT launch MainActivity. Let the user stay on home screen.
             }
             dialog.dismiss()
             finish()
@@ -149,7 +248,6 @@ class WidgetActionActivity : Activity() {
         dialog.setOnCancelListener { finish() }
         dialog.show()
         
-        // Show keyboard automatically
         inputName.requestFocus()
         dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
     }
@@ -212,7 +310,6 @@ class WidgetActionActivity : Activity() {
             newEvent.put("nome", eventName)
             newEvent.put("status", "rascunho")
             
-            // Set date to today
             val cal = java.util.Calendar.getInstance()
             val dayStr = String.format("%04d-%02d-%02d", cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1, cal.get(java.util.Calendar.DAY_OF_MONTH))
             newEvent.put("data_inicio", dayStr)
@@ -224,13 +321,7 @@ class WidgetActionActivity : Activity() {
             }
             prefs.edit().putString("user_events", newArr.toString()).apply()
             
-            val intent = Intent(this, CalendarWidgetProvider::class.java)
-            intent.action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-            val widgetManager = AppWidgetManager.getInstance(this)
-            val ids = widgetManager.getAppWidgetIds(ComponentName(this, CalendarWidgetProvider::class.java))
-            intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-            sendBroadcast(intent)
-            
+            updateWidgetUI()
         } catch (e: Exception) { e.printStackTrace() }
     }
 
@@ -258,7 +349,6 @@ class WidgetActionActivity : Activity() {
             newTask.put("nome", taskName)
             newTask.put("status", "rascunho")
             newTask.put("is_favorite", true)
-            // Add at the beginning
             val newArr = JSONArray()
             newArr.put(newTask)
             for (i in 0 until arr.length()) {

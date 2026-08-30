@@ -321,7 +321,9 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
           value: JSON.stringify(statusColors)
         });
         
-        await WidgetPlugin.updateWidget();
+        if (Capacitor.isNativePlatform()) {
+          try { await WidgetPlugin.updateWidget(); } catch (err) { console.warn('Widget update failed', err); }
+        }
       } catch (err) {
         console.error('Error syncing favorites to native widget', err);
       }

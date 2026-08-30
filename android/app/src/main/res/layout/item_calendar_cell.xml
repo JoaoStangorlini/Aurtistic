@@ -5,8 +5,7 @@
     android:layout_height="match_parent"
     android:layout_weight="1"
     android:orientation="vertical"
-    android:minHeight="40dp"
-    android:padding="2dp"
+    android:padding="1dp"
     android:layout_margin="1dp"
     android:background="@drawable/bg_calendar_cell">
     
@@ -16,8 +15,9 @@
         android:layout_height="wrap_content"
         android:gravity="center"
         android:textColor="#8E8E8E"
-        android:textSize="10sp"
-        android:textStyle="bold" />
+        android:textSize="9sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
         
     <TextView
         android:id="@+id/cell_day_text"
@@ -33,5 +33,5 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:layout_marginTop="2dp" />
+        android:layout_marginTop="1dp" />
 </LinearLayout>

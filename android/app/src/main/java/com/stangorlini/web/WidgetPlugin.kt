@@ -3,6 +3,7 @@ package com.stangorlini.web
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Intent
+import android.util.Log
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
@@ -13,32 +14,41 @@ class WidgetPlugin : Plugin() {
 
     @PluginMethod
     fun updateWidget(call: PluginCall) {
-        val context = context
-        val widgetManager = AppWidgetManager.getInstance(context)
+        try {
+            val context = context
+            val widgetManager = AppWidgetManager.getInstance(context)
 
-        val providers = arrayOf(
-            EventsWidgetProvider::class.java,
-            CalendarWidgetProvider::class.java,
-            WeeklyCalendarWidgetProvider::class.java,
-            GlobalWidgetProvider::class.java
-        )
+            val providers = arrayOf(
+                EventsWidgetProvider::class.java,
+                CalendarWidgetProvider::class.java,
+                WeeklyCalendarWidgetProvider::class.java,
+                GlobalWidgetProvider::class.java
+            )
 
-        for (provider in providers) {
-            val intent = Intent(context, provider).apply {
-                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                val ids = widgetManager.getAppWidgetIds(ComponentName(context, provider))
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+            for (provider in providers) {
+                try {
+                    val intent = Intent(context, provider).apply {
+                        action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                        val ids = widgetManager.getAppWidgetIds(ComponentName(context, provider))
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+                    }
+                    context.sendBroadcast(intent)
+                    if (provider == EventsWidgetProvider::class.java) {
+                        val ids = widgetManager.getAppWidgetIds(ComponentName(context, provider))
+                        widgetManager.notifyAppWidgetViewDataChanged(ids, R.id.widget_events_list)
+                    } else if (provider == GlobalWidgetProvider::class.java) {
+                        val ids = widgetManager.getAppWidgetIds(ComponentName(context, provider))
+                        widgetManager.notifyAppWidgetViewDataChanged(ids, R.id.global_list_view)
+                    }
+                } catch (e: Throwable) {
+                    Log.e("WidgetPlugin", "Error updating provider: ${provider.simpleName}", e)
+                }
             }
-            context.sendBroadcast(intent)
-            if (provider == EventsWidgetProvider::class.java) {
-                val ids = widgetManager.getAppWidgetIds(ComponentName(context, provider))
-                widgetManager.notifyAppWidgetViewDataChanged(ids, R.id.widget_events_list)
-            } else if (provider == GlobalWidgetProvider::class.java) {
-                val ids = widgetManager.getAppWidgetIds(ComponentName(context, provider))
-                widgetManager.notifyAppWidgetViewDataChanged(ids, R.id.global_list_view)
-            }
+
+            call.resolve()
+        } catch (e: Throwable) {
+            Log.e("WidgetPlugin", "Error in updateWidget", e)
+            call.resolve()
         }
-
-        call.resolve()
     }
 }
