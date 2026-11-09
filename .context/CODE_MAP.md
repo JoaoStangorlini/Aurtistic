@@ -37,7 +37,7 @@
 - **`src/app/delete-account/page.tsx`** (209L): L11:DeleteAccountPage
 - **`src/app/exportar-importar/page.tsx`** (205L): L9:ExportImportPage
 - **`src/app/galeria/page.tsx`** (7L): L4:GaleriaPage
-- **`src/app/layout.tsx`** (147L): L36:RootLayout
+- **`src/app/layout.tsx`** (154L): L36:RootLayout
 - **`src/app/loading.tsx`** (27L): L4:Loading
 - **`src/app/login/LoginForm.tsx`** (59L): L8:LoginForm
 - **`src/app/login/actions.ts`** (278L): L13:login | L86:signup | L173:getHubLabDivMembersAction | L199:loginHubMemberDirectAction
@@ -84,7 +84,7 @@
 - **`src/components/media/InPlaceFilePreviewModal.tsx`** (159L): L8:InPlaceFilePreviewModalProps | L20:InPlaceFilePreviewModal
 - **`src/components/onboarding/CoachMarksOverlay.tsx`** (314L): L16:CoachMarksOverlay
 - **`src/components/onboarding/CoachMarksProvider.tsx`** (138L): L33:CoachMarksProvider | L131:useCoachMarks
-- **`src/components/onboarding/FirstTimeOnboardingModal.tsx`** (505L): L22:evaluateOnboardingTrigger | L40:getInitialOnboardingOpen | L44:FirstTimeOnboardingModal
+- **`src/components/onboarding/FirstTimeOnboardingModal.tsx`** (528L): L22:FirstTimeOnboardingModalProps | L27:evaluateOnboardingTrigger | L58:FirstTimeOnboardingModal
 - **`src/components/organizacoes/CreateOrganizationModal.tsx`** (173L): L8:CreateOrganizationModalProps | L14:CreateOrganizationModal
 - **`src/components/organizacoes/InviteAcceptClient.tsx`** (177L): L11:InviteAcceptClientProps | L18:InviteAcceptClient
 - **`src/components/organizacoes/JoinOrganizationModal.tsx`** (252L): L11:JoinOrganizationModalProps | L17:JoinOrganizationModal

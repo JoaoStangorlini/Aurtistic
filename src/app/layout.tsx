@@ -47,8 +47,12 @@ export default async function RootLayout({
   let initialVaultTicket: string | undefined;
   let serverUrl: string | undefined;
   let initialTheme = undefined;
+  let onboardingUserId: string | undefined;
+  let hasConfiguredModules = false;
 
   if (user) {
+    onboardingUserId = user.id;
+
     try {
       const storageSession = await issueUserStorageSession(supabase, user.id);
       initialMediaTicket = storageSession.mediaReadOnlyTicket.ticket;
@@ -64,6 +68,9 @@ export default async function RootLayout({
         .single();
       if (profile?.features_config?.theme) {
         initialTheme = profile.features_config.theme;
+      }
+      if (profile?.features_config?.modules) {
+        hasConfiguredModules = true;
       }
     } catch {}
   }
@@ -134,7 +141,7 @@ export default async function RootLayout({
                 <main className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden">
                   {children}
                 </main>
-                <FirstTimeOnboardingModal />
+                <FirstTimeOnboardingModal userId={onboardingUserId} hasConfiguredModules={hasConfiguredModules} />
                 <GlobalAudioDock />
               </AurtisticMediaProvider>
             </SelfCareAlarmProvider>

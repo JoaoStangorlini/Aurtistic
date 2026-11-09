@@ -19,9 +19,27 @@ const ONBOARDING_KEY = 'aurtistic_onboarding_completed_v2';
 const ONBOARDING_DATE_KEY = 'aurtistic_onboarding_last_seen_date';
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
-export function evaluateOnboardingTrigger(): boolean {
+export interface FirstTimeOnboardingModalProps {
+  userId?: string | null;
+  hasConfiguredModules?: boolean;
+}
+
+export function evaluateOnboardingTrigger(
+  userId?: string | null,
+  hasConfiguredModules?: boolean
+): boolean {
   if (typeof window === 'undefined') return false;
+  // Se o usuário não está autenticado, nunca abre o onboarding
+  if (!userId) return false;
+
+  // Se o usuário já possui configuração de módulos no perfil, não abre automaticamente
+  if (hasConfiguredModules) return false;
+
   try {
+    const userCompleted = localStorage.getItem(`aurtistic_onboarding_completed_${userId}`);
+    const userDismissed = localStorage.getItem(`aurtistic_onboarding_dismissed_${userId}`);
+    if (userCompleted || userDismissed) return false;
+
     const completed = localStorage.getItem(ONBOARDING_KEY);
     if (!completed) return true;
 
@@ -37,12 +55,11 @@ export function evaluateOnboardingTrigger(): boolean {
   }
 }
 
-function getInitialOnboardingOpen(): boolean {
-  return evaluateOnboardingTrigger();
-}
-
-export function FirstTimeOnboardingModal() {
-  const [isOpen, setIsOpen] = useState(getInitialOnboardingOpen);
+export function FirstTimeOnboardingModal({
+  userId,
+  hasConfiguredModules = false,
+}: FirstTimeOnboardingModalProps = {}) {
+  const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'modules' | 'theme'>('modules');
   const [isSaving, setIsSaving] = useState(false);
   const { mode, palette, setThemeMode, setThemePalette } = useTheme();
@@ -51,6 +68,12 @@ export function FirstTimeOnboardingModal() {
   const pathname = usePathname();
 
   const [modulesConfig, setModulesConfig] = useState<ModulesConfig>(getInitialModulesConfig);
+
+  useEffect(() => {
+    if (evaluateOnboardingTrigger(userId, hasConfiguredModules)) {
+      setIsOpen(true);
+    }
+  }, [userId, hasConfiguredModules]);
 
   useEffect(() => {
     const handleRelaunch = () => {
