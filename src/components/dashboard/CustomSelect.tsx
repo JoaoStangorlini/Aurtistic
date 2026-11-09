@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
@@ -71,8 +72,8 @@ export function CustomSelect({ name, value, options: initialOptions, onChange, t
   
   // Standard input box look
   const boxClasses = disabled 
-    ? "w-full border rounded-md px-4 py-2 opacity-50 cursor-not-allowed bg-[#121212] border-[#2D2D2D] text-[#8E8E8E]"
-    : "w-full border border-[#2D2D2D] rounded-md px-4 py-2 cursor-pointer focus:outline-none transition-colors flex justify-between items-center bg-[#121212] hover:border-[#FFCC00]";
+    ? "w-full border rounded-md px-4 py-2 opacity-50 cursor-not-allowed bg-app border-border-subtle text-fg-muted"
+    : "w-full border border-border-subtle rounded-md px-4 py-2 cursor-pointer focus:outline-none transition-colors flex justify-between items-center bg-app hover:border-[#FFCC00]";
 
   return (
     <div className="relative w-full" ref={containerRef}>
@@ -91,13 +92,13 @@ export function CustomSelect({ name, value, options: initialOptions, onChange, t
           ) : value ? (
             <Badge type={type} value={selectedLabel} />
           ) : (
-            <span className="text-[#8E8E8E]">Selecione...</span>
+            <span className="text-fg-muted">Selecione...</span>
           )}
         </div>
         <div className="flex items-center">
           {onEditColumn && (
             <span 
-              className="material-symbols-outlined text-[16px] text-[#8E8E8E] mr-2 hover:text-white"
+              className="material-symbols-outlined text-[16px] text-fg-muted mr-2 hover:text-fg"
               onClick={(e) => {
                 e.stopPropagation();
                 onEditColumn();
@@ -106,16 +107,16 @@ export function CustomSelect({ name, value, options: initialOptions, onChange, t
               edit
             </span>
           )}
-          <span className="material-symbols-outlined text-[18px] text-[#8E8E8E]" style={{ transform: isOpen ? 'rotate(180deg)' : 'none' }}>
+          <span className="material-symbols-outlined text-[18px] text-fg-muted" style={{ transform: isOpen ? 'rotate(180deg)' : 'none' }}>
             expand_more
           </span>
         </div>
       </div>
 
       {isOpen && !disabled && (
-        <div className="absolute z-[100] mt-1 w-full bg-[#1A1A1A] border border-[#2D2D2D] rounded-md shadow-2xl overflow-hidden max-h-60 flex flex-col">
+        <div className="absolute z-[100] mt-1 w-full bg-surface border border-border-subtle rounded-md shadow-2xl overflow-hidden max-h-60 flex flex-col">
           {isAddingCustom ? (
-            <div className="p-3 flex gap-2 border-b border-[#2D2D2D]">
+            <div className="p-3 flex gap-2 border-b border-border-subtle">
               <input 
                 type="text" 
                 value={customValue}
@@ -128,9 +129,9 @@ export function CustomSelect({ name, value, options: initialOptions, onChange, t
                 }}
                 placeholder="Novo valor..."
                 autoFocus
-                className="flex-1 bg-[#121212] border border-[#2D2D2D] rounded px-3 py-1 text-sm text-white focus:outline-none focus:border-[#9D4EDD]"
+                className="flex-1 bg-app border border-border-subtle rounded px-3 py-1 text-sm text-fg focus:outline-none focus:border-[#9D4EDD]"
               />
-              <button type="button" onClick={() => handleCustomSubmit()} className="bg-[#9D4EDD] text-white rounded px-3 py-1 text-sm font-bold hover:bg-[#8338C7]">
+              <button type="button" onClick={() => handleCustomSubmit()} className="bg-[var(--accent-primary)] text-white rounded px-3 py-1 text-sm font-bold hover:bg-[#8338C7]">
                 OK
               </button>
             </div>
@@ -141,7 +142,7 @@ export function CustomSelect({ name, value, options: initialOptions, onChange, t
                   <div
                     key={option.value}
                     onClick={() => handleSelect(option.value)}
-                    className="px-4 py-2 cursor-pointer transition-colors hover:bg-[#252525] flex items-center"
+                    className="px-4 py-2 cursor-pointer transition-colors hover:bg-surface-hover flex items-center"
                   >
                     <Badge type={type} value={option.label} customColor={option.color} />
                   </div>
@@ -149,11 +150,11 @@ export function CustomSelect({ name, value, options: initialOptions, onChange, t
               })}
               
               {(allowCustom || onEditColumn) && (
-                <div className="flex border-t border-[#2D2D2D]">
+                <div className="flex border-t border-border-subtle">
                   {allowCustom && (
                     <div
                       onClick={() => setIsAddingCustom(true)}
-                      className="flex-1 px-4 py-2 cursor-pointer transition-colors text-[#FFCC00] hover:bg-[#252525] font-bold text-sm flex items-center gap-2"
+                      className="flex-1 px-4 py-2 cursor-pointer transition-colors text-[#FFCC00] hover:bg-surface-hover font-bold text-sm flex items-center gap-2"
                     >
                       <span className="material-symbols-outlined text-[16px]">add</span>
                       Adicionar Novo
@@ -165,7 +166,7 @@ export function CustomSelect({ name, value, options: initialOptions, onChange, t
                         setIsOpen(false);
                         onEditColumn();
                       }}
-                      className="px-4 py-2 cursor-pointer transition-colors text-[#8E8E8E] hover:bg-[#252525] hover:text-white border-l border-[#2D2D2D] flex items-center justify-center"
+                      className="px-4 py-2 cursor-pointer transition-colors text-fg-muted hover:bg-surface-hover hover:text-fg border-l border-border-subtle flex items-center justify-center"
                       title="Editar Coluna"
                     >
                       <span className="material-symbols-outlined text-[16px]">edit</span>

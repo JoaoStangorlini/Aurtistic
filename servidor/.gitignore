@@ -1,0 +1,34 @@
+# Dependências
+node_modules/
+package-lock.json
+
+# Variáveis de ambiente e credenciais
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.cert
+*.jks
+*.keystore
+
+# Dados de mídia, miniaturas e storage local
+data/
+storage/
+.deploy_backup/
+tmp_deploy/
+*.tar.gz
+*.zip
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Sistema Operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+

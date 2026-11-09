@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -113,15 +114,15 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[2000] p-4 pb-24 sm:pb-4 backdrop-blur-sm">
-      <div className="bg-[#121212] border border-[#2D2D2D] rounded-xl shadow-2xl w-full max-w-2xl max-h-[75vh] sm:max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
+      <div className="bg-app border border-border-subtle rounded-xl shadow-2xl w-full max-w-2xl max-h-[75vh] sm:max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
         
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-[#2D2D2D] bg-[#1A1A1A]">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+        <div className="flex justify-between items-center p-6 border-b border-border-subtle bg-surface">
+          <h2 className="text-xl font-bold text-fg flex items-center gap-2">
             <span className="material-symbols-outlined text-[#9D4EDD]">event</span>
             {event ? 'Editar Evento' : 'Novo Evento'}
           </h2>
-          <button onClick={onClose} className="text-[#8E8E8E] hover:text-white transition-colors">
+          <button onClick={onClose} className="text-fg-muted hover:text-fg transition-colors">
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
@@ -132,12 +133,12 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
             
             {/* Nome */}
             <div>
-              <label className="block text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-2">Nome do Evento *</label>
+              <label className="block text-xs font-bold text-fg-muted uppercase tracking-wider mb-2">Nome do Evento *</label>
               <input
                 type="text"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
-                className="w-full bg-[#1A1A1A] border border-[#2D2D2D] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] focus:ring-1 focus:ring-[#9D4EDD] transition-all"
+                className="w-full bg-surface border border-border-subtle text-fg px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] focus:ring-1 focus:ring-[#9D4EDD] transition-all"
                 placeholder="Ex: Reunião Semanal, Aula de Design..."
                 required
               />
@@ -146,21 +147,21 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
             {/* Datas */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-2">Data de Início</label>
+                <label className="block text-xs font-bold text-fg-muted uppercase tracking-wider mb-2">Data de Início</label>
                 <input
                   type="datetime-local"
                   value={dataInicio}
                   onChange={(e) => setDataInicio(e.target.value)}
-                  className="w-full bg-[#1A1A1A] border border-[#2D2D2D] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] transition-all color-scheme-dark"
+                  className="w-full bg-surface border border-border-subtle text-fg px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] transition-all color-scheme-dark"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-2">Data de Fim (Opcional)</label>
+                <label className="block text-xs font-bold text-fg-muted uppercase tracking-wider mb-2">Data de Fim (Opcional)</label>
                 <input
                   type="datetime-local"
                   value={dataFim}
                   onChange={(e) => setDataFim(e.target.value)}
-                  className="w-full bg-[#1A1A1A] border border-[#2D2D2D] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] transition-all color-scheme-dark"
+                  className="w-full bg-surface border border-border-subtle text-fg px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] transition-all color-scheme-dark"
                 />
               </div>
             </div>
@@ -168,7 +169,7 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
             {/* Dimensão & Status */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-2">Dimensão</label>
+                <label className="block text-xs font-bold text-fg-muted uppercase tracking-wider mb-2">Dimensão</label>
                 <CustomSelect 
                   name="dimensao" 
                   value={dimensao} 
@@ -181,11 +182,11 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-2">Status do Evento</label>
+                <label className="block text-xs font-bold text-fg-muted uppercase tracking-wider mb-2">Status do Evento</label>
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value as any)}
-                  className="w-full bg-[#1A1A1A] border border-[#2D2D2D] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] transition-all color-scheme-dark font-medium"
+                  className="w-full bg-surface border border-border-subtle text-fg px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] transition-all color-scheme-dark font-medium"
                 >
                   <option value="confirmado">Confirmado</option>
                   <option value="rascunho">Rascunho</option>
@@ -195,16 +196,16 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
             </div>
 
             {/* Rotina Semanal */}
-            <div className="mt-2 border border-[#2D2D2D] bg-[#1A1A1A]/50 rounded-xl p-5">
-              <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-2">
+            <div className="mt-2 border border-border-subtle bg-surface/50 rounded-xl p-5">
+              <h3 className="text-sm font-bold text-fg mb-1 flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#9D4EDD] text-[18px]">update</span>
                 Rotina Semanal
               </h3>
-              <p className="text-xs text-[#8E8E8E] mb-4">Selecione os dias em que o evento se repete e defina os horários.</p>
+              <p className="text-xs text-fg-muted mb-4">Selecione os dias em que o evento se repete e defina os horários.</p>
               
               <div className="flex flex-col gap-3">
                 {DIAS_SEMANA.map(dia => (
-                  <div key={dia} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border border-[#2D2D2D] bg-[#1A1A1A] hover:border-[#9D4EDD]/50 transition-colors">
+                  <div key={dia} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border border-border-subtle bg-surface hover:border-[#9D4EDD]/50 transition-colors">
                     <label className="flex items-center gap-3 cursor-pointer min-w-[120px]">
                       <input 
                         type="checkbox" 
@@ -212,7 +213,7 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
                         onChange={() => handleDiaToggle(dia)}
                         className="w-5 h-5 accent-[#9D4EDD] rounded cursor-pointer"
                       />
-                      <span className={`font-bold text-sm ${horarios[dia] ? 'text-white' : 'text-[#8E8E8E]'}`}>{dia}</span>
+                      <span className={`font-bold text-sm ${horarios[dia] ? 'text-fg' : 'text-fg-muted'}`}>{dia}</span>
                     </label>
                     
                     {horarios[dia] && (
@@ -221,14 +222,14 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
                           type="time"
                           value={horarios[dia].inicio}
                           onChange={(e) => handleTimeChange(dia, 'inicio', e.target.value)}
-                          className="bg-[#121212] border border-[#333] text-white px-3 py-1.5 rounded text-sm focus:outline-none focus:border-[#9D4EDD] color-scheme-dark"
+                          className="bg-app border border-border-subtle text-fg px-3 py-1.5 rounded text-sm focus:outline-none focus:border-[#9D4EDD] color-scheme-dark"
                         />
-                        <span className="text-[#8E8E8E] text-xs font-bold">ATÉ</span>
+                        <span className="text-fg-muted text-xs font-bold">ATÉ</span>
                         <input
                           type="time"
                           value={horarios[dia].fim}
                           onChange={(e) => handleTimeChange(dia, 'fim', e.target.value)}
-                          className="bg-[#121212] border border-[#333] text-white px-3 py-1.5 rounded text-sm focus:outline-none focus:border-[#9D4EDD] color-scheme-dark"
+                          className="bg-app border border-border-subtle text-fg px-3 py-1.5 rounded text-sm focus:outline-none focus:border-[#9D4EDD] color-scheme-dark"
                         />
                       </div>
                     )}
@@ -239,11 +240,11 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
 
             {/* Descrição */}
             <div>
-              <label className="block text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-2">Descrição / Anotações</label>
+              <label className="block text-xs font-bold text-fg-muted uppercase tracking-wider mb-2">Descrição / Anotações</label>
               <textarea
                 value={descricao}
                 onChange={(e) => setDescricao(e.target.value)}
-                className="w-full bg-[#1A1A1A] border border-[#2D2D2D] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] transition-all resize-y min-h-[100px] custom-scrollbar"
+                className="w-full bg-surface border border-border-subtle text-fg px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] transition-all resize-y min-h-[100px] custom-scrollbar"
                 placeholder="Detalhes adicionais sobre o evento..."
               />
             </div>
@@ -252,11 +253,11 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-[#2D2D2D] bg-[#1A1A1A] flex justify-end gap-3">
+        <div className="p-4 border-t border-border-subtle bg-surface flex justify-end gap-3">
           <button 
             type="button" 
             onClick={onClose}
-            className="px-6 py-2.5 rounded-lg font-bold text-[#8E8E8E] hover:text-white hover:bg-[#2D2D2D] transition-colors"
+            className="px-6 py-2.5 rounded-lg font-bold text-fg-muted hover:text-fg hover:bg-surface-hover transition-colors"
           >
             Cancelar
           </button>
@@ -264,7 +265,7 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
             type="submit" 
             form="event-form"
             disabled={isSubmitting || !nome.trim()}
-            className="px-6 py-2.5 rounded-lg font-bold bg-[#9D4EDD] text-white hover:bg-[#8338c7] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-[#9D4EDD]/20"
+            className="px-6 py-2.5 rounded-lg font-bold bg-[var(--accent-primary)] text-white hover:bg-[#8338c7] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-[#9D4EDD]/20"
           >
             {isSubmitting ? (
               <><span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> Salvando...</>

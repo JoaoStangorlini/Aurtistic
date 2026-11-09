@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 export interface TaskColumnOption {
   value: string;
   label: string;
@@ -17,6 +18,9 @@ export interface TaskColumn {
 
 export interface Task {
   is_personal?: boolean;
+  organization_id?: string | null;
+  subteam_id?: string | null;
+  assigned_member_ids?: string[];
   id: string;
   created_at: string;
   nome: string;
@@ -34,6 +38,7 @@ export interface Task {
   ordem_manual?: number;
   is_favorite?: boolean;
   parent_id?: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   custom_fields?: Record<string, any>;
 }
 
@@ -57,3 +62,8 @@ export interface AgendaEvent {
   is_favorite?: boolean;
   created_at: string;
 }
+
+export * from './storage';
+export * from './portfolio';
+export * from './organizations';
+

@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 'use client';
 
 import { useState } from 'react';
@@ -17,7 +18,7 @@ export default function LoginForm({ next }: { next: string }) {
 
       <input type="hidden" name="next" value={next} />
       <div>
-        <label className="block text-xs font-semibold text-[#a0a0a0] uppercase tracking-wider mb-2" htmlFor="email">
+        <label className="block text-xs font-semibold text-fg-secondary uppercase tracking-wider mb-2" htmlFor="email">
           Email
         </label>
         <input
@@ -26,12 +27,12 @@ export default function LoginForm({ next }: { next: string }) {
           type="email"
           autoComplete="email"
           required
-          className="w-full bg-[#131313] border border-[#2D2D2D] text-[#e5e2e1] px-4 py-3 rounded-lg focus:outline-none focus:border-[#FFCC00] transition-colors"
+          className="w-full bg-[#131313] border border-border-subtle text-[#e5e2e1] px-4 py-3 rounded-lg focus:outline-none focus:border-[#FFCC00] transition-colors"
           placeholder="seu@email.com"
         />
       </div>
       <div>
-        <label className="block text-xs font-semibold text-[#a0a0a0] uppercase tracking-wider mb-2" htmlFor="password">
+        <label className="block text-xs font-semibold text-fg-secondary uppercase tracking-wider mb-2" htmlFor="password">
           Senha
         </label>
         <input
@@ -40,7 +41,7 @@ export default function LoginForm({ next }: { next: string }) {
           type="password"
           autoComplete="current-password"
           required
-          className="w-full bg-[#131313] border border-[#2D2D2D] text-[#e5e2e1] px-4 py-3 rounded-lg focus:outline-none focus:border-[#FFCC00] transition-colors"
+          className="w-full bg-[#131313] border border-border-subtle text-[#e5e2e1] px-4 py-3 rounded-lg focus:outline-none focus:border-[#FFCC00] transition-colors"
           placeholder="••••••••"
         />
       </div>

@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 import { createClient } from '@/utils/supabase/server';
 import { getUserProfile } from '@/app/(dashboard)/actions';
 import { redirect } from 'next/navigation';
@@ -10,14 +11,14 @@ export default async function ConfiguracoesAvancadasPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/aurtistic/login');
+    redirect('/login');
   }
 
   const profile = await getUserProfile();
   
   if (!profile) {
     return (
-      <div className="h-full flex flex-col items-center justify-center p-8 bg-[#121212] text-white">
+      <div className="h-full flex flex-col items-center justify-center p-8 bg-app text-fg">
         Perfil não encontrado.
       </div>
     );
@@ -60,14 +61,17 @@ export default async function ConfiguracoesAvancadasPage() {
     soft_delete_to_discarded: false
   };
 
+  const hubConnection = profile.features_config?.hub_connection || null;
+
   return (
-    <main className="min-h-full bg-[#121212] p-4 md:p-8">
+    <main className="min-h-full bg-app p-4 md:p-8">
       <AdvancedConfigClient 
         initialConfig={currentAdvancedConfig}
         availableStatuses={availableStatuses}
         availablePriorities={availablePriorities}
         availableCategories={availableCategories}
         userEmail={user.email || ''}
+        hubConnection={hubConnection}
       />
     </main>
   );

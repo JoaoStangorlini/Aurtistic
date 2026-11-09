@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 'use client';
 
 import Link from 'next/link';
@@ -37,33 +38,33 @@ export default function DeleteAccountPage() {
   };
 
   return (
-    <div className="min-h-full flex flex-col p-4 md:p-8 bg-[#121212] text-[#E0E0E0]">
+    <div className="min-h-full flex flex-col p-4 md:p-8 bg-app text-fg-secondary">
       <div className="max-w-4xl mx-auto w-full">
         <div className="mb-8">
-          <Link href="/aurtistic" className="text-[#8E8E8E] hover:text-[#FFCC00] text-sm font-bold flex items-center gap-2 mb-4 transition-colors">
+          <Link href="/aurtistic" className="text-fg-muted hover:text-[#FFCC00] text-sm font-bold flex items-center gap-2 mb-4 transition-colors">
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             Voltar para o Dashboard
           </Link>
           <h1 className="text-3xl font-black text-[#db4437] mb-2 font-['Bukra']">Área de Exclusão</h1>
-          <p className="text-[#8E8E8E]">Gerencie a remoção dos seus dados permanentemente.</p>
+          <p className="text-fg-muted">Gerencie a remoção dos seus dados permanentemente.</p>
         </div>
 
-        <div className="space-y-6 bg-[#1A1A1A] p-6 md:p-10 rounded-2xl border border-[#2D2D2D] shadow-xl">
+        <div className="space-y-6 bg-surface p-6 md:p-10 rounded-2xl border border-border-subtle shadow-xl">
           
           <div className="border border-[#db4437]/30 bg-[#db4437]/10 p-6 rounded-xl flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
             <div className="flex-1">
-              <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+              <h2 className="text-xl font-bold text-fg mb-2 flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#db4437]">delete</span>
                 Excluir Apenas as Tarefas
               </h2>
-              <p className="text-sm text-[#A0A0A0] leading-relaxed">
+              <p className="text-sm text-fg-secondary leading-relaxed">
                 Todas as tarefas que você criou serão apagadas definitivamente do banco de dados. Sua conta, no entanto, continuará ativa e você poderá criar novas tarefas depois.
               </p>
             </div>
             <button 
               onClick={handleDeleteTasks}
               disabled={isDeletingTasks || isDeletingProfile}
-              className="bg-[#2D2D2D] hover:bg-[#db4437] text-white px-6 py-3 rounded-md text-sm font-bold transition-colors w-full md:w-auto shrink-0 disabled:opacity-50"
+              className="bg-surface-hover hover:bg-[#db4437] text-fg px-6 py-3 rounded-md text-sm font-bold transition-colors w-full md:w-auto shrink-0 disabled:opacity-50"
             >
               {isDeletingTasks ? 'Excluindo...' : 'Excluir Só Tarefas'}
             </button>
@@ -75,14 +76,14 @@ export default function DeleteAccountPage() {
                 <span className="material-symbols-outlined text-[#db4437]">delete_forever</span>
                 Excluir Perfil e Tarefas
               </h2>
-              <p className="text-sm text-[#E0E0E0] leading-relaxed">
+              <p className="text-sm text-fg-secondary leading-relaxed">
                 Aviso Importante: Esta ação é imediata, irreversível e destrutiva. Ao confirmar, todos os seus dados e o seu perfil serão fisicamente deletados, e sua sessão será encerrada.
               </p>
             </div>
             <button 
               onClick={handleDeleteProfile}
               disabled={isDeletingTasks || isDeletingProfile}
-              className="bg-[#db4437] hover:bg-[#b3382c] text-white px-6 py-3 rounded-md text-sm font-bold transition-colors w-full md:w-auto shrink-0 disabled:opacity-50"
+              className="bg-[#db4437] hover:bg-[#b3382c] text-fg px-6 py-3 rounded-md text-sm font-bold transition-colors w-full md:w-auto shrink-0 disabled:opacity-50"
             >
               {isDeletingProfile ? 'Excluindo...' : 'Excluir Tudo'}
             </button>

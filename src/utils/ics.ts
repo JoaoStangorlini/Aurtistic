@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 import { Task } from '@/types';
 
 // Utility to generate a unique ID for events
@@ -156,3 +157,57 @@ export const parseICSFile = (icsText: string): ParsedICSEvent[] => {
 
   return events;
 };
+
+/**
+ * Projeta intervalos ocupados da agenda do usuário para pré-preenchimento automático
+ * do grid estilo When2Meet.
+ */
+export function computeUserBusyIntervals(
+  events: Array<{ data_inicio: string | null; data_fim: string | null; horarios_semanais?: Record<string, { inicio: string; fim: string }> | null }>,
+  rangeStart: Date,
+  rangeEnd: Date
+): Array<{ start: Date; end: Date }> {
+  const busyList: Array<{ start: Date; end: Date }> = [];
+  const DAYS_MAP: Record<number, string> = {
+    0: 'Domingo',
+    1: 'Segunda',
+    2: 'Terça',
+    3: 'Quarta',
+    4: 'Quinta',
+    5: 'Sexta',
+    6: 'Sábado',
+  };
+
+  for (const ev of events) {
+    if (ev.data_inicio) {
+      const s = new Date(ev.data_inicio);
+      const e = ev.data_fim ? new Date(ev.data_fim) : new Date(s.getTime() + 60 * 60 * 1000);
+      if (!isNaN(s.getTime()) && !isNaN(e.getTime())) {
+        if (e >= rangeStart && s <= rangeEnd) {
+          busyList.push({ start: s, end: e });
+        }
+      }
+    }
+
+    // Projeta recorrência semanal se houver horários semanais definidos
+    if (ev.horarios_semanais) {
+      const cur = new Date(rangeStart);
+      while (cur <= rangeEnd) {
+        const dayName = DAYS_MAP[cur.getDay()];
+        const schedule = ev.horarios_semanais[dayName];
+        if (schedule && schedule.inicio && schedule.fim) {
+          const [sH, sM] = schedule.inicio.split(':').map(Number);
+          const [eH, eM] = schedule.fim.split(':').map(Number);
+          const slotStart = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate(), sH, sM, 0);
+          const slotEnd = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate(), eH, eM, 0);
+          if (slotEnd >= rangeStart && slotStart <= rangeEnd) {
+            busyList.push({ start: slotStart, end: slotEnd });
+          }
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+    }
+  }
+
+  return busyList;
+}

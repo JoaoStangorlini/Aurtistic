@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 import { saveTask as saveTaskServer, deleteTask as deleteTaskServer, updateMultipleTasks as updateMultipleTasksServer, deleteMultipleTasks as deleteMultipleTasksServer } from '@/app/(dashboard)/actions';
 import { pushMutation } from './offlineSync';
 import { Task } from '@/types';

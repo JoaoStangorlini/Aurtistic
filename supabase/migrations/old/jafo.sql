@@ -1,3 +1,4 @@
+-- Este programa é um software livre (Licença AGPLv3)
 -- ==========================================
 -- Migração Mk7: Normatização de Tarefas
 -- ==========================================

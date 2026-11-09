@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 const XLSX = require('xlsx');
 
 const tasks = [

@@ -1,8 +1,16 @@
+// Este programa é um software livre (Licença AGPLv3)
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { Task, TaskColumn, AgendaEvent } from '@/types';
+import {
+  signEdgeTenantTicket,
+  PRIMARY_ADMIN_UUID,
+  getEdgeStorageServerUrl,
+  resolveEdgeHmacSecret,
+} from '@/lib/edge-ticket';
+import { buildTenantZipUrl } from '@/lib/edge-urls';
 
 export async function updateTaskOrders(updates: { id: string, ordem_manual: number }[]) {
   const supabase = await createClient();
@@ -628,3 +636,194 @@ export async function updateAdvancedConfig(advancedSettings: any) {
   const { error } = await supabase.from('user_profiles').update({ features_config }).eq('id', user.id);
   if (error) throw new Error(error.message);
 }
+
+export async function updateThemePreferencesAction(theme: { mode: string; palette: string }) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Não autenticado' };
+
+  try {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('features_config')
+      .eq('id', user.id)
+      .single();
+
+    const features_config = profile?.features_config || {};
+    features_config.theme = {
+      mode: theme.mode,
+      palette: theme.palette,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ features_config })
+      .eq('id', user.id);
+
+    if (error) throw error;
+    return { ok: true };
+  } catch (err: any) {
+    console.error('Erro ao salvar tema do usuário:', err);
+    return { ok: false, error: err?.message || 'Erro ao salvar tema' };
+  }
+}
+
+export async function updateModulesConfigAction(modules: {
+  tasks: boolean;
+  selfCare: boolean;
+  resumo: boolean;
+  portfolio: boolean;
+  curriculo: boolean;
+  servidor: boolean;
+  defaultRoute: string;
+}) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Não autenticado' };
+
+  try {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('features_config')
+      .eq('id', user.id)
+      .single();
+
+    const features_config = profile?.features_config || {};
+    features_config.modules = {
+      ...modules,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ features_config })
+      .eq('id', user.id);
+
+    if (error) throw error;
+    return { ok: true };
+  } catch (err: any) {
+    console.error('Erro ao salvar configuração de módulos:', err);
+    return { ok: false, error: err?.message || 'Erro ao salvar módulos' };
+  }
+}
+
+/**
+ * [CORREÇÃO ERRO 403]: Emite um ticket de download autorizado (purpose: 'share', allowDownload: true)
+ * com escopo estrito no álbum/pasta requisitada para que os botões de download .ZIP funcionem perfeitamente.
+ */
+export async function getPortfolioAlbumZipUrlAction(input: {
+  albumPath: string;
+  ownerId?: string;
+}): Promise<{ ok: boolean; zipUrl?: string; error?: string }> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const cleanAlbum = (input.albumPath || 'Portfolio')
+      .replace(/\\/g, '/')
+      .replace(/^\/+|\/+$/g, '');
+
+    const targetOwnerId = user?.id || input.ownerId || PRIMARY_ADMIN_UUID;
+
+    const ticketObj = signEdgeTenantTicket({
+      userId: targetOwnerId,
+      role: user?.id === targetOwnerId ? 'admin' : 'member',
+      purpose: 'share',
+      allowedPrefix: cleanAlbum,
+      readOnly: true,
+      allowDownload: true,
+      ttlMs: 15 * 60 * 1000,
+    });
+
+    const serverUrl = getEdgeStorageServerUrl();
+    const zipUrl = buildTenantZipUrl(cleanAlbum, ticketObj.ticket, { serverUrl });
+
+    return { ok: true, zipUrl };
+  } catch (err: any) {
+    console.error('[getPortfolioAlbumZipUrlAction] Erro ao emitir ticket de ZIP:', err);
+    return { ok: false, error: err?.message || 'Falha ao gerar link de download' };
+  }
+}
+
+/**
+ * Sincroniza o acervo com os arquivos reais do servidor de armazenamento (Fire Stick).
+ * Se forceReset for true, zera o catálogo em memória, no disco e no Supabase.
+ */
+export async function syncPortfolioAction(options?: {
+  forceReset?: boolean;
+}): Promise<{ ok: boolean; count: number; error?: string }> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user || user.id !== PRIMARY_ADMIN_UUID) {
+      return { ok: false, count: 0, error: 'Apenas o Administrador pode sincronizar o portfólio.' };
+    }
+
+    const serverUrl = getEdgeStorageServerUrl();
+    const apiKey = resolveEdgeHmacSecret();
+
+    if (options?.forceReset) {
+      // 1. Zera catálogo no servidor Edge
+      try {
+        await fetch(`${serverUrl}/api/portfolio/reset`, {
+          method: 'POST',
+          headers: {
+            'x-storage-key': apiKey,
+          },
+          signal: AbortSignal.timeout(6000),
+        });
+      } catch (edgeErr) {
+        console.warn('[syncPortfolioAction] Falha ao chamar reset no nó Edge:', edgeErr);
+      }
+
+      // 2. Limpa registros de fotos no Supabase
+      await supabase
+        .from('user_files_index')
+        .delete()
+        .eq('user_id', user.id)
+        .or('show_in_portfolio.eq.true,relative_path.ilike.Portfolio/%');
+
+      revalidatePath('/portfolio');
+      return { ok: true, count: 0 };
+    }
+
+    // Sincronização normal ou forçada do disco
+    const syncRes = await fetch(`${serverUrl}/api/portfolio/sync?force=1`, {
+      method: 'POST',
+      headers: {
+        'x-storage-key': apiKey,
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!syncRes.ok) {
+      return { ok: false, count: 0, error: `Falha HTTP ${syncRes.status} no nó Edge.` };
+    }
+
+    const syncData = await syncRes.json();
+    const photoCount = syncData.count || 0;
+
+    // Se o disco estiver vazio, limpa o Supabase para sincronizar
+    if (photoCount === 0) {
+      await supabase
+        .from('user_files_index')
+        .delete()
+        .eq('user_id', user.id)
+        .or('show_in_portfolio.eq.true,relative_path.ilike.Portfolio/%');
+    }
+
+    revalidatePath('/portfolio');
+    return { ok: true, count: photoCount };
+  } catch (err: any) {
+    console.error('[syncPortfolioAction] Erro ao sincronizar portfólio:', err);
+    return { ok: false, count: 0, error: err?.message || 'Falha ao sincronizar acervo.' };
+  }
+}
+
+

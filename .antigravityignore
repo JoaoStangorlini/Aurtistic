@@ -1,0 +1,38 @@
+# Dependências e Builds
+node_modules/
+**/node_modules/
+.next/
+out/
+build/
+dist/
+android/
+.vercel/
+
+# Lockfiles e Mapas (Consomem 50k+ tokens se lidos)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+*.tsbuildinfo
+*.map
+public/sw.js
+
+# Dados Brutos, Catálogos Gigantes e Mídias
+servidor/data/
+servidor/storage/
+servidor/*.log
+servidor/.deploy_backup/
+servidor/tmp_deploy/
+servidor/backups/
+public/logos/
+public/icons/
+public/*.png
+public/*.svg
+public/*.ico
+*.avif
+*.webp
+*.jpg
+lint_output.txt
+scratch_test/
+Notion/
+Tarefas/
+*.keystore

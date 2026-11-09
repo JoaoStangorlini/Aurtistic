@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 const fs = require('fs');
 
 // 1. Update TasksView.tsx

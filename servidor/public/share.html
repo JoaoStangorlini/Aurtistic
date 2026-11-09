@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <title>Compartilhamento • João Stangorlini</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0B1320;
+      color: #E0FBFC;
+    }
+    .font-syne { font-family: 'Syne', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* Marca d'água visual client-side */
+    .watermark-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle, transparent 40%, rgba(11, 19, 32, 0.4) 100%);
+    }
+    .watermark-overlay span {
+      transform: rotate(-25deg);
+      font-family: 'Syne', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: rgba(255, 183, 3, 0.35);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      user-select: none;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Header Superior -->
+  <header class="w-full bg-[#240046] border-b border-[#5A189A]/50 px-4 sm:px-8 py-3 sticky top-0 z-40 shadow-xl">
+    <div class="max-w-6xl mx-auto flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <img src="/logo-principal.png?v=10" alt="Logo" class="w-10 h-10 object-contain drop-shadow" />
+        <div>
+          <h1 class="font-syne text-base sm:text-lg font-bold text-[#E0FBFC] leading-tight">João Stangorlini</h1>
+          <p class="text-[11px] font-mono text-[#FFB703]" id="shareModeBadge">Portal de Compartilhamento</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <a href="/" class="text-xs font-mono text-[#E0FBFC]/70 hover:text-[#FFB703] transition-colors flex items-center gap-1">
+          <span class="material-symbols-outlined text-[16px]">home</span>
+          <span class="hidden sm:inline">Início</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Conteúdo Principal -->
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-6 space-y-6">
+
+    <!-- Card de Informações do Compartilhamento -->
+    <div class="bg-[#10002B]/90 border border-[#5A189A]/60 rounded-2xl p-4 sm:p-6 shadow-xl relative overflow-hidden" id="shareHeroCard">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="space-y-1 min-w-[240px]">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase" id="shareTypeTag">Álbum</span>
+            <span class="text-xs font-mono text-[#E0FBFC]/60" id="shareExpiryText">Validade</span>
+          </div>
+          <h2 class="font-syne text-xl sm:text-2xl font-extrabold text-[#E0FBFC]" id="shareTitle">Carregando compartilhamento...</h2>
+          <p class="text-xs text-[#E0FBFC]/70 font-mono" id="shareItemCount">0 itens disponíveis</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2" id="shareHeaderActions">
+          <button type="button" id="btnDownloadZip" class="hidden px-4 py-2 bg-[#FFB703] hover:bg-[#e0a200] text-[#0B1320] font-bold text-xs rounded-xl shadow transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]">download_for_offline</span>
+            <span>Baixar Álbum (.ZIP)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODO 1 & 2: Galeria & Seleção do Cliente (Proofing) -->
+    <div id="sectionGalleryAndProofing" class="space-y-6 hidden">
+      <!-- Barra de Controle do Proofing -->
+      <div id="proofingControlBar" class="bg-[#240046] border border-[#5A189A] rounded-2xl p-4 shadow-lg flex flex-wrap items-center justify-between gap-4 hidden">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-[#FFB703] text-[26px]">checklist</span>
+          <div>
+            <h3 class="font-syne text-sm font-bold text-[#E0FBFC]">Escolha do Cliente (Client Proofing)</h3>
+            <p class="text-xs font-mono text-[#E0FBFC]/70">
+              <span id="proofingCounter" class="text-[#FFB703] font-bold">0</span> foto(s) selecionada(s)
+            </p>
+          </div>
+        </div>
+
+        <button type="button" id="btnOpenProofingModal" class="px-4 py-2 bg-[#FFB703] hover:bg-[#e0a200] text-[#0B1320] font-bold text-xs rounded-xl shadow flex items-center gap-2 transition-all active:scale-95 cursor-pointer">
+          <span class="material-symbols-outlined text-[18px]">send</span>
+          <span>Finalizar e Enviar Seleção</span>
+        </button>
+      </div>
+
+      <!-- Grid de Mídias -->
+      <div id="shareMediaGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+        <!-- Renderizado dinamicamente -->
+      </div>
+    </div>
+
+    <!-- MODO 3: Dropzone Público (Upload Apenas) -->
+    <div id="sectionDropzone" class="space-y-4 hidden">
+      <div class="bg-[#10002B]/90 border-2 border-dashed border-[#5A189A] hover:border-[#FFB703] rounded-3xl p-8 sm:p-12 text-center transition-colors cursor-pointer relative" id="dropzoneContainer">
+        <input type="file" id="dropzoneFileInput" multiple accept="image/*,video/*,.zip" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+        <div class="space-y-3 pointer-events-none">
+          <span class="material-symbols-outlined text-5xl text-[#FFB703]">cloud_upload</span>
+          <h3 class="font-syne text-lg font-bold text-[#E0FBFC]">Arraste suas fotos e vídeos aqui</h3>
+          <p class="text-xs text-[#E0FBFC]/70 font-mono">ou clique para selecionar do seu dispositivo</p>
+          <div class="pt-2">
+            <span class="px-3 py-1 bg-[#240046] border border-[#5A189A] rounded-full text-[11px] font-mono text-[#FFB703]">
+              Formatos aceitos: JPG, PNG, WEBP, AVIF, MP4, MOV, ZIP
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Barra de Progresso de Upload -->
+      <div id="uploadProgressBox" class="hidden bg-[#240046] border border-[#5A189A] rounded-2xl p-4 space-y-2">
+        <div class="flex justify-between text-xs font-mono">
+          <span id="uploadStatusText">Enviando arquivos...</span>
+          <span id="uploadPercentText" class="text-[#FFB703]">0%</span>
+        </div>
+        <div class="w-full bg-[#0B1320] h-2.5 rounded-full overflow-hidden">
+          <div id="uploadProgressBar" class="bg-[#FFB703] h-full w-0 transition-all duration-200"></div>
+        </div>
+      </div>
+
+      <!-- Lista de Arquivos Enviados -->
+      <div id="uploadedFilesList" class="space-y-2"></div>
+    </div>
+
+    <!-- Estado de Erro ou Link Expirado -->
+    <div id="sectionError" class="hidden text-center py-16 space-y-4">
+      <span class="material-symbols-outlined text-6xl text-rose-500">link_off</span>
+      <h2 class="font-syne text-2xl font-bold text-[#E0FBFC]" id="errorMessage">Link Indisponível</h2>
+      <p class="text-xs text-[#E0FBFC]/70 font-mono max-w-md mx-auto" id="errorDescription">
+        Este link de compartilhamento expirou, foi revogado ou não existe mais. Entre em contato com o fotógrafo para solicitar um novo link.
+      </p>
+      <div class="pt-4">
+        <a href="/" class="px-4 py-2 bg-[#5A189A] hover:bg-[#7B2CBF] text-[#E0FBFC] rounded-xl text-xs font-mono transition-colors">
+          Ir para a Página Inicial
+        </a>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Modal de Envio do Proofing -->
+  <div id="modalProofingFeedback" class="fixed inset-0 z-50 bg-[#0B1320]/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-[#240046] border border-[#5A189A] rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="font-syne text-lg font-bold text-[#E0FBFC]">Enviar Seleção para o Fotógrafo</h3>
+        <button type="button" id="btnCloseProofingModal" class="text-[#E0FBFC]/60 hover:text-[#FFB703] text-lg cursor-pointer">✕</button>
+      </div>
+
+      <p class="text-xs text-[#E0FBFC]/80 font-mono">
+        Você selecionou <span id="modalSelectedCount" class="text-[#FFB703] font-bold">0</span> fotos para edição e entrega final.
+      </p>
+
+      <div class="space-y-1.5">
+        <label for="clientNotesInput" class="text-xs font-mono text-[#E0FBFC]">Observações ou solicitações de edição (opcional):</label>
+        <textarea id="clientNotesInput" rows="4" placeholder="Ex: Ajustar o tom da foto 04; remover reflexo na foto 12; fotos favoritas para álbum impresso..." class="w-full p-3 rounded-xl bg-[#0B1320] border border-[#5A189A] text-xs font-mono text-[#E0FBFC] placeholder-[#E0FBFC]/40 focus:outline-none focus:border-[#FFB703]"></textarea>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button type="button" id="btnCancelProofingModal" class="px-4 py-2 bg-[#0B1320] border border-[#5A189A] hover:border-[#FFB703] text-xs font-mono rounded-xl text-[#E0FBFC] cursor-pointer">
+          Cancelar
+        </button>
+        <button type="button" id="btnSubmitProofing" class="px-5 py-2 bg-[#FFB703] hover:bg-[#e0a200] text-[#0B1320] text-xs font-mono font-bold rounded-xl shadow cursor-pointer">
+          Confirmar e Enviar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 bg-[#240046] border border-[#FFB703] text-[#E0FBFC] px-4 py-2.5 rounded-xl text-xs font-mono shadow-2xl hidden transition-opacity">
+    <span id="toastMsg">Mensagem</span>
+  </div>
+
+  <footer class="w-full bg-[#10002B] border-t border-[#5A189A]/30 py-4 px-4 text-center text-xs font-mono text-[#E0FBFC]/50">
+    © 2026 João Stangorlini Fotografia • Todos os direitos reservados
+  </footer>
+
+  <script>
+    (function () {
+      const pathParts = window.location.pathname.split('/');
+      const token = pathParts[pathParts.length - 1];
+      let shareData = null;
+      let selectedItems = new Set();
+
+      const $ = (id) => document.getElementById(id);
+
+      function showToast(msg) {
+        const t = $('toast');
+        const tm = $('toastMsg');
+        if (!t || !tm) return;
+        tm.textContent = msg;
+        t.classList.remove('hidden');
+        t.style.opacity = '1';
+        setTimeout(() => {
+          t.style.opacity = '0';
+          setTimeout(() => t.classList.add('hidden'), 300);
+        }, 3500);
+      }
+
+      async function init() {
+        if (!token) {
+          showError('Link Inválido', 'Nenhum token de compartilhamento fornecido.');
+          return;
+        }
+
+        try {
+          const res = await fetch(`/api/shares/${encodeURIComponent(token)}/meta`);
+          const data = await res.json();
+
+          if (!res.ok || data.error) {
+            showError('Link Indisponível', data.error || 'Não foi possível carregar o compartilhamento.');
+            return;
+          }
+
+          shareData = data;
+          renderShareView(data);
+        } catch (err) {
+          showError('Erro de Conexão', 'Não foi possível conectar ao servidor. Tente novamente mais tarde.');
+        }
+      }
+
+      function showError(title, desc) {
+        $('sectionError').classList.remove('hidden');
+        $('sectionGalleryAndProofing').classList.add('hidden');
+        $('sectionDropzone').classList.add('hidden');
+        $('shareHeroCard').classList.add('hidden');
+        $('errorMessage').textContent = title;
+        $('errorDescription').textContent = desc;
+      }
+
+      function renderShareView(data) {
+        const share = data.share;
+        $('shareTitle').textContent = share.title || 'Álbum Compartilhado';
+
+        const modeMap = {
+          view: 'Galeria de Fotos',
+          proofing: 'Escolha do Cliente (Proofing)',
+          upload_only: 'Caixa de Entrada (Upload)'
+        };
+        $('shareModeBadge').textContent = modeMap[share.mode] || 'Compartilhamento';
+        $('shareTypeTag').textContent = modeMap[share.mode] || 'Álbum';
+
+        if (share.expiresAt) {
+          const exp = new Date(share.expiresAt);
+          $('shareExpiryText').textContent = `Expira em: ${exp.toLocaleDateString('pt-BR')} às ${exp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+        } else {
+          $('shareExpiryText').textContent = 'Link Permanente (Sem expiração)';
+        }
+
+        if (share.mode === 'upload_only') {
+          $('sectionDropzone').classList.remove('hidden');
+          setupDropzone(share);
+        } else {
+          $('sectionGalleryAndProofing').classList.remove('hidden');
+          $('shareItemCount').textContent = `${data.items?.length || 0} fotos / arquivos`;
+
+          if (share.allowZip && !share.watermark) {
+            const btnZip = $('btnDownloadZip');
+            btnZip.classList.remove('hidden');
+            btnZip.onclick = () => {
+              window.location.href = `/api/export/zip?token=${encodeURIComponent(token)}`;
+            };
+          }
+
+          if (share.mode === 'proofing') {
+            $('proofingControlBar').classList.remove('hidden');
+            if (Array.isArray(share.selectedItems)) {
+              share.selectedItems.forEach((id) => selectedItems.add(id));
+            }
+            updateProofingCounter();
+          }
+
+          renderMediaGrid(data.items || [], share);
+        }
+      }
+
+      function renderMediaGrid(items, share) {
+        const grid = $('shareMediaGrid');
+        grid.innerHTML = '';
+
+        if (!items.length) {
+          grid.innerHTML = '<p class="col-span-full text-center text-xs font-mono text-[#E0FBFC]/50 py-12">Nenhuma fotografia disponível nesta pasta.</p>';
+          return;
+        }
+
+        for (const it of items) {
+          const isSelected = selectedItems.has(it.path || it.name);
+          const card = document.createElement('div');
+          card.className = `relative group rounded-xl overflow-hidden bg-[#240046] border transition-all ${
+            isSelected ? 'border-[#FFB703] ring-2 ring-[#FFB703]' : 'border-[#5A189A]/60 hover:border-[#FFB703]'
+          }`;
+
+          const imgUrl = it.thumbUrl || it.streamUrl;
+          const isWatermarked = Boolean(share.watermark);
+
+          card.innerHTML = `
+            <div class="aspect-square w-full relative overflow-hidden bg-[#0B1320] flex items-center justify-center">
+              <img src="${imgUrl}" alt="${it.name}" class="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
+              ${isWatermarked ? '<div class="watermark-overlay"><span>João Stangorlini</span></div>' : ''}
+              ${
+                share.mode === 'proofing'
+                  ? `
+                  <button type="button" class="btn-toggle-select absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-transform active:scale-90 cursor-pointer shadow-lg ${
+                    isSelected ? 'bg-[#FFB703] text-[#0B1320]' : 'bg-[#0B1320]/80 text-[#E0FBFC] hover:bg-[#FFB703] hover:text-[#0B1320]'
+                  }">
+                    <span class="material-symbols-outlined text-[18px]">${isSelected ? 'check' : 'favorite_border'}</span>
+                  </button>
+                  `
+                  : ''
+              }
+            </div>
+            <div class="p-2 text-center truncate">
+              <p class="text-[11px] font-mono text-[#E0FBFC] truncate" title="${it.name}">${it.name}</p>
+            </div>
+          `;
+
+          if (share.mode === 'proofing') {
+            const btnSel = card.querySelector('.btn-toggle-select');
+            btnSel.onclick = (e) => {
+              e.stopPropagation();
+              const key = it.path || it.name;
+              if (selectedItems.has(key)) {
+                selectedItems.delete(key);
+                card.classList.remove('border-[#FFB703]', 'ring-2', 'ring-[#FFB703]');
+                card.classList.add('border-[#5A189A]/60');
+                btnSel.className = 'btn-toggle-select absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-transform active:scale-90 cursor-pointer shadow-lg bg-[#0B1320]/80 text-[#E0FBFC] hover:bg-[#FFB703] hover:text-[#0B1320]';
+                btnSel.innerHTML = '<span class="material-symbols-outlined text-[18px]">favorite_border</span>';
+              } else {
+                selectedItems.add(key);
+                card.classList.add('border-[#FFB703]', 'ring-2', 'ring-[#FFB703]');
+                card.classList.remove('border-[#5A189A]/60');
+                btnSel.className = 'btn-toggle-select absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-transform active:scale-90 cursor-pointer shadow-lg bg-[#FFB703] text-[#0B1320]';
+                btnSel.innerHTML = '<span class="material-symbols-outlined text-[18px]">check</span>';
+              }
+              updateProofingCounter();
+            };
+          }
+
+          grid.appendChild(card);
+        }
+      }
+
+      function updateProofingCounter() {
+        const count = selectedItems.size;
+        $('proofingCounter').textContent = count;
+        $('modalSelectedCount').textContent = count;
+      }
+
+      // Handlers de Proofing Feedback
+      $('btnOpenProofingModal')?.addEventListener('click', () => {
+        if (selectedItems.size === 0) {
+          showToast('Selecione pelo menos uma fotografia antes de enviar.');
+          return;
+        }
+        $('modalProofingFeedback').classList.remove('hidden');
+      });
+
+      $('btnCloseProofingModal')?.addEventListener('click', () => {
+        $('modalProofingFeedback').classList.add('hidden');
+      });
+      $('btnCancelProofingModal')?.addEventListener('click', () => {
+        $('modalProofingFeedback').classList.add('hidden');
+      });
+
+      $('btnSubmitProofing')?.addEventListener('click', async () => {
+        const btn = $('btnSubmitProofing');
+        btn.disabled = true;
+        btn.textContent = 'Enviando...';
+
+        try {
+          const notes = $('clientNotesInput')?.value || '';
+          const res = await fetch(`/api/shares/${encodeURIComponent(token)}/feedback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              selectedItems: Array.from(selectedItems),
+              clientNotes: notes,
+            }),
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            $('modalProofingFeedback').classList.add('hidden');
+            showToast('Seleção enviada com sucesso! O fotógrafo foi notificado.');
+          } else {
+            showToast(data.error || 'Falha ao enviar seleção.');
+          }
+        } catch {
+          showToast('Erro de conexão ao enviar seleção.');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Confirmar e Enviar';
+        }
+      });
+
+      // Dropzone
+      function setupDropzone() {
+        const input = $('dropzoneFileInput');
+        input.addEventListener('change', async (e) => {
+          const files = e.target.files;
+          if (!files || !files.length) return;
+          await uploadFiles(files);
+        });
+      }
+
+      async function uploadFiles(files) {
+        const box = $('uploadProgressBox');
+        const bar = $('uploadProgressBar');
+        const pText = $('uploadPercentText');
+        const sText = $('uploadStatusText');
+        box.classList.remove('hidden');
+
+        const formData = new FormData();
+        for (let i = 0; i < files.length; i++) {
+          formData.append('files', files[i]);
+        }
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `/api/shares/${encodeURIComponent(token)}/upload`, true);
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            bar.style.width = `${percent}%`;
+            pText.textContent = `${percent}%`;
+            sText.textContent = `Enviando ${files.length} arquivo(s)...`;
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            bar.style.width = '100%';
+            pText.textContent = '100%';
+            sText.textContent = 'Envio concluído com sucesso!';
+            showToast(`${files.length} arquivo(s) enviados com sucesso!`);
+            $('dropzoneFileInput').value = '';
+          } else {
+            sText.textContent = 'Falha no envio.';
+            showToast('Erro ao enviar arquivos.');
+          }
+        };
+
+        xhr.onerror = () => {
+          sText.textContent = 'Erro de rede no upload.';
+          showToast('Erro de conexão durante o upload.');
+        };
+
+        xhr.send(formData);
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>
+

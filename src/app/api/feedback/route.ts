@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 

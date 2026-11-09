@@ -1,3 +1,4 @@
+-- Este programa é um software livre (Licença AGPLv3)
 -- Função para verificar se um usuário existe pelo email (usado no login unificado)
 CREATE OR REPLACE FUNCTION public.check_user_exists(lookup_email text)
 RETURNS boolean

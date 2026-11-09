@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 'use client';
 
 import Link from 'next/link';
@@ -78,7 +79,7 @@ export default function Navbar({
 
   return (
     <>
-    <header className="sticky top-0 w-full z-50 bg-[#121212]/80 backdrop-blur-xl border-b border-[#2D2D2D] shrink-0">
+    <header className="sticky top-0 w-full z-50 bg-app/80 backdrop-blur-xl border-b border-border-subtle shrink-0">
       <div className="flex justify-between items-center px-6 py-4 max-w-7xl mx-auto w-full gap-4">
         
         {/* Left: Logo */}
@@ -99,7 +100,7 @@ export default function Navbar({
                 className={`font-medium transition-colors ${
                   isActive 
                     ? 'text-[#9D4EDD] font-bold border-b-[3px] border-[#FFCC00] pb-1' 
-                    : 'text-[#A0A0A0] hover:text-[#9D4EDD]'
+                    : 'text-fg-secondary hover:text-[#9D4EDD]'
                 }`}
                 onClick={(e) => handleNavClick(e, link.href)}
               >
@@ -112,18 +113,18 @@ export default function Navbar({
         {/* Right: Search & ID */}
         <div className="flex justify-end items-center gap-4">
           <div className="relative hidden lg:block w-[200px]">
-            <span className="material-symbols-outlined absolute left-2.5 top-1.5 text-[#8E8E8E] text-[18px]">search</span>
+            <span className="material-symbols-outlined absolute left-2.5 top-1.5 text-fg-muted text-[18px]">search</span>
             <input 
               type="text" 
               placeholder="Buscar na página..." 
               onChange={handleSearchChange}
-              className="w-full bg-[#1A1A1A] border border-[#2D2D2D] rounded-full pl-9 pr-4 py-1 text-sm text-white focus:outline-none focus:border-[#9D4EDD] transition-colors"
+              className="w-full bg-surface border border-border-subtle rounded-full pl-9 pr-4 py-1 text-sm text-fg focus:outline-none focus:border-[#9D4EDD] transition-colors"
             />
           </div>
           
           {/* Mobile Search Icon */}
           <button 
-            className="lg:hidden text-[#8E8E8E] hover:text-white flex items-center justify-center transition-colors"
+            className="lg:hidden text-fg-muted hover:text-fg flex items-center justify-center transition-colors"
             onClick={() => {
               setIsMobileSearchOpen(!isMobileSearchOpen);
             }}
@@ -133,19 +134,19 @@ export default function Navbar({
           
           <Link 
             href={targetHref}
-            className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border border-[#2D2D2D] bg-[#1A1A1A] hover:border-[#9D4EDD] hover:bg-[#9D4EDD]/10 transition-colors group cursor-pointer shrink-0"
+            className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border border-border-subtle bg-surface hover:border-[#9D4EDD] hover:bg-[#9D4EDD]/10 transition-colors group cursor-pointer shrink-0"
           >
             {userRole === 'Convidado' ? (
-              <div className="w-7 h-7 rounded-full bg-[#1A1A1A] border border-[#2D2D2D] flex items-center justify-center group-hover:border-[#9D4EDD] transition-colors">
-                <span className="material-symbols-outlined text-[16px] text-[#8E8E8E]">person</span>
+              <div className="w-7 h-7 rounded-full bg-surface border border-border-subtle flex items-center justify-center group-hover:border-[#9D4EDD] transition-colors">
+                <span className="material-symbols-outlined text-[16px] text-fg-muted">person</span>
               </div>
             ) : (
-              <img src={userRole === 'LabDiv' ? "/labdiv-logo.png" : "/perfil.jpeg"} alt="Perfil" className="w-7 h-7 rounded-full object-cover border border-[#2D2D2D] group-hover:border-[#9D4EDD] transition-colors" />
+              <img src={userRole === 'LabDiv' ? "/labdiv-logo.png" : "/perfil.jpeg"} alt="Perfil" className="w-7 h-7 rounded-full object-cover border border-border-subtle group-hover:border-[#9D4EDD] transition-colors" />
             )}
 
             <div className="flex items-center gap-1.5">
               <div className={`w-1.5 h-1.5 rounded-full ${userRole === 'Convidado' ? 'bg-[#8E8E8E]' : userRole === 'ADM' ? 'bg-[#FFCC00]' : 'bg-[#9D4EDD]'}`}></div>
-              <span className="text-[10px] md:text-[11px] font-bold text-[#A0A0A0] group-hover:text-white uppercase tracking-wider truncate max-w-[80px] md:max-w-none">
+              <span className="text-[10px] md:text-[11px] font-bold text-fg-secondary group-hover:text-fg uppercase tracking-wider truncate max-w-[80px] md:max-w-none">
                 {userRole}
               </span>
             </div>
@@ -156,15 +157,15 @@ export default function Navbar({
 
       {/* Mobile Search Dropdown */}
       {isMobileSearchOpen && (
-        <div className="lg:hidden bg-[#121212]/95 backdrop-blur-xl border-b border-[#2D2D2D] px-6 py-4 absolute w-full left-0 top-full shadow-2xl flex">
+        <div className="lg:hidden bg-app/95 backdrop-blur-xl border-b border-border-subtle px-6 py-4 absolute w-full left-0 top-full shadow-2xl flex">
           <div className="relative w-full">
-            <span className="material-symbols-outlined absolute left-3 top-2 text-[#8E8E8E] text-[20px]">search</span>
+            <span className="material-symbols-outlined absolute left-3 top-2 text-fg-muted text-[20px]">search</span>
             <input 
               type="text" 
               placeholder="Buscar na página..." 
               onChange={handleSearchChange}
               autoFocus
-              className="w-full bg-[#1A1A1A] border border-[#2D2D2D] rounded-full pl-10 pr-4 py-2 text-white focus:outline-none focus:border-[#9D4EDD] transition-colors"
+              className="w-full bg-surface border border-border-subtle rounded-full pl-10 pr-4 py-2 text-fg focus:outline-none focus:border-[#9D4EDD] transition-colors"
             />
           </div>
         </div>
@@ -173,7 +174,7 @@ export default function Navbar({
 
     {/* Mobile Bottom Floating Nav */}
     <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-      <div className="bg-[#1A1A1A]/95 backdrop-blur-xl border border-[#2D2D2D] rounded-full p-2 flex items-center gap-1 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+      <div className="bg-surface/95 backdrop-blur-xl border border-border-subtle rounded-full p-2 flex items-center gap-1 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
         {navLinks.map(link => {
           const isActive = pathname === link.href || (pathname === '/' && link.href === '/');
           let icon = '';
@@ -190,7 +191,7 @@ export default function Navbar({
               className={`flex items-center justify-center rounded-full transition-all duration-300 ease-out ${
                 isActive 
                   ? 'bg-[#9D4EDD]/20 text-[#9D4EDD] px-5 py-2.5 gap-2' 
-                  : 'text-[#8E8E8E] hover:text-white px-3 py-2.5'
+                  : 'text-fg-muted hover:text-fg px-3 py-2.5'
               }`}
               onClick={(e) => handleNavClick(e, link.href)}
             >

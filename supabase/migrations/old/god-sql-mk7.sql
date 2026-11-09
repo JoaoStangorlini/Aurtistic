@@ -1,3 +1,4 @@
+-- Este programa é um software livre (Licença AGPLv3)
 -- 1. Primeiro, removemos a limitação de ENUM para aceitar qualquer texto
 ALTER TABLE tasks ALTER COLUMN dimension DROP DEFAULT;
 ALTER TABLE tasks ALTER COLUMN dimension TYPE TEXT USING dimension::TEXT;

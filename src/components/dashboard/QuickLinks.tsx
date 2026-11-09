@@ -83,7 +83,9 @@ export function CopyableQuickLink({
   icon,
   hoverClass,
   onRemove,
-  isEditing
+  isEditing,
+  isPinned,
+  onTogglePin,
 }: {
   name: string;
   href: string;
@@ -91,6 +93,8 @@ export function CopyableQuickLink({
   hoverClass?: string;
   onRemove?: () => void;
   isEditing?: boolean;
+  isPinned?: boolean;
+  onTogglePin?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -104,7 +108,7 @@ export function CopyableQuickLink({
   };
 
   return (
-    <div className={`relative group/btn flex items-center bg-[#1A1A1A] border border-[#FFCC00]/40 rounded-full text-xs font-medium text-[#A0A0A0] transition-all duration-300 hover:border-[#FFCC00] hover:text-[#FFCC00] ${hoverClass || ''}`}>
+    <div className={`relative group/btn flex items-center bg-surface border border-[#FFCC00]/40 rounded-full text-xs font-medium text-fg-secondary transition-all duration-300 hover:border-[#FFCC00] hover:text-[#FFCC00] ${hoverClass || ''}`}>
       <a 
         href={href} 
         target="_blank" 
@@ -114,9 +118,31 @@ export function CopyableQuickLink({
         {icon}
         <span>{name}</span>
       </a>
+
+      {onTogglePin && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onTogglePin();
+          }}
+          className={`px-1.5 py-1.5 border-l border-white/10 transition-colors flex items-center justify-center cursor-pointer ${
+            isPinned
+              ? 'text-[var(--accent-secondary,#FFCC00)]'
+              : 'text-fg-muted hover:text-[var(--accent-secondary,#FFCC00)]'
+          }`}
+          title={isPinned ? 'Desafixar da barra compacta' : 'Fixar nos 4 chips da barra compacta'}
+        >
+          <span className="material-symbols-outlined text-[13px]">
+            {isPinned ? 'keep' : 'keep_public'}
+          </span>
+        </button>
+      )}
+
       <button 
         onClick={handleCopy}
-        className="pr-3 pl-1.5 py-1.5 border-l border-white/10 text-[#8E8E8E] hover:text-[#FFCC00] transition-colors flex items-center justify-center cursor-pointer"
+        className="pr-3 pl-1.5 py-1.5 border-l border-white/10 text-fg-muted hover:text-[#FFCC00] transition-colors flex items-center justify-center cursor-pointer"
         title="Copiar Link"
       >
         <span className="material-symbols-outlined text-[13px] font-bold">
@@ -138,7 +164,7 @@ export function CopyableQuickLink({
 export function QuickLinks() {
   return (
     <div className="flex flex-wrap items-center gap-2 mb-6">
-      <span className="text-[11px] font-semibold text-[#8E8E8E] uppercase tracking-wider mr-2 hidden md:inline">Links Rápidos:</span>
+      <span className="text-[11px] font-semibold text-fg-muted uppercase tracking-wider mr-2 hidden md:inline">Links Rápidos:</span>
       {systemLinks.map(link => (
         <CopyableQuickLink 
           key={link.name}

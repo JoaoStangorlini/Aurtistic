@@ -1,3 +1,4 @@
+-- Este programa é um software livre (Licença AGPLv3)
 -- 3_quick_filters.sql
 -- Adiciona a coluna quick_filters na tabela user_profiles para salvar as preferências do usuário
 -- sobre quais colunas aparecem na barra horizontal de Filtros Rápidos.

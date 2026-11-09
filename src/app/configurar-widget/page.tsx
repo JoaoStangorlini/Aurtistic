@@ -10,7 +10,7 @@ export default async function ConfigurarWidgetPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/aurtistic/login');
+    redirect('/login');
   }
 
   // Buscar todas as tarefas do usuário para o gerenciador de visibilidade do Widget
@@ -21,7 +21,7 @@ export default async function ConfigurarWidgetPage() {
     .order('created_at', { ascending: false });
 
   return (
-    <main className="min-h-full bg-[#121212] p-4 md:p-8">
+    <main className="min-h-full bg-app p-4 md:p-8">
       <WidgetConfigClient 
         userId={user.id} 
         tasks={tasks || []} 

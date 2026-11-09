@@ -1,3 +1,4 @@
+-- Este programa é um software livre (Licença AGPLv3)
 -- Script de Importacao de Tarefas do Notion
 
 INSERT INTO tasks (title, category, due_date, description, priority, assignee, status, dimension) VALUES ('Adicionar 1 hora de estudos para cada hora de materias', 'Programar', '2026-03-21 00:00:00Z', NULL, 'Baixa', 'Andy Raposo', 'COMPLETED', 'HUB_LABDIV');

@@ -1,3 +1,4 @@
+-- Este programa é um software livre (Licença AGPLv3)
 
 -- Drop se existir
 DROP TABLE IF EXISTS tasks;

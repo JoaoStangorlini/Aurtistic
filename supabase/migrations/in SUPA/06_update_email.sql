@@ -1,3 +1,4 @@
+-- Este programa é um software livre (Licença AGPLv3)
 -- Atualiza o email e o display name/metadata do usuário stangorlini para o padrão do Aurtistic
 UPDATE auth.users 
 SET 

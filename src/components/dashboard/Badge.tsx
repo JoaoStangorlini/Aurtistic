@@ -1,19 +1,20 @@
+// Este programa é um software livre (Licença AGPLv3)
 import React from 'react';
 
 type BadgeType = 'status' | 'prioridade' | 'categoria' | 'responsavel' | 'dimensao' | string;
 
 export function getBadgeColorClass(type: BadgeType, value: string | null): string {
-  if (!value) return 'bg-[#2D2D2D] text-[#A0A0A0] border-[#353534]';
+  if (!value) return 'bg-surface-hover text-fg-secondary border-[#353534]';
   const text = value.toLowerCase().trim();
-  let colorClass = 'bg-[#2D2D2D] text-[#A0A0A0] border-[#353534]'; // Default dark gray
+  let colorClass = 'bg-surface-hover text-fg-secondary border-[#353534]'; // Default dark gray
   
   if (type === 'status') {
     if (text.includes('completa')) colorClass = 'bg-[#0f9d58]/15 text-[#0f9d58] border-[#0f9d58]/30'; // Green
     else if (text.includes('testar')) colorClass = 'bg-[#f4b400]/15 text-[#f4b400] border-[#f4b400]/30'; // Yellow
     else if (text.includes('descartada')) colorClass = 'bg-[#db4437]/15 text-[#db4437] border-[#db4437]/30'; // Red
     else if (text.includes('progresso')) colorClass = 'bg-[#4285f4]/15 text-[#4285f4] border-[#4285f4]/30'; // Blue
-    else if (text.includes('iniciada')) colorClass = 'bg-[#E0E0E0]/15 text-[#E0E0E0] border-[#E0E0E0]/30'; // Light Gray
-    else if (text.includes('rascunho')) colorClass = 'bg-[#8E8E8E]/15 text-[#8E8E8E] border-[#8E8E8E]/30 text-dashed'; // Gray with different feel
+    else if (text.includes('iniciada')) colorClass = 'bg-[#E0E0E0]/15 text-fg-secondary border-[#E0E0E0]/30'; // Light Gray
+    else if (text.includes('rascunho')) colorClass = 'bg-[#8E8E8E]/15 text-fg-muted border-[#8E8E8E]/30 text-dashed'; // Gray with different feel
   } 
   else if (type === 'prioridade') {
     if (text === 'baixa') colorClass = 'bg-[#4285f4]/15 text-[#4285f4] border-[#4285f4]/30'; // Blue
@@ -26,7 +27,7 @@ export function getBadgeColorClass(type: BadgeType, value: string | null): strin
     else if (text.includes('touch')) colorClass = 'bg-[#0f9d58]/15 text-[#0f9d58] border-[#0f9d58]/30'; // Green
     else if (text.includes('reunir')) colorClass = 'bg-[#FF8C8C]/15 text-[#FF8C8C] border-[#FF8C8C]/30'; // Salmon/Pink
     else if (text.includes('post')) colorClass = 'bg-[#f4b400]/15 text-[#f4b400] border-[#f4b400]/30'; // Yellow
-    else if (text.includes('outros')) colorClass = 'bg-[#E0E0E0]/15 text-[#E0E0E0] border-[#E0E0E0]/30'; // Light Gray
+    else if (text.includes('outros')) colorClass = 'bg-[#E0E0E0]/15 text-fg-secondary border-[#E0E0E0]/30'; // Light Gray
   }
   else if (type === 'responsavel') {
     if (text.includes('andy')) colorClass = 'bg-[#db4437]/15 text-[#db4437] border-[#db4437]/30'; // Red
@@ -43,7 +44,7 @@ export function getBadgeColorClass(type: BadgeType, value: string | null): strin
     else if (text.includes('livros')) colorClass = 'bg-[#FFCC00]/15 text-[#FFCC00] border-[#FFCC00]/30'; // Amarelo LabDiv
     else if (text.includes('filmes') || text.includes('series') || text.includes('séries')) colorClass = 'bg-[#FFE066]/15 text-[#FFE066] border-[#FFE066]/30'; // Amarelo Claro
     else if (text.includes('tatuagens') || text.includes('tattoo')) colorClass = 'bg-[#D39BFE]/15 text-[#D39BFE] border-[#D39BFE]/30'; // Roxo Claro
-    else if (text.includes('cin')) colorClass = 'bg-[#E0E0E0]/15 text-[#E0E0E0] border-[#E0E0E0]/30'; // Cinza Claro
+    else if (text.includes('cin')) colorClass = 'bg-[#E0E0E0]/15 text-fg-secondary border-[#E0E0E0]/30'; // Cinza Claro
     else if (text.includes('compras')) colorClass = 'bg-[#69F0AE]/15 text-[#69F0AE] border-[#69F0AE]/30'; // Verde Claro
     else if (text.includes('stangorlini') || text.includes('web')) colorClass = 'bg-[#3b82f6]/15 text-[#3b82f6] border-[#3b82f6]/30'; // Azul Royal
     else if (text.includes('fotografia') || text.includes('foto')) colorClass = 'bg-[#ec4899]/15 text-[#ec4899] border-[#ec4899]/30'; // Rosa Vibrante

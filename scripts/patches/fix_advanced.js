@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 const fs = require('fs');
 const path = './src/app/configuracoes-avancadas/AdvancedConfigClient.tsx';
 

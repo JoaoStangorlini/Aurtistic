@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -108,29 +109,29 @@ export default function ExportImportPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#121212] flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full bg-[#2D2D2D] animate-pulse"></div>
+      <div className="min-h-screen bg-app flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full bg-surface-hover animate-pulse"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#121212] text-white p-4 md:p-8">
+    <div className="min-h-screen bg-app text-fg p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-8 mt-16">
         <div>
-          <Link href="/" className="inline-flex items-center gap-2 text-[#A0A0A0] hover:text-[#9D4EDD] transition-colors mb-4">
+          <Link href="/" className="inline-flex items-center gap-2 text-fg-secondary hover:text-[#9D4EDD] transition-colors mb-4">
             <span className="material-symbols-outlined">arrow_back</span>
             Voltar para Dashboard
           </Link>
           <h1 className="text-3xl font-bold font-bukra">Exportar e Importar Dados</h1>
-          <p className="text-[#A0A0A0] mt-2 font-opensans">
+          <p className="text-fg-secondary mt-2 font-opensans">
             Gerencie seus dados. Você pode fazer backup das suas tarefas e eventos, ou importar dados de outras plataformas via arquivo CSV.
           </p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
           {/* Tarefas */}
-          <div className="bg-[#1A1A1A] border border-[#2D2D2D] rounded-xl p-6 space-y-6">
+          <div className="bg-surface border border-border-subtle rounded-xl p-6 space-y-6">
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-[#FFCC00] text-3xl">task_alt</span>
               <h2 className="text-xl font-bold font-bukra">Tarefas</h2>
@@ -140,12 +141,12 @@ export default function ExportImportPage() {
               <div className="space-y-2">
                 <button 
                   onClick={handleExportTasksCSV}
-                  className="w-full flex items-center justify-center gap-2 bg-[#2D2D2D] hover:bg-[#3D3D3D] text-white py-3 px-4 rounded-lg transition-colors font-medium"
+                  className="w-full flex items-center justify-center gap-2 bg-surface-hover hover:bg-[#3D3D3D] text-fg py-3 px-4 rounded-lg transition-colors font-medium"
                 >
                   <span className="material-symbols-outlined">download</span>
                   Baixar Tarefas (CSV)
                 </button>
-                <p className="text-sm text-[#A0A0A0] font-opensans">
+                <p className="text-sm text-fg-secondary font-opensans">
                   Gera um arquivo CSV com todas as suas tarefas ativas, ideal para backup ou uso em planilhas.
                 </p>
               </div>
@@ -156,7 +157,7 @@ export default function ExportImportPage() {
                   Importar Tarefas (CSV)
                   <input type="file" accept=".csv" className="hidden" onChange={handleImportTasksCSV} />
                 </label>
-                <p className="text-sm text-[#A0A0A0] font-opensans">
+                <p className="text-sm text-fg-secondary font-opensans">
                   Importa tarefas a partir de um arquivo CSV. O arquivo deve conter cabeçalhos como Nome, Descrição, etc.
                 </p>
               </div>
@@ -164,7 +165,7 @@ export default function ExportImportPage() {
           </div>
 
           {/* Eventos */}
-          <div className="bg-[#1A1A1A] border border-[#2D2D2D] rounded-xl p-6 space-y-6">
+          <div className="bg-surface border border-border-subtle rounded-xl p-6 space-y-6">
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-[#00E5FF] text-3xl">event</span>
               <h2 className="text-xl font-bold font-bukra">Eventos</h2>
@@ -174,12 +175,12 @@ export default function ExportImportPage() {
               <div className="space-y-2">
                 <button 
                   onClick={handleExportEventsCSV}
-                  className="w-full flex items-center justify-center gap-2 bg-[#2D2D2D] hover:bg-[#3D3D3D] text-white py-3 px-4 rounded-lg transition-colors font-medium"
+                  className="w-full flex items-center justify-center gap-2 bg-surface-hover hover:bg-[#3D3D3D] text-fg py-3 px-4 rounded-lg transition-colors font-medium"
                 >
                   <span className="material-symbols-outlined">download</span>
                   Baixar Eventos (CSV)
                 </button>
-                <p className="text-sm text-[#A0A0A0] font-opensans">
+                <p className="text-sm text-fg-secondary font-opensans">
                   Gera um arquivo CSV com todos os seus eventos da agenda.
                 </p>
               </div>
@@ -190,7 +191,7 @@ export default function ExportImportPage() {
                   Importar Eventos (CSV)
                   <input type="file" accept=".csv" className="hidden" onChange={handleImportEventsCSV} />
                 </label>
-                <p className="text-sm text-[#A0A0A0] font-opensans">
+                <p className="text-sm text-fg-secondary font-opensans">
                   Importa eventos a partir de um arquivo CSV.
                 </p>
               </div>

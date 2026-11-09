@@ -1,23 +1,43 @@
+// Este programa é um software livre (Licença AGPLv3)
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { useEffect, useState, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter, usePathname } from 'next/navigation';
 import { logoutAurtistic } from '@/app/(dashboard)/aurtistic/actions';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
+import { useTheme } from '@/components/theme/ThemeProvider';
+import { useCoachMarks } from '@/components/onboarding/CoachMarksProvider';
+import { ThemeDropdownSection } from '@/components/theme/ThemeDropdownSection';
+import { ThemedAurtisticLogo } from '@/components/theme/ThemedAurtisticLogo';
+import { ModulesConfig, getInitialModulesConfig } from '@/lib/modules-config';
 
 export default function AurtisticNavbar() {
+  const { resolvedMode, paletteDef } = useTheme();
+  const { startTour } = useCoachMarks();
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isIdentityDropdownOpen, setIsIdentityDropdownOpen] = useState(false);
+  const [isMobileIdentityOpen, setIsMobileIdentityOpen] = useState(false);
+  const identityDropdownRef = useRef<HTMLDivElement>(null);
+  const [modulesConfig, setModulesConfig] = useState<ModulesConfig>(getInitialModulesConfig);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const pathname = usePathname();
   const [supabase] = useState(() => createClient());
+
+  useEffect(() => {
+    const handleModulesChanged = (e: any) => {
+      if (e?.detail) setModulesConfig(e.detail);
+      else setModulesConfig(getInitialModulesConfig());
+    };
+    window.addEventListener('aurtistic:modules-changed', handleModulesChanged);
+    return () => window.removeEventListener('aurtistic:modules-changed', handleModulesChanged);
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -70,6 +90,9 @@ export default function AurtisticNavbar() {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsSettingsOpen(false);
       }
+      if (identityDropdownRef.current && !identityDropdownRef.current.contains(event.target as Node)) {
+        setIsIdentityDropdownOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
 
@@ -85,7 +108,7 @@ export default function AurtisticNavbar() {
     } catch (e) {
       console.error(e);
       await supabase.auth.signOut();
-      router.push('/aurtistic/login');
+      router.push('/login');
     }
   };
 
@@ -108,180 +131,330 @@ export default function AurtisticNavbar() {
 
   const tabMetadata: Record<string, { name: string; href: string }> = {
     tasks: { name: customLabels.tasks || 'Tarefas', href: '/' },
-    resumo: { name: customLabels.resumo || 'Resumo', href: '/resumo' },
+    resumo: { 
+      name: (!customLabels.resumo || customLabels.resumo === 'Cartão de Visitas') ? 'Resumo' : customLabels.resumo, 
+      href: '/resumo' 
+    },
     curriculo: { name: customLabels.curriculo || 'Currículo', href: '/curriculo' },
     portfolio: { name: customLabels.portfolio || 'Portfólio', href: '/portfolio' },
+    servidor: { name: customLabels.servidor || 'Meus Arquivos', href: '/servidor' },
+    organizacoes: { name: customLabels.organizacoes || 'Gestão', href: '/servidor' },
     extra: { name: customLabels.extra || 'Aba Extra', href: customLinks.extra || '#' }
   };
 
-  const activeTabs = profile?.features_config?.active || ['tasks', 'resumo', 'curriculo', 'portfolio'];
-  const orderedTabs = profile?.features_config?.order || ['tasks', 'resumo', 'curriculo', 'portfolio', 'extra'];
-  const visibleTabs = orderedTabs.filter((t: string) => activeTabs.includes(t));
+  const configuredActive = profile?.features_config?.active;
+  const activeTabs = configuredActive
+    ? (configuredActive.includes('organizacoes') ? configuredActive : [...configuredActive, 'organizacoes'])
+    : ['tasks', 'resumo', 'curriculo', 'portfolio', 'servidor', 'organizacoes'];
+
+  const configuredOrder = profile?.features_config?.order;
+  const orderedTabs = configuredOrder
+    ? (configuredOrder.includes('organizacoes') ? configuredOrder : [...configuredOrder, 'organizacoes'])
+    : ['tasks', 'resumo', 'curriculo', 'portfolio', 'servidor', 'organizacoes', 'extra'];
+
+  const visibleTabs = orderedTabs.filter((t: string) => {
+    if (!activeTabs.includes(t)) return false;
+    if (t === 'tasks' && !modulesConfig.tasks) return false;
+    if (t === 'resumo' && !modulesConfig.resumo) return false;
+    if (t === 'curriculo' && !modulesConfig.curriculo) return false;
+    if (t === 'portfolio' && !modulesConfig.portfolio) return false;
+    if (t === 'servidor' && !modulesConfig.servidor) return false;
+    return true;
+  });
+
+  // Macro-grupos de navegação para máxima clareza e eliminação de sobrecarga
+  const hasTasks = modulesConfig.tasks && activeTabs.includes('tasks');
+  const hasOrgs = modulesConfig.servidor && activeTabs.includes('organizacoes');
+  const hasServidor = modulesConfig.servidor && activeTabs.includes('servidor');
+  const hasOrgsOrServer = hasOrgs || hasServidor;
+
+  const isOrgsActive = pathname === '/labdiv' || pathname === '/organizacoes' || pathname === '/servidor';
+  const orgsHref = hasServidor ? '/servidor' : '/labdiv';
+  const orgsLabel = customLabels.organizacoes || 'Gestão';
+
+  const hasPortfolio = modulesConfig.portfolio && activeTabs.includes('portfolio');
+  const hasCurriculo = modulesConfig.curriculo && activeTabs.includes('curriculo');
+  const hasResumo = modulesConfig.resumo && activeTabs.includes('resumo');
+
+  const identityItems = [
+    hasPortfolio && {
+      key: 'portfolio',
+      name: customLabels.portfolio || 'Portfólio',
+      href: '/portfolio',
+      desc: 'Galeria visual e projetos autorais',
+      icon: 'photo_camera',
+    },
+    hasCurriculo && {
+      key: 'curriculo',
+      name: customLabels.curriculo || 'Currículo',
+      href: '/curriculo',
+      desc: 'Histórico acadêmico e formação',
+      icon: 'contact_page',
+    },
+    hasResumo && {
+      key: 'resumo',
+      name: (!customLabels.resumo || customLabels.resumo === 'Cartão de Visitas') ? 'Resumo' : customLabels.resumo,
+      href: '/resumo',
+      desc: 'Apresentação e cartão de visitas',
+      icon: 'badge',
+    },
+  ].filter(Boolean) as { key: string; name: string; href: string; desc: string; icon: string }[];
+
+  const isIdentityActive = identityItems.some(item => pathname === item.href);
 
   return (
     <>
-      <header className="sticky top-0 w-full z-50 bg-[#121212]/90 backdrop-blur-xl border-b border-[#2D2D2D] shrink-0">
+      <header className="sticky top-0 w-full z-50 bg-app/90 backdrop-blur-xl border-b border-border-subtle shrink-0">
         <div className="flex justify-between items-center px-4 md:px-8 py-2 w-full gap-4">
         
-        {/* Left: Logo */}
+        {/* Left: Themed Chameleon Logo */}
         <div className="flex justify-start items-center gap-2">
-          <Link href="/" className="flex items-center group">
-            <Image 
-              src="/aurtistic_logo_white_v3.png" 
-              alt="Aurtistic Logo" 
-              width={180} 
-              height={41}
-              className="h-8 md:h-9 w-auto object-contain transition-opacity group-hover:opacity-90"
-              style={{ filter: 'none', forcedColorAdjust: 'none' }}
-              priority
-            />
-          </Link>
+          <ThemedAurtisticLogo size="md" showTagline={false} linkToHome={true} />
         </div>
 
 
-        {/* Center: Dynamic Navigation Links */}
-        <nav className="hidden md:flex justify-center gap-4 lg:gap-8 items-center flex-1 mx-4">
-          {visibleTabs.map((key: string) => {
-            const tab = tabMetadata[key];
-            if (!tab) return null;
-            const isExternal = tab.href.startsWith('http://') || tab.href.startsWith('https://');
-            const isActive = pathname === tab.href;
+        {/* Center: Navigation Links Agrupados (Enxutos & Funcionais) */}
+        <nav className="hidden md:flex justify-center gap-5 lg:gap-8 items-center flex-1 mx-4" data-tour="nav-tabs">
+          {/* 1. Tarefas */}
+          {hasTasks && (
+            <Link 
+              href="/"
+              className={`font-medium transition-colors ${
+                pathname === '/' 
+                  ? 'text-[var(--accent-primary)] font-bold border-b-[3px] border-[var(--accent-secondary)] pb-1' 
+                  : 'text-fg-secondary hover:text-[var(--accent-primary)]'
+              }`}
+            >
+              {customLabels.tasks || 'Tarefas'}
+            </Link>
+          )}
 
-            if (isExternal) {
-              return (
-                <a 
-                  key={key}
-                  href={tab.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-[#A0A0A0] hover:text-[#9D4EDD] transition-colors"
-                >
-                  {tab.name}
-                </a>
-              );
-            }
+          {/* 2. Organizações & Servidor (Unificado em uma aba) */}
+          {hasOrgsOrServer && (
+            <Link 
+              href={orgsHref}
+              className={`font-medium transition-colors ${
+                isOrgsActive
+                  ? 'text-[var(--accent-primary)] font-bold border-b-[3px] border-[var(--accent-secondary)] pb-1' 
+                  : 'text-fg-secondary hover:text-[var(--accent-primary)]'
+              }`}
+            >
+              {orgsLabel}
+            </Link>
+          )}
 
-            return (
-              <Link 
-                key={key}
-                href={tab.href}
-                className={`font-medium transition-colors ${
-                  isActive 
-                    ? 'text-[#9D4EDD] font-bold border-b-[3px] border-[#FFCC00] pb-1' 
-                    : 'text-[#A0A0A0] hover:text-[#9D4EDD]'
+          {/* 3. Identidade / Portfólio (Menu Unificado se houver mais de um módulo ativo) */}
+          {identityItems.length === 1 && (
+            <Link 
+              href={identityItems[0].href}
+              data-tour="nav-identity-dropdown"
+              className={`font-medium transition-colors ${
+                pathname === identityItems[0].href 
+                  ? 'text-[var(--accent-primary)] font-bold border-b-[3px] border-[var(--accent-secondary)] pb-1' 
+                  : 'text-fg-secondary hover:text-[var(--accent-primary)]'
+              }`}
+            >
+              {identityItems[0].name}
+            </Link>
+          )}
+
+          {identityItems.length > 1 && (
+            <div className="relative" ref={identityDropdownRef} data-tour="nav-identity-dropdown">
+              <button
+                type="button"
+                onClick={() => setIsIdentityDropdownOpen(!isIdentityDropdownOpen)}
+                className={`font-medium transition-colors flex items-center gap-1 cursor-pointer py-1 ${
+                  isIdentityActive 
+                    ? 'text-[var(--accent-primary)] font-bold border-b-[3px] border-[var(--accent-secondary)] pb-1' 
+                    : 'text-fg-secondary hover:text-[var(--accent-primary)]'
                 }`}
               >
-                {tab.name}
-              </Link>
-            );
-          })}
+                <span>Identidade</span>
+                <span className={`material-symbols-outlined text-[16px] transition-transform duration-200 ${isIdentityDropdownOpen ? 'rotate-180 text-[var(--accent-secondary)]' : ''}`}>
+                  expand_more
+                </span>
+              </button>
+
+              {isIdentityDropdownOpen && (
+                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-64 bg-surface border border-border-subtle rounded-2xl shadow-2xl overflow-hidden py-1.5 z-50">
+                  <div className="px-3.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-fg-muted border-b border-border-subtle">
+                    Apresentação & Perfil
+                  </div>
+                  {identityItems.map((item) => {
+                    const isItemActive = pathname === item.href;
+                    return (
+                      <Link
+                        key={item.key}
+                        href={item.href}
+                        onClick={() => setIsIdentityDropdownOpen(false)}
+                        className={`flex items-start gap-3 px-3.5 py-2.5 hover:bg-surface-hover transition-colors ${
+                          isItemActive ? 'bg-[var(--accent-primary)]/15 text-[var(--accent-primary)]' : 'text-fg'
+                        }`}
+                      >
+                        <span className={`material-symbols-outlined text-[20px] mt-0.5 ${isItemActive ? 'text-[var(--accent-primary)]' : 'text-[var(--accent-secondary)]'}`}>
+                          {item.icon}
+                        </span>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold leading-tight">{item.name}</span>
+                          <span className="text-[10px] text-fg-muted leading-tight mt-0.5">{item.desc}</span>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 4. Aba Extra (se configurada e externa/customizada) */}
+          {activeTabs.includes('extra') && (
+            <a 
+              href={customLinks.extra || '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-fg-secondary hover:text-[var(--accent-primary)] transition-colors"
+            >
+              {customLabels.extra || 'Aba Extra'}
+            </a>
+          )}
         </nav>
 
-        {/* Right: Auth State / Settings Dropdown */}
-        <div className="flex justify-end items-center gap-4">
+        {/* Right: Help Button (?) + Auth State / Settings Dropdown */}
+        <div className="flex justify-end items-center gap-2 sm:gap-3">
+          {/* Botão de Ajuda (?) - Themed & Compacto */}
+          <button
+            type="button"
+            onClick={startTour}
+            data-tour="navbar-help"
+            className="w-8 h-8 rounded-full border border-border-subtle bg-surface hover:border-[var(--accent-secondary,#FFCC00)] hover:bg-[var(--accent-secondary,#FFCC00)]/10 text-fg hover:text-[var(--accent-secondary,#FFCC00)] transition-colors cursor-pointer shrink-0 shadow-sm flex items-center justify-center"
+            title="Tutorial Interativo da Página (?)"
+            aria-label="Ajuda e Tutorial Interativo"
+          >
+            <span className="material-symbols-outlined text-[18px] text-[var(--accent-secondary,#FFCC00)]">help_outline</span>
+          </button>
+
           {loading ? (
-            <div className="w-8 h-8 rounded-full bg-[#2D2D2D] animate-pulse"></div>
+            <div className="w-8 h-8 rounded-full bg-surface-hover animate-pulse"></div>
           ) : user ? (
             <div className="relative" ref={dropdownRef}>
               <div 
                 onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                className="flex items-center gap-2 pl-1 pr-3 py-1.5 rounded-full border border-[#2D2D2D] bg-[#1A1A1A] hover:border-[#9D4EDD] hover:bg-[#9D4EDD]/10 transition-colors cursor-pointer shrink-0"
+                data-tour="profile-menu-trigger"
+                className="flex items-center gap-2 pl-1 pr-3 py-1.5 rounded-full border border-border-subtle bg-surface hover:border-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 transition-colors cursor-pointer shrink-0"
               >
-                <div className="w-7 h-7 rounded-full overflow-hidden bg-[#2D2D2D] flex items-center justify-center border border-[#FFCC00] shrink-0">
+                <div className="w-7 h-7 rounded-full overflow-hidden bg-surface-hover flex items-center justify-center border border-[var(--accent-secondary)] shrink-0">
                   {user?.user_metadata?.avatar_url ? (
                     <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                   ) : (user?.id === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e' && profile?.features_config?.advanced_settings?.sync_curriculum_photo !== false) ? (
                     <img src="/perfil.jpeg" alt="Profile" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="material-symbols-outlined text-[16px] text-white">person</span>
+                    <span className="material-symbols-outlined text-[16px] text-fg">person</span>
                   )}
                 </div>
-                <span className="text-white text-xs font-bold uppercase tracking-wider hidden sm:inline">{displayName}</span>
-                <span className="material-symbols-outlined text-[16px] text-[#A0A0A0] hover:text-[#FFCC00] transition-colors">settings</span>
+                <span className="text-fg text-xs font-bold uppercase tracking-wider hidden sm:inline">{displayName}</span>
+                <span className="material-symbols-outlined text-[16px] text-fg-secondary hover:text-[var(--accent-secondary)] transition-colors">settings</span>
               </div>
 
               {isSettingsOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-[#1A1A1A] border border-[#2D2D2D] rounded-lg shadow-xl overflow-hidden py-1 z-50">
+                <div className="absolute right-0 mt-2 w-72 bg-surface border border-border-subtle rounded-2xl shadow-2xl overflow-hidden py-1 z-50">
+                  {/* Cabeçalho do Usuário */}
+                  <div className="px-4 py-2.5 border-b border-border-subtle bg-app">
+                    <p className="text-xs font-bold text-fg truncate">{displayName}</p>
+                    <p className="text-[11px] text-fg-muted truncate">{user?.email}</p>
+                  </div>
+
+                  {/* BLOCO 1: Espaço de Trabalho & Arquivos */}
+                  <div className="py-1">
+                    <div className="px-4 py-1 text-[10px] font-black uppercase tracking-wider text-fg-muted">
+                      Espaço de Trabalho
+                    </div>
                     <Link 
-                      href="/exportar-importar"
+                      href="/servidor"
                       onClick={() => setIsSettingsOpen(false)}
-                      className="w-full text-left px-4 py-2 text-sm text-[#E0E0E0] hover:bg-[#2D2D2D] hover:text-white transition-colors flex items-center gap-2"
+                      className="w-full text-left px-4 py-2 text-xs text-[var(--accent-secondary)] hover:bg-surface-hover transition-colors flex items-center gap-2.5 font-bold"
                     >
-                      <span className="material-symbols-outlined text-[18px]">sync_alt</span>
-                      Exportar / Importar
-                    </Link>
-                    <Link 
-                      href="/configurar-notificacoes"
-                      onClick={() => setIsSettingsOpen(false)}
-                      className="w-full text-left px-4 py-2 text-sm text-[#E0E0E0] hover:bg-[#2D2D2D] hover:text-[#FFCC00] transition-colors flex items-center gap-2"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">notifications_active</span>
-                      Notificações
+                      <span className="material-symbols-outlined text-[18px]">folder_special</span>
+                      <span>Meus Arquivos</span>
                     </Link>
 
-                    <Link 
-                      href="/configurar-widget"
-                      onClick={() => setIsSettingsOpen(false)}
-                      className="w-full text-left px-4 py-2 text-sm text-[#E0E0E0] hover:bg-[#2D2D2D] hover:text-[#FFCC00] transition-colors flex items-center gap-2 group"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSettingsOpen(false);
+                        if (typeof window !== 'undefined') {
+                          window.dispatchEvent(new CustomEvent('aurtistic:relaunch-onboarding'));
+                        }
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs text-fg-secondary hover:bg-surface-hover hover:text-[var(--accent-secondary,#FFCC00)] transition-colors flex items-center gap-2.5 font-medium cursor-pointer"
                     >
-                      <span className="material-symbols-outlined text-[18px]">widgets</span>
-                      Configurar Widgets
-                    </Link>
+                      <span className="material-symbols-outlined text-[18px] text-[var(--accent-secondary,#FFCC00)]">tune</span>
+                      <span>Personalizar Módulos</span>
+                    </button>
+                  </div>
+
+                  <div className="h-[1px] bg-border-subtle my-1" />
+
+                  {/* BLOCO 2: Preferências & Configurações */}
+                  <div className="py-1">
+                    <div className="px-4 py-1 text-[10px] font-black uppercase tracking-wider text-fg-muted">
+                      Aparência & Ajustes
+                    </div>
+                    
+                    {/* Seletor Compacto de Tema */}
+                    <ThemeDropdownSection />
 
                     <Link 
                       href="/configuracoes-avancadas"
                       onClick={() => setIsSettingsOpen(false)}
-                      className="w-full text-left px-4 py-2 text-sm text-[#E0E0E0] hover:bg-[#2D2D2D] hover:text-[#9D4EDD] transition-colors flex items-center gap-2 group"
+                      className="w-full text-left px-4 py-2 text-xs text-fg-secondary hover:bg-surface-hover hover:text-[var(--accent-primary)] transition-colors flex items-center gap-2.5 font-medium group"
                     >
-                      <span className="material-symbols-outlined text-[18px]">tune</span>
-                      Configurações Avançadas
+                      <span className="material-symbols-outlined text-[18px] text-[var(--accent-primary)]">settings</span>
+                      <span>Central de Configurações</span>
                     </Link>
+                  </div>
+
+                  <div className="h-[1px] bg-border-subtle my-1" />
+
+                  {/* BLOCO 3: Sistema & Ajuda */}
+                  <div className="py-1">
+                    <div className="px-4 py-1 text-[10px] font-black uppercase tracking-wider text-fg-muted">
+                      Ajuda & Conta
+                    </div>
 
                     <Link 
                       href="/relatar-bug"
                       onClick={() => setIsSettingsOpen(false)}
-                      className="w-full text-left px-4 py-2 text-sm text-[#E0E0E0] hover:bg-[#2D2D2D] hover:text-[#FFCC00] transition-colors flex items-center gap-2"
+                      className="w-full text-left px-4 py-2 text-xs text-fg-secondary hover:bg-surface-hover hover:text-[var(--accent-secondary)] transition-colors flex items-center gap-2.5 font-medium"
                     >
                       <span className="material-symbols-outlined text-[18px]">bug_report</span>
-                      Relatar Bug / Feedback
+                      <span>Relatar Bug / Feedback</span>
                     </Link>
 
                     <Link 
                       href="/privacy-policy"
                       onClick={() => setIsSettingsOpen(false)}
-                      className="w-full text-left px-4 py-2 text-sm text-[#E0E0E0] hover:bg-[#2D2D2D] hover:text-white transition-colors flex items-center gap-2"
+                      className="w-full text-left px-4 py-2 text-xs text-fg-muted hover:bg-surface-hover hover:text-fg transition-colors flex items-center gap-2.5"
                     >
                       <span className="material-symbols-outlined text-[18px]">policy</span>
-                      Política de Privacidade
+                      <span>Privacidade</span>
                     </Link>
-
-                    <div className="h-[1px] bg-[#2D2D2D] my-1" />
-
-                    <Link 
-                      href="/delete-account"
-                      onClick={() => setIsSettingsOpen(false)}
-                      className="w-full text-left px-4 py-2 text-sm text-[#db4437] hover:bg-[#db4437]/10 transition-colors flex items-center gap-2"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">delete_forever</span>
-                      Excluir perfil ou tarefas
-                    </Link>
-
-                    <div className="h-[1px] bg-[#2D2D2D] my-1" />
 
                     <button 
+                      type="button"
                       onClick={handleLogout}
-                      className="w-full text-left px-4 py-2 text-sm text-[#E0E0E0] hover:bg-[#2D2D2D] hover:text-[#db4437] transition-colors flex items-center gap-2"
+                      className="w-full text-left px-4 py-2 text-xs text-rose-400 hover:bg-rose-500/10 transition-colors flex items-center gap-2.5 font-bold cursor-pointer mt-1"
                     >
                       <span className="material-symbols-outlined text-[18px]">logout</span>
-                      Sair
+                      <span>Sair</span>
                     </button>
                   </div>
-                )}
+                </div>
+              )}
             </div>
           ) : (
             <Link 
-              href="/aurtistic/login"
-              className="bg-[#FFCC00] text-[#121212] px-5 py-2 rounded-md text-sm font-bold hover:bg-[#e6b800] transition-colors"
+              href="/login"
+              className="bg-[var(--accent-secondary)] text-[var(--on-accent-secondary)] px-5 py-2 rounded-md text-sm font-bold hover:brightness-95 transition-colors"
             >
               Entrar
             </Link>
@@ -291,53 +464,103 @@ export default function AurtisticNavbar() {
       </div>
     </header>
 
-      {/* Mobile Bottom Floating Pill Nav */}
-      <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[99]">
-        <div className="bg-[#1A1A1A]/95 backdrop-blur-xl border border-[#2D2D2D] rounded-full p-2 flex items-center gap-1 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
-          {visibleTabs.map((key: string) => {
-            const tab = tabMetadata[key];
-            if (!tab) return null;
-            const isExternal = tab.href.startsWith('http://') || tab.href.startsWith('https://');
-            const isActive = pathname === tab.href;
+      {/* Mobile Bottom Floating Pill Nav (Enxuto & Agrupado) */}
+      <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[99]" data-tour="nav-tabs">
+        <div className="bg-surface/95 backdrop-blur-xl border border-border-subtle rounded-full p-1.5 flex items-center gap-1 shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
+          {/* 1. Tarefas */}
+          {hasTasks && (
+            <Link
+              href="/"
+              className={`flex items-center justify-center rounded-full transition-all duration-300 ease-out ${
+                pathname === '/'
+                  ? 'bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] px-4 py-2 gap-1.5'
+                  : 'text-fg-muted hover:text-fg px-3 py-2'
+              }`}
+              title="Tarefas"
+            >
+              <span className="material-symbols-outlined text-[20px]">task_alt</span>
+              {pathname === '/' && <span className="text-xs font-bold whitespace-nowrap">Tarefas</span>}
+            </Link>
+          )}
 
-            const tabIcons: Record<string, string> = {
-              tasks: 'task_alt',
-              resumo: 'home',
-              curriculo: 'contact_page',
-              portfolio: 'photo_camera',
-              extra: 'link'
-            };
-            const icon = tabIcons[key] || 'link';
+          {/* 2. Organizações & Servidor (Unificado) */}
+          {hasOrgsOrServer && (
+            <Link
+              href={orgsHref}
+              className={`flex items-center justify-center rounded-full transition-all duration-300 ease-out ${
+                isOrgsActive
+                  ? 'bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] px-4 py-2 gap-1.5'
+                  : 'text-fg-muted hover:text-fg px-3 py-2'
+              }`}
+              title={orgsLabel}
+            >
+              <span className="material-symbols-outlined text-[20px]">domain</span>
+              {isOrgsActive && (
+                <span className="text-xs font-bold whitespace-nowrap">Gestão</span>
+              )}
+            </Link>
+          )}
 
-            if (isExternal) {
-              return (
-                <a
-                  key={key}
-                  href={tab.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center rounded-full text-[#8E8E8E] hover:text-white px-3 py-2.5"
-                >
-                  <span className="material-symbols-outlined text-[22px]">{icon}</span>
-                </a>
-              );
-            }
+          {/* 3. Identidade (Portfólio / Currículo / Resumo) */}
+          {identityItems.length === 1 && (
+            <Link
+              href={identityItems[0].href}
+              className={`flex items-center justify-center rounded-full transition-all duration-300 ease-out ${
+                pathname === identityItems[0].href
+                  ? 'bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] px-4 py-2 gap-1.5'
+                  : 'text-fg-muted hover:text-fg px-3 py-2'
+              }`}
+              title={identityItems[0].name}
+            >
+              <span className="material-symbols-outlined text-[20px]">{identityItems[0].icon}</span>
+              {pathname === identityItems[0].href && (
+                <span className="text-xs font-bold whitespace-nowrap">{identityItems[0].name}</span>
+              )}
+            </Link>
+          )}
 
-            return (
-              <Link 
-                key={key}
-                href={tab.href}
-                className={`flex items-center justify-center rounded-full transition-all duration-300 ease-out ${
-                  isActive 
-                    ? 'bg-[#9D4EDD]/20 text-[#9D4EDD] px-5 py-2.5 gap-2' 
-                    : 'text-[#8E8E8E] hover:text-white px-3 py-2.5'
+          {identityItems.length > 1 && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsMobileIdentityOpen(!isMobileIdentityOpen)}
+                className={`flex items-center justify-center rounded-full transition-all duration-300 ease-out cursor-pointer ${
+                  isIdentityActive
+                    ? 'bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] px-4 py-2 gap-1.5'
+                    : 'text-fg-muted hover:text-fg px-3 py-2'
                 }`}
+                title="Identidade e Perfil"
               >
-                <span className="material-symbols-outlined text-[22px]">{icon}</span>
-                {isActive && <span className="text-xs font-bold whitespace-nowrap">{tab.name}</span>}
-              </Link>
-            );
-          })}
+                <span className="material-symbols-outlined text-[20px]">badge</span>
+                {isIdentityActive && (
+                  <span className="text-xs font-bold whitespace-nowrap">
+                    {identityItems.find((i) => i.href === pathname)?.name || 'Perfil'}
+                  </span>
+                )}
+              </button>
+
+              {isMobileIdentityOpen && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-48 bg-surface/95 backdrop-blur-xl border border-border-subtle rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col gap-1">
+                  {identityItems.map((item) => {
+                    const isItemActive = pathname === item.href;
+                    return (
+                      <Link
+                        key={item.key}
+                        href={item.href}
+                        onClick={() => setIsMobileIdentityOpen(false)}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-colors ${
+                          isItemActive ? 'bg-[var(--accent-primary)] text-white' : 'text-fg-secondary hover:bg-surface-hover hover:text-fg'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[16px]">{item.icon}</span>
+                        <span>{item.name}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </>

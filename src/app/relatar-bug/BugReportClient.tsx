@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 'use client';
 
 import { useState } from 'react';
@@ -49,23 +50,23 @@ export default function BugReportClient({ userEmail }: { userEmail: string }) {
   };
 
   return (
-    <div className="bg-[#1A1A1A] border border-[#2D2D2D] rounded-xl p-8 shadow-2xl">
+    <div className="bg-surface border border-border-subtle rounded-xl p-8 shadow-2xl">
       <div className="flex items-center gap-3 mb-4">
         <span className="material-symbols-outlined text-[32px] text-[#FFCC00]">bug_report</span>
-        <h1 className="text-2xl font-black text-white font-['Bukra'] tracking-tight">Relatar Bug / Feedback</h1>
+        <h1 className="text-2xl font-black text-fg font-['Bukra'] tracking-tight">Relatar Bug / Feedback</h1>
       </div>
       
-      <p className="text-[#A0A0A0] text-sm mb-8">
+      <p className="text-fg-secondary text-sm mb-8">
         Encontrou algum erro, tem alguma dúvida ou gostaria de sugerir uma nova funcionalidade? Descreva abaixo e a notificação será enviada diretamente aos desenvolvedores do Aurtistic.
       </p>
 
       <div className="space-y-6">
         <div>
-          <label className="block text-sm font-bold text-[#E0E0E0] mb-2">Qual é o tipo de relato?</label>
+          <label className="block text-sm font-bold text-fg-secondary mb-2">Qual é o tipo de relato?</label>
           <select 
             value={feedbackType} 
             onChange={e => setFeedbackType(e.target.value)}
-            className="w-full bg-[#252525] border border-[#333333] rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-[#FFCC00] transition-colors"
+            className="w-full bg-surface-hover border border-border-subtle rounded-lg px-4 py-3 text-fg text-sm focus:outline-none focus:border-[#FFCC00] transition-colors"
           >
             <option value="Bug">🐞 Relatar Erro / Bug</option>
             <option value="Sugestao">💡 Sugestão de Funcionalidade</option>
@@ -74,20 +75,20 @@ export default function BugReportClient({ userEmail }: { userEmail: string }) {
         </div>
 
         <div>
-          <label className="block text-sm font-bold text-[#E0E0E0] mb-2">Descrição Detalhada</label>
+          <label className="block text-sm font-bold text-fg-secondary mb-2">Descrição Detalhada</label>
           <textarea 
             value={feedbackDesc}
             onChange={e => setFeedbackDesc(e.target.value)}
             rows={6}
             placeholder="Descreva o que aconteceu em detalhes. Se for um bug, como podemos reproduzi-lo?"
-            className="w-full bg-[#252525] border border-[#333333] rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-[#FFCC00] custom-scrollbar transition-colors"
+            className="w-full bg-surface-hover border border-border-subtle rounded-lg px-4 py-3 text-fg text-sm focus:outline-none focus:border-[#FFCC00] custom-scrollbar transition-colors"
           />
         </div>
 
         <div className="pt-4 flex gap-4">
           <button
             onClick={() => router.back()}
-            className="flex-1 bg-[#2D2D2D] hover:bg-[#3D3D3D] text-white py-3 rounded-xl font-bold transition-colors"
+            className="flex-1 bg-surface-hover hover:bg-[#3D3D3D] text-fg py-3 rounded-xl font-bold transition-colors"
           >
             Voltar
           </button>

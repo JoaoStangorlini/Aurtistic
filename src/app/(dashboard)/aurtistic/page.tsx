@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 import { createClient } from '@/utils/supabase/server';
 import { getTaskColumns, getUserProfile } from '@/app/(dashboard)/actions';
 import { redirect } from 'next/navigation';
@@ -11,7 +12,7 @@ export default async function AurtisticPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/aurtistic/login');
+    redirect('/login');
   }
 
   // 1. Pessoal tasks
@@ -32,7 +33,7 @@ export default async function AurtisticPage() {
 
   if (pessoalError) {
     return (
-      <div className="h-full flex flex-col p-4 md:p-8 bg-[#121212]">
+      <div className="h-full flex flex-col p-4 md:p-8 bg-app">
         <div className="p-4 bg-[#93000a]/20 border border-[#93000a] text-[#ffdad6] rounded-md text-sm">
           Erro ao carregar tarefas: {pessoalError.message}
         </div>
@@ -83,7 +84,7 @@ export default async function AurtisticPage() {
   const profile = await getUserProfile();
 
   return (
-    <Suspense fallback={<div className="h-full bg-[#121212] flex items-center justify-center text-white">Carregando painel...</div>}>
+    <Suspense fallback={<div className="h-full bg-app flex items-center justify-center text-fg">Carregando painel...</div>}>
       <AurtisticWorkspaceClient
         initialProfile={profile}
         pessoalTasks={pessoalTasks || []}

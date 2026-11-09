@@ -1,3 +1,4 @@
+-- Este programa é um software livre (Licença AGPLv3)
 -- Extensões necessárias
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 

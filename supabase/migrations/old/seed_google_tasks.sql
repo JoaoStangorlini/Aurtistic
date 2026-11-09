@@ -1,3 +1,4 @@
+-- Este programa é um software livre (Licença AGPLv3)
 -- Seed Extra: Tarefas extraídas manualmente pelo subagente a partir do Google Tarefas
 
 -- 1. Minhas tarefas (PESSOAL)

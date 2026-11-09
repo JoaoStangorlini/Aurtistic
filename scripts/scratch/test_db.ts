@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });

@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 const fs = require('fs');
 let content = fs.readFileSync('src/app/configurar-notificacoes/NotificationsConfigClient.tsx', 'utf8');
 

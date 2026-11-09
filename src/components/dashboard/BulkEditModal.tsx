@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 'use client';
 
 import { useState } from 'react';
@@ -16,7 +17,7 @@ const CheckboxToggle = ({ field, label, isActive, onToggle }: { field: string, l
       onChange={() => onToggle(field)} 
       className="accent-[#9D4EDD] w-4 h-4 rounded-sm"
     />
-    <span className="text-xs text-[#8E8E8E] uppercase tracking-wider font-bold hover:text-white transition-colors">{label}</span>
+    <span className="text-xs text-fg-muted uppercase tracking-wider font-bold hover:text-fg transition-colors">{label}</span>
   </label>
 );
 
@@ -183,14 +184,14 @@ export function BulkEditModal({ isOpen, onClose, taskIds, tasks, onSuccess, uniq
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 p-4 pb-24 sm:pb-4">
-      <div className="bg-[#1A1A1A] border border-[#2D2D2D] rounded-lg shadow-xl w-full max-w-3xl max-h-[75vh] sm:max-h-[90vh] flex flex-col">
+      <div className="bg-surface border border-border-subtle rounded-lg shadow-xl w-full max-w-3xl max-h-[75vh] sm:max-h-[90vh] flex flex-col">
         
-        <div className="flex justify-between items-center p-6 border-b border-[#2D2D2D]">
+        <div className="flex justify-between items-center p-6 border-b border-border-subtle">
           <div>
             <h2 className="text-xl font-bold text-[#9D4EDD]">Edição em Massa</h2>
-            <p className="text-xs text-[#A0A0A0] mt-1">Alterando {taskIds.length} tarefas selecionadas. Marque os campos que deseja sobrescrever.</p>
+            <p className="text-xs text-fg-secondary mt-1">Alterando {taskIds.length} tarefas selecionadas. Marque os campos que deseja sobrescrever.</p>
           </div>
-          <button onClick={onClose} className="text-[#A0A0A0] hover:text-white">
+          <button onClick={onClose} className="text-fg-secondary hover:text-fg">
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
@@ -199,51 +200,51 @@ export function BulkEditModal({ isOpen, onClose, taskIds, tasks, onSuccess, uniq
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             
             {/* Status */}
-            <div className={`p-3 rounded-lg border transition-colors ${activeFields.status ? 'border-[#9D4EDD]/50 bg-[#9D4EDD]/5' : 'border-[#2D2D2D]'}`}>
+            <div className={`p-3 rounded-lg border transition-colors ${activeFields.status ? 'border-[#9D4EDD]/50 bg-[#9D4EDD]/5' : 'border-border-subtle'}`}>
               <CheckboxToggle field="status" label="Status" isActive={!!activeFields.status} onToggle={handleFieldToggle} />
               <CustomSelect name="status" value={formData.status || ''} onChange={handleChange} type="status" options={statusOptions} disabled={!activeFields.status} allowCustom={true} onEditColumn={columns.find(c => c.key === 'status') ? () => handleEditCol('status') : undefined} />
             </div>
 
             {/* Prioridade */}
-            <div className={`p-3 border rounded-md transition-colors ${activeFields.prioridade ? 'border-[#9D4EDD] bg-[#9D4EDD]/5' : 'border-[#2D2D2D]'}`}>
+            <div className={`p-3 border rounded-md transition-colors ${activeFields.prioridade ? 'border-[#9D4EDD] bg-[#9D4EDD]/5' : 'border-border-subtle'}`}>
               <CheckboxToggle field="prioridade" label="Prioridade" isActive={activeFields.prioridade} onToggle={handleFieldToggle} />
               <CustomSelect name="prioridade" value={formData.prioridade || ''} onChange={handleChange} type="prioridade" options={prioridadeOptions} disabled={!activeFields.prioridade} allowCustom={true} onEditColumn={columns.find(c => c.key === 'prioridade') ? () => handleEditCol('prioridade') : undefined} />
             </div>
 
             {/* Categoria */}
-            <div className={`p-3 border rounded-md transition-colors ${activeFields.categoria ? 'border-[#9D4EDD] bg-[#9D4EDD]/5' : 'border-[#2D2D2D]'}`}>
+            <div className={`p-3 border rounded-md transition-colors ${activeFields.categoria ? 'border-[#9D4EDD] bg-[#9D4EDD]/5' : 'border-border-subtle'}`}>
               <CheckboxToggle field="categoria" label="Categoria" isActive={activeFields.categoria} onToggle={handleFieldToggle} />
               <CustomSelect name="categoria" value={formData.categoria || ''} onChange={handleChange} type="categoria" options={categoriaOptions} allowCustom={true} disabled={!activeFields.categoria} onEditColumn={columns.find(c => c.key === 'categoria') ? () => handleEditCol('categoria') : undefined} />
             </div>
 
             {/* Responsável */}
-            <div className={`p-3 border rounded-md transition-colors ${activeFields.responsavel ? 'border-[#9D4EDD] bg-[#9D4EDD]/5' : 'border-[#2D2D2D]'}`}>
+            <div className={`p-3 border rounded-md transition-colors ${activeFields.responsavel ? 'border-[#9D4EDD] bg-[#9D4EDD]/5' : 'border-border-subtle'}`}>
               <CheckboxToggle field="responsavel" label="Responsável" isActive={activeFields.responsavel} onToggle={handleFieldToggle} />
               <CustomSelect name="responsavel" value={formData.responsavel || ''} onChange={handleChange} type="responsavel" options={responsavelOptions} disabled={!activeFields.responsavel} allowCustom={true} onEditColumn={columns.find(c => c.key === 'responsavel') ? () => handleEditCol('responsavel') : undefined} />
             </div>
 
             {/* Dimensão */}
-            <div className={`p-3 border rounded-md transition-colors ${activeFields.dimensao ? 'border-[#9D4EDD] bg-[#9D4EDD]/5' : 'border-[#2D2D2D]'}`}>
+            <div className={`p-3 border rounded-md transition-colors ${activeFields.dimensao ? 'border-[#9D4EDD] bg-[#9D4EDD]/5' : 'border-border-subtle'}`}>
               <CheckboxToggle field="dimensao" label="Dimensão" isActive={activeFields.dimensao} onToggle={handleFieldToggle} />
               <CustomSelect name="dimensao" value={formData.dimensao || ''} onChange={handleChange} type="dimensao" options={dimensaoOptions} allowCustom={true} disabled={!activeFields.dimensao} onEditColumn={columns.find(c => c.key === 'dimensao') ? () => handleEditCol('dimensao') : undefined} />
             </div>
 
             {/* Frequência */}
-            <div className={`p-3 rounded-lg border transition-colors ${activeFields.frequencia ? 'border-[#9D4EDD]/50 bg-[#9D4EDD]/5' : 'border-[#2D2D2D]'}`}>
+            <div className={`p-3 rounded-lg border transition-colors ${activeFields.frequencia ? 'border-[#9D4EDD]/50 bg-[#9D4EDD]/5' : 'border-border-subtle'}`}>
               <CheckboxToggle field="frequencia" label="Frequência" isActive={!!activeFields.frequencia} onToggle={handleFieldToggle} />
-              <input disabled={!activeFields.frequencia} placeholder="Ex: Diária, Semanal, Mensal" name="frequencia" value={formData.frequencia || ''} onChange={handleChange} className="w-full bg-[#121212] border border-[#2D2D2D] rounded-md px-4 py-2 text-white focus:outline-none focus:border-[#FFCC00] disabled:opacity-50" />
+              <input disabled={!activeFields.frequencia} placeholder="Ex: Diária, Semanal, Mensal" name="frequencia" value={formData.frequencia || ''} onChange={handleChange} className="w-full bg-app border border-border-subtle rounded-md px-4 py-2 text-fg focus:outline-none focus:border-[#FFCC00] disabled:opacity-50" />
             </div>
 
             {/* Início */}
-            <div className={`p-3 rounded-lg border transition-colors ${activeFields.inicio ? 'border-[#9D4EDD]/50 bg-[#9D4EDD]/5' : 'border-[#2D2D2D]'}`}>
+            <div className={`p-3 rounded-lg border transition-colors ${activeFields.inicio ? 'border-[#9D4EDD]/50 bg-[#9D4EDD]/5' : 'border-border-subtle'}`}>
               <CheckboxToggle field="inicio" label="Início" isActive={!!activeFields.inicio} onToggle={handleFieldToggle} />
-              <input disabled={!activeFields.inicio} type="date" name="inicio" value={formData.inicio || ''} onChange={handleChange} className="w-full bg-[#121212] border border-[#2D2D2D] rounded-md px-4 py-2 text-white focus:outline-none focus:border-[#FFCC00] [color-scheme:dark] disabled:opacity-50" />
+              <input disabled={!activeFields.inicio} type="date" name="inicio" value={formData.inicio || ''} onChange={handleChange} className="w-full bg-app border border-border-subtle rounded-md px-4 py-2 text-fg focus:outline-none focus:border-[#FFCC00] [color-scheme:dark] disabled:opacity-50" />
             </div>
 
             {/* Prazo */}
-            <div className={`p-3 rounded-lg border transition-colors ${activeFields.prazo ? 'border-[#9D4EDD]/50 bg-[#9D4EDD]/5' : 'border-[#2D2D2D]'}`}>
+            <div className={`p-3 rounded-lg border transition-colors ${activeFields.prazo ? 'border-[#9D4EDD]/50 bg-[#9D4EDD]/5' : 'border-border-subtle'}`}>
               <CheckboxToggle field="prazo" label="Prazo" isActive={!!activeFields.prazo} onToggle={handleFieldToggle} />
-              <input disabled={!activeFields.prazo} type="date" name="prazo" value={formData.prazo || ''} onChange={handleChange} className="w-full bg-[#121212] border border-[#2D2D2D] rounded-md px-4 py-2 text-white focus:outline-none focus:border-[#FFCC00] [color-scheme:dark] disabled:opacity-50" />
+              <input disabled={!activeFields.prazo} type="date" name="prazo" value={formData.prazo || ''} onChange={handleChange} className="w-full bg-app border border-border-subtle rounded-md px-4 py-2 text-fg focus:outline-none focus:border-[#FFCC00] [color-scheme:dark] disabled:opacity-50" />
             </div>
 
           </div>
@@ -261,8 +262,8 @@ export function BulkEditModal({ isOpen, onClose, taskIds, tasks, onSuccess, uniq
               <span className="material-symbols-outlined text-[18px]">delete</span>
               Excluir
             </button>
-            <button type="button" onClick={onClose} disabled={loading} className="px-6 py-2 border border-[#2D2D2D] text-white rounded-md hover:bg-[#252525] text-sm font-semibold transition-colors">Cancelar</button>
-            <button type="submit" disabled={loading} className="px-6 py-2 bg-[#9D4EDD] text-white rounded-md hover:bg-[#8338C7] text-sm font-bold transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2">
+            <button type="button" onClick={onClose} disabled={loading} className="px-6 py-2 border border-border-subtle text-fg rounded-md hover:bg-surface-hover text-sm font-semibold transition-colors">Cancelar</button>
+            <button type="submit" disabled={loading} className="px-6 py-2 bg-[var(--accent-primary)] text-white rounded-md hover:bg-[#8338C7] text-sm font-bold transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2">
               <span className="material-symbols-outlined text-[18px]">done_all</span>
               {loading ? 'Aplicando...' : 'Aplicar a Todas'}
             </button>

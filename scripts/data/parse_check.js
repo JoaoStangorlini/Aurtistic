@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 const fs = require('fs');
 const ts = require('typescript');
 const code = fs.readFileSync('src/components/dashboard/TasksView.tsx', 'utf8');

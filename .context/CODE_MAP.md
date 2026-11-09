@@ -1,0 +1,179 @@
+# 🗺️ Mapa Cirúrgico de Símbolos e Linhas (Auto-Gerado)
+> **Instrução ao Agente:** Use os números de linha `L<num>` abaixo para ler apenas o trecho necessário com `startLine` e `endLine`. NUNCA leia arquivos >120 linhas inteiros.
+
+- **`src/app/(dashboard)/actions.ts`** (830L): L15:updateTaskOrders | L32:saveTask | L143:deleteTask | L156:updateMultipleTasks | L206:deleteMultipleTasks | L222:getTaskColumns | L236:saveTaskColumn | L261:updateOptionNameCascade | L283:getUserProfile | L443:saveQuickLinks | L458:saveQuickPreferences | L479:saveUserProfileData | L503:updateNotificationConfig | L539:createEvent | L559:createEventsBatch | L582:updateEvent | L604:deleteEvent | L626:updateAdvancedConfig | L640:updateThemePreferencesAction | L672:updateModulesConfigAction | L715:getPortfolioAlbumZipUrlAction | L755:syncPortfolioAction
+- **`src/app/(dashboard)/aurtistic/actions.ts`** (168L): L8:loginAurtistic | L44:signupAurtistic | L93:logoutAurtistic | L100:deleteAurtisticProfile | L127:deleteAllTasks | L143:checkAurtisticUser
+- **`src/app/(dashboard)/aurtistic/curriculo/page.tsx`** (56L): L13:CurriculoPage
+- **`src/app/(dashboard)/aurtistic/delete-account/page.tsx`** (97L): L9:DeleteAccountPage
+- **`src/app/(dashboard)/aurtistic/page.tsx`** (103L): L10:AurtisticPage
+- **`src/app/(dashboard)/aurtistic/portfolio/page.tsx`** (58L): L14:PortfolioPage
+- **`src/app/(dashboard)/aurtistic/privacy-policy/page.tsx`** (81L): L4:PrivacyPolicyPage
+- **`src/app/(dashboard)/aurtistic/resumo/page.tsx`** (56L): L13:ResumoPage
+- **`src/app/(dashboard)/labdiv/page.tsx`** (310L): L16:LabDivPage
+- **`src/app/(dashboard)/loading.tsx`** (7L): L4:DashboardLoading
+- **`src/app/(dashboard)/organizacoes/actions.ts`** (818L): L35:getUserOrganizationsAction | L136:getOrganizationDetailsAction | L193:updateMemberCapacityAction | L214:createOrganizationInviteAction | L247:getOrganizationTaskTemplatesAction | L261:createOrganizationTaskTemplateAction | L291:convertMeetingAgendaItemToTaskAction | L379:applyPlaybookToTasksAction | L449:getOrganizationMeetingsAction | L467:createOrganizationMeetingAction | L504:getMeetingDetailsAction | L535:updateMeetingNotesAction | L587:submitMeetingReviewAction | L622:publishMeetingAtaAction | L648:createOrganizationAction | L688:getOrganizationInvitePreviewAction | L712:joinOrganizationByCodeAction | L781:getOrCreateActiveInviteAction
+- **`src/app/(dashboard)/organizacoes/page.tsx`** (9L): L5:OrganizacoesPage
+- **`src/app/(dashboard)/servidor/actions.ts`** (771L): L35:EcosystemLinksPatch | L54:syncUserFileIndexAction | L223:updateFileEcosystemLinksAction | L259:reconcileFolderIndexAction | L313:adminListStorageUsersAction | L333:adminUpdateGovernanceAction | L377:syncLegacyPortfolioCatalogAction | L472:refreshTenantTicketAction | L514:createShareLinkAction | L569:deleteShareLinkAction | L592:cascadeFolderUpdateAction | L673:updateStoragePublicSlugAction | L698:refreshOrganizationTicketAction | L725:requestEventQuotaBoostAction
+- **`src/app/(dashboard)/servidor/page.tsx`** (171L): L11:ServidorPage
+- **`src/app/[username]/SharedWorkspaceClient.tsx`** (246L): L21:SharedWorkspaceClient
+- **`src/app/[username]/page.tsx`** (92L): L16:SharedProfilePage
+- **`src/app/api/auth/hublabdiv/route.ts`** (91L): L9:GET | L42:POST
+- **`src/app/api/feedback/route.ts`** (53L): L5:POST
+- **`src/app/api/manifest/route.ts`** (39L): L5:GET
+- **`src/app/api/meetings/analyze/route.ts`** (92L): L6:POST
+- **`src/app/api/meetings/transcribe-chunk/route.ts`** (63L): L6:POST
+- **`src/app/auth/actions.ts`** (318L): L19:linkExistingAccountAction | L241:createAccountFromHubAction | L272:unlinkHubAccountAction
+- **`src/app/auth/callback/route.ts`** (60L): L6:GET
+- **`src/app/auth/hub-callback/route.ts`** (347L): L14:GET
+- **`src/app/auth/vincular-conta/page.tsx`** (203L): L12:VincularContaPage
+- **`src/app/configuracoes-avancadas/AdvancedConfigClient.tsx`** (516L): L38:AdvancedConfigClient
+- **`src/app/configuracoes-avancadas/page.tsx`** (79L): L9:ConfiguracoesAvancadasPage
+- **`src/app/configurar-notificacoes/NotificationsConfigClient.tsx`** (312L): L18:NotificationsConfigClient
+- **`src/app/configurar-notificacoes/page.tsx`** (69L): L9:ConfigurarNotificacoesPage
+- **`src/app/configurar-widget/WidgetConfigClient.tsx`** (553L): L10:ToggleButtons | L42:WidgetConfigClient
+- **`src/app/configurar-widget/page.tsx`** (32L): L8:ConfigurarWidgetPage
+- **`src/app/convite/[token]/page.tsx`** (33L): L8:InvitePage
+- **`src/app/curriculo/page.tsx`** (58L): L13:CurriculoPage
+- **`src/app/delete-account/page.tsx`** (209L): L11:DeleteAccountPage
+- **`src/app/exportar-importar/page.tsx`** (205L): L9:ExportImportPage
+- **`src/app/galeria/page.tsx`** (7L): L4:GaleriaPage
+- **`src/app/layout.tsx`** (147L): L36:RootLayout
+- **`src/app/loading.tsx`** (27L): L4:Loading
+- **`src/app/login/LoginForm.tsx`** (59L): L8:LoginForm
+- **`src/app/login/actions.ts`** (278L): L13:login | L86:signup | L173:getHubLabDivMembersAction | L199:loginHubMemberDirectAction
+- **`src/app/login/page.tsx`** (24L): L6:LoginPage
+- **`src/app/page.tsx`** (118L): L12:AurtisticPage
+- **`src/app/portfolio/[username]/page.tsx`** (94L): L16:PublicPortfolioPage
+- **`src/app/portfolio/page.tsx`** (58L): L14:PortfolioPage
+- **`src/app/privacy-policy/page.tsx`** (81L): L4:PrivacyPolicyPage
+- **`src/app/relatar-bug/BugReportClient.tsx`** (115L): L7:BugReportClient
+- **`src/app/relatar-bug/page.tsx`** (24L): L8:BugReportPage
+- **`src/app/resumo/page.tsx`** (57L): L13:ResumoPage
+- **`src/app/s/[token]/actions.ts`** (367L): L15:VerifySharePinResult | L29:SubmitProofingResult | L40:verifySharePinAction | L145:refreshShareTicketAction | L214:submitClientProofingAction | L302:getShareLinkZipUrlAction
+- **`src/app/s/[token]/page.tsx`** (140L): L16:generateMetadata | L40:ClientProofingPage | L116:ExpiredOrNotFoundView
+- **`src/app/sw.ts`** (40L): Sem exports diretos
+- **`src/components/GlobalHighlighter.tsx`** (65L): L7:GlobalHighlighter
+- **`src/components/Navbar.tsx`** (208L): L12:Navbar
+- **`src/components/auth/HubLinkCard.tsx`** (195L): L10:HubLinkCardProps | L15:HubLinkCard
+- **`src/components/auth/UnifiedAuthCard.tsx`** (243L): L10:UnifiedAuthCardProps | L17:UnifiedAuthCard
+- **`src/components/cuidados/EyeRest202020Overlay.tsx`** (125L): L6:EyeRest202020OverlayProps | L13:EyeRest202020Overlay
+- **`src/components/cuidados/SelfCareAlarmProvider.tsx`** (640L): L28:SelfCareAlarmContextType | L51:useSelfCareAlarms | L64:getSharedAudioContext | L98:synthesizeAudioTone | L151:SelfCareAlarmProvider
+- **`src/components/cuidados/SelfCareHub.tsx`** (793L): L8:getInitialNotificationState | L17:getStoredExpanded | L26:SelfCareHub
+- **`src/components/dashboard/AurtisticNavbar.tsx`** (570L): L17:AurtisticNavbar
+- **`src/components/dashboard/AurtisticQuickLinks.tsx`** (284L): L9:QuickLink | L17:getStoredExpanded | L26:AurtisticQuickLinks
+- **`src/components/dashboard/AurtisticWorkspaceClient.tsx`** (422L): L26:AurtisticWorkspaceClient
+- **`src/components/dashboard/Badge.tsx`** (97L): L6:getBadgeColorClass | L63:Badge
+- **`src/components/dashboard/BulkEditModal.tsx`** (276L): L12:CheckboxToggle | L36:BulkEditModal
+- **`src/components/dashboard/CreateTaskModal.tsx`** (174L): L25:CreateTaskModal
+- **`src/components/dashboard/CurriculoClient.tsx`** (889L): L12:CurriculoClientProps | L56:CurriculoClient
+- **`src/components/dashboard/CustomSelect.tsx`** (184L): L24:CustomSelect
+- **`src/components/dashboard/EventFormModal.tsx`** (282L): L23:EventFormModal
+- **`src/components/dashboard/Footer.tsx`** (21L): L2:Footer
+- **`src/components/dashboard/ImportICSModal.tsx`** (180L): L14:ImportICSModal
+- **`src/components/dashboard/OptionsEditorModal.tsx`** (213L): L14:OptionsEditorModal
+- **`src/components/dashboard/PortfolioClient.tsx`** (534L): L12:PortfolioClientProps | L29:PortfolioClient
+- **`src/components/dashboard/QuickLinks.tsx`** (180L): L5:HubIcon | L6:NotionIcon | L7:DriveIcon | L8:DiscordIcon | L9:ClarityIcon | L10:SupabaseIcon | L11:CloudinaryIcon | L12:VercelIcon | L13:CanvaIcon | L14:GlobeIcon | L16:SystemLinkDef | L80:CopyableQuickLink | L164:QuickLinks
+- **`src/components/dashboard/ResumoClient.tsx`** (585L): L20:ResumoClientProps | L28:ResumoClient
+- **`src/components/dashboard/TaskBoard.tsx`** (117L): L25:TaskBoard
+- **`src/components/dashboard/TaskCalendar.tsx`** (323L): L16:TaskCalendar
+- **`src/components/dashboard/TaskFormModal.tsx`** (977L): L34:TaskFormModal
+- **`src/components/dashboard/TasksView.tsx`** (3027L): L38:WidgetPluginPlugin | L45:formatDate | L51:getDaysUntil | L67:getStatusWeight | L77:getPriorityWeight | L85:HighlightedText | L103:TasksView
+- **`src/components/dashboard/WidgetPreviews.tsx`** (724L): L4:WidgetTasksPreview | L74:WidgetCalendarPreview | L248:WidgetWeeklyCalendarPreview | L445:WidgetGlobalPreview
+- **`src/components/media/AurtisticMediaContext.tsx`** (590L): L19:MediaTrack | L31:InPlaceNoteState | L39:InPlacePreviewState | L49:AurtisticMediaContextType | L110:useAurtisticMedia | L118:AurtisticMediaProviderProps | L125:AurtisticMediaProvider
+- **`src/components/media/GlobalAudioDock.tsx`** (233L): L7:formatTime | L14:GlobalAudioDock
+- **`src/components/media/InPlaceFilePreviewModal.tsx`** (159L): L8:InPlaceFilePreviewModalProps | L20:InPlaceFilePreviewModal
+- **`src/components/onboarding/CoachMarksOverlay.tsx`** (314L): L16:CoachMarksOverlay
+- **`src/components/onboarding/CoachMarksProvider.tsx`** (138L): L33:CoachMarksProvider | L131:useCoachMarks
+- **`src/components/onboarding/FirstTimeOnboardingModal.tsx`** (505L): L22:evaluateOnboardingTrigger | L40:getInitialOnboardingOpen | L44:FirstTimeOnboardingModal
+- **`src/components/organizacoes/CreateOrganizationModal.tsx`** (173L): L8:CreateOrganizationModalProps | L14:CreateOrganizationModal
+- **`src/components/organizacoes/InviteAcceptClient.tsx`** (177L): L11:InviteAcceptClientProps | L18:InviteAcceptClient
+- **`src/components/organizacoes/JoinOrganizationModal.tsx`** (252L): L11:JoinOrganizationModalProps | L17:JoinOrganizationModal
+- **`src/components/organizacoes/LabDivWorkspaceClient.tsx`** (402L): L29:LabDivWorkspaceClientProps | L46:LabDivWorkspaceClient
+- **`src/components/organizacoes/LiveMeetingSplitWorkspace.tsx`** (617L): L15:LiveMeetingSplitWorkspaceProps | L23:LiveMeetingSplitWorkspace
+- **`src/components/organizacoes/MeetingReviewApprovalModal.tsx`** (228L): L15:MeetingReviewApprovalModalProps | L23:MeetingReviewApprovalModal
+- **`src/components/organizacoes/MemberCapacityQuickSelector.tsx`** (150L): L9:MemberCapacityQuickSelectorProps | L16:MemberCapacityQuickSelector
+- **`src/components/organizacoes/OrganizationManagementView.tsx`** (348L): L25:OrganizationManagementViewProps | L37:OrganizationManagementView
+- **`src/components/organizacoes/OrganizationPlaybooksModal.tsx`** (271L): L16:OrganizationPlaybooksModalProps | L24:OrganizationPlaybooksModal
+- **`src/components/organizacoes/OrganizationScopeToolbar.tsx`** (231L): L10:OrganizationScopeToolbarProps | L22:OrganizationScopeToolbar
+- **`src/components/organizacoes/TeamProgressPanel.tsx`** (250L): L13:TeamProgressPanelProps | L24:TeamProgressPanel
+- **`src/components/organizacoes/When2MeetSchedulerGrid.tsx`** (232L): L10:When2MeetSchedulerGridProps | L21:When2MeetSchedulerGrid
+- **`src/components/portfolio/AurtisticGalleryGrid.tsx`** (878L): L13:AurtisticGalleryGridProps | L75:AurtisticGalleryGrid
+- **`src/components/portfolio/PhotoInspectModal.tsx`** (463L): L10:PhotoInspectItem | L16:PhotoInspectModalProps | L26:PhotoInspectModal
+- **`src/components/servidor/AdminQuotaGovernancePanel.tsx`** (628L): L18:AdminQuotaGovernancePanelProps | L24:AdminQuotaGovernancePanel
+- **`src/components/servidor/FileEcosystemMenu.tsx`** (335L): L8:FileEcosystemMenuProps | L17:FileEcosystemMenu
+- **`src/components/servidor/NoteEditorDrawer.tsx`** (229L): L9:NoteEditorDrawerProps | L21:NoteEditorDrawer
+- **`src/components/servidor/PinLockModal.tsx`** (189L): L7:PinLockModalProps | L18:PinLockModal
+- **`src/components/servidor/StorageQuotaCard.tsx`** (197L): L8:StorageQuotaCardProps | L23:StorageQuotaCard
+- **`src/components/servidor/UserVaultWorkspace.tsx`** (3571L): L63:UserOrganizationVaultOption | L76:UserVaultWorkspaceProps | L93:getInitialVaultLayout | L102:getInitialPreviewOpen | L113:UserVaultWorkspace
+- **`src/components/servidor/VaultActionDialog.tsx`** (180L): L6:VaultActionDialogProps | L20:VaultActionDialogContent | L171:VaultActionDialog
+- **`src/components/servidor/VaultContextMenu.tsx`** (743L): L7:FolderCustomMeta | L42:VaultContextMenuProps | L79:VaultContextMenu
+- **`src/components/servidor/VaultIdeTreeSidebar.tsx`** (599L): L8:VaultIdeTreeSidebarProps | L33:getFileIcon | L52:getIconColor | L72:TreeFileNode | L117:TreeFolderNode | L268:VaultIdeTreeSidebar
+- **`src/components/servidor/VaultIdeWorkbench.tsx`** (780L): L10:VaultIdeWorkbenchProps | L26:VaultIdeWorkbench
+- **`src/components/servidor/VaultPreviewPanel.tsx`** (617L): L10:VaultPreviewPanelProps | L23:VaultPreviewPanel
+- **`src/components/servidor/VaultUploadManagerModal.tsx`** (988L): L16:QueuedUploadItem | L26:VaultUploadManagerModalProps | L41:formatBytes | L49:getFileIcon | L82:VaultUploadManagerModal
+- **`src/components/share/ClientProofingView.tsx`** (825L): L14:ProofingPhotoItem | L20:ClientProofingViewProps | L36:ClientProofingView
+- **`src/components/tarefas/TaskFilePickerModal.tsx`** (791L): L20:TaskFilePickerModalProps | L33:TaskFilePickerModal
+- **`src/components/theme/ThemeDropdownSection.tsx`** (98L): L8:ThemeDropdownSection
+- **`src/components/theme/ThemeProvider.tsx`** (247L): L38:getInitialPreferences | L70:resolveSystemLuminance | L75:ThemeProvider | L214:useTheme | L232:ThemedTopLoader
+- **`src/components/theme/ThemedAurtisticLogo.tsx`** (160L): L9:ThemedAurtisticLogoProps | L22:ThemedAurtisticLogo
+- **`src/hooks/useBackgroundSpeechTranscription.ts`** (182L): L7:UseBackgroundSpeechTranscriptionOptions | L14:useBackgroundSpeechTranscription
+- **`src/hooks/useEdgeUpload.ts`** (82L): L8:UseEdgeUploadOptions | L15:useEdgeUpload
+- **`src/hooks/useTenantTicketRefresh.ts`** (71L): L9:useTenantTicketRefresh
+- **`src/lib/coach-marks-steps.ts`** (489L): L3:CoachMarkStep | L12:CoachMarksTour | L451:getCoachMarksForPathname
+- **`src/lib/edge-client.ts`** (365L): L13:TenantDirectoryListingResponse | L29:fetchTenantDirectory | L89:computeUnindexedDiskEntries | L102:uploadTenantFileDirect | L163:saveTenantNoteDirect | L191:readTenantNoteDirect | L215:createTenantFolderDirect | L241:renameOrMoveTenantEntryDirect | L267:deleteTenantEntryDirect | L291:fetchTenantTrashDirect | L308:restoreTenantTrashItemDirect | L329:emptyTenantTrashDirect | L348:fetchEdgeTelemetryDirect
+- **`src/lib/edge-ticket.ts`** (429L): L22:IssuedUserStorageSession | L36:issueUserStorageSession | L124:IssuedOrganizationStorageSession | L139:issueOrganizationVaultSession | L215:computeEffectiveQuotaBytes | L250:getEdgeStorageServerUrl | L258:resolveEdgeHmacSecret | L280:SignEdgeTicketOptions | L298:signEdgeTenantTicket | L374:attachSignedPublicMediaUrls
+- **`src/lib/edge-urls.ts`** (70L): L6:resolveClientEdgeServerUrl | L14:buildTenantStreamUrl | L30:buildTenantThumbUrl | L46:buildTenantZipUrl | L62:formatStorageBytes
+- **`src/lib/file-upload-helpers.ts`** (306L): L6:UploadItem | L30:readAllDirectoryEntries | L65:traverseEntryRecursive | L105:extractFilesFromDataTransfer | L172:extractFilesFromFileList | L194:resolveItemTargetFolder | L216:getMimeTypeFromFilename | L263:extractFilesFromZip
+- **`src/lib/hub-sso.ts`** (128L): L5:HubSsoPayload | L19:HubConnectionData | L37:signHubSsoTicket | L59:verifyHubSsoTicket | L99:encryptLinkSecret | L112:decryptLinkSecret
+- **`src/lib/modules-config.ts`** (132L): L2:ModulesConfig | L24:ModulePreset | L110:getInitialModulesConfig
+- **`src/lib/notifications.ts`** (130L): L17:syncTaskNotifications
+- **`src/lib/offlineActions.ts`** (61L): L6:saveTask | L19:deleteTask | L32:updateMultipleTasks | L47:deleteMultipleTasks
+- **`src/lib/offlineSync.ts`** (175L): L11:MutationType | L13:MutationAction | L47:saveTasksToCache | L74:pushMutation | L110:removeMutation | L124:saveProfileToCache | L151:saveLinksToCache
+- **`src/lib/pin-rate-limit.ts`** (58L): L17:checkPinRateLimit | L37:recordPinFailure | L53:resetPinAttempts
+- **`src/lib/pin-scrypt.ts`** (64L): L14:hashShareOrFolderPin | L32:verifyShareOrFolderPin
+- **`src/lib/portfolio-catalog.ts`** (192L): L10:EnsurePortfolioCatalogOptions | L23:ensurePortfolioCatalogLoaded
+- **`src/lib/self-care-config.ts`** (194L): L4:SelfCarePillarKey | L13:SelfCareSound | L15:SelfCareAlarmConfig | L33:SelfCareDailyLog | L128:getTodayKey | L133:getCurrentHHMM | L138:loadSelfCareConfigs | L154:saveSelfCareConfigs | L161:loadDailySelfCareLog | L188:saveDailySelfCareLog
+- **`src/lib/supabase/client.ts`** (10L): L4:createClient
+- **`src/lib/supabase/server.ts`** (30L): L5:createClient
+- **`src/lib/theme-config.ts`** (165L): L3:ThemeMode | L4:ResolvedThemeMode | L5:ThemePaletteId | L12:ThemePreferences | L17:PaletteDefinition | L162:buildThemeInitScript
+- **`src/lib/validators.ts`** (136L): L5:ValidationResult | L21:isUuid | L29:sanitizeRelativeTenantPath | L79:sanitizeSafeFilename | L100:validateNumericPin | L111:validatePublicSlug | L125:validateShareToken
+- **`src/proxy.ts`** (21L): L5:proxy
+- **`src/types/index.ts`** (70L): L2:TaskColumnOption | L9:TaskColumn | L19:Task | L45:HorarioSemanal | L50:AgendaEvent
+- **`src/types/organizations.ts`** (149L): L4:OrgRole | L5:CognitiveCapacity | L6:MeetingStatus | L7:MeetingReviewStatus | L8:ReviewDecision | L10:AgendaItem | L18:Organization | L35:OrganizationSubteam | L44:OrganizationMember | L63:OrganizationInvite | L80:OrganizationTaskTemplate | L90:OrganizationMeeting | L122:OrganizationMeetingAvailability | L132:OrganizationMeetingPersonalNote | L141:OrganizationMeetingReview
+- **`src/types/portfolio.ts`** (48L): L5:PortfolioMediaArtwork | L26:CurriculumVerifiedDocument | L40:PublicCreatorResolvedProfile
+- **`src/types/storage.ts`** (208L): L3:StorageRole | L4:StorageApprovalStatus | L5:TicketPurpose | L6:ShareMode | L7:ItemVisibility | L9:StorageGlobalSettings | L17:UserStoragePreferences | L22:UserStorageProfile | L42:EdgeTenantTicketPayload | L60:SignedEdgeTicket | L71:ExifMetadata | L92:EdgeVaultEntry | L108:EdgeMutationResponse | L116:EdgeTrashItem | L126:EdgeTelemetrySnapshot | L142:UserFileIndexRow | L172:ShareLinkRow | L192:AdminStorageUserSummary
+- **`src/utils/csv.ts`** (228L): L4:escapeCSV | L13:downloadCSV | L51:parseTasksFromCSV | L101:parseCSVString | L151:downloadEventsCSV | L183:parseEventsFromCSV
+- **`src/utils/ics.ts`** (214L): L5:generateUID | L29:generateICSFile | L76:downloadICS | L90:ParsedICSEvent | L165:computeUserBusyIntervals
+- **`src/utils/supabase/client.ts`** (10L): L4:createClient
+- **`src/utils/supabase/middleware.ts`** (53L): L5:updateSession
+- **`src/utils/supabase/server.ts`** (38L): L5:createClient
+- **`servidor/lib/atomic-store.js`** (71L): L22:atomicWriteFile
+- **`servidor/lib/deduplicator.js`** (121L): L15:computeFileHash | L28:scanFilesBySize | L63:findDuplicates
+- **`servidor/lib/pin-vault.js`** (57L): L17:hashPin | L38:verifyPin
+- **`servidor/lib/search-engine.js`** (113L): L16:searchCatalogItems
+- **`servidor/lib/share-manager.js`** (217L): Sem exports diretos
+- **`servidor/lib/shortcut-manager.js`** (199L): L17:createVirtualShortcut | L106:removeVirtualShortcut | L123:syncShortcutsCascade | L149:mergeShortcutsAfterScan | L177:normalizeFolderScopeKey
+- **`servidor/lib/trash-manager.js`** (252L): Sem exports diretos
+- **`servidor/lib/webdav-server.js`** (258L): L26:toRfc1123Date | L30:escapeXml
+- **`servidor/lib/zip-exporter.js`** (151L): L32:collectFiles | L69:streamDirectoryAsZip
+- **`servidor/server.js`** (7954L): L53:resolveActiveStorageDir | L124:refreshStorageDir | L136:isExternalStorageMounted | L156:resolvePortfolioDir | L180:isPortfolioRelatedRelPath | L281:getMimeType | L286:classifyFileKind | L297:sanitizeFilename | L303:sanitizeAlbumName | L315:sanitizeSubalbumPath | L332:moveFileSafe | L346:moveDirectoryContentsRecursive | L363:renameDirectorySafeFAT32 | L395:resolveSafeChildPath | L414:timingSafeMatch | L421:parseCookies | L439:createSessionToken | L447:verifySessionToken | L458:isRequestAuthenticatedAdmin | L480:getClientIp | L494:checkLoginRateLimit | L511:recordLoginFailure | L557:readImageDimensionsAndOrientation | L746:acquireThumbWorker | L754:releaseThumbWorker | L763:generateThumbnailWebP | L821:isLocalhostDevMode | L986:loadThumbSigIndex | L999:persistThumbSigIndex | L1008:migrateThumbCacheKey | L1028:normalizeLayoutSettings | L1059:normalizeItemVisualProps | L1108:sortAlbumsByOrder | L1124:getMockCatalog | L1187:buildMockSvg | L1261:normalizeCatalogShape | L1332:syncPortfolioFromDiskAsync | L1596:portfolioThumbCachePath | L1601:hasCachedPortfolioThumb | L1605:scheduleThumbPregeneration | L1617:runThumbPregeneration | L1652:checkUsbMountFromProcMounts | L1668:startSmartHotplugMonitor | L1688:initCatalogStore | L1766:persistCatalog | L1806:adjustZoneStats | L1814:scanDirectoryRecursiveAsync | L1844:recalculateAllZonesAsync | L1877:formatCommercialDiskSize | L1895:saveDiskCapacitySnapshot | L1904:getRealMemInfo | L1950:getDiskCapacitySync | L2017:streamFileWithRange | L2184:requireHubOrAdmin | L2189:requireAdminSession | L2295:POST /api/admin/remote-deploy | L2441:POST /api/upload | L2467:DELETE /api/media/:filename | L2484:GET /api/auth/me | L2491:POST /api/auth/login | L2526:POST /api/auth/logout | L2539:fetchRemoteCatalogFallback | L2564:GET /api/portfolio | L2595:POST /api/portfolio/sync | L2615:POST /api/portfolio/reset | L2630:generatePhotoPlaceholderSvg | L2664:acquireContentReader | L2672:releaseContentReader | L2682:USE /portfolio-media/thumb | L2854:GET /portfolio-media/mock/:type/:id | L2895:USE /portfolio-media/content | L3108:migrateCatalogFolderPrefix | L3247:POST /api/portfolio/folder/rename | L3359:POST /api/portfolio/items/move | L3459:POST /api/portfolio/folder/move | L3561:PUT /api/portfolio/layout | L3852:POST /api/portfolio/shortcuts | L3873:DELETE /api/portfolio/shortcuts | L3889:GET /api/search | L3899:POST /api/portfolio/items/feature | L4028:DELETE /api/portfolio/item/:id | L4101:discoverConnectedDrives | L4198:resolveDriveRoot | L4208:GET /api/vault/drives | L4238:resolveVaultLogicalPath | L4273:buildPortfolioVirtualDirectoryTree | L4291:GET /api/vault/tree | L4474:GET /api/vault/list | L4676:GET /api/vault/thumb | L4755:POST /api/vault/folder | L4775:POST /api/vault/move | L4848:POST /api/vault/upload | L4874:GET /api/vault/stream | L4942:DELETE /api/vault/entry | L4986:GET /api/trash/list | L4995:POST /api/trash/restore | L5009:DELETE /api/trash/purge | L5020:DELETE /api/trash/empty | L5032:GET /api/duplicates | L5041:POST /api/duplicates/convert-shortcut | L5074:POST /api/vault/pin/set | L5115:POST /api/vault/pin/unlock | L5143:POST /api/vault/pin/lock | L5159:GET /api/vault/pin/status | L5174:POST /api/vault/pin/setup | L5210:GET /api/vault/read-text | L5245:POST /api/vault/save-text | L5264:GET /api/network/info | L5288:POST /api/vault/create-txt | L5334:POST /api/shares/create | L5357:GET /api/shares/list | L5366:DELETE /api/shares/:id | L5375:GET /s/:token | L5379:GET /api/shares/:token/meta | L5436:POST /api/shares/:token/feedback | L5469:POST /api/shares/:token/upload | L5510:GET /api/export/zip | L5560:POST /api/portfolio/settings | L5573:POST /api/portfolio/folder-inclusion | L5598:POST /api/vault/curate | L5680:POST /api/vault/meta | L5795:resolvePortfolioItemDiskFile | L5835:collectFolderFiles | L5944:GET /api/vault/folder-manifest | L6057:buildTelemetryPayload | L6214:GET /api/server/telemetry | L6219:GET /api/admin/usb-diag | L6255:POST /api/server/telemetry/recalculate | L6260:GET /api/hub-media/list | L6310:POST /api/hub-media/upload | L6323:DELETE /api/hub-media/:filename | L6343:readBetaListSafe | L6356:writeBetaListSafe | L6369:POST /api/beta-signup | L6398:GET /api/admin/beta-signups | L6433:persistTenantFolderPins | L6439:resolveTenantHmacSecret | L6451:normalizeTenantRelPath | L6475:ensureTenantRootProvisioned | L6495:resolveTenantSafePath | L6527:resolveTenantListingDirs | L6562:computeDirectoryBytesRecursive | L6586:getTenantUsedBytes | L6622:adjustTenantUsedBytes | L6629:classifyTenantEntryKind | L6638:getTenantFolderPinRecord | L6646:isTenantPathPinProtected | L6660:assertFolderPinUnlockedIfRequired | L6673:assertPublicMediaPathAllowed | L6701:buildTenantEntryDescriptorAsync | L6747:verifyTenantTicket | L6852:resolveExistingPrebuiltThumbnail | L6924:GET /api/tenant/list | L7072:GET /api/tenant/stream | L7097:GET /api/tenant/thumb | L7151:GET /api/tenant/note | L7178:POST /api/tenant/note | L7356:POST /api/tenant/folder | L7394:POST /api/tenant/rename | L7452:getTenantTrashDirAndManifest | L7458:readTenantTrashManifest | L7469:writeTenantTrashManifest | L7475:DELETE /api/tenant/entry | L7559:GET /api/tenant/trash | L7572:POST /api/tenant/trash/restore | L7627:DELETE /api/tenant/trash | L7664:POST /api/tenant/pin/set | L7694:POST /api/tenant/pin/verify | L7732:DELETE /api/tenant/pin | L7757:GET /api/tenant/zip | L7800:GET /api/tenant/legacy-catalog-export | L7859:GET /api/tenant/telemetry | L7921:GET /
+- **`supabase/migrations/in SUPA/01_aurtistic_unified_ecosystem.sql`** (605L): L17:public.storage_global_settings | L30:public.user_storage_profiles | L51:public.user_files_index | L80:public.share_links | L111:public.escape_like_pattern | L116:public.set_aurtistic_ecosystem_updated_at | L125:trg_user_storage_profiles_updated_at | L130:trg_user_files_index_updated_at | L135:public.protect_storage_profile_privileges | L155:trg_protect_storage_profile_privileges | L159:public.cleanup_deleted_task_from_file_index | L172:trg_cleanup_deleted_task_files | L213:public.handle_new_user_storage_profile | L242:on_auth_user_created_storage | L290:public.sync_user_storage_used_bytes | L300:public.delete_user_file_cascade | L318:public.cascade_rename_user_files_index | L350:public.resolve_public_creator_profile | L377:public.admin_list_storage_users | L405:public.admin_update_user_storage_governance | L450:public.get_share_link_by_token_internal | L457:public.get_share_link_files_by_token | L487:public.submit_client_proofing_selection
+- **`supabase/migrations/in SUPA/01_create_events.sql`** (27L): L4:public.events
+- **`supabase/migrations/in SUPA/05_check_user.sql`** (14L): L3:public.check_user_exists
+- **`supabase/migrations/in SUPA/06_multi_organizations_v4_complete.sql`** (949L): L11:public.organizations | L28:public.organization_subteams | L38:public.organization_members | L60:public.organization_invites | L76:public.organization_task_templates | L90:public.organization_meetings | L116:public.organization_meeting_availability | L127:public.organization_meeting_personal_notes | L137:public.organization_meeting_process_notes | L147:public.organization_meeting_reviews | L209:public.is_org_member | L223:public.is_org_admin | L238:public.can_write_org_vault | L253:public.update_my_member_capacity | L288:public.recalc_org_vault_used_bytes | L312:public.inherit_task_subteam_from_member | L337:trg_inherit_task_subteam | L343:public.protect_meeting_review_publication | L378:trg_protect_meeting_review_publication | L616:public.get_organization_invite_preview | L670:public.accept_organization_invite | L761:public.create_new_organization
+- **`supabase/migrations/in SUPA/07_atomic_cascades_and_auth_provisioning.sql`** (417L): L11:public.delete_user_file_cascade | L112:public.cascade_rename_user_files_index | L228:public.handle_auth_user_provisioning | L333:on_auth_user_created_provisioning | L342:public.link_hublabdiv_member
+- **`supabase/migrations/in SUPA/1_dynamic_columns.sql`** (84L): L4:public.task_columns
+- **`supabase/migrations/in SUPA/2_aurtistic_planner.sql`** (42L): L4:public.user_profiles
+- **`supabase/migrations/in SUPA/tabela inicial.sql`** (324L): L9:tasks
+- **`supabase/migrations/newsqls/01_aurtistic_unified_ecosystem.sql`** (605L): L17:public.storage_global_settings | L30:public.user_storage_profiles | L51:public.user_files_index | L80:public.share_links | L111:public.escape_like_pattern | L116:public.set_aurtistic_ecosystem_updated_at | L125:trg_user_storage_profiles_updated_at | L130:trg_user_files_index_updated_at | L135:public.protect_storage_profile_privileges | L155:trg_protect_storage_profile_privileges | L159:public.cleanup_deleted_task_from_file_index | L172:trg_cleanup_deleted_task_files | L213:public.handle_new_user_storage_profile | L242:on_auth_user_created_storage | L290:public.sync_user_storage_used_bytes | L300:public.delete_user_file_cascade | L318:public.cascade_rename_user_files_index | L350:public.resolve_public_creator_profile | L377:public.admin_list_storage_users | L405:public.admin_update_user_storage_governance | L450:public.get_share_link_by_token_internal | L457:public.get_share_link_files_by_token | L487:public.submit_client_proofing_selection
+- **`supabase/migrations/newsqls/01_create_events.sql`** (27L): L4:public.events
+- **`supabase/migrations/newsqls/05_check_user.sql`** (14L): L3:public.check_user_exists
+- **`supabase/migrations/newsqls/06_multi_organizations_v4_complete.sql`** (949L): L11:public.organizations | L28:public.organization_subteams | L38:public.organization_members | L60:public.organization_invites | L76:public.organization_task_templates | L90:public.organization_meetings | L116:public.organization_meeting_availability | L127:public.organization_meeting_personal_notes | L137:public.organization_meeting_process_notes | L147:public.organization_meeting_reviews | L209:public.is_org_member | L223:public.is_org_admin | L238:public.can_write_org_vault | L253:public.update_my_member_capacity | L288:public.recalc_org_vault_used_bytes | L312:public.inherit_task_subteam_from_member | L337:trg_inherit_task_subteam | L343:public.protect_meeting_review_publication | L378:trg_protect_meeting_review_publication | L616:public.get_organization_invite_preview | L670:public.accept_organization_invite | L761:public.create_new_organization
+- **`supabase/migrations/newsqls/07_atomic_cascades_and_auth_provisioning.sql`** (417L): L11:public.delete_user_file_cascade | L112:public.cascade_rename_user_files_index | L228:public.handle_auth_user_provisioning | L333:on_auth_user_created_provisioning | L342:public.link_hublabdiv_member
+- **`supabase/migrations/newsqls/1_dynamic_columns.sql`** (84L): L4:public.task_columns
+- **`supabase/migrations/newsqls/2_aurtistic_planner.sql`** (42L): L4:public.user_profiles
+- **`supabase/migrations/newsqls/tabela inicial.sql`** (324L): L9:tasks
+- **`supabase/migrations/old/notion.sql`** (84L): Sem exports diretos
+- **`supabase/migrations/old/schema.sql`** (70L): L10:tasks | L25:time_slots
+- **`supabase/migrations/old/seed_google_tasks.sql`** (81L): Sem exports diretos
+- **`supabase/migrations/old/tasks.sql`** (192L): L7:tasks

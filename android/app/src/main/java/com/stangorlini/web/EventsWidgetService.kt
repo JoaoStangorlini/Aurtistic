@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 package com.stangorlini.web
 
 import android.content.Context
@@ -76,7 +77,7 @@ class EventsWidgetFactory(private val context: Context, private val intent: Inte
         val text = dimensionName.lowercase().trim()
         return when {
             text.contains("usp") -> Pair(R.drawable.widget_item_bg_usp, "#404DA8FF")
-            text.contains("hub") -> Pair(R.drawable.widget_item_bg_hub, "#409D4EDD")
+            text.contains("hub") || text.contains("labdiv") -> Pair(R.drawable.widget_item_bg_hub, "#409D4EDD")
             text.contains("urgente") -> Pair(R.drawable.widget_item_bg_urgente, "#40F14343")
             text.contains("livros") -> Pair(R.drawable.widget_item_bg_livros, "#40FFCC00")
             text.contains("filmes") || text.contains("series") || text.contains("séries") -> Pair(R.drawable.widget_item_bg_filmes, "#40FFE066")
@@ -212,9 +213,20 @@ class EventsWidgetFactory(private val context: Context, private val intent: Inte
                     val dataInicio = event.optString("data_inicio", "")
                     var timeText = "Dia inteiro"
                     if (dataInicio.contains("T")) {
-                        val parts = dataInicio.replace("Z", "").split("T")
-                        val timeParts = parts[1].split(":")
-                        if (timeParts.size >= 2) timeText = "${timeParts[0]}:${timeParts[1]}"
+                        try {
+                            val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+                            sdf.timeZone = TimeZone.getTimeZone("UTC")
+                            val parsedDate = sdf.parse(dataInicio)
+                            if (parsedDate != null) {
+                                val localFmt = SimpleDateFormat("HH:mm", Locale("pt", "BR"))
+                                localFmt.timeZone = TimeZone.getTimeZone("America/Sao_Paulo")
+                                timeText = localFmt.format(parsedDate)
+                            }
+                        } catch (e: Exception) {
+                            val parts = dataInicio.replace("Z", "").split("T")
+                            val timeParts = parts[1].split(":")
+                            if (timeParts.size >= 2) timeText = "${timeParts[0]}:${timeParts[1]}"
+                        }
                     }
                     views.setTextViewText(R.id.event_time, timeText)
                     return views

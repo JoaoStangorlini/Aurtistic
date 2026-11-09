@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 import { createClient } from '@/utils/supabase/server';
 import { getUserProfile } from '@/app/(dashboard)/actions';
 import { redirect } from 'next/navigation';
@@ -10,14 +11,14 @@ export default async function ConfigurarNotificacoesPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/aurtistic/login');
+    redirect('/login');
   }
 
   const profile = await getUserProfile();
   
   if (!profile) {
     return (
-      <div className="h-full flex flex-col items-center justify-center p-8 bg-[#121212] text-white">
+      <div className="h-full flex flex-col items-center justify-center p-8 bg-app text-fg">
         Perfil não encontrado.
       </div>
     );
@@ -46,13 +47,13 @@ export default async function ConfigurarNotificacoesPage() {
   const userTasks = tasksData || [];
 
   return (
-    <div className="min-h-full bg-[#121212] text-white p-4 md:p-8">
+    <div className="min-h-full bg-app text-fg p-4 md:p-8">
       <div className="max-w-2xl mx-auto mt-12">
         <h1 className="text-3xl font-bold text-[#FFCC00] mb-2 flex items-center gap-3">
           <span className="material-symbols-outlined text-[32px]">notifications_active</span>
           Configurar Notificações
         </h1>
-        <p className="text-[#A0A0A0] mb-8">
+        <p className="text-fg-secondary mb-8">
           Personalize como e quando você quer ser alertado sobre os prazos das suas tarefas.
         </p>
 

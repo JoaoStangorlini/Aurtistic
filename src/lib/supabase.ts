@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';

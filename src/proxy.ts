@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 import { type NextRequest } from 'next/server'
 import { updateSession } from '@/utils/supabase/middleware'
 

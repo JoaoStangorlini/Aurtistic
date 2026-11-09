@@ -1,7 +1,21 @@
+// Este programa é um software livre (Licença AGPLv3)
 'use client';
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Task, TaskColumn, AgendaEvent } from '@/types';
+import { Task, TaskColumn, AgendaEvent, UserFileIndexRow } from '@/types';
+import { useAurtisticMedia } from '@/components/media/AurtisticMediaContext';
+import { TaskFilePickerModal } from '@/components/tarefas/TaskFilePickerModal';
+import { formatStorageBytes } from '@/lib/edge-urls';
+import { OrganizationManagementView } from '@/components/organizacoes/OrganizationManagementView';
+import { OrganizationScopeToolbar } from '@/components/organizacoes/OrganizationScopeToolbar';
+import { JoinOrganizationModal } from '@/components/organizacoes/JoinOrganizationModal';
+import { CreateOrganizationModal } from '@/components/organizacoes/CreateOrganizationModal';
+import {
+  getUserOrganizationsAction,
+  getOrganizationDetailsAction,
+  getOrganizationMeetingsAction,
+} from '@/app/(dashboard)/organizacoes/actions';
+
 import { Badge, getBadgeColorClass } from './Badge';
 import { TaskFormModal } from './TaskFormModal';
 import { EventFormModal } from './EventFormModal';
@@ -86,7 +100,31 @@ const HighlightedText = ({ text, highlight }: { text: string | null, highlight: 
   );
 };
 
-export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], displayMode = 'tarefas', initialColumns = [], isPersonalScope = false, userId, initialQuickFilters = ['responsavel', 'dimensao'], initialQuickSorts = ['status', 'prazo', 'prioridade', 'manual'], advancedSettings = {} }: { initialTasks: Task[], initialEvents?: AgendaEvent[], displayMode?: 'tarefas' | 'eventos' | 'ambos', initialColumns?: TaskColumn[], isPersonalScope?: boolean, userId?: string, initialQuickFilters?: string[], initialQuickSorts?: string[], advancedSettings?: any }) {
+export function TasksView({
+  initialTasks: rawInitialTasks,
+  initialEvents = [],
+  displayMode = 'tarefas',
+  initialColumns = [],
+  isPersonalScope = false,
+  userId,
+  initialQuickFilters = ['responsavel', 'dimensao'],
+  initialQuickSorts = ['status', 'prazo', 'prioridade', 'manual'],
+  advancedSettings = {},
+  initialUserFiles = [],
+  initialOrganizations = [],
+}: {
+  initialTasks: Task[];
+  initialEvents?: AgendaEvent[];
+  displayMode?: 'tarefas' | 'eventos' | 'ambos';
+  initialColumns?: TaskColumn[];
+  isPersonalScope?: boolean;
+  userId?: string;
+  initialQuickFilters?: string[];
+  initialQuickSorts?: string[];
+  advancedSettings?: any;
+  initialUserFiles?: UserFileIndexRow[];
+  initialOrganizations?: any[];
+}) {
   const enableSubtasks = advancedSettings.enable_subtasks !== false;
   const enableAdminFilters = advancedSettings.enable_admin_filters !== false;
 
@@ -102,7 +140,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
     return opt?.color;
   };
 
-  const [viewMode, setViewMode] = useState<'list' | 'weekly' | 'monthly'>(advancedSettings.default_view_mode || 'list');
+  const [viewMode, setViewMode] = useState<'list' | 'weekly' | 'monthly' | 'org_management'>(advancedSettings.default_view_mode || 'list');
 
   useEffect(() => {
     if (displayMode === 'eventos') {
@@ -113,7 +151,60 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
       setViewMode(advancedSettings.default_view_mode || 'list');
     }
   }, [displayMode, advancedSettings.default_view_mode]);
-  const [calendarCurrentDate, setCalendarCurrentDate] = useState(new Date());
+    const [calendarCurrentDate, setCalendarCurrentDate] = useState(new Date());
+
+  const [organizations, setOrganizations] = useState<any[]>(initialOrganizations || []);
+  const [activeOrgId, setActiveOrgId] = useState<string | null>(
+    (initialOrganizations && initialOrganizations.length > 0) ? initialOrganizations[0].id : null
+  );
+  const [activeScope, setActiveScope] = useState<'all' | 'individual' | 'organization'>('individual');
+  const [activeOrgDetails, setActiveOrgDetails] = useState<any>(null);
+  const [orgMeetings, setOrgMeetings] = useState<any[]>([]);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [filePickerTaskId, setFilePickerTaskId] = useState<string | null>(null);
+  const [userFiles, setUserFiles] = useState<UserFileIndexRow[]>(initialUserFiles || []);
+  const [onlyMyTasks, setOnlyMyTasks] = useState(false);
+  const [isQuickFiltersExpanded, setIsQuickFiltersExpanded] = useState(false);
+
+  const activeOrg = organizations.find((o) => o.id === activeOrgId) || organizations[0] || null;
+
+  const toggleQuickFiltersExpanded = useCallback(() => {
+    setIsQuickFiltersExpanded((prev) => !prev);
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadOrgs() {
+      const res = await getUserOrganizationsAction();
+      if (!ignore && res.ok && Array.isArray(res.organizations)) {
+        const orgs = res.organizations;
+        setOrganizations(orgs);
+        if (orgs.length > 0) {
+          setActiveOrgId(prev => prev || orgs[0].id);
+        } else {
+          setActiveScope('individual');
+        }
+      }
+    }
+    loadOrgs();
+    return () => { ignore = true; };
+  }, []);
+
+  useEffect(() => {
+    if ((activeScope === 'organization' || activeScope === 'all') && activeOrgId) {
+      getOrganizationDetailsAction(activeOrgId).then(res => {
+        if (res.ok && res.organization) {
+          setActiveOrgDetails(res.organization);
+        }
+      });
+      getOrganizationMeetingsAction(activeOrgId).then(res => {
+        if (res.ok && res.meetings) {
+          setOrgMeetings(res.meetings);
+        }
+      });
+    }
+  }, [activeScope, activeOrgId]);
   
   // Normalizar os dados que vêm do banco (migração temporária na UI)
   const initialTasks = useMemo(() => 
@@ -1083,9 +1174,151 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
       return { ...prev, [key]: updated };
     });
   };
+  // Active filter pills for compact view
+  const activeFilterPills = useMemo(() => {
+    const pills: { key: string; label: string; onRemove: () => void }[] = [];
+    if (showFavoritesOnly) {
+      pills.push({
+        key: 'fav',
+        label: '★ Favoritas',
+        onRemove: () => setShowFavoritesOnly(false),
+      });
+    }
+    if (showDraftsOnly) {
+      pills.push({
+        key: 'draft',
+        label: '📝 Rascunhos',
+        onRemove: () => setShowDraftsOnly(false),
+      });
+    }
+    selectedStatuses.forEach((s) => {
+      pills.push({
+        key: `status_${s}`,
+        label: `Status: ${s}`,
+        onRemove: () => setSelectedStatuses((prev) => prev.filter((x) => x !== s)),
+      });
+    });
+    selectedCategories.forEach((c) => {
+      pills.push({
+        key: `cat_${c}`,
+        label: `Cat: ${c}`,
+        onRemove: () => setSelectedCategories((prev) => prev.filter((x) => x !== c)),
+      });
+    });
+    selectedDimensions.forEach((d) => {
+      pills.push({
+        key: `dim_${d}`,
+        label: `Dim: ${d}`,
+        onRemove: () => setSelectedDimensions((prev) => prev.filter((x) => x !== d)),
+      });
+    });
+    selectedUsers.forEach((u) => {
+      pills.push({
+        key: `user_${u}`,
+        label: `@${u}`,
+        onRemove: () => setSelectedUsers((prev) => prev.filter((x) => x !== u)),
+      });
+    });
+    Object.entries(customFilters).forEach(([colKey, vals]) => {
+      if (Array.isArray(vals)) {
+        vals.forEach((v) => {
+          const colName = columns.find((c) => c.key === colKey)?.name || colKey;
+          pills.push({
+            key: `custom_${colKey}_${v}`,
+            label: `${colName}: ${v}`,
+            onRemove: () =>
+              setCustomFilters((prev) => ({
+                ...prev,
+                [colKey]: (prev[colKey] || []).filter((x) => x !== v),
+              })),
+          });
+        });
+      }
+    });
+    return pills;
+  }, [
+    showFavoritesOnly,
+    showDraftsOnly,
+    selectedStatuses,
+    selectedCategories,
+    selectedDimensions,
+    selectedUsers,
+    customFilters,
+    columns,
+  ]);
+
+  const clearAllQuickFilters = useCallback(() => {
+    setShowFavoritesOnly(false);
+    setShowDraftsOnly(false);
+    setSelectedStatuses([]);
+    setSelectedCategories([]);
+    setSelectedDimensions([]);
+    setSelectedUsers([]);
+    setCustomFilters({});
+    setLocalSearchTerm('');
+  }, []);
+
   // Process Events: Filter
   const processedEvents = (() => {
     let evts = [...localEvents];
+
+    const isLabdivDim = (d?: string | null) => {
+      const v = (d || '').trim().toLowerCase();
+      return v === 'hub' || v === 'labdiv';
+    };
+
+    if (activeScope === 'individual') {
+      evts = evts.filter(e => !e.is_labdiv && !isLabdivDim(e.dimensao));
+    } else if (activeScope === 'organization') {
+      const currentOrg = organizations.find(o => o.id === activeOrgId) || organizations[0];
+      const isLabdivActive = !currentOrg || currentOrg.id === '1ab41410-0000-4000-8000-000000000001' ||
+        currentOrg.slug?.toLowerCase().includes('labdiv') || currentOrg.name?.toLowerCase().includes('labdiv');
+
+      evts = evts.filter(e => {
+        if (isLabdivActive && (e.is_labdiv || isLabdivDim(e.dimensao))) return true;
+        if ((e as any).organization_id && (e as any).organization_id === currentOrg?.id) return true;
+        if (currentOrg?.name && (e.dimensao || '').trim().toLowerCase() === currentOrg.name.trim().toLowerCase()) return true;
+        return false;
+      });
+
+      if (orgMeetings && orgMeetings.length > 0) {
+        const meetingEvents: AgendaEvent[] = orgMeetings.map(m => ({
+          id: m.id,
+          user_id: userId || '',
+          nome: `🏛️ [Reunião] ${m.title}`,
+          descricao: m.description || `Reunião da organização ${currentOrg?.name || ''}${m.meet_url ? ` | Link: ${m.meet_url}` : ''}`,
+          status: 'confirmado',
+          data_inicio: m.scheduled_at ? m.scheduled_at.split('T')[0] : null,
+          data_fim: m.scheduled_at ? m.scheduled_at.split('T')[0] : null,
+          horarios_semanais: null,
+          frequencia: 'Pontual',
+          categoria: 'Reunião',
+          dimensao: currentOrg?.name || 'HUB',
+          created_at: m.created_at || new Date().toISOString(),
+          is_labdiv: isLabdivActive,
+        }));
+        evts = [...evts, ...meetingEvents];
+      }
+    } else if (activeScope === 'all') {
+      if (orgMeetings && orgMeetings.length > 0) {
+        const meetingEvents: AgendaEvent[] = orgMeetings.map(m => ({
+          id: m.id,
+          user_id: userId || '',
+          nome: `🏛️ [Reunião] ${m.title}`,
+          descricao: m.description || `Reunião institucional${m.meet_url ? ` | Link: ${m.meet_url}` : ''}`,
+          status: 'confirmado',
+          data_inicio: m.scheduled_at ? m.scheduled_at.split('T')[0] : null,
+          data_fim: m.scheduled_at ? m.scheduled_at.split('T')[0] : null,
+          horarios_semanais: null,
+          frequencia: 'Pontual',
+          categoria: 'Reunião',
+          dimensao: 'HUB',
+          created_at: m.created_at || new Date().toISOString(),
+          is_labdiv: true,
+        }));
+        evts = [...evts, ...meetingEvents];
+      }
+    }
     if (showDraftsOnly) {
       evts = evts.filter(e => e.status === 'rascunho');
     }
@@ -1114,6 +1347,44 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
   // Process Tasks: Filter and Sort
   const processedTasks = (() => {
     let tasks = [...localTasks];
+
+    const isOrgTask = (t: Task) => {
+      if (t.is_personal === true) return false;
+      if (t.organization_id) return true;
+      const dim = (t.dimensao || '').trim().toLowerCase();
+      if (dim === 'hub' || dim === 'labdiv') return true;
+      if (organizations.some(o => (o.name && o.name.trim().toLowerCase() === dim) || (o.slug && o.slug.trim().toLowerCase() === dim))) {
+        return true;
+      }
+      return false;
+    };
+
+    if (activeScope === 'individual') {
+      tasks = tasks.filter(t => !isOrgTask(t));
+    } else if (activeScope === 'organization') {
+      const currentOrg = organizations.find(o => o.id === activeOrgId) || organizations[0];
+      if (!currentOrg) {
+        tasks = [];
+      } else {
+        const currentOrgId = currentOrg.id;
+        const currentOrgName = (currentOrg.name || '').trim().toLowerCase();
+        const currentOrgSlug = ((currentOrg as any).slug || '').trim().toLowerCase();
+        const isLabdivActive = currentOrgId === '1ab41410-0000-4000-8000-000000000001' || currentOrgSlug.includes('labdiv') || currentOrgName.includes('labdiv');
+
+        tasks = tasks.filter(t => {
+          if (t.is_personal === true) return false;
+          if (t.organization_id && t.organization_id === currentOrgId) return true;
+          const dim = (t.dimensao || '').trim().toLowerCase();
+          if (isLabdivActive && (dim === 'hub' || dim === 'labdiv')) return true;
+          if (currentOrg.name && dim === currentOrgName) return true;
+          return false;
+        });
+      }
+    }
+
+    if (onlyMyTasks && userId) {
+      tasks = tasks.filter(t => t.user_id === userId || (t.responsavel && t.responsavel.toLowerCase().includes('stangorlini')));
+    }
 
     if (isDailyFollowup && displayMode !== 'eventos') {
       const today = new Date().toISOString().split('T')[0];
@@ -1271,373 +1542,256 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
   return (
     <div className="w-full flex flex-col relative">
       
-      {/* Header & Toolbar */}
-      <div className="flex flex-col gap-4 mb-6 shrink-0">
-        {advancedSettings.show_quick_filters !== false && (
-          <>
-            <div className="flex items-center mb-2 justify-between">
-              <h3 className="text-sm font-bold text-[#8E8E8E] uppercase tracking-wider flex items-center gap-2">
-                Filtros Rápidos
-                <button onClick={() => setIsQuickFiltersModalOpen(true)} className="text-[#A0A0A0] hover:text-[#9D4EDD] transition-colors" title="Configurar Filtros Rápidos">
-                  <span className="material-symbols-outlined text-[16px]">settings</span>
-                </button>
-              </h3>
-            </div>
-
-            {/* Toolbar de Filtros Rápidos */}
-            <div className="flex flex-col items-end gap-3 w-full mb-2">
+      {/* ========================================================
+          BARRA DE COMANDO UNIFICADA (Unified Command Toolbar)
+          Substitui as 4 camadas horizontais anteriores por uma
+          única faixa elegante de alta densidade (~48px)
+          ======================================================== */}
+      <div className="w-full flex flex-col gap-2.5 mb-4 shrink-0">
+        <div className="w-full bg-surface border border-border-subtle rounded-2xl p-2 md:p-2.5 shadow-lg flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
           
-          {/* Row 1: Ordenação dinâmica */}
-          {displayMode !== 'eventos' && quickSorts.length > 0 && (
-            <div className="flex w-full overflow-x-auto hide-scrollbar items-center justify-start gap-3 shrink-0 pb-1">
-              <span className="text-[10px] text-[#8E8E8E] px-1 font-bold uppercase tracking-wider shrink-0">Ordem:</span>
-              
-              <div className="flex items-center gap-2 shrink-0">
-                {quickSorts.map(sortKey => {
-                  if (sortKey === 'status') {
-                    return (
-                      <React.Fragment key="status">
-                        <button onClick={() => setSortBy('status')} className={`px-3 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 ${sortBy === 'status' ? 'bg-[#9D4EDD]/20 border-[#9D4EDD] text-[#9D4EDD]' : 'bg-[#1A1A1A] border-[#FFCC00] text-[#8E8E8E] hover:border-[#9D4EDD]/50 hover:text-white'}`}>Padrão</button>
-                        <button onClick={() => setSortBy('status_inv')} className={`px-3 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 ${sortBy === 'status_inv' ? 'bg-[#FFCC00]/15 border-[#FFCC00] text-[#FFCC00]' : 'bg-[#1A1A1A] border-[#FFCC00] text-[#8E8E8E] hover:border-[#9D4EDD]/50 hover:text-white'}`}>Padrão (inv)</button>
-                      </React.Fragment>
-                    );
-                  }
-                  if (sortKey === 'manual') {
-                    return <button key="manual" onClick={() => setSortBy('manual')} className={`px-3 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 ${sortBy === 'manual' ? 'bg-[#9D4EDD]/20 border-[#9D4EDD] text-[#9D4EDD]' : 'bg-[#1A1A1A] border-[#FFCC00] text-[#8E8E8E] hover:border-[#9D4EDD]/50 hover:text-white'}`}>Manual</button>;
-                  }
-                  if (sortKey === 'prazo') {
-                    return <button key="prazo" onClick={() => setSortBy('prazo')} className={`px-3 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 ${sortBy === 'prazo' ? 'bg-[#9D4EDD]/20 border-[#9D4EDD] text-[#9D4EDD]' : 'bg-[#1A1A1A] border-[#FFCC00] text-[#8E8E8E] hover:border-[#9D4EDD]/50 hover:text-white'}`}>Prazo</button>;
-                  }
-                  if (sortKey === 'prioridade') {
-                    return (
-                      <React.Fragment key="prioridade">
-                        <span className="text-[10px] text-[#8E8E8E] px-1 font-bold uppercase tracking-wider hidden sm:inline ml-1">Prio:</span>
-                        <button onClick={() => setSortBy('prioridade_desc')} className={`px-3 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 flex items-center gap-1 ${sortBy === 'prioridade_desc' ? getBadgeColorClass('prioridade', 'alta') : 'bg-[#1A1A1A] border-[#FFCC00] text-[#8E8E8E] hover:border-[#9D4EDD]/50 hover:text-white'}`}><span className="material-symbols-outlined text-[12px]">arrow_upward</span> Alta</button>
-                        <button onClick={() => setSortBy('prioridade_asc')} className={`px-3 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 flex items-center gap-1 ${sortBy === 'prioridade_asc' ? getBadgeColorClass('prioridade', 'baixa') : 'bg-[#1A1A1A] border-[#FFCC00] text-[#8E8E8E] hover:border-[#9D4EDD]/50 hover:text-white'}`}><span className="material-symbols-outlined text-[12px]">arrow_downward</span> Baixa</button>
-                      </React.Fragment>
-                    );
-                  }
-                  if (sortKey === 'categoria') {
-                    return <button key="categoria" onClick={() => setSortBy('categoria')} className={`px-3 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 ${sortBy === 'categoria' ? 'bg-[#9D4EDD]/20 border-[#9D4EDD] text-[#9D4EDD]' : 'bg-[#1A1A1A] border-[#FFCC00] text-[#8E8E8E] hover:border-[#9D4EDD]/50 hover:text-white'}`}>Categoria</button>;
-                  }
-                  
-                  const col = columns.find(c => c.key === sortKey);
-                  if (col) {
-                    return (
-                      <button key={sortKey} onClick={() => setSortBy(`custom_${sortKey}`)} className={`px-3 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 ${sortBy === `custom_${sortKey}` ? 'bg-[#9D4EDD]/20 border-[#9D4EDD] text-[#9D4EDD]' : 'bg-[#1A1A1A] border-[#FFCC00] text-[#8E8E8E] hover:border-[#9D4EDD]/50 hover:text-white'}`}>{col.name}</button>
-                    );
-                  }
-
-                  return null;
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Row 2: Status (Visibilidade) */}
-          {displayMode !== 'eventos' && (
-          <div className="flex w-full overflow-x-auto hide-scrollbar items-center gap-2 shrink-0 pb-1 justify-start">
-            <span className="text-[10px] text-[#8E8E8E] px-1 font-bold uppercase tracking-wider shrink-0">Visibilidade:</span>
-            
-            <button
-                onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-                className={`h-[26px] px-2 text-[11px] rounded-md border transition-colors font-bold shrink-0 flex items-center justify-center gap-1
-                  ${showFavoritesOnly ? 'bg-[#FFCC00]/20 border-[#FFCC00] text-[#FFCC00]' : 'bg-[#1A1A1A] border-[#FFCC00] text-[#8E8E8E] hover:border-[#FFCC00]/50 hover:text-white'}`}
-            >
-                <span className={`material-symbols-outlined text-[12px] ${showFavoritesOnly ? 'text-[#FFCC00]' : ''}`}>star</span>
-            </button>
-
-            <button
-                onClick={() => setShowDraftsOnly(!showDraftsOnly)}
-                className={`h-[26px] px-3 text-[11px] rounded-md border transition-colors font-bold shrink-0 flex items-center justify-center gap-1
-                  ${showDraftsOnly ? 'bg-[#8E8E8E]/20 border-[#8E8E8E] text-[#8E8E8E]' : 'bg-[#1A1A1A] border-[#FFCC00] text-[#8E8E8E] hover:border-[#8E8E8E]/50 hover:text-white'}`}
-            >
-                <span className={`material-symbols-outlined text-[12px] ${showDraftsOnly ? 'text-[#8E8E8E]' : ''}`}>draft</span> Rascunhos
-            </button>
-            
-            {uniqueStatuses.map(s => (
-              <button 
-                key={s} 
-                onClick={() => toggleFilter(selectedStatuses, setSelectedStatuses, s)}
-                className={`h-[26px] px-3 text-[11px] rounded-md border transition-colors font-bold shrink-0 flex items-center justify-center
-                  ${selectedStatuses.includes(s) ? getBadgeColorClass('status', s) : 'bg-[#1A1A1A] border-[#FFCC00] text-[#8E8E8E] hover:border-[#9D4EDD]/50 hover:text-white'}`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-          )}
-
-          {/* Filtros Customizados baseados no quickFilters */}
-          {displayMode !== 'eventos' && quickFilters.map(filterKey => {
-            const col = columns.find(c => c.key === filterKey);
-            // Casos nativos que usam unique do hook
-            let options: string[] = [];
-            let isSelected: (val: string) => boolean = () => false;
-            let onToggle: (val: string) => void = () => {};
-            let onClear: () => void = () => {};
-            let isAllSelected = false;
-            let isHidden = false;
-
-            if (filterKey === 'responsavel') {
-              options = uniqueUsers;
-              isSelected = (v) => selectedUsers.includes(v);
-              onToggle = (v) => toggleFilter(selectedUsers, setSelectedUsers, v);
-              onClear = () => setSelectedUsers([]);
-              isAllSelected = selectedUsers.length === 0;
-              if (isPersonalScope) isHidden = true;
-            } else if (filterKey === 'dimensao') {
-              options = uniqueDimensions;
-              isSelected = (v) => selectedDimensions.includes(v);
-              onToggle = (v) => toggleFilter(selectedDimensions, setSelectedDimensions, v);
-              onClear = () => setSelectedDimensions([]);
-              isAllSelected = selectedDimensions.length === 0;
-            } else if (filterKey === 'status') {
-              options = uniqueStatuses;
-              isSelected = (v) => selectedStatuses.includes(v);
-              onToggle = (v) => toggleFilter(selectedStatuses, setSelectedStatuses, v);
-              onClear = () => setSelectedStatuses([]);
-              isAllSelected = selectedStatuses.length === 0;
-            } else if (filterKey === 'categoria') {
-              options = uniqueCategories;
-              isSelected = (v) => selectedCategories.includes(v);
-              onToggle = (v) => toggleFilter(selectedCategories, setSelectedCategories, v);
-              onClear = () => setSelectedCategories([]);
-              isAllSelected = selectedCategories.length === 0;
-            } else if (col) {
-              // Coluna dinâmica
-              options = col.options.map(o => o.value);
-              isSelected = (v) => (customFilters[filterKey] || []).includes(v);
-              onToggle = (v) => toggleCustomFilter(filterKey, v);
-              onClear = () => setCustomFilters(prev => ({ ...prev, [filterKey]: [] }));
-              isAllSelected = (customFilters[filterKey] || []).length === 0;
-            }
-
-            options = options.filter(o => o && o.trim() !== '');
-            if (isHidden || options.length === 0) return null;
-
-            return (
-              <div key={filterKey} className="flex w-full overflow-x-auto hide-scrollbar items-center gap-2 shrink-0 pb-1 justify-start">
-                <span className="text-[10px] text-[#8E8E8E] px-1 font-bold uppercase tracking-wider shrink-0">
-                  {col ? col.name : filterKey}:
-                </span>
-                {options.length > 1 && (
-                  <button 
-                    onClick={onClear}
-                    className={`h-[26px] px-3 text-[11px] rounded-md border transition-colors font-bold shrink-0
-                      ${isAllSelected ? 'bg-[#FFCC00]/20 border-[#FFCC00] text-[#FFCC00]' : 'bg-[#1A1A1A] border-[#FFCC00] text-[#8E8E8E] hover:border-[#9D4EDD]/50 hover:text-white'}`}
-                  >
-                    Todas
-                  </button>
-                )}
-                {options.map(o => (
-                  <button 
-                    key={o} 
-                    onClick={() => onToggle(o)}
-                    className={`h-[26px] px-3 text-[11px] ${filterKey === 'responsavel' ? 'rounded-full' : 'rounded-md'} border transition-colors font-bold flex items-center justify-center gap-1 shrink-0
-                      ${isSelected(o) ? getBadgeColorClass(filterKey, o) : 'bg-[#1A1A1A] border-[#FFCC00] text-[#8E8E8E] hover:border-[#9D4EDD]/50 hover:text-white'}`}
-                  >
-                    {filterKey === 'responsavel' && <span className="material-symbols-outlined text-[12px]">person</span>}
-                    {o}
-                  </button>
-                ))}
-              </div>
-            );
-          })}
-
-
-          {/* Filtro extra de Acompanhamento para Eventos e Ambos */}
-          {(displayMode === 'eventos' || displayMode === 'ambos') && (
-            <div className="flex w-full overflow-x-auto hide-scrollbar items-center gap-2 shrink-0 pb-1 justify-start">
-              <span className="text-[10px] text-[#8E8E8E] px-1 font-bold uppercase tracking-wider shrink-0">
-                Acompanhamento:
-              </span>
-              <button 
-                onClick={() => setIsDailyFollowup(!isDailyFollowup)}
-                className={`h-[26px] px-3 text-[11px] rounded-md border transition-colors font-bold flex items-center justify-center gap-1 shrink-0
-                  ${isDailyFollowup ? 'bg-[#9D4EDD] text-white border-[#9D4EDD]' : 'bg-[#1A1A1A] border-[#FFCC00] text-[#8E8E8E] hover:border-[#9D4EDD]/50 hover:text-white'}`}
-              >
-                <span className="material-symbols-outlined text-[12px]">today</span>
-                Hoje & Pendentes
-              </button>
-            </div>
-          )}
-          </div>
-          </>
-        )}
-
-        {/* Row 4: Botão de Filtros */}
-          <div className="flex flex-col w-full items-end gap-2 shrink-0 pb-2 z-30">
-            <div className="flex items-center text-[#8E8E8E] text-[11px] font-bold px-3 shrink-0 bg-[#1A1A1A] rounded-md border border-[#2D2D2D] h-[36px] w-auto justify-start order-2">
-              <span className="text-[#FFCC00] text-sm mr-1">{processedTasks.length}</span> 
-              <span className="hidden sm:inline">de</span>
-              <span className="text-white text-sm mx-1">{localTasks.length}</span> 
-              <span className="hidden sm:inline">visíveis</span>
-              {selectedTasks.size > 0 && (
-                <>
-                  <span className="mx-2">|</span>
-                  <span className="text-[#9D4EDD] text-sm mr-1">{selectedTasks.size}</span>
-                  <span className="hidden sm:inline">selecionadas</span>
-                </>
-              )}
-              {selectedTasks.size > 1 && (
-                <button 
-                  onClick={() => setIsBulkEditModalOpen(true)}
-                  className="bg-[#9D4EDD]/20 text-[#9D4EDD] hover:bg-[#9D4EDD] hover:text-white border border-[#9D4EDD]/50 px-2 py-0.5 rounded text-[10px] ml-2 flex items-center gap-1 transition-colors"
+          {/* Lado Esquerdo: Escopo (Tudo vs Individual vs Organização) integrado */}
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+            <span className="text-[10px] font-black text-fg-muted uppercase tracking-wider mr-1 hidden sm:inline">Escopo:</span>
+            <div className="inline-flex p-1 bg-app rounded-xl border border-border-subtle">
+              {organizations && organizations.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveScope('all');
+                    if (viewMode === 'org_management') setViewMode('list');
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activeScope === 'all'
+                      ? 'bg-gradient-brand text-[var(--on-accent-primary)] shadow-sm font-black'
+                      : 'text-neutral-400 hover:text-white hover:bg-white/5'
+                  }`}
+                  title="Ver tarefas e eventos individuais e organizacionais juntos"
                 >
-                  <span className="material-symbols-outlined text-[12px]">edit</span> Editar
+                  <span className="material-symbols-outlined text-[15px]">public</span>
+                  Tudo
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveScope('individual');
+                  if (viewMode === 'org_management') setViewMode('list');
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeScope === 'individual'
+                    ? 'bg-gradient-brand text-[var(--on-accent-primary)] shadow-sm font-black'
+                    : 'text-neutral-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[15px]">person</span>
+                Individual
+              </button>
+              
+              {organizations && organizations.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setActiveScope('organization')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activeScope === 'organization'
+                      ? 'bg-gradient-brand text-[var(--on-accent-primary)] shadow-sm font-black'
+                      : 'text-neutral-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[15px]">domain</span>
+                  {activeOrg?.name || 'Organização'}
+                  <span className="rounded-full bg-slate-900/60 px-1.5 py-0.2 text-[10px] text-teal-300 font-mono">
+                    {organizations.length}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsJoinModalOpen(true)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-teal-300 hover:bg-teal-500/10 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  title="Entrar com Código ou Criar Organização"
+                >
+                  <span className="material-symbols-outlined text-[15px]">domain_add</span>
+                  <span>🏛️ + Entrar ou Criar Org</span>
                 </button>
               )}
             </div>
 
-            <div className="flex items-center gap-2 order-1 w-full justify-end shrink-0 flex-wrap">
-              {displayMode !== 'eventos' && advancedSettings.show_quick_filters !== false && (
-              <div className="relative shrink-0" ref={filterMenuRef}>
-              <button 
-                onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
-              className="flex items-center gap-1.5 bg-[#9D4EDD] text-white font-bold rounded-md px-3 py-1.5 text-xs hover:bg-[#8338C7] transition-colors shadow-sm"
+            {/* Seletor se tiver mais de uma organização */}
+            {activeScope === 'organization' && organizations.length > 1 && (
+              <select
+                value={activeOrgId || organizations[0]?.id}
+                onChange={(e) => setActiveOrgId(e.target.value)}
+                className="bg-surface border border-border-subtle text-fg text-xs font-bold rounded-lg px-2.5 py-1.5 outline-none focus:border-[var(--accent-primary)] cursor-pointer"
+              >
+                {organizations.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Ações rápidas de organização (Entrar / Criar) */}
+            <div className="flex items-center gap-1 ml-1">
+              <button
+                type="button"
+                onClick={() => setIsJoinModalOpen(true)}
+                className="p-1.5 text-neutral-400 hover:text-white hover:bg-white/5 rounded-lg border border-transparent hover:border-border-subtle transition-colors cursor-pointer"
+                title="Entrar com Código de Convite"
+              >
+                <span className="material-symbols-outlined text-[16px]">key</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(true)}
+                className="p-1.5 text-neutral-400 hover:text-white hover:bg-white/5 rounded-lg border border-transparent hover:border-border-subtle transition-colors cursor-pointer"
+                title="Criar Nova Organização"
+              >
+                <span className="material-symbols-outlined text-[16px]">add_business</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Centro: Modos de Visualização (Lista | Semanal | Mensal | Equipe) */}
+          <div className="flex items-center justify-center gap-1 bg-app p-1 rounded-xl border border-border-subtle shrink-0 self-center lg:self-auto">
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'list'
+                  ? 'bg-[#9D4EDD] text-white shadow-sm font-black'
+                  : 'text-neutral-400 hover:text-white hover:bg-white/5'
+              }`}
             >
-              <span className="material-symbols-outlined text-[16px]">filter_list</span>
-              Mais filtros
-              <span className="material-symbols-outlined text-[16px]">{isFilterMenuOpen ? 'expand_less' : 'expand_more'}</span>
+              <span className="material-symbols-outlined text-[16px]">format_list_bulleted</span>
+              <span>Lista</span>
             </button>
 
-            {isFilterMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-[320px] bg-[#1A1A1A] border border-[#2D2D2D] rounded-lg shadow-2xl z-50 max-h-[70vh] overflow-y-auto flex flex-col">
-                
-                {/* Section: Ordenar Por */}
-                <div className="p-4 border-b border-[#2D2D2D]">
-                  <h3 className="text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-3">Ordenar Por</h3>
-                  <div className="flex flex-col gap-2">
-                    <label className="flex items-center gap-2 text-sm text-white cursor-pointer hover:text-[#9D4EDD] transition-colors">
-                      <input type="radio" name="sort" checked={sortBy === 'status'} onChange={() => setSortBy('status')} className="accent-[#9D4EDD]" />
-                      Status (Padrão)
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-white cursor-pointer hover:text-[#9D4EDD] transition-colors">
-                      <input type="radio" name="sort" checked={sortBy === 'prazo'} onChange={() => setSortBy('prazo')} className="accent-[#9D4EDD]" />
-                      Prazo (Mais Curto)
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-white cursor-pointer hover:text-[#9D4EDD] transition-colors">
-                      <input type="radio" name="sort" checked={sortBy === 'categoria'} onChange={() => setSortBy('categoria')} className="accent-[#9D4EDD]" />
-                      Categoria (A-Z)
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-white cursor-pointer hover:text-[#9D4EDD] transition-colors">
-                      <input type="radio" name="sort" checked={sortBy === 'prioridade_desc'} onChange={() => setSortBy('prioridade_desc')} className="accent-[#9D4EDD]" />
-                      Prioridade (Alta para Baixa)
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-white cursor-pointer hover:text-[#9D4EDD] transition-colors">
-                      <input type="radio" name="sort" checked={sortBy === 'prioridade_asc'} onChange={() => setSortBy('prioridade_asc')} className="accent-[#9D4EDD]" />
-                      Prioridade (Baixa para Alta)
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-white cursor-pointer hover:text-[#9D4EDD] transition-colors">
-                      <input type="radio" name="sort" checked={sortBy === 'manual'} onChange={() => setSortBy('manual')} className="accent-[#9D4EDD]" />
-                      Manual / Personalizada (Arrastar)
-                    </label>
-                  </div>
-                </div>
+            <button
+              type="button"
+              onClick={() => setViewMode('weekly')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'weekly'
+                  ? 'bg-[#9D4EDD] text-white shadow-sm font-black'
+                  : 'text-neutral-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px]">view_week</span>
+              <span>Semanal</span>
+            </button>
 
-                {/* Section: Visibilidade Status */}
-                <div className="p-4 border-b border-[#2D2D2D]">
-                  <h3 className="text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-3">Filtrar: Status</h3>
-                  <div className="flex flex-col gap-2">
-                    {uniqueStatuses.map(status => (
-                      <label key={status} className="flex items-center gap-2 text-sm text-white cursor-pointer hover:text-[#9D4EDD] transition-colors">
-                        <input type="checkbox" checked={selectedStatuses.includes(status)} onChange={() => toggleFilter(selectedStatuses, setSelectedStatuses, status)} className="accent-[#9D4EDD] rounded-sm" />
-                        {status}
-                      </label>
-                    ))}
-                  </div>
-                </div>
+            <button
+              type="button"
+              onClick={() => setViewMode('monthly')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'monthly'
+                  ? 'bg-[#9D4EDD] text-white shadow-sm font-black'
+                  : 'text-neutral-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px]">calendar_month</span>
+              <span>Mensal</span>
+            </button>
 
-                {/* Section: Visibilidade Categoria */}
-                <div className="p-4 border-b border-[#2D2D2D]">
-                  <h3 className="text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-3">Filtrar: Categoria</h3>
-                  <div className="flex flex-col gap-2 max-h-[150px] overflow-y-auto">
-                    {uniqueCategories.map(cat => (
-                      <label key={cat} className="flex items-center gap-2 text-sm text-white cursor-pointer hover:text-[#9D4EDD] transition-colors">
-                        <input type="checkbox" checked={selectedCategories.includes(cat)} onChange={() => toggleFilter(selectedCategories, setSelectedCategories, cat)} className="accent-[#9D4EDD] rounded-sm" />
-                        {cat}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-
-                {/* Section: Visibilidade Responsável */}
-                {!isPersonalScope && (
-                  <div className="p-4 border-b border-[#2D2D2D]">
-                    <h3 className="text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-3">Filtrar: Responsável</h3>
-                    <div className="flex flex-col gap-2">
-                      {uniqueUsers.map(user => (
-                        <label key={user} className="flex items-center gap-2 text-sm text-white cursor-pointer hover:text-[#9D4EDD] transition-colors">
-                          <input type="checkbox" checked={selectedUsers.includes(user)} onChange={() => toggleFilter(selectedUsers, setSelectedUsers, user)} className="accent-[#9D4EDD] rounded-sm" />
-                          {user}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Section: Visibilidade Dimensões */}
-                {uniqueDimensions.length > 1 && (
-                  <div className="p-4 border-b border-[#2D2D2D]">
-                    <h3 className="text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-3">Filtrar: Dimensão</h3>
-                    <div className="flex flex-col gap-2">
-                      {uniqueDimensions.map(dim => (
-                        <label key={dim} className="flex items-center gap-2 text-sm text-white cursor-pointer hover:text-[#9D4EDD] transition-colors">
-                          <input type="checkbox" checked={selectedDimensions.includes(dim)} onChange={() => toggleFilter(selectedDimensions, setSelectedDimensions, dim)} className="accent-[#9D4EDD] rounded-sm" />
-                          {dim}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Section: Exportação */}
-                {advancedSettings?.show_export_buttons !== false && (
-                  <div className="p-4 bg-[#1A1A1A]">
-                    <h3 className="text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-3">Exportar ({processedTasks.length} tarefas visíveis)</h3>
-                    <div className="flex gap-2">
-                      <button onClick={() => downloadCSV(processedTasks, 'tarefas_hub.csv')} className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 border border-[#0f9d58]/50 text-[#0f9d58] rounded hover:bg-[#0f9d58]/10 text-xs font-semibold transition-colors" title="Baixar CSV">
-                        <span className="material-symbols-outlined text-[16px]">table</span> CSV
-                      </button>
-                      <button onClick={() => downloadICS(processedTasks, 'tarefas_hub.ics')} className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 border border-[#4285f4]/50 text-[#4285f4] rounded hover:bg-[#4285f4]/10 text-xs font-semibold transition-colors" title="Baixar Google Agenda (ICS)">
-                        <span className="material-symbols-outlined text-[16px]">calendar_month</span> Agenda
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+            {activeScope === 'organization' && (
+              <button
+                type="button"
+                onClick={() => setViewMode('org_management')}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === 'org_management'
+                    ? 'bg-teal-500 text-slate-950 font-black shadow-sm'
+                    : 'text-teal-400 hover:bg-teal-500/10'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px]">groups</span>
+                <span>Equipe</span>
+                {activeOrgDetails?.members?.length ? (
+                  <span className="px-1.5 py-0.2 rounded-full bg-black/40 text-[10px] font-mono">
+                    {activeOrgDetails.members.length}
+                  </span>
+                ) : null}
+              </button>
             )}
+          </div>
+
+          {/* Lado Direito: Ações (Filtros, Colunas, Foco, Criação, Contadores) */}
+          <div className="flex items-center gap-2 justify-end shrink-0 flex-wrap" data-tour="tasks-toolbar">
+            {/* Contador de tarefas e Bulk Edit */}
+            <div className="flex items-center text-fg-muted text-[11px] font-bold px-2.5 py-1 bg-app rounded-lg border border-border-subtle h-[34px] text-fg-muted">
+              <span className="text-[#FFCC00] text-xs mr-1">{processedTasks.length}</span>
+              <span className="hidden xl:inline mr-1">/</span>
+              <span className="text-white text-xs mr-1">{localTasks.length}</span>
+              <span className="hidden xl:inline">visíveis</span>
+              {selectedTasks.size > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setIsBulkEditModalOpen(true)}
+                  className="ml-2 bg-[#9D4EDD]/20 text-[#9D4EDD] hover:bg-[#9D4EDD] hover:text-white border border-[#9D4EDD]/50 px-2 py-0.5 rounded text-[10px] flex items-center gap-1 transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[12px]">edit</span>
+                  Editar ({selectedTasks.size})
+                </button>
+              )}
             </div>
+
+            {/* Gatilho de Filtros */}
+            {displayMode !== 'eventos' && advancedSettings.show_quick_filters !== false && (
+              <button
+                type="button"
+                data-tour="tasks-quick-filters"
+                onClick={toggleQuickFiltersExpanded}
+                className={`h-[34px] px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                  isQuickFiltersExpanded || activeFilterPills.length > 0
+                    ? 'bg-[var(--accent-secondary,#FFCC00)]/15 border-[var(--accent-secondary,#FFCC00)] text-[var(--accent-secondary,#FFCC00)]'
+                    : 'bg-app border border-border-subtle text-fg-secondary hover:text-fg hover:border-border-strong hover:bg-surface-hover'
+                }`}
+                title="Filtros e Ordenação"
+              >
+                <span className="material-symbols-outlined text-[16px]">tune</span>
+                <span>Filtros</span>
+                {activeFilterPills.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-[var(--accent-secondary,#FFCC00)] text-black">
+                    {activeFilterPills.length}
+                  </span>
+                )}
+                <span className={`material-symbols-outlined text-[16px] transition-transform duration-200 ${isQuickFiltersExpanded ? 'rotate-180' : ''}`}>
+                  expand_more
+                </span>
+              </button>
             )}
-            
-              {displayMode !== 'eventos' && (
+
+            {/* Editar Colunas */}
+            {displayMode !== 'eventos' && (
               <div className="relative">
-                <button 
+                <button
+                  type="button"
                   onClick={() => setIsColumnsMenuOpen(!isColumnsMenuOpen)}
-                  className="bg-[#FFCC00] text-[#121212] hover:bg-[#e6b800] px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-colors border border-transparent shadow-sm"
+                  className="h-[34px] bg-app border border-border-subtle text-fg-secondary hover:text-fg hover:border-border-strong hover:bg-surface-hover px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Editar Colunas Visíveis"
                 >
                   <span className="material-symbols-outlined text-[16px]">view_column</span>
-                  Editar Colunas
-                  <span className="material-symbols-outlined text-[16px]">expand_more</span>
+                  <span className="hidden sm:inline">Colunas</span>
+                  <span className="material-symbols-outlined text-[14px]">expand_more</span>
                 </button>
 
                 {isColumnsMenuOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-[240px] bg-[#1A1A1A] border border-[#2D2D2D] rounded-lg shadow-2xl z-50 overflow-hidden flex flex-col">
-                    <div className="p-3 border-b border-[#2D2D2D]">
-                      <h3 className="text-xs font-bold text-[#8E8E8E] uppercase tracking-wider mb-2">Colunas</h3>
+                  <div className="absolute right-0 top-full mt-2 w-[240px] bg-surface border border-border-subtle rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col">
+                    <div className="p-3 border-b border-border-subtle">
+                      <h3 className="text-xs font-bold text-fg-muted uppercase tracking-wider mb-2">Colunas</h3>
                       <div className="flex flex-col gap-1 max-h-[250px] overflow-y-auto">
                         {columns.map(col => (
-                          <div key={col.id} className="flex justify-between items-center group px-2 py-1.5 hover:bg-[#252525] rounded-md transition-colors">
+                          <div key={col.id} className="flex justify-between items-center group px-2 py-1.5 hover:bg-surface-hover rounded-md transition-colors">
                             <span className="text-sm text-white truncate max-w-[150px]">{col.name}</span>
                             <button
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setIsColumnsMenuOpen(false);
                                 setEditingColumn(col);
                               }}
-                              className="text-[#8E8E8E] hover:text-[#FFCC00] transition-colors opacity-0 group-hover:opacity-100 flex items-center justify-center p-1"
+                              className="text-fg-muted hover:text-[#FFCC00] transition-colors opacity-0 group-hover:opacity-100 flex items-center justify-center p-1"
                               title="Editar Coluna"
                             >
                               <span className="material-symbols-outlined text-[16px]">edit</span>
@@ -1648,6 +1802,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                     </div>
                     
                     <button
+                      type="button"
                       onClick={() => {
                         setIsColumnsMenuOpen(false);
                         setEditingColumn({
@@ -1660,138 +1815,404 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                           order_num: 0
                         });
                       }}
-                      className="px-4 py-3 cursor-pointer transition-colors text-[#FFCC00] hover:bg-[#252525] font-bold text-sm flex items-center gap-2"
+                      className="px-4 py-2.5 cursor-pointer transition-colors text-[#FFCC00] hover:bg-surface-hover font-bold text-xs flex items-center gap-2"
                     >
                       <span className="material-symbols-outlined text-[16px]">add</span>
                       Adicionar Nova Coluna
                     </button>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Foco Diário */}
+            {displayMode !== 'eventos' && (
+              <button
+                type="button"
+                onClick={() => setIsDailyFollowup(!isDailyFollowup)}
+                className={`h-[34px] px-2.5 py-1 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer border ${
+                  isDailyFollowup
+                    ? 'bg-[#9D4EDD] text-white border-[#9D4EDD]'
+                    : 'bg-app border border-border-subtle text-fg-secondary hover:text-fg hover:border-border-strong hover:bg-surface-hover'
+                }`}
+                title="Foco Diário (Hoje & Pendentes)"
+              >
+                <span className="material-symbols-outlined text-[16px]">track_changes</span>
+                <span className="hidden sm:inline">Foco</span>
+              </button>
+            )}
+
+            {/* Importar ICS se modo não for apenas tarefas */}
+            {displayMode !== 'tarefas' && (
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(true)}
+                className="h-[34px] bg-app border border-border-subtle text-fg font-bold px-2.5 py-1 text-xs rounded-lg hover:bg-surface-hover hover:border-[var(--accent-primary)] transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
+                title="Importar de Google Agenda / .ics"
+              >
+                <span className="material-symbols-outlined text-[16px]">file_upload</span>
+                <span className="hidden sm:inline">.ics</span>
+              </button>
+            )}
+
+            {/* Criação Rápida */}
+            <div className="relative shrink-0" ref={quickCreateMenuRef}>
+              <button
+                type="button"
+                onClick={() => setIsQuickCreateMenuOpen(!isQuickCreateMenuOpen)}
+                className="h-[34px] bg-gradient-brand text-[var(--on-accent-secondary)] font-black px-3 py-1 text-xs rounded-lg hover:brightness-110 transition-all shadow-md flex items-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">bolt</span>
+                <span>Criar</span>
+                <span className="material-symbols-outlined text-[14px]">{isQuickCreateMenuOpen ? 'expand_less' : 'expand_more'}</span>
+              </button>
+
+              {isQuickCreateMenuOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-surface border border-border-subtle rounded-xl shadow-2xl z-50 overflow-hidden py-1">
+                  <div className="px-3 py-1.5 text-[10px] font-bold text-fg-muted uppercase tracking-wider border-b border-border-subtle">
+                    Rascunhos Rápidos
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setIsQuickCreateMenuOpen(false); handleNewDraftTask(); }}
+                    className="w-full text-left px-4 py-2.5 text-xs text-white hover:bg-[#9D4EDD]/20 hover:text-[#9D4EDD] transition-colors flex items-center gap-2.5 font-bold cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-[#FFCC00]">edit_note</span>
+                    Rascunho de Tarefa
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIsQuickCreateMenuOpen(false); handleNewDraftEvent(); }}
+                    className="w-full text-left px-4 py-2.5 text-xs text-white hover:bg-[#9D4EDD]/20 hover:text-[#9D4EDD] transition-colors flex items-center gap-2.5 font-bold cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-[#9D4EDD]">event_note</span>
+                    Rascunho de Evento
+                  </button>
+
+                  <div className="h-[1px] bg-border-subtle my-1" />
+
+                  <div className="px-3 py-1.5 text-[10px] font-bold text-fg-muted uppercase tracking-wider border-b border-border-subtle">
+                    Formulário Completo
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setIsQuickCreateMenuOpen(false); handleNew(); }}
+                    className="w-full text-left px-4 py-2.5 text-xs text-fg-secondary hover:bg-surface-hover hover:text-white transition-colors flex items-center gap-2.5 font-medium cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-[#FFCC00]">add_task</span>
+                    Nova Tarefa Completa
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIsQuickCreateMenuOpen(false); handleNewEvent(); }}
+                    className="w-full text-left px-4 py-2.5 text-xs text-fg-secondary hover:bg-surface-hover hover:text-white transition-colors flex items-center gap-2.5 font-medium cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-[#9D4EDD]">calendar_add_on</span>
+                    Novo Evento Completo
+                  </button>
                 </div>
               )}
-              {displayMode !== 'eventos' && (
-                <button 
-                  onClick={() => setIsDailyFollowup(!isDailyFollowup)}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-md flex items-center gap-1.5 transition-colors shadow-sm shrink-0 ${isDailyFollowup ? 'bg-[#9D4EDD] text-white' : 'bg-[#2D2D2D] hover:bg-[#3D3D3D] text-white border border-[#404040]'}`}
-                  title="Foco Diário"
-                >
-                  <span className="material-symbols-outlined text-[16px]">track_changes</span>
-                  Foco
-                </button>
-              )}
-              {displayMode !== 'tarefas' && (
-                <button
-                  onClick={() => setIsImportModalOpen(true)}
-                  className="bg-[#1A1A1A] border border-[#2D2D2D] text-white font-bold px-3 py-2 text-sm lg:px-4 lg:py-2.5 rounded-md hover:bg-[#2A2A2A] hover:border-[#9D4EDD] transition-colors shadow-sm shrink-0 flex items-center gap-1.5"
-                  title="Importar de Google Agenda / .ics"
-                >
-                  <span className="material-symbols-outlined text-base">file_upload</span>
-                  <span>Importar .ics</span>
-                </button>
-              )}
-
-              {/* Menu de Criação Rápida */}
-              <div className="relative shrink-0" ref={quickCreateMenuRef}>
-                <button 
-                  onClick={() => setIsQuickCreateMenuOpen(!isQuickCreateMenuOpen)}
-                  className="bg-gradient-to-r from-[#FFCC00] via-[#FF9900] to-[#9D4EDD] text-[#121212] font-black px-4 py-2 text-sm lg:px-5 lg:py-2.5 rounded-md hover:brightness-110 transition-all shadow-md flex items-center gap-1.5 shrink-0"
-                >
-                  <span className="material-symbols-outlined text-[18px]">bolt</span>
-                  <span>Criação Rápida</span>
-                  <span className="material-symbols-outlined text-[16px]">{isQuickCreateMenuOpen ? 'expand_less' : 'expand_more'}</span>
-                </button>
-
-                {isQuickCreateMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-[#1A1A1A] border border-[#2D2D2D] rounded-xl shadow-2xl z-50 overflow-hidden py-1">
-                    <div className="px-3 py-1.5 text-[10px] font-bold text-[#8E8E8E] uppercase tracking-wider border-b border-[#2D2D2D]">
-                      Rascunhos Rápidos
-                    </div>
-                    <button 
-                      onClick={() => { setIsQuickCreateMenuOpen(false); handleNewDraftTask(); }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-white hover:bg-[#9D4EDD]/20 hover:text-[#9D4EDD] transition-colors flex items-center gap-2.5 font-bold"
-                    >
-                      <span className="material-symbols-outlined text-[16px] text-[#FFCC00]">edit_note</span>
-                      Rascunho de Tarefa
-                    </button>
-                    <button 
-                      onClick={() => { setIsQuickCreateMenuOpen(false); handleNewDraftEvent(); }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-white hover:bg-[#9D4EDD]/20 hover:text-[#9D4EDD] transition-colors flex items-center gap-2.5 font-bold"
-                    >
-                      <span className="material-symbols-outlined text-[16px] text-[#9D4EDD]">event_note</span>
-                      Rascunho de Evento
-                    </button>
-
-                    <div className="h-[1px] bg-[#2D2D2D] my-1" />
-
-                    <div className="px-3 py-1.5 text-[10px] font-bold text-[#8E8E8E] uppercase tracking-wider border-b border-[#2D2D2D]">
-                      Formulário Completo
-                    </div>
-                    <button 
-                      onClick={() => { setIsQuickCreateMenuOpen(false); handleNew(); }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-[#E0E0E0] hover:bg-[#252525] hover:text-white transition-colors flex items-center gap-2.5 font-medium"
-                    >
-                      <span className="material-symbols-outlined text-[16px] text-[#FFCC00]">add_task</span>
-                      Nova Tarefa Completa
-                    </button>
-                    <button 
-                      onClick={() => { setIsQuickCreateMenuOpen(false); handleNewEvent(); }}
-                      className="w-full text-left px-4 py-2.5 text-xs text-[#E0E0E0] hover:bg-[#252525] hover:text-white transition-colors flex items-center gap-2.5 font-medium"
-                    >
-                      <span className="material-symbols-outlined text-[16px] text-[#9D4EDD]">calendar_add_on</span>
-                      Novo Evento Completo
-                    </button>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         </div>
 
+        {/* Chips de Filtros Ativos (quando recolhido, mas houver filtros aplicados) */}
+        {!isQuickFiltersExpanded && activeFilterPills.length > 0 && (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-surface/70 border border-border-subtle rounded-xl overflow-x-auto hide-scrollbar">
+            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider shrink-0">Filtros:</span>
+            <div className="flex items-center gap-1.5 flex-1 overflow-x-auto hide-scrollbar">
+              {activeFilterPills.map((p) => (
+                <span
+                  key={p.key}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-surface-hover border border-border-subtle text-fg shrink-0"
+                >
+                  <span className="truncate max-w-[130px]">{p.label}</span>
+                  <button
+                    type="button"
+                    onClick={() => p.onRemove()}
+                    className="text-fg-muted hover:text-white rounded-full w-3.5 h-3.5 flex items-center justify-center text-[10px] cursor-pointer"
+                    title="Remover filtro"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={clearAllQuickFilters}
+              className="text-[11px] font-bold text-fg-secondary hover:text-rose-400 px-2 py-0.5 rounded border border-border-subtle hover:border-rose-500/40 transition-colors shrink-0 cursor-pointer"
+            >
+              Limpar tudo
+            </button>
+          </div>
+        )}
 
-      {/* View Mode */}
-      <div className="w-full flex items-center justify-center mt-6 mb-2 pb-2">
-        <div className="flex bg-[#1A1A1A] border border-[#2D2D2D] rounded-full p-1.5 shadow-lg">
-          <button
-            onClick={() => setViewMode('list')}
-            className={`px-6 py-2 text-sm font-bold rounded-full transition-all flex items-center gap-2 ${
-              viewMode === 'list' 
-                ? 'bg-[#9D4EDD] text-white shadow-md' 
-                : 'text-[#A0A0A0] hover:text-white'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[16px]">format_list_bulleted</span>
-            Lista
-          </button>
-          <button
-            onClick={() => setViewMode('weekly')}
-            className={`px-6 py-2 text-sm font-bold rounded-full transition-all flex items-center gap-2 ${
-              viewMode === 'weekly' 
-                ? 'bg-[#9D4EDD] text-white shadow-md' 
-                : 'text-[#A0A0A0] hover:text-white'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[16px]">view_week</span>
-            Semanal
-          </button>
-          <button
-            onClick={() => setViewMode('monthly')}
-            className={`px-6 py-2 text-sm font-bold rounded-full transition-all flex items-center gap-2 ${
-              viewMode === 'monthly' 
-                ? 'bg-[#9D4EDD] text-white shadow-md' 
-                : 'text-[#A0A0A0] hover:text-white'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[16px]">calendar_month</span>
-            Mensal
-          </button>
-        </div>
+        {/* Painel Completo de Filtros quando Expandido */}
+        {isQuickFiltersExpanded && (
+          <div className="w-full bg-surface border border-border-subtle rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col gap-3">
+            {/* Header do Painel */}
+            <div className="flex items-center justify-between pb-2 border-b border-border-subtle">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px] text-[var(--accent-secondary,#FFCC00)]">tune</span>
+                <span className="text-xs font-bold text-white uppercase tracking-wider">Painel de Filtros e Ordenação</span>
+                {activeFilterPills.length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-[var(--accent-secondary,#FFCC00)]/20 text-[var(--accent-secondary,#FFCC00)] border border-[var(--accent-secondary,#FFCC00)]/40">
+                    {activeFilterPills.length} {activeFilterPills.length === 1 ? 'ativo' : 'ativos'}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {activeFilterPills.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearAllQuickFilters}
+                    className="text-[11px] font-bold text-fg-secondary hover:text-rose-400 px-2 py-0.5 rounded border border-border-subtle hover:border-rose-500/40 transition-colors cursor-pointer"
+                  >
+                    Limpar tudo
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsQuickFiltersModalOpen(true)}
+                  className="p-1 text-fg-muted hover:text-[var(--accent-primary,#9D4EDD)] hover:bg-surface-hover rounded transition-colors cursor-pointer"
+                  title="Configurar Filtros Rápidos"
+                >
+                  <span className="material-symbols-outlined text-[16px]">settings</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Row 1: Ordenação dinâmica */}
+            {displayMode !== 'eventos' && quickSorts.length > 0 && (
+              <div className="flex w-full overflow-x-auto hide-scrollbar items-center justify-start gap-2 shrink-0 pb-1">
+                <span className="text-[10px] text-fg-muted px-1 font-bold uppercase tracking-wider shrink-0">Ordem:</span>
+                <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                  {quickSorts.map(sortKey => {
+                    if (sortKey === 'status') {
+                      return (
+                        <React.Fragment key="status">
+                          <button type="button" onClick={() => setSortBy('status')} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${sortBy === 'status' ? 'bg-[#9D4EDD]/20 border-[#9D4EDD] text-[#9D4EDD]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}>Padrão</button>
+                          <button type="button" onClick={() => setSortBy('status_inv')} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${sortBy === 'status_inv' ? 'bg-[#FFCC00]/15 border-[#FFCC00] text-[#FFCC00]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}>Padrão (inv)</button>
+                        </React.Fragment>
+                      );
+                    }
+                    if (sortKey === 'manual') {
+                      return <button type="button" key="manual" onClick={() => setSortBy('manual')} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${sortBy === 'manual' ? 'bg-[#9D4EDD]/20 border-[#9D4EDD] text-[#9D4EDD]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}>Manual</button>;
+                    }
+                    if (sortKey === 'prazo') {
+                      return <button type="button" key="prazo" onClick={() => setSortBy('prazo')} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${sortBy === 'prazo' ? 'bg-[#9D4EDD]/20 border-[#9D4EDD] text-[#9D4EDD]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}>Prazo</button>;
+                    }
+                    if (sortKey === 'prioridade') {
+                      return (
+                        <React.Fragment key="prioridade">
+                          <button type="button" onClick={() => setSortBy('prioridade_desc')} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 flex items-center gap-1 cursor-pointer ${sortBy === 'prioridade_desc' ? getBadgeColorClass('prioridade', 'alta') : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}><span className="material-symbols-outlined text-[12px]">arrow_upward</span> Alta</button>
+                          <button type="button" onClick={() => setSortBy('prioridade_asc')} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 flex items-center gap-1 cursor-pointer ${sortBy === 'prioridade_asc' ? getBadgeColorClass('prioridade', 'baixa') : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}><span className="material-symbols-outlined text-[12px]">arrow_downward</span> Baixa</button>
+                        </React.Fragment>
+                      );
+                    }
+                    if (sortKey === 'categoria') {
+                      return <button type="button" key="categoria" onClick={() => setSortBy('categoria')} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${sortBy === 'categoria' ? 'bg-[#9D4EDD]/20 border-[#9D4EDD] text-[#9D4EDD]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}>Categoria</button>;
+                    }
+                    const col = columns.find(c => c.key === sortKey);
+                    if (col) {
+                      return (
+                        <button type="button" key={`custom_${sortKey}`} onClick={() => setSortBy(`custom_${sortKey}`)} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${sortBy === `custom_${sortKey}` ? 'bg-[#9D4EDD]/20 border-[#9D4EDD] text-[#9D4EDD]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}>{col.name}</button>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Row 2: Status (Visibilidade) */}
+            {displayMode !== 'eventos' && (
+              <div className="flex w-full overflow-x-auto hide-scrollbar items-center gap-2 shrink-0 pb-1 justify-start">
+                <span className="text-[10px] text-fg-muted px-1 font-bold uppercase tracking-wider shrink-0">Status:</span>
+                <button
+                  type="button"
+                  onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                  className={`h-[26px] px-2 text-[11px] rounded-md border transition-colors font-bold shrink-0 flex items-center justify-center gap-1 cursor-pointer ${
+                    showFavoritesOnly ? 'bg-[#FFCC00]/20 border-[#FFCC00] text-[#FFCC00]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
+                  }`}
+                  title="Apenas Favoritas"
+                >
+                  <span className={`material-symbols-outlined text-[12px] ${showFavoritesOnly ? 'text-[#FFCC00]' : ''}`}>star</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDraftsOnly(!showDraftsOnly)}
+                  className={`h-[26px] px-2.5 text-[11px] rounded-md border transition-colors font-bold shrink-0 flex items-center justify-center gap-1 cursor-pointer ${
+                    showDraftsOnly ? 'bg-[#8E8E8E]/20 border-[#8E8E8E] text-fg-muted' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
+                  }`}
+                >
+                  <span className={`material-symbols-outlined text-[12px] ${showDraftsOnly ? 'text-fg-muted' : ''}`}>draft</span> Rascunhos
+                </button>
+                {uniqueStatuses.map(s => (
+                  <button
+                    type="button"
+                    key={s}
+                    onClick={() => toggleFilter(selectedStatuses, setSelectedStatuses, s)}
+                    className={`h-[26px] px-2.5 text-[11px] rounded-md border transition-colors font-bold shrink-0 flex items-center justify-center cursor-pointer ${
+                      selectedStatuses.includes(s) ? getBadgeColorClass('status', s) : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Filtros Customizados baseados no quickFilters */}
+            {displayMode !== 'eventos' && quickFilters.map(filterKey => {
+              const col = columns.find(c => c.key === filterKey);
+              let options: string[] = [];
+              let isSelected: (val: string) => boolean = () => false;
+              let onToggle: (val: string) => void = () => {};
+              let onClear: () => void = () => {};
+              let isAllSelected = false;
+              let isHidden = false;
+
+              if (filterKey === 'responsavel') {
+                options = uniqueUsers;
+                isSelected = (v) => selectedUsers.includes(v);
+                onToggle = (v) => toggleFilter(selectedUsers, setSelectedUsers, v);
+                onClear = () => setSelectedUsers([]);
+                isAllSelected = selectedUsers.length === 0;
+                if (isPersonalScope) isHidden = true;
+              } else if (filterKey === 'dimensao') {
+                options = uniqueDimensions;
+                isSelected = (v) => selectedDimensions.includes(v);
+                onToggle = (v) => toggleFilter(selectedDimensions, setSelectedDimensions, v);
+                onClear = () => setSelectedDimensions([]);
+                isAllSelected = selectedDimensions.length === 0;
+              } else if (filterKey === 'status') {
+                options = uniqueStatuses;
+                isSelected = (v) => selectedStatuses.includes(v);
+                onToggle = (v) => toggleFilter(selectedStatuses, setSelectedStatuses, v);
+                onClear = () => setSelectedStatuses([]);
+                isAllSelected = selectedStatuses.length === 0;
+              } else if (filterKey === 'categoria') {
+                options = uniqueCategories;
+                isSelected = (v) => selectedCategories.includes(v);
+                onToggle = (v) => toggleFilter(selectedCategories, setSelectedCategories, v);
+                onClear = () => setSelectedCategories([]);
+                isAllSelected = selectedCategories.length === 0;
+              } else if (col) {
+                options = col.options.map(o => o.value);
+                isSelected = (v) => (customFilters[filterKey] || []).includes(v);
+                onToggle = (v) => toggleCustomFilter(filterKey, v);
+                onClear = () => setCustomFilters(prev => ({ ...prev, [filterKey]: [] }));
+                isAllSelected = (customFilters[filterKey] || []).length === 0;
+              }
+
+              options = options.filter(o => o && o.trim() !== '');
+              if (isHidden || options.length === 0) return null;
+
+              return (
+                <div key={filterKey} className="flex w-full overflow-x-auto hide-scrollbar items-center gap-2 shrink-0 pb-1 justify-start">
+                  <span className="text-[10px] text-fg-muted px-1 font-bold uppercase tracking-wider shrink-0">
+                    {col ? col.name : filterKey}:
+                  </span>
+                  {options.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={onClear}
+                      className={`h-[26px] px-2.5 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${
+                        isAllSelected ? 'bg-[#FFCC00]/20 border-[#FFCC00] text-[#FFCC00]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
+                      }`}
+                    >
+                      Todas
+                    </button>
+                  )}
+                  {filterKey === 'dimensao' && (
+                    <button
+                      type="button"
+                      data-tour="filter-only-mine"
+                      onClick={() => setOnlyMyTasks((prev) => !prev)}
+                      className={`h-[26px] px-2.5 text-[11px] rounded-md border transition-all font-bold shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                        onlyMyTasks
+                          ? 'bg-[var(--accent-primary,#9D4EDD)] text-white border-[var(--accent-primary,#9D4EDD)] shadow-sm'
+                          : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
+                      }`}
+                    >
+                      <span>🎯 Apenas Minhas</span>
+                    </button>
+                  )}
+                  {options.map(o => (
+                    <button
+                      type="button"
+                      key={o}
+                      onClick={() => onToggle(o)}
+                      className={`h-[26px] px-2.5 text-[11px] ${filterKey === 'responsavel' ? 'rounded-full' : 'rounded-md'} border transition-colors font-bold flex items-center justify-center gap-1 shrink-0 cursor-pointer ${
+                        isSelected(o) ? getBadgeColorClass(filterKey, o) : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
+                      }`}
+                    >
+                      {filterKey === 'responsavel' && <span className="material-symbols-outlined text-[12px]">person</span>}
+                      {o}
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+
+            {/* Acompanhamento se estiver em eventos ou ambos */}
+            {(displayMode === 'eventos' || displayMode === 'ambos') && (
+              <div className="flex w-full overflow-x-auto hide-scrollbar items-center gap-2 shrink-0 pb-1 justify-start">
+                <span className="text-[10px] text-fg-muted px-1 font-bold uppercase tracking-wider shrink-0">
+                  Acompanhamento:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsDailyFollowup(!isDailyFollowup)}
+                  className={`h-[26px] px-3 text-[11px] rounded-md border transition-colors font-bold flex items-center justify-center gap-1 shrink-0 cursor-pointer ${
+                    isDailyFollowup ? 'bg-[#9D4EDD] text-white border-[#9D4EDD]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[12px]">today</span>
+                  Hoje & Pendentes
+                </button>
+              </div>
+            )}
+
+            {/* Exportação */}
+            {advancedSettings?.show_export_buttons !== false && (
+              <div className="pt-2 border-t border-border-subtle flex items-center justify-between flex-wrap gap-2">
+                <span className="text-[10px] text-fg-muted font-bold uppercase tracking-wider">
+                  Exportar ({processedTasks.length} visíveis):
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => downloadCSV(processedTasks, 'tarefas.csv')}
+                    className="flex items-center gap-1.5 px-2.5 py-1 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 rounded text-xs font-semibold transition-colors cursor-pointer"
+                    title="Baixar em formato CSV"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">table</span>
+                    CSV
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => downloadICS(processedTasks, 'tarefas.ics')}
+                    className="flex items-center gap-1.5 px-2.5 py-1 border border-blue-500/40 text-blue-400 hover:bg-blue-500/10 rounded text-xs font-semibold transition-colors cursor-pointer"
+                    title="Baixar em formato de calendário ICS"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">calendar_month</span>
+                    Agenda (ICS)
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
-
       {viewMode === 'list' && displayMode !== 'eventos' && (
-        <div className="flex flex-col gap-2 mt-4 custom-scrollbar overflow-x-auto w-full border border-[#2D2D2D] rounded-lg relative overflow-hidden" style={{ minHeight: '600px' }}>
-          <div ref={desktopContainerRef} style={{ overflowAnchor: 'none' }} className="hidden md:block overflow-x-auto bg-[#1A1A1A] border border-[#2D2D2D] rounded-lg relative">
+        <div data-tour="tasks-main-view" className="flex flex-col gap-2 mt-4 custom-scrollbar overflow-x-auto w-full border border-border-subtle rounded-lg relative overflow-hidden" style={{ minHeight: '600px' }}>
+          <div ref={desktopContainerRef} style={{ overflowAnchor: 'none' }} className="hidden md:block overflow-x-auto bg-surface border border-border-subtle rounded-lg relative">
             <table className="w-full text-left border-collapse min-w-[1400px]">
-          <thead className="bg-[#252525] border-b border-[#2D2D2D] sticky top-0 z-10">
+          <thead className="bg-surface-hover border-b border-border-subtle sticky top-0 z-10">
             <tr>
               <th className="p-4 w-[100px] text-center">
                 <input type="checkbox" className="accent-[#9D4EDD] rounded-sm" onChange={(e) => {
@@ -1802,57 +2223,57 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                   }
                 }} checked={selectedTasks.size === processedTasks.length && processedTasks.length > 0} />
               </th>
-              <th className="p-4 text-xs font-semibold text-[#8E8E8E] uppercase tracking-wider text-center w-[60px]">
+              <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider text-center w-[60px]">
                 <div className="flex items-center justify-center gap-1 relative group/tooltip cursor-help w-fit mx-auto">
-                  Ação <span className="material-symbols-outlined text-[6px] text-[#8E8E8E]">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-[#121212] text-white text-[11px] rounded border border-[#2D2D2D] shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal left-1/2 -translate-x-1/2">
+                  Ação <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal left-1/2 -translate-x-1/2">
                     Botões de edição e sub-tarefas.
                   </div>
                 </div>
               </th>
-              <th className="p-4 text-xs font-semibold text-[#8E8E8E] uppercase tracking-wider w-[220px]">
+              <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider w-[220px]">
                 <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                  Nome <span className="material-symbols-outlined text-[6px] text-[#8E8E8E]">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-[#121212] text-white text-[11px] rounded border border-[#2D2D2D] shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-left font-normal normal-case tracking-normal left-0">
+                  Nome <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-left font-normal normal-case tracking-normal left-0">
                     O nome principal da sua tarefa.
                   </div>
                 </div>
               </th>
-              <th className="p-4 text-xs font-semibold text-[#8E8E8E] uppercase tracking-wider">
+              <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">
                 <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                  Status <span className="material-symbols-outlined text-[6px] text-[#8E8E8E]">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-[#121212] text-white text-[11px] rounded border border-[#2D2D2D] shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal left-1/2 -translate-x-1/2">
+                  Status <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal left-1/2 -translate-x-1/2">
                     O estágio atual da tarefa (Ex: Em progresso).
                   </div>
                 </div>
               </th>
-              <th className="p-4 text-xs font-semibold text-[#8E8E8E] uppercase tracking-wider">
+              <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">
                 <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                  Prioridade <span className="material-symbols-outlined text-[6px] text-[#8E8E8E]">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-[#121212] text-white text-[11px] rounded border border-[#2D2D2D] shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal left-1/2 -translate-x-1/2">
+                  Prioridade <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal left-1/2 -translate-x-1/2">
                     Nível de urgência (Alta, Média, Baixa).
                   </div>
                 </div>
               </th>
-              <th className="p-4 text-xs font-semibold text-[#8E8E8E] uppercase tracking-wider">
+              <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">
                 <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                  Categoria <span className="material-symbols-outlined text-[6px] text-[#8E8E8E]">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-[#121212] text-white text-[11px] rounded border border-[#2D2D2D] shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal left-1/2 -translate-x-1/2">
+                  Categoria <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal left-1/2 -translate-x-1/2">
                     O tipo de ação (Ex: Programar, Estudar).
                   </div>
                 </div>
               </th>
-              {visibleExtraCols.includes("responsavel") && <th className="p-4 text-xs font-semibold text-[#8E8E8E] uppercase tracking-wider">Responsável</th>}
-              <th className="p-4 text-xs font-semibold text-[#8E8E8E] uppercase tracking-wider">Criada em</th>
-              <th className="p-4 text-xs font-semibold text-[#8E8E8E] uppercase tracking-wider">Início</th>
-              <th className="p-4 text-xs font-semibold text-[#8E8E8E] uppercase tracking-wider">Prazo</th>
-              {hasAnyPrazo && <th className="p-4 text-xs font-semibold text-[#8E8E8E] uppercase tracking-wider">Dias Restantes</th>}
-              {visibleExtraCols.includes("concluida_em") && <th className="p-4 text-xs font-semibold text-[#8E8E8E] uppercase tracking-wider">Concluída em</th>}
-              {visibleExtraCols.includes("frequencia") && <th className="p-4 text-xs font-semibold text-[#8E8E8E] uppercase tracking-wider">Freq.</th>}
-              <th className="p-4 text-xs font-semibold text-[#8E8E8E] uppercase tracking-wider">
+              {visibleExtraCols.includes("responsavel") && <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">Responsável</th>}
+              <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">Criada em</th>
+              <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">Início</th>
+              <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">Prazo</th>
+              {hasAnyPrazo && <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">Dias Restantes</th>}
+              {visibleExtraCols.includes("concluida_em") && <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">Concluída em</th>}
+              {visibleExtraCols.includes("frequencia") && <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">Freq.</th>}
+              <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">
                 <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                  Dimensão <span className="material-symbols-outlined text-[6px] text-[#8E8E8E]">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-[#121212] text-white text-[11px] rounded border border-[#2D2D2D] shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
+                  Dimensão <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
                     A grande área da sua vida (Pessoal, Saúde, etc).
                   </div>
                 </div>
@@ -1862,7 +2283,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
           <tbody>
             {localTasks.length === 0 && (
               <tr>
-                <td colSpan={14} className="p-8 text-center text-[#8E8E8E]">
+                <td colSpan={14} className="p-8 text-center text-fg-muted">
                   Nenhuma tarefa encontrada. Clique em <span className="text-[#FFCC00] font-bold">+ Nova Tarefa</span> para começar.
                 </td>
               </tr>
@@ -1877,13 +2298,13 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                 onDrop={sortBy === 'manual' ? (e) => handleDrop(e, task.id) : undefined}
                 onDragEnd={sortBy === 'manual' ? () => setDropTargetId(null) : undefined}
                 onClick={(e) => handleRowClick(e, task.id)}
-                className={`transition-colors group ${selectedTasks.has(task.id) ? 'bg-[#9D4EDD]/10' : 'hover:bg-[#252525]'} ${draggedTaskId === task.id ? 'opacity-50' : ''} ${dropTargetId === task.id ? (dropPosition === 'top' ? 'border-t-2 border-[#9D4EDD]' : 'border-b-2 border-[#9D4EDD]') : 'border-b border-[#FFCC00]/30 hover:border-[#9D4EDD]'}`}
+                className={`transition-colors group ${selectedTasks.has(task.id) ? 'bg-[#9D4EDD]/10' : 'hover:bg-surface-hover'} ${draggedTaskId === task.id ? 'opacity-50' : ''} ${dropTargetId === task.id ? (dropPosition === 'top' ? 'border-t-2 border-[#9D4EDD]' : 'border-b-2 border-[#9D4EDD]') : 'border-b border-[#FFCC00]/30 hover:border-[#9D4EDD]'}`}
               >
                 <td className="p-4">
                   <div className="flex items-center justify-center gap-2">
-                    <span className={`material-symbols-outlined text-[#8E8E8E] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity ${sortBy === 'manual' ? 'cursor-grab' : 'cursor-not-allowed'}`} title={sortBy !== 'manual' ? 'Mude para ordenação Manual para arrastar' : 'Arrastar'}>drag_indicator</span>
+                    <span className={`material-symbols-outlined text-fg-muted hover:text-white opacity-0 group-hover:opacity-100 transition-opacity ${sortBy === 'manual' ? 'cursor-grab' : 'cursor-not-allowed'}`} title={sortBy !== 'manual' ? 'Mude para ordenação Manual para arrastar' : 'Arrastar'}>drag_indicator</span>
                     <input type="checkbox" className="accent-[#9D4EDD] rounded-sm" checked={selectedTasks.has(task.id)} onChange={(e) => toggleCheckbox(e, task.id)} />
-                    <button onClick={(e) => handleFavoriteToggle(e, task.id)} className={`transition-colors flex items-center justify-center ${task.is_favorite ? 'text-[#FFCC00]' : 'text-[#8E8E8E] hover:text-[#FFCC00]'}`}>
+                    <button onClick={(e) => handleFavoriteToggle(e, task.id)} className={`transition-colors flex items-center justify-center ${task.is_favorite ? 'text-[#FFCC00]' : 'text-fg-muted hover:text-[#FFCC00]'}`}>
                       <span className={`material-symbols-outlined text-[18px] ${task.is_favorite ? 'filled' : ''}`} style={task.is_favorite ? { fontVariationSettings: "'FILL' 1" } : {}}>star</span>
                     </button>
                   </div>
@@ -1891,7 +2312,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                 <td className="p-4 text-center">
                   <button 
                     onClick={() => handleEdit(task)}
-                    className="text-[#8E8E8E] hover:text-[#9D4EDD] opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-fg-muted hover:text-[#9D4EDD] opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <span className="material-symbols-outlined text-[18px]">edit</span>
                   </button>
@@ -1899,7 +2320,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                 <td className="p-4 text-sm font-medium text-white break-words" title={task.descricao || ''}>
                   <div className={`flex items-center gap-2 ${task.parent_id ? 'pl-3 border-l-2 border-[#FFCC00] ml-4 scale-[0.97] origin-left' : ''}`}>
                     {!task.parent_id && localTasks.some(t => t.parent_id === task.id) && (
-                      <button onClick={(e) => toggleExpand(e, task.id)} className="text-[#8E8E8E] hover:text-white transition-colors flex items-center justify-center shrink-0">
+                      <button onClick={(e) => toggleExpand(e, task.id)} className="text-fg-muted hover:text-white transition-colors flex items-center justify-center shrink-0">
                         <span className="material-symbols-outlined text-[20px]">{!collapsedTasks.has(task.id) ? 'expand_more' : 'chevron_right'}</span>
                       </button>
                     )}
@@ -1907,14 +2328,14 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                       <div className="flex items-center gap-2">
                         <HighlightedText text={task.nome} highlight={searchTerm} />
                         {(task as any).custom_fields?.foto_url && (
-                          <a href={(task as any).custom_fields.foto_url} target="_blank" rel="noopener noreferrer" className="text-[#8E8E8E] hover:text-[#9D4EDD] flex items-center transition-colors" title="Ver foto">
+                          <a href={(task as any).custom_fields.foto_url} target="_blank" rel="noopener noreferrer" className="text-fg-muted hover:text-[#9D4EDD] flex items-center transition-colors" title="Ver foto">
                             <span className="material-symbols-outlined text-[16px]">image</span>
                           </a>
                         )}
                       </div>
                       {task.descricao && (
                         <div className="mt-1 flex flex-col items-start w-full pr-2">
-                          <div className={`text-xs text-[#A0A0A0] transition-all ${(expandedTasks.includes(task.id) || advancedSettings?.auto_expand_descriptions) ? 'whitespace-pre-wrap' : 'line-clamp-1'}`}>
+                          <div className={`text-xs text-fg-secondary transition-all ${(expandedTasks.includes(task.id) || advancedSettings?.auto_expand_descriptions) ? 'whitespace-pre-wrap' : 'line-clamp-1'}`}>
                             <HighlightedText text={task.descricao} highlight={searchTerm} />
                           </div>
                           {(!advancedSettings?.auto_expand_descriptions && (task.descricao.length > 80 || task.descricao.includes('\n'))) && (
@@ -1938,9 +2359,9 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                 <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'prioridade')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar prioridade"><Badge type="prioridade" value={task.prioridade} customColor={getColColor('prioridade', task.prioridade)} /></div></td>
                 <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'categoria')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar categoria"><Badge type="categoria" value={task.categoria} customColor={getColColor('categoria', task.categoria)} /></div></td>
                 {!isPersonalScope && <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'responsavel')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar responsável"><Badge type="responsavel" value={task.responsavel} customColor={getColColor('responsavel', task.responsavel)} /></div></td>}
-                <td className="p-4 text-xs text-[#A0A0A0]">{formatDate(task.created_at)}</td>
-                <td className="p-4 text-xs text-[#A0A0A0]">{formatDate(task.inicio)}</td>
-                <td className="p-4 text-xs text-[#A0A0A0]">{formatDate(task.prazo)}</td>
+                <td className="p-4 text-xs text-fg-secondary">{formatDate(task.created_at)}</td>
+                <td className="p-4 text-xs text-fg-secondary">{formatDate(task.inicio)}</td>
+                <td className="p-4 text-xs text-fg-secondary">{formatDate(task.prazo)}</td>
                 {hasAnyPrazo && (
                   <td className="p-4 text-xs">
                     {task.prazo ? (
@@ -1950,7 +2371,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                           if (days === null) return <span className="text-[#9D4EDD] font-bold">Concluída</span>;
                           return <span className="text-[#9D4EDD] font-bold">Concluída ({days > 0 ? `+${days}d` : `${days}d`})</span>;
                         }
-                        if (task.status === 'descartada') return <span className="text-[#8E8E8E] font-bold">-</span>;
+                        if (task.status === 'descartada') return <span className="text-fg-muted font-bold">-</span>;
                         const days = getDaysUntil(task.prazo);
                         if (days === null) return '-';
                         if (days < 0) return <span className="text-[#db4437] font-bold">Atrasada ({-days}d)</span>;
@@ -1960,15 +2381,15 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                     ) : '-'}
                   </td>
                 )}
-                <td className="p-4 text-xs text-[#A0A0A0]">{formatDate(task.concluida_em)}</td>
-                <td className="p-4 text-xs text-[#A0A0A0]">{task.frequencia || '-'}</td>
+                <td className="p-4 text-xs text-fg-secondary">{formatDate(task.concluida_em)}</td>
+                <td className="p-4 text-xs text-fg-secondary">{task.frequencia || '-'}</td>
                 <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'dimensao')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar dimensão"><Badge type="dimensao" value={task.dimensao} customColor={getColColor('dimensao', task.dimensao)} /></div></td>
               </tr>
               </React.Fragment>
             ))}
             {processedTasks.length === 0 && (
               <tr>
-                <td colSpan={13} className="p-8 text-center text-[#8E8E8E] text-sm">Nenhuma tarefa encontrada.</td>
+                <td colSpan={13} className="p-8 text-center text-fg-muted text-sm">Nenhuma tarefa encontrada.</td>
               </tr>
             )}
           </tbody>
@@ -1987,16 +2408,16 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
             onDrop={sortBy === 'manual' ? (e) => handleDrop(e, task.id) : undefined}
             onDragEnd={sortBy === 'manual' ? () => setDropTargetId(null) : undefined}
             onClick={(e) => handleRowClick(e, task.id)}
-            className={`border rounded-lg p-4 flex flex-col gap-3 relative transition-colors ${selectedTasks.has(task.id) ? 'bg-[#9D4EDD]/10 border-[#9D4EDD]/30' : 'bg-[#1A1A1A] border-[#FFCC00]/30 hover:border-[#9D4EDD]'} ${draggedTaskId === task.id ? 'opacity-50' : ''} ${dropTargetId === task.id ? (dropPosition === 'top' ? 'border-t-2 border-[#9D4EDD]' : 'border-b-2 border-[#9D4EDD]') : ''} ${task.parent_id ? 'border-l-2 border-l-[#FFCC00] ml-4 scale-[0.97] origin-left' : ''}`}
+            className={`border rounded-lg p-4 flex flex-col gap-3 relative transition-colors ${selectedTasks.has(task.id) ? 'bg-[#9D4EDD]/10 border-[#9D4EDD]/30' : 'bg-surface border border-border-subtle hover:border-[var(--accent-primary)]'} ${draggedTaskId === task.id ? 'opacity-50' : ''} ${dropTargetId === task.id ? (dropPosition === 'top' ? 'border-t-2 border-[#9D4EDD]' : 'border-b-2 border-[#9D4EDD]') : ''} ${task.parent_id ? 'border-l-2 border-l-[#FFCC00] ml-4 scale-[0.97] origin-left' : ''}`}
           >
             <div className="absolute top-4 right-4 flex items-center gap-3">
-              <button onClick={(e) => handleFavoriteToggle(e, task.id)} className={`transition-colors flex items-center justify-center ${task.is_favorite ? 'text-[#FFCC00]' : 'text-[#8E8E8E] hover:text-[#FFCC00]'}`}>
+              <button onClick={(e) => handleFavoriteToggle(e, task.id)} className={`transition-colors flex items-center justify-center ${task.is_favorite ? 'text-[#FFCC00]' : 'text-fg-muted hover:text-[#FFCC00]'}`}>
                 <span className={`material-symbols-outlined text-[18px] ${task.is_favorite ? 'filled' : ''}`} style={task.is_favorite ? { fontVariationSettings: "'FILL' 1" } : {}}>star</span>
               </button>
               <input type="checkbox" className="accent-[#9D4EDD] rounded-sm w-4 h-4" checked={selectedTasks.has(task.id)} onChange={(e) => toggleCheckbox(e, task.id)} />
               <button 
                 onClick={() => handleEdit(task)}
-                className="text-[#8E8E8E] hover:text-[#9D4EDD]"
+                className="text-fg-muted hover:text-[#9D4EDD]"
               >
                 <span className="material-symbols-outlined text-[18px]">edit</span>
               </button>
@@ -2004,19 +2425,19 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
             
             <div className={`pr-16 flex items-start gap-2`}>
               {!task.parent_id && localTasks.some(t => t.parent_id === task.id) && (
-                <button onClick={(e) => toggleExpand(e, task.id)} className="text-[#8E8E8E] hover:text-white transition-colors flex items-center justify-center shrink-0 mt-0.5">
+                <button onClick={(e) => toggleExpand(e, task.id)} className="text-fg-muted hover:text-white transition-colors flex items-center justify-center shrink-0 mt-0.5">
                   <span className="material-symbols-outlined text-[20px]">{!collapsedTasks.has(task.id) ? 'expand_more' : 'chevron_right'}</span>
                 </button>
               )}
               {(!task.parent_id || !localTasks.some(t => t.parent_id === task.id)) && (
-                <span className={`material-symbols-outlined text-[#8E8E8E] text-[18px] mt-0.5 ${sortBy === 'manual' ? 'cursor-grab' : 'cursor-not-allowed'}`} title={sortBy !== 'manual' ? 'Mude para ordenação Manual para arrastar' : 'Arrastar'}>drag_indicator</span>
+                <span className={`material-symbols-outlined text-fg-muted text-[18px] mt-0.5 ${sortBy === 'manual' ? 'cursor-grab' : 'cursor-not-allowed'}`} title={sortBy !== 'manual' ? 'Mude para ordenação Manual para arrastar' : 'Arrastar'}>drag_indicator</span>
               )}
               <div>
                 <h3 className="text-sm font-bold text-white mb-1">
                   <div className="flex items-center gap-2">
                     <HighlightedText text={task.nome} highlight={searchTerm} />
                     {(task as any).custom_fields?.foto_url && (
-                      <a href={(task as any).custom_fields.foto_url} target="_blank" rel="noopener noreferrer" className="text-[#8E8E8E] hover:text-[#9D4EDD] flex items-center transition-colors" title="Ver foto">
+                      <a href={(task as any).custom_fields.foto_url} target="_blank" rel="noopener noreferrer" className="text-fg-muted hover:text-[#9D4EDD] flex items-center transition-colors" title="Ver foto">
                         <span className="material-symbols-outlined text-[16px]">image</span>
                       </a>
                     )}
@@ -2024,7 +2445,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                 </h3>
                 {task.descricao && (
                   <div className="mt-1 flex flex-col items-start w-full">
-                    <p className={`text-[11px] text-[#A0A0A0] transition-all ${(expandedTasks.includes(task.id) || advancedSettings?.auto_expand_descriptions) ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}>
+                    <p className={`text-[11px] text-fg-secondary transition-all ${(expandedTasks.includes(task.id) || advancedSettings?.auto_expand_descriptions) ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}>
                       <HighlightedText text={task.descricao} highlight={searchTerm} />
                     </p>
                     {(!advancedSettings?.auto_expand_descriptions && (task.descricao.length > 100 || task.descricao.includes('\n'))) && (
@@ -2047,21 +2468,21 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
             <div className="mt-1 pl-6 pr-2">
               <div className="flex justify-between items-center text-center mb-1 gap-1">
                 <div className="flex-1 flex justify-center items-center gap-1">
-  <span className="text-[9px] text-[#8E8E8E] font-semibold uppercase tracking-wider truncate">Status</span>
-  <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Estágio atual.")}><span className="material-symbols-outlined text-[6px] text-[#8E8E8E]">help</span></div>
+  <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Status</span>
+  <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Estágio atual.")}><span className="material-symbols-outlined text-[6px] text-fg-muted">help</span></div>
 </div>
                 <div className="flex-1 flex justify-center items-center gap-1">
-  <span className="text-[9px] text-[#8E8E8E] font-semibold uppercase tracking-wider truncate">Prio</span>
-  <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Nível de urgência.")}><span className="material-symbols-outlined text-[6px] text-[#8E8E8E]">help</span></div>
+  <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Prio</span>
+  <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Nível de urgência.")}><span className="material-symbols-outlined text-[6px] text-fg-muted">help</span></div>
 </div>
                 <div className="flex-1 flex justify-center items-center gap-1">
-  <span className="text-[9px] text-[#8E8E8E] font-semibold uppercase tracking-wider truncate">Categ</span>
-  <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Tipo de ação.")}><span className="material-symbols-outlined text-[6px] text-[#8E8E8E]">help</span></div>
+  <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Categ</span>
+  <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Tipo de ação.")}><span className="material-symbols-outlined text-[6px] text-fg-muted">help</span></div>
 </div>
-                {visibleExtraCols.includes("responsavel") && <span className="text-[9px] text-[#8E8E8E] font-semibold uppercase tracking-wider flex-1 truncate">Resp</span>}
+                {visibleExtraCols.includes("responsavel") && <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider flex-1 truncate">Resp</span>}
                 <div className="flex-1 flex justify-center items-center gap-1">
-  <span className="text-[9px] text-[#8E8E8E] font-semibold uppercase tracking-wider truncate">Dim</span>
-  <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Área da vida.")}><span className="material-symbols-outlined text-[6px] text-[#8E8E8E]">help</span></div>
+  <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Dim</span>
+  <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Área da vida.")}><span className="material-symbols-outlined text-[6px] text-fg-muted">help</span></div>
 </div>
               </div>
               <div className="flex justify-between items-center text-center gap-1">
@@ -2073,7 +2494,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
               </div>
             </div>
 
-            <div className="flex items-center justify-between mt-2 border-t border-[#2D2D2D] pt-2 pb-1 text-[9px] text-[#A0A0A0] pl-6 pr-2">
+            <div className="flex items-center justify-between mt-2 border-t border-border-subtle pt-2 pb-1 text-[9px] text-fg-secondary pl-6 pr-2">
               <span className="truncate">Cria: {formatDate(task.created_at)}</span>
               <span className="truncate">Ini: {formatDate(task.inicio)}</span>
               <span className="truncate flex items-center gap-1">
@@ -2085,7 +2506,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                       if (days === null) return <span className="text-[#9D4EDD] font-bold">Concluída</span>;
                       return <span className="text-[#9D4EDD] font-bold">Concluída ({days > 0 ? `+${days}d` : `${days}d`})</span>;
                     }
-                    if (task.status === 'descartada') return <span className="text-[#8E8E8E] font-bold">-</span>;
+                    if (task.status === 'descartada') return <span className="text-fg-muted font-bold">-</span>;
                     const days = getDaysUntil(task.prazo);
                     if (days === null) return null;
                     if (days < 0) return <span className="text-[#db4437] font-bold">({-days}d)</span>;
@@ -2105,14 +2526,14 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
           </div>
         ))}
         {localTasks.length === 0 && (
-          <div className="p-4 bg-[#1A1A1A] rounded-lg border border-[#FFCC00]/50 shadow-sm relative animate-pulse-slow">
+          <div className="p-4 bg-surface rounded-lg border border-border-subtle shadow-sm relative animate-pulse-slow">
             <div className="flex items-start gap-3">
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-2">
                   Bem-vindo! Tarefa de exemplo.
                   <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                    <span className="material-symbols-outlined text-[6px] text-[#8E8E8E]">help</span>
-                    <div className="absolute top-full mt-2 w-48 p-2 bg-[#121212] text-white text-[11px] rounded border border-[#2D2D2D] shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-left font-normal normal-case tracking-normal left-0">
+                    <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                    <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-left font-normal normal-case tracking-normal left-0">
                       O nome principal da sua tarefa.
                     </div>
                   </div>
@@ -2121,51 +2542,51 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <div className="flex items-center justify-between text-[10px] bg-[#252525] p-2 rounded">
-                <span className="text-[#8E8E8E] font-bold uppercase tracking-wider">Status</span>
+              <div className="flex items-center justify-between text-[10px] bg-surface-hover p-2 rounded text-fg">
+                <span className="text-fg-muted font-bold uppercase tracking-wider">Status</span>
                 <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                  <span className="material-symbols-outlined text-[6px] text-[#8E8E8E]">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-[#121212] text-white text-[11px] rounded border border-[#2D2D2D] shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
+                  <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
                     O estágio atual da tarefa (Ex: Em progresso).
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-between text-[10px] bg-[#252525] p-2 rounded">
-                <span className="text-[#8E8E8E] font-bold uppercase tracking-wider">Dimensão</span>
+              <div className="flex items-center justify-between text-[10px] bg-surface-hover p-2 rounded text-fg">
+                <span className="text-fg-muted font-bold uppercase tracking-wider">Dimensão</span>
                 <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                  <span className="material-symbols-outlined text-[6px] text-[#8E8E8E]">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-[#121212] text-white text-[11px] rounded border border-[#2D2D2D] shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
+                  <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
                     A grande área da sua vida (Pessoal, Saúde, etc).
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-between text-[10px] bg-[#252525] p-2 rounded">
-                <span className="text-[#8E8E8E] font-bold uppercase tracking-wider">Prioridade</span>
+              <div className="flex items-center justify-between text-[10px] bg-surface-hover p-2 rounded text-fg">
+                <span className="text-fg-muted font-bold uppercase tracking-wider">Prioridade</span>
                 <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                  <span className="material-symbols-outlined text-[6px] text-[#8E8E8E]">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-[#121212] text-white text-[11px] rounded border border-[#2D2D2D] shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
+                  <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
                     Nível de urgência (Alta, Média, Baixa).
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-between text-[10px] bg-[#252525] p-2 rounded">
-                <span className="text-[#8E8E8E] font-bold uppercase tracking-wider">Categoria</span>
+              <div className="flex items-center justify-between text-[10px] bg-surface-hover p-2 rounded text-fg">
+                <span className="text-fg-muted font-bold uppercase tracking-wider">Categoria</span>
                 <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                  <span className="material-symbols-outlined text-[6px] text-[#8E8E8E]">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-[#121212] text-white text-[11px] rounded border border-[#2D2D2D] shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
+                  <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
                     O tipo de ação (Ex: Programar, Estudar).
                   </div>
                 </div>
               </div>
             </div>
             
-            <div className="mt-6 text-center text-[#8E8E8E] text-xs">
+            <div className="mt-6 text-center text-fg-muted text-xs">
               Nenhuma tarefa encontrada.<br/>Clique em <span className="text-[#FFCC00] font-bold">+ Nova Tarefa</span> para começar.
             </div>
           </div>
         )}
         {processedTasks.length === 0 && localTasks.length > 0 && (
-          <div className="p-8 text-center text-[#8E8E8E] text-sm bg-[#1A1A1A] rounded-lg border border-[#2D2D2D]">
+          <div className="p-8 text-center text-fg-muted text-sm bg-surface rounded-lg border border-border-subtle">
             Nenhuma tarefa encontrada.
           </div>
         )}
@@ -2177,7 +2598,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
           <TaskCalendar 
             currentDate={calendarCurrentDate} 
             onDateChange={setCalendarCurrentDate} 
-            format={viewMode}
+            format={viewMode === 'monthly' ? 'monthly' : 'weekly'}
             tasks={displayMode === 'eventos' ? [] : processedTasks} 
             events={displayMode === 'tarefas' ? [] : processedEvents}
             onTaskClick={(t) => { setTaskToEdit(t); setIsModalOpen(true); }}
@@ -2187,25 +2608,25 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
         
         {/* Events List */}
         {displayMode !== 'tarefas' && (
-          <div className="mt-8 border border-[#2D2D2D] rounded-lg p-4 bg-[#1A1A1A]/50">
-            <h3 className="text-[#8E8E8E] uppercase font-bold text-xs mb-4">Próximos Eventos</h3>
+          <div className="mt-8 border border-border-subtle rounded-lg p-4 bg-surface/50">
+            <h3 className="text-fg-muted uppercase font-bold text-xs mb-4">Próximos Eventos</h3>
             {processedEvents.length === 0 ? (
-              <div className="text-sm text-[#8E8E8E]">Nenhum evento programado.</div>
+              <div className="text-sm text-fg-muted">Nenhum evento programado.</div>
             ) : (
               <div className="flex flex-col gap-2">
                 {processedEvents.map(evt => (
-                  <div key={evt.id} onClick={() => { setEventToEdit(evt); setIsEventModalOpen(true); }} className="flex flex-col p-3 bg-[#252525] border border-[#333333] rounded hover:border-[#9D4EDD]/50 transition-colors cursor-pointer relative group">
+                  <div key={evt.id} onClick={() => { setEventToEdit(evt); setIsEventModalOpen(true); }} className="flex flex-col p-3 bg-surface border border-border-subtle hover:bg-surface-hover rounded hover:border-[#9D4EDD]/50 transition-colors cursor-pointer relative group">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-[#26a69a] text-[16px]">event</span>
-                        <span className="font-bold text-sm text-[#E0E0E0]">{evt.nome}</span>
+                        <span className="font-bold text-sm text-fg-secondary">{evt.nome}</span>
                       </div>
-                      <button onClick={(e) => handleEventFavoriteToggle(e, evt)} className={`transition-colors flex items-center justify-center ${evt.is_favorite ? 'text-[#FFCC00]' : 'text-[#8E8E8E] hover:text-[#FFCC00] opacity-0 group-hover:opacity-100'}`}>
+                      <button onClick={(e) => handleEventFavoriteToggle(e, evt)} className={`transition-colors flex items-center justify-center ${evt.is_favorite ? 'text-[#FFCC00]' : 'text-fg-muted hover:text-[#FFCC00] opacity-0 group-hover:opacity-100'}`}>
                         <span className={`material-symbols-outlined text-[18px] ${evt.is_favorite ? 'filled' : ''}`} style={evt.is_favorite ? { fontVariationSettings: "'FILL' 1" } : {}}>star</span>
                       </button>
                     </div>
                     {(evt.data_inicio || evt.horarios_semanais) && (
-                      <div className="text-xs text-[#8E8E8E] mt-1 pl-6">
+                      <div className="text-xs text-fg-muted mt-1 pl-6">
                         {evt.frequencia === 'Semanal' && evt.horarios_semanais 
                           ? Object.entries(evt.horarios_semanais).map(([dia, h]: [string, any]) => `${dia} (${h.inicio} - ${h.fim})`).join(', ')
                           : evt.data_inicio ? new Date(evt.data_inicio).toLocaleDateString() : ''}
@@ -2239,7 +2660,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
         {isAurtistic && (
           <button 
             onClick={scrollToTop}
-            className="bg-[#1A1A1A] hover:bg-[#9D4EDD]/10 border border-[#FFCC00]/50 hover:border-[#9D4EDD] text-[#8E8E8E] hover:text-[#9D4EDD] p-3 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center group"
+            className="bg-surface hover:bg-surface-hover border border-[#FFCC00]/50 hover:border-[#9D4EDD] text-fg-muted hover:text-[#9D4EDD] p-3 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center group"
             title="Ir para o topo"
           >
             <span className="material-symbols-outlined">arrow_upward</span>
@@ -2271,7 +2692,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
         {/* Floating Scroll to Bottom Button */}
         <button 
           onClick={scrollToBottom}
-          className="bg-[#1A1A1A] hover:bg-[#9D4EDD]/10 border border-[#FFCC00]/50 hover:border-[#9D4EDD] text-[#8E8E8E] hover:text-[#9D4EDD] p-3 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center group"
+          className="bg-surface hover:bg-surface-hover border border-[#FFCC00]/50 hover:border-[#9D4EDD] text-fg-muted hover:text-[#9D4EDD] p-3 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center group"
           title="Ir para o fundo (Mais Recentes)"
         >
           <span className="material-symbols-outlined">arrow_downward</span>
@@ -2289,6 +2710,13 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
         columns={columns}
         onEditColumn={(col) => setEditingColumn(col)}
         advancedSettings={advancedSettings}
+        activeScope={activeScope}
+        activeOrgId={activeOrgId}
+        organizations={organizations}
+        subteams={activeOrgDetails?.subteams || []}
+        members={activeOrgDetails?.members || []}
+        userFiles={userFiles}
+        onFilesUpdated={() => {}}
       />
       <BulkEditModal 
         isOpen={isBulkEditModalOpen} 
@@ -2342,7 +2770,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
       {/* Active Tooltip Dropdown */}
       {activeTooltip && (
         <div
-          className="fixed z-[100] w-32 p-2 bg-[#121212] text-white text-[10px] rounded border border-[#2D2D2D] shadow-xl text-center font-normal normal-case tracking-normal"
+          className="fixed z-[100] w-32 p-2 bg-app text-fg text-[10px] rounded border border-border-subtle shadow-xl text-center font-normal normal-case tracking-normal"
           style={{ top: activeTooltip.top, bottom: activeTooltip.bottom, left: activeTooltip.left }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -2353,7 +2781,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
       {/* Quick Edit Dropdown */}
       {quickEdit && (
         <div 
-          className="fixed z-[100] bg-[#1A1A1A] border border-[#2D2D2D] rounded-md shadow-[0_8px_32px_rgba(0,0,0,0.8)] overflow-hidden min-w-[140px]"
+          className="fixed z-[100] bg-surface border border-border-subtle rounded-md shadow-[0_8px_32px_rgba(0,0,0,0.8)] overflow-hidden min-w-[140px]"
           style={{ top: quickEdit.top, bottom: quickEdit.bottom, left: quickEdit.left }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -2373,7 +2801,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                 return (
                   <button 
                     key={optStr} 
-                    className={`text-left px-3 py-2 text-xs hover:bg-[#252525] transition-colors ${quickEdit.value?.toLowerCase() === optStr.toLowerCase() ? 'text-[#9D4EDD] font-bold bg-[#9D4EDD]/10' : 'text-[#E0E0E0]'}`} 
+                    className={`text-left px-3 py-2 text-xs hover:bg-surface-hover transition-colors ${quickEdit.value?.toLowerCase() === optStr.toLowerCase() ? 'text-[#9D4EDD] font-bold bg-[#9D4EDD]/10' : 'text-fg-secondary'}`} 
                     onClick={() => handleQuickSave(quickEdit.taskId, quickEdit.field, optStr)}
                   >
                     {optStr === "" ? "Nenhum" : (quickEdit.field === 'status' ? optStr.charAt(0).toUpperCase() + optStr.slice(1) : optStr)}
@@ -2387,30 +2815,30 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
       {/* Modal Quick Filters */}
       {isQuickFiltersModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#1A1A1A] border border-[#2D2D2D] rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-[#2D2D2D] flex items-center justify-between bg-[#121212]">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#FFCC00]">settings</span>
+          <div className="bg-surface border border-border-subtle rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-border-subtle flex items-center justify-between bg-app">
+              <h2 className="text-lg font-bold text-fg flex items-center gap-2">
+                <span className="material-symbols-outlined text-[var(--accent-secondary)]">settings</span>
                 Filtros Rápidos
               </h2>
               <button 
                 onClick={() => setIsQuickFiltersModalOpen(false)}
-                className="text-[#8E8E8E] hover:text-white transition-colors flex items-center justify-center p-1 rounded-full hover:bg-[#2D2D2D]"
+                className="text-fg-muted hover:text-fg transition-colors flex items-center justify-center p-1 rounded-full hover:bg-surface-hover"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
             
-            <div className="flex w-full border-b border-[#2D2D2D] bg-[#1A1A1A]">
-               <button className={`flex-1 py-3 text-sm font-bold transition-colors ${quickFiltersTab === 'visibilidade' ? 'text-[#FFCC00] border-b-2 border-[#FFCC00]' : 'text-[#8E8E8E] hover:text-white'}`} onClick={() => setQuickFiltersTab('visibilidade')}>Visibilidade</button>
-               <button className={`flex-1 py-3 text-sm font-bold transition-colors ${quickFiltersTab === 'ordem' ? 'text-[#FFCC00] border-b-2 border-[#FFCC00]' : 'text-[#8E8E8E] hover:text-white'}`} onClick={() => setQuickFiltersTab('ordem')}>Ordem</button>
+            <div className="flex w-full border-b border-border-subtle bg-surface">
+               <button className={`flex-1 py-3 text-sm font-bold transition-colors cursor-pointer ${quickFiltersTab === 'visibilidade' ? 'text-[var(--accent-secondary)] border-b-2 border-[var(--accent-secondary)]' : 'text-fg-muted hover:text-fg'}`} onClick={() => setQuickFiltersTab('visibilidade')}>Visibilidade</button>
+               <button className={`flex-1 py-3 text-sm font-bold transition-colors cursor-pointer ${quickFiltersTab === 'ordem' ? 'text-[var(--accent-secondary)] border-b-2 border-[var(--accent-secondary)]' : 'text-fg-muted hover:text-fg'}`} onClick={() => setQuickFiltersTab('ordem')}>Ordem</button>
             </div>
             
             <div className="p-4 flex flex-col gap-3 max-h-[60vh] overflow-y-auto">
               
               {quickFiltersTab === 'visibilidade' ? (
                 <>
-                  <p className="text-xs text-[#A0A0A0] mb-2">Selecione quais colunas você quer que apareçam como botões para filtrar as tarefas.</p>
+                  <p className="text-xs text-fg-secondary mb-2">Selecione quais colunas você quer que apareçam como botões para filtrar as tarefas.</p>
                   
                   {['status', 'categoria', 'responsavel', 'dimensao'].map(key => {
                     if (isPersonalScope && key === 'responsavel') return null;
@@ -2422,7 +2850,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                       'dimensao': 'Dimensão'
                     };
                     return (
-                      <label key={key} className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-[#252525] rounded-md transition-colors">
+                      <label key={key} className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-surface-hover rounded-md transition-colors">
                         <input type="checkbox" className="accent-[#FFCC00] w-4 h-4 cursor-pointer" checked={isSelected} onChange={(e) => {
                             let newFilters = [...quickFilters];
                             if (e.target.checked) newFilters.push(key);
@@ -2430,12 +2858,12 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                             setQuickFilters(newFilters);
                           }}
                         />
-                        <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-[#8E8E8E] group-hover:text-[#A0A0A0]'}`}>{labels[key]}</span>
+                        <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-fg-muted group-hover:text-fg-secondary'}`}>{labels[key]}</span>
                       </label>
                     );
                   })}
 
-                  {columns.length > 0 && <hr className="border-[#2D2D2D] my-2" />}
+                  {columns.length > 0 && <hr className="border-border-subtle my-2" />}
 
                   {columns.map(col => {
                     if (col.type !== 'select') return null;
@@ -2443,7 +2871,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                     if (staticKeys.includes(col.key)) return null;
                     const isSelected = quickFilters.includes(col.key);
                     return (
-                      <label key={col.id} className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-[#252525] rounded-md transition-colors">
+                      <label key={col.id} className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-surface-hover rounded-md transition-colors">
                         <input type="checkbox" className="accent-[#FFCC00] w-4 h-4 cursor-pointer" checked={isSelected} onChange={(e) => {
                             let newFilters = [...quickFilters];
                             if (e.target.checked) newFilters.push(col.key);
@@ -2451,14 +2879,14 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                             setQuickFilters(newFilters);
                           }}
                         />
-                        <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-[#8E8E8E] group-hover:text-[#A0A0A0]'}`}>{col.name}</span>
+                        <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-fg-muted group-hover:text-fg-secondary'}`}>{col.name}</span>
                       </label>
                     );
                   })}
                 </>
               ) : (
                 <>
-                  <p className="text-xs text-[#A0A0A0] mb-2">Selecione quais colunas podem ser usadas para ordenar a visualização das tarefas (Linha ORDEM).</p>
+                  <p className="text-xs text-fg-secondary mb-2">Selecione quais colunas podem ser usadas para ordenar a visualização das tarefas (Linha ORDEM).</p>
                   
                   {['status', 'prazo', 'prioridade', 'categoria', 'manual'].map(key => {
                     const isSelected = quickSorts.includes(key);
@@ -2470,7 +2898,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                       'manual': 'Manual (Arrastar)'
                     };
                     return (
-                      <label key={key} className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-[#252525] rounded-md transition-colors">
+                      <label key={key} className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-surface-hover rounded-md transition-colors">
                         <input type="checkbox" className="accent-[#FFCC00] w-4 h-4 cursor-pointer" checked={isSelected} onChange={(e) => {
                             let newSorts = [...quickSorts];
                             if (e.target.checked) newSorts.push(key);
@@ -2478,19 +2906,19 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                             setQuickSorts(newSorts);
                           }}
                         />
-                        <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-[#8E8E8E] group-hover:text-[#A0A0A0]'}`}>{labels[key]}</span>
+                        <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-fg-muted group-hover:text-fg-secondary'}`}>{labels[key]}</span>
                       </label>
                     );
                   })}
 
-                  {columns.length > 0 && <hr className="border-[#2D2D2D] my-2" />}
+                  {columns.length > 0 && <hr className="border-border-subtle my-2" />}
 
                   {columns.map(col => {
                     const staticKeys = ['status', 'categoria', 'responsavel', 'dimensao', 'prioridade', 'prazo', 'manual'];
                     if (staticKeys.includes(col.key)) return null;
                     const isSelected = quickSorts.includes(col.key);
                     return (
-                      <label key={col.id} className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-[#252525] rounded-md transition-colors">
+                      <label key={col.id} className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-surface-hover rounded-md transition-colors">
                         <input type="checkbox" className="accent-[#FFCC00] w-4 h-4 cursor-pointer" checked={isSelected} onChange={(e) => {
                             let newSorts = [...quickSorts];
                             if (e.target.checked) newSorts.push(col.key);
@@ -2498,7 +2926,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
                             setQuickSorts(newSorts);
                           }}
                         />
-                        <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-[#8E8E8E] group-hover:text-[#A0A0A0]'}`}>{col.name}</span>
+                        <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-fg-muted group-hover:text-fg-secondary'}`}>{col.name}</span>
                       </label>
                     );
                   })}
@@ -2507,7 +2935,7 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
 
             </div>
 
-            <div className="p-4 border-t border-[#2D2D2D] bg-[#121212] flex justify-end">
+            <div className="p-4 border-t border-border-subtle bg-app flex justify-end">
               <button
                 onClick={async () => {
                   try {
@@ -2527,6 +2955,72 @@ export function TasksView({ initialTasks: rawInitialTasks, initialEvents = [], d
         </div>
       )}
 
+      {/* Módulo de Gestão da Organização (quando viewMode === 'org_management') */}
+      {viewMode === 'org_management' && activeScope === 'organization' && (
+        <div className="w-full mt-4">
+          <OrganizationManagementView
+            organization={activeOrgDetails?.organization || activeOrgDetails || activeOrg}
+            subteams={activeOrgDetails?.subteams || []}
+            members={activeOrgDetails?.members || []}
+            tasks={processedTasks}
+            meetings={orgMeetings}
+            currentUserId={userId || ''}
+            userEvents={processedEvents}
+            onMeetingsUpdated={async () => {
+              if (activeOrgId) {
+                const res = await getOrganizationMeetingsAction(activeOrgId);
+                if (res.ok && res.meetings) {
+                  setOrgMeetings(res.meetings);
+                }
+              }
+            }}
+          />
+        </div>
+      )}
+
+      {/* Modais de Gestão e Criação de Organizações */}
+      <JoinOrganizationModal
+        isOpen={isJoinModalOpen}
+        onClose={() => setIsJoinModalOpen(false)}
+        onJoinedSuccess={async (orgId) => {
+          setIsJoinModalOpen(false);
+          setActiveOrgId(orgId);
+          setActiveScope('organization');
+          const res = await getUserOrganizationsAction();
+          if (res.ok && res.organizations) {
+            setOrganizations(res.organizations);
+          }
+        }}
+      />
+
+      <CreateOrganizationModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreatedSuccess={async (orgId) => {
+          setIsCreateModalOpen(false);
+          setActiveOrgId(orgId);
+          setActiveScope('organization');
+          const res = await getUserOrganizationsAction();
+          if (res.ok && res.organizations) {
+            setOrganizations(res.organizations);
+          }
+        }}
+      />
+
+      {/* Modal de Anexo de Arquivos nas Tarefas */}
+      {filePickerTaskId && (
+        <TaskFilePickerModal
+          isOpen={Boolean(filePickerTaskId)}
+          onClose={() => setFilePickerTaskId(null)}
+          taskId={filePickerTaskId}
+          taskTitle={localTasks.find(t => t.id === filePickerTaskId)?.nome || 'Tarefa'}
+          currentlyLinkedPaths={(localTasks.find(t => t.id === filePickerTaskId) as any)?.arquivos_vinculados || []}
+          ticket=""
+          onLinkedUpdated={() => {
+            setFilePickerTaskId(null);
+          }}
+        />
+      )}
     </div>
   );
 }

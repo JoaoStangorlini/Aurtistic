@@ -1,0 +1,21 @@
+# Vercel Deployment Ignore Rules
+# Ignora artefatos locais, projeto Android Capacitor e servidor de borda Fire TV Stick
+
+# Android Capacitor
+android/
+
+# Edge Storage Daemon (Fire TV Stick)
+servidor/
+
+# Migrações Supabase Locais
+supabase/
+
+# Scripts e Testes Locais
+tests/
+scratch_test/
+scripts/
+
+# Documentação & Logs Locais
+*.log
+scratch/
+

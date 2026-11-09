@@ -1,3 +1,4 @@
+# Este programa é um software livre (Licença AGPLv3)
 from PIL import Image
 
 # Open the original generated image (which has the full logo but is 1024x1024)

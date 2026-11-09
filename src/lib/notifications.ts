@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { Task } from '@/types';

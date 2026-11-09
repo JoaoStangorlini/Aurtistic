@@ -19,15 +19,15 @@ function ToggleButtons({
   onToggleTasks: () => void 
 }) {
   return (
-    <div className="flex bg-[#1A1A1A] p-1 rounded-xl border border-[#2D2D2D] relative w-full mt-2 gap-1 overflow-x-auto custom-scrollbar">
+    <div className="flex bg-surface p-1 rounded-xl border border-border-subtle relative w-full mt-2 gap-1 overflow-x-auto custom-scrollbar">
       <button 
         onClick={onToggleEvents}
-        className={`flex-1 px-2 py-2 text-[12px] font-bold rounded-lg transition-colors whitespace-nowrap ${showEvents ? 'bg-[#FFCC00] text-[#121212] shadow' : 'text-[#8E8E8E] hover:text-white'}`}>
+        className={`flex-1 px-2 py-2 text-[12px] font-bold rounded-lg transition-colors whitespace-nowrap ${showEvents ? 'bg-[#FFCC00] text-[#121212] shadow' : 'text-fg-muted hover:text-fg'}`}>
         Eventos (E)
       </button>
       <button 
         onClick={onToggleTasks}
-        className={`flex-1 px-2 py-2 text-[12px] font-bold rounded-lg transition-colors whitespace-nowrap ${showTasks ? 'bg-[#9D4EDD] text-white shadow' : 'text-[#8E8E8E] hover:text-white'}`}>
+        className={`flex-1 px-2 py-2 text-[12px] font-bold rounded-lg transition-colors whitespace-nowrap ${showTasks ? 'bg-[var(--accent-primary)] text-white shadow' : 'text-fg-muted hover:text-fg'}`}>
         Tarefas (T)
       </button>
     </div>
@@ -44,6 +44,7 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
   const [hiddenStatuses, setHiddenStatuses] = useState<string[]>(['completa', 'descartada', 'concluída']);
   const [sortOrder, setSortOrder] = useState<string>('recentes');
   const [selectedDimension, setSelectedDimension] = useState('Todas');
+  const [onlyMyTasks, setOnlyMyTasks] = useState(true);
   const [hiddenTaskIds, setHiddenTaskIds] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -84,6 +85,11 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
         const { value: dimVal } = await Preferences.get({ key: 'widget_filter_dimension' });
         if (dimVal) {
           setSelectedDimension(dimVal);
+        }
+
+        const { value: onlyMineVal } = await Preferences.get({ key: 'widget_only_my_tasks' });
+        if (onlyMineVal !== null) {
+          setOnlyMyTasks(onlyMineVal === 'true');
         }
 
         const { value: hiddenVal } = await Preferences.get({ key: 'widget_hidden_task_ids' });
@@ -143,6 +149,7 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
       await Preferences.set({ key: 'widget_hidden_statuses', value: JSON.stringify(hiddenStatuses) });
       await Preferences.set({ key: 'widget_sort_order', value: sortOrder });
       await Preferences.set({ key: 'widget_filter_dimension', value: selectedDimension });
+      await Preferences.set({ key: 'widget_only_my_tasks', value: onlyMyTasks ? 'true' : 'false' });
       await Preferences.set({ key: 'widget_hidden_task_ids', value: JSON.stringify(hiddenTaskIds) });
       await Preferences.set({ key: 'widget_calendar_show_tasks', value: calendarShowTasks.toString() });
       await Preferences.set({ key: 'widget_calendar_show_events', value: calendarShowEvents.toString() });
@@ -168,6 +175,11 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
         } else {
           filteredTasks = filteredTasks.filter(t => t.dimensao === selectedDimension);
         }
+      }
+
+      // 4. Filtrar apenas minhas tarefas se habilitado
+      if (onlyMyTasks && userId) {
+        filteredTasks = filteredTasks.filter(t => t.user_id === userId);
       }
 
       const widgetTasks = filteredTasks.map(t => ({
@@ -209,35 +221,35 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
   return (
     <>
       {isDirty && !savedSuccess && (
-        <div className="fixed top-24 right-4 md:right-8 z-50 bg-[#9D4EDD] text-white px-4 py-3 rounded shadow-2xl flex items-center gap-3 border border-[#9D4EDD]/50 animate-pulse">
+        <div className="fixed top-24 right-4 md:right-8 z-50 bg-[var(--accent-primary)] text-white px-4 py-3 rounded shadow-2xl flex items-center gap-3 border border-[#9D4EDD]/50 animate-pulse">
           <span className="material-symbols-outlined">save</span>
           <div className="flex flex-col">
             <span className="font-bold text-sm">Alterações não salvas</span>
             <span className="text-xs font-medium">Lembre-se de salvar!</span>
           </div>
-          <button onClick={handleSave} disabled={isSaving} className="ml-2 bg-[#121212] text-[#9D4EDD] px-3 py-1.5 rounded text-xs font-bold hover:bg-[#2D2D2D] transition-colors disabled:opacity-50">
+          <button onClick={handleSave} disabled={isSaving} className="ml-2 bg-app text-[#9D4EDD] px-3 py-1.5 rounded text-xs font-bold hover:bg-surface-hover transition-colors disabled:opacity-50">
             {isSaving ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
       )}
-      <div className="max-w-6xl mx-auto bg-[#1A1A1A] border border-[#2D2D2D] rounded-xl p-6 md:p-8 shadow-2xl flex flex-col">
+      <div className="max-w-6xl mx-auto bg-surface border border-border-subtle rounded-xl p-6 md:p-8 shadow-2xl flex flex-col">
       
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between md:items-center pb-6 border-b border-[#2D2D2D] mb-6 gap-4">
+      <div className="flex flex-col md:flex-row justify-between md:items-center pb-6 border-b border-border-subtle mb-6 gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#FFCC00]/10 border border-[#FFCC00]/30 flex items-center justify-center text-[#FFCC00]">
             <span className="material-symbols-outlined text-[24px]">widgets</span>
           </div>
           <div>
-            <h1 className="text-2xl font-black text-white font-['Bukra'] tracking-tight">Configurações dos Widgets</h1>
-            <p className="text-xs text-[#8E8E8E] mt-0.5">Personalize os widgets que aparecem na tela inicial do seu celular.</p>
+            <h1 className="text-2xl font-black text-fg font-['Bukra'] tracking-tight">Configurações dos Widgets</h1>
+            <p className="text-xs text-fg-muted mt-0.5">Personalize os widgets que aparecem na tela inicial do seu celular.</p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.back()}
-            className="text-[#8E8E8E] hover:text-white transition-colors p-2 rounded-lg"
+            className="text-fg-muted hover:text-fg transition-colors p-2 rounded-lg"
           >
             <span className="material-symbols-outlined text-[24px]">close</span>
           </button>
@@ -252,7 +264,7 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
       )}
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-[#2D2D2D] mb-8 pb-1 overflow-x-auto custom-scrollbar">
+      <div className="flex items-center gap-2 border-b border-border-subtle mb-8 pb-1 overflow-x-auto custom-scrollbar">
         {[
           { id: 'lista', label: 'Lista', icon: 'view_list' },
           { id: 'calendario', label: 'Calendário', icon: 'calendar_month' },
@@ -262,7 +274,7 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id ? 'border-[#9D4EDD] text-[#9D4EDD]' : 'border-transparent text-[#8E8E8E] hover:text-white'}`}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id ? 'border-[#9D4EDD] text-[#9D4EDD]' : 'border-transparent text-fg-muted hover:text-fg'}`}
           >
             <span className="material-symbols-outlined text-[18px]">{tab.icon}</span>
             {tab.label}
@@ -276,9 +288,9 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
         <div className="space-y-6">
           {activeTab === 'lista' && (
             <>
-              <div className="text-[#8E8E8E] text-sm p-4 bg-[#121212] border border-[#2D2D2D] rounded-lg">
-                <h3 className="text-white font-bold mb-1">Visualização da Lista</h3>
-                <p className="text-xs text-[#8E8E8E] mb-3">Escolha o que deseja visualizar na lista principal.</p>
+              <div className="text-fg-muted text-sm p-4 bg-app border border-border-subtle rounded-lg">
+                <h3 className="text-fg font-bold mb-1">Visualização da Lista</h3>
+                <p className="text-xs text-fg-muted mb-3">Escolha o que deseja visualizar na lista principal.</p>
                 <ToggleButtons 
                   showEvents={listShowEvents}
                   showTasks={listShowTasks}
@@ -292,8 +304,8 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
                   }} 
                 />
 
-                <div className="mt-4 p-3 bg-[#1A1A1A] rounded-lg border border-[#2D2D2D]">
-                  <h4 className="text-white font-semibold text-xs mb-2">Como funcionam os botões no Widget:</h4>
+                <div className="mt-4 p-3 bg-surface rounded-lg border border-border-subtle">
+                  <h4 className="text-fg font-semibold text-xs mb-2">Como funcionam os botões no Widget:</h4>
                   <ul className="text-[11px] space-y-1.5">
                     <li><strong className="text-[#FFCC00]">E</strong> = Clicar liga/desliga apenas os Eventos.</li>
                     <li><strong className="text-[#9D4EDD]">T</strong> = Clicar liga/desliga apenas as Tarefas.</li>
@@ -302,17 +314,17 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
                 </div>
               </div>
               {/* Filtro de Status */}
-              <div className="p-4 bg-[#121212] border border-[#2D2D2D] rounded-lg">
-                <h3 className="text-base font-bold text-white mb-1 flex items-center gap-2">
+              <div className="p-4 bg-app border border-border-subtle rounded-lg">
+                <h3 className="text-base font-bold text-fg mb-1 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[#0f9d58] text-[20px]">filter_list</span>
                   Status Ocultos
                 </h3>
-                <p className="text-xs text-[#8E8E8E] mb-3">Selecione quais status NÃO aparecerão no widget.</p>
+                <p className="text-xs text-fg-muted mb-3">Selecione quais status NÃO aparecerão no widget.</p>
                 <div className="flex flex-wrap gap-2">
                   {uniqueStatuses.map(status => {
                     const isHidden = hiddenStatuses.includes(status);
                     return (
-                      <button key={status} onClick={() => toggleStatusVisibility(status)} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all border flex items-center gap-1 ${isHidden ? 'bg-[#2D2D2D] text-[#8E8E8E] border-[#3D3D3D]' : 'bg-[#9D4EDD]/20 text-[#9D4EDD] border-[#9D4EDD]/30'}`}>
+                      <button key={status} onClick={() => toggleStatusVisibility(status)} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all border flex items-center gap-1 ${isHidden ? 'bg-surface-hover text-fg-muted border-border-strong' : 'bg-[#9D4EDD]/20 text-[#9D4EDD] border-[#9D4EDD]/30'}`}>
                         <span className="material-symbols-outlined text-[14px]">{isHidden ? 'visibility_off' : 'visibility'}</span>
                         {status}
                       </button>
@@ -322,12 +334,12 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
               </div>
 
               {/* Ordenação */}
-              <div className="p-4 bg-[#121212] border border-[#2D2D2D] rounded-lg">
-                <h3 className="text-base font-bold text-white mb-1 flex items-center gap-2">
+              <div className="p-4 bg-app border border-border-subtle rounded-lg">
+                <h3 className="text-base font-bold text-fg mb-1 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[#4285f4] text-[20px]">sort</span>
-                  <label className="text-[#A0A0A0] text-sm font-bold uppercase tracking-wider mb-2 block">Critério de Ordenação</label>
+                  <label className="text-fg-secondary text-sm font-bold uppercase tracking-wider mb-2 block">Critério de Ordenação</label>
                 </h3>
-                <select value={sortOrder} onChange={(e) => { setIsDirty(true); setSortOrder(e.target.value); }} className="w-full mt-2 bg-[#1A1A1A] border border-[#2D2D2D] text-white px-4 py-2.5 rounded-lg text-sm font-semibold">
+                <select value={sortOrder} onChange={(e) => { setIsDirty(true); setSortOrder(e.target.value); }} className="w-full mt-2 bg-surface border border-border-subtle text-fg px-4 py-2.5 rounded-lg text-sm font-semibold">
                   <option value="recentes">Criados Recentemente</option>
                   <option value="antigas">Mais antigas primeiro</option>
                   <option value="prazo_asc">Prazo mais próximo</option>
@@ -336,24 +348,43 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
               </div>
 
               {/* Filtro por Dimensão */}
-              <div className="p-4 bg-[#121212] border border-[#2D2D2D] rounded-lg">
-                <h3 className="text-base font-bold text-white mb-1 flex items-center gap-2">
+              <div className="p-4 bg-app border border-border-subtle rounded-lg">
+                <h3 className="text-base font-bold text-fg mb-1 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[#FFCC00] text-[20px]">category</span>
-                  <label className="text-[#A0A0A0] text-sm font-bold uppercase tracking-wider mb-2 block">Filtrar por Dimensão</label>
+                  <label className="text-fg-secondary text-sm font-bold uppercase tracking-wider mb-2 block">Filtrar por Dimensão</label>
                 </h3>
-                <select value={selectedDimension} onChange={(e) => { setIsDirty(true); setSelectedDimension(e.target.value); }} className="w-full mt-2 bg-[#1A1A1A] border border-[#2D2D2D] text-white px-4 py-2.5 rounded-lg text-sm font-semibold">
+                <select value={selectedDimension} onChange={(e) => { setIsDirty(true); setSelectedDimension(e.target.value); }} className="w-full mt-2 bg-surface border border-border-subtle text-fg px-4 py-2.5 rounded-lg text-sm font-semibold">
                   <option value="Todas">Todas as Tarefas</option>
                   <option value="Favoritas">Apenas Favoritas (★)</option>
                   {dimensions.map(dim => <option key={dim} value={dim}>{dim}</option>)}
                 </select>
               </div>
+
+              {/* Filtro Apenas Minhas Tarefas */}
+              <div className="p-4 bg-app border border-border-subtle rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#9D4EDD] text-[20px]">person_check</span>
+                    <div>
+                      <h3 className="text-sm font-bold text-fg">🎯 Exibir apenas minhas tarefas nos widgets</h3>
+                      <p className="text-xs text-fg-muted">Oculta tarefas de outros membros da organização na tela inicial (Recomendado).</p>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={onlyMyTasks}
+                    onChange={(e) => { setIsDirty(true); setOnlyMyTasks(e.target.checked); }}
+                    className="w-5 h-5 accent-[#9D4EDD] rounded cursor-pointer"
+                  />
+                </div>
+              </div>
             </>
           )}
 
           {activeTab === 'calendario' && (
-            <div className="text-[#8E8E8E] text-sm p-4 bg-[#121212] border border-[#2D2D2D] rounded-lg">
-              <h3 className="text-white font-bold mb-1">Configurações do Calendário Mensal</h3>
-              <p className="text-xs text-[#8E8E8E] mb-3">Escolha o que deseja visualizar no calendário do widget.</p>
+            <div className="text-fg-muted text-sm p-4 bg-app border border-border-subtle rounded-lg">
+              <h3 className="text-fg font-bold mb-1">Configurações do Calendário Mensal</h3>
+              <p className="text-xs text-fg-muted mb-3">Escolha o que deseja visualizar no calendário do widget.</p>
               <ToggleButtons 
                 showEvents={calendarShowEvents}
                 showTasks={calendarShowTasks}
@@ -367,8 +398,8 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
                 }} 
               />
               
-              <div className="mt-4 p-3 bg-[#1A1A1A] rounded-lg border border-[#2D2D2D]">
-                <h4 className="text-white font-semibold text-xs mb-2">Como funcionam os botões no Widget:</h4>
+              <div className="mt-4 p-3 bg-surface rounded-lg border border-border-subtle">
+                <h4 className="text-fg font-semibold text-xs mb-2">Como funcionam os botões no Widget:</h4>
                 <ul className="text-[11px] space-y-1.5">
                   <li><strong className="text-[#FFCC00]">E</strong> = Clicar liga/desliga apenas os Eventos.</li>
                   <li><strong className="text-[#9D4EDD]">T</strong> = Clicar liga/desliga apenas as Tarefas.</li>
@@ -379,9 +410,9 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
           )}
 
           {activeTab === 'semanal' && (
-            <div className="text-[#8E8E8E] text-sm p-4 bg-[#121212] border border-[#2D2D2D] rounded-lg">
-              <h3 className="text-white font-bold mb-1">Configurações do Calendário Semanal</h3>
-              <p className="text-xs text-[#8E8E8E] mb-3">Escolha o que deseja visualizar no calendário do widget.</p>
+            <div className="text-fg-muted text-sm p-4 bg-app border border-border-subtle rounded-lg">
+              <h3 className="text-fg font-bold mb-1">Configurações do Calendário Semanal</h3>
+              <p className="text-xs text-fg-muted mb-3">Escolha o que deseja visualizar no calendário do widget.</p>
               <ToggleButtons 
                 showEvents={weeklyShowEvents}
                 showTasks={weeklyShowTasks}
@@ -395,8 +426,8 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
                 }} 
               />
               
-              <div className="mt-4 p-3 bg-[#1A1A1A] rounded-lg border border-[#2D2D2D]">
-                <h4 className="text-white font-semibold text-xs mb-2">Como funcionam os botões no Widget:</h4>
+              <div className="mt-4 p-3 bg-surface rounded-lg border border-border-subtle">
+                <h4 className="text-fg font-semibold text-xs mb-2">Como funcionam os botões no Widget:</h4>
                 <ul className="text-[11px] space-y-1.5">
                   <li><strong className="text-[#FFCC00]">E</strong> = Clicar liga/desliga apenas os Eventos.</li>
                   <li><strong className="text-[#9D4EDD]">T</strong> = Clicar liga/desliga apenas as Tarefas.</li>
@@ -404,31 +435,31 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
                 </ul>
               </div>
 
-              <div className="mt-4 p-4 bg-[#1A1A1A] border border-[#2D2D2D] rounded-lg">
-                <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+              <div className="mt-4 p-4 bg-surface border border-border-subtle rounded-lg">
+                <h3 className="text-base font-bold text-fg mb-3 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[#9D4EDD] text-[20px]">view_agenda</span>
                   Divisão de Turnos
                 </h3>
                 <div className="flex flex-col gap-2">
-                  <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${weeklySplitType === 'none' ? 'border-[#9D4EDD] bg-[#9D4EDD]/10' : 'border-[#2D2D2D] bg-[#121212] hover:border-[#3D3D3D]'}`}>
+                  <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${weeklySplitType === 'none' ? 'border-[#9D4EDD] bg-[#9D4EDD]/10' : 'border-border-subtle bg-app hover:border-border-strong'}`}>
                     <input type="radio" name="splitType" value="none" checked={weeklySplitType === 'none'} onChange={() => { setIsDirty(true); setWeeklySplitType('none'); }} className="hidden" />
                     <div className="flex-1">
-                      <h4 className="text-white font-semibold text-sm">Turno Único</h4>
-                      <p className="text-[#8E8E8E] text-xs">Exibe as tarefas e eventos de forma contínua no dia.</p>
+                      <h4 className="text-fg font-semibold text-sm">Turno Único</h4>
+                      <p className="text-fg-muted text-xs">Exibe as tarefas e eventos de forma contínua no dia.</p>
                     </div>
                   </label>
-                  <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${weeklySplitType === '12h' ? 'border-[#9D4EDD] bg-[#9D4EDD]/10' : 'border-[#2D2D2D] bg-[#121212] hover:border-[#3D3D3D]'}`}>
+                  <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${weeklySplitType === '12h' ? 'border-[#9D4EDD] bg-[#9D4EDD]/10' : 'border-border-subtle bg-app hover:border-border-strong'}`}>
                     <input type="radio" name="splitType" value="12h" checked={weeklySplitType === '12h'} onChange={() => { setIsDirty(true); setWeeklySplitType('12h'); }} className="hidden" />
                     <div className="flex-1">
-                      <h4 className="text-white font-semibold text-sm">Dividir em 2 Turnos (12h-24h-12h)</h4>
-                      <p className="text-[#8E8E8E] text-xs">Separa os itens em bloco da Manhã e Tarde/Noite.</p>
+                      <h4 className="text-fg font-semibold text-sm">Dividir em 2 Turnos (12h-24h-12h)</h4>
+                      <p className="text-fg-muted text-xs">Separa os itens em bloco da Manhã e Tarde/Noite.</p>
                     </div>
                   </label>
-                  <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${weeklySplitType === '8h' ? 'border-[#9D4EDD] bg-[#9D4EDD]/10' : 'border-[#2D2D2D] bg-[#121212] hover:border-[#3D3D3D]'}`}>
+                  <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${weeklySplitType === '8h' ? 'border-[#9D4EDD] bg-[#9D4EDD]/10' : 'border-border-subtle bg-app hover:border-border-strong'}`}>
                     <input type="radio" name="splitType" value="8h" checked={weeklySplitType === '8h'} onChange={() => { setIsDirty(true); setWeeklySplitType('8h'); }} className="hidden" />
                     <div className="flex-1">
-                      <h4 className="text-white font-semibold text-sm">Dividir em 3 Turnos (8h-16h-24h-8h)</h4>
-                      <p className="text-[#8E8E8E] text-xs">Separa os itens em Manhã, Tarde e Noite.</p>
+                      <h4 className="text-fg font-semibold text-sm">Dividir em 3 Turnos (8h-16h-24h-8h)</h4>
+                      <p className="text-fg-muted text-xs">Separa os itens em Manhã, Tarde e Noite.</p>
                     </div>
                   </label>
                 </div>
@@ -437,13 +468,13 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
           )}
 
           {activeTab === 'global' && (
-            <div className="text-[#8E8E8E] text-sm p-4 bg-[#121212] border border-[#2D2D2D] rounded-lg">
-              <h3 className="text-white font-bold mb-1">Configurações do Widget Global</h3>
-              <p className="text-xs text-[#8E8E8E] mb-3">O Widget Global combina o Calendário Mensal e a Lista no topo (50/50) com o Calendário Semanal na parte inferior.</p>
+            <div className="text-fg-muted text-sm p-4 bg-app border border-border-subtle rounded-lg">
+              <h3 className="text-fg font-bold mb-1">Configurações do Widget Global</h3>
+              <p className="text-xs text-fg-muted mb-3">O Widget Global combina o Calendário Mensal e a Lista no topo (50/50) com o Calendário Semanal na parte inferior.</p>
               
-              <div className="p-3 bg-[#1A1A1A] rounded-lg border border-[#2D2D2D]">
-                <h4 className="text-white font-semibold text-xs mb-2">Estrutura do Widget Global:</h4>
-                <div className="text-[11px] space-y-3 text-[#E0E0E0]">
+              <div className="p-3 bg-surface rounded-lg border border-border-subtle">
+                <h4 className="text-fg font-semibold text-xs mb-2">Estrutura do Widget Global:</h4>
+                <div className="text-[11px] space-y-3 text-fg-secondary">
                   <div>
                     <strong className="text-[#9D4EDD] block mb-1">Seção Superior (Cabeçalho Global):</strong>
                     <ul className="pl-2 space-y-1">
@@ -471,11 +502,11 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
         </div>
 
         {/* Lado Direito: Preview */}
-        <div className="flex flex-col border border-[#2D2D2D] rounded-xl bg-[#1A1A1A] overflow-hidden">
-          <div className="bg-[#252525] p-3 border-b border-[#2D2D2D] text-center">
-            <span className="text-[#E0E0E0] text-xs font-bold uppercase tracking-wider">Preview do Widget Android</span>
+        <div className="flex flex-col border border-border-subtle rounded-xl bg-surface overflow-hidden">
+          <div className="bg-surface-hover p-3 border-b border-border-subtle text-center">
+            <span className="text-fg-secondary text-xs font-bold uppercase tracking-wider">Preview do Widget Android</span>
           </div>
-          <div className="flex-1 p-8 flex items-center justify-center bg-[#121212]/50" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\\"20\\" height=\\"20\\" viewBox=\\"0 0 20 20\\" xmlns=\\"http://www.w3.org/2000/svg\\"%3E%3Cg fill=\\"%23252525\\" fill-opacity=\\"0.4\\" fill-rule=\\"evenodd\\"%3E%3Ccircle cx=\\"3\\" cy=\\"3\\" r=\\"1\\"/%3E%3Ccircle cx=\\"13\\" cy=\\"13\\" r=\\"1\\"/%3E%3C/g%3E%3C/svg%3E")' }}>
+          <div className="flex-1 p-8 flex items-center justify-center bg-app/50" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\\"20\\" height=\\"20\\" viewBox=\\"0 0 20 20\\" xmlns=\\"http://www.w3.org/2000/svg\\"%3E%3Cg fill=\\"%23252525\\" fill-opacity=\\"0.4\\" fill-rule=\\"evenodd\\"%3E%3Ccircle cx=\\"3\\" cy=\\"3\\" r=\\"1\\"/%3E%3Ccircle cx=\\"13\\" cy=\\"13\\" r=\\"1\\"/%3E%3C/g%3E%3C/svg%3E")' }}>
             {activeTab === 'lista' && <WidgetTasksPreview tasks={tasks} config={{ hiddenStatuses, hiddenTaskIds, sortOrder, selectedDimension }} />}
             {activeTab === 'calendario' && <WidgetCalendarPreview config={{ calendarShowTasks, calendarShowEvents }} />}
             {activeTab === 'semanal' && <WidgetWeeklyCalendarPreview config={{ weeklyShowTasks, weeklyShowEvents, weeklySplitType }} />}
@@ -486,13 +517,13 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
       </div>
 
       {/* Botões de Ação */}
-      <div className="mt-8 pt-6 border-t border-[#2D2D2D] flex justify-end gap-3">
+      <div className="mt-8 pt-6 border-t border-border-subtle flex justify-end gap-3">
         <button
           onClick={handleSave}
           disabled={isSaving || savedSuccess}
           className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 disabled:opacity-70 ${
             savedSuccess 
-              ? 'bg-[#0f9d58] text-white hover:bg-[#0b8043]' 
+              ? 'bg-[#0f9d58] text-fg hover:bg-[#0b8043]' 
               : 'bg-[#FFCC00] text-[#121212] hover:bg-[#e6b800]'
           }`}
         >

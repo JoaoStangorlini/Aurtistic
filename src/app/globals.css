@@ -1,3 +1,4 @@
+/* Este programa é um software livre (Licença AGPLv3) */
 @import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block");
 @import "tailwindcss";
 
@@ -21,43 +22,418 @@
 }
 
 @theme {
-  /* LabDiv / Portfolio Palette */
+  /* Dynamic App Tokens bound to CSS Custom Properties */
+  --color-app: var(--bg-app);
+  --color-surface: var(--bg-surface);
+  --color-surface-hover: var(--bg-hover);
+  --color-hover: var(--bg-hover);
+  --color-elevated: var(--bg-elevated);
+  --color-border-subtle: var(--border-subtle);
+  --color-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+
+  --color-fg: var(--text-primary);
+  --color-fg-secondary: var(--text-secondary);
+  --color-fg-muted: var(--text-muted);
+  --color-muted: var(--text-muted);
+
+  --color-accent-primary: var(--accent-primary);
+  --color-accent-primary-hover: var(--accent-primary-hover);
+  --color-on-accent-primary: var(--on-accent-primary);
+
+  --color-accent-secondary: var(--accent-secondary);
+  --color-accent-secondary-hover: var(--accent-secondary-hover);
+  --color-on-accent-secondary: var(--on-accent-secondary);
+
+  --gradient-brand: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  --gradient-brand-soft: linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 20%, transparent), color-mix(in srgb, var(--accent-secondary) 20%, transparent));
+
+  /* Legacy Tokens retained for backwards compatibility */
   --color-base-dark: #121212;
-  --color-surface: #1E1E1E;
-  --color-surface-hover: #2D2D2D;
   --color-purple: #3B1E43;
   --color-purple-light: #5A2E65;
   --color-gold: #FFCC00;
   --color-red: #F14343;
   --color-blue: #0F4780;
-  
-  --color-text-primary: #F5F5F5;
-  --color-text-secondary: #A0A0A0;
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
 
   --font-title: var(--font-bukra), 'Arial Black', sans-serif;
   --font-body: var(--font-open-sans), 'Open Sans', sans-serif;
 }
 
 @layer base {
-  :root {
+  /* Default Root (Dark Mode & Roxo/Dourado) */
+  :root,
+  html[data-theme-mode="dark"] {
     color-scheme: dark;
-    --background: var(--color-base-dark);
-    --foreground: var(--color-text-primary);
+    --bg-app: #121212;
+    --bg-surface: #1A1A1A;
+    --bg-elevated: #242424;
+    --bg-hover: #2D2D2D;
+    --border-subtle: #2D2D2D;
+    --border-strong: #3D3D3D;
+    --text-primary: #F5F5F5;
+    --text-secondary: #A0A0A0;
+    --text-muted: #8E8E8E;
+    --background: var(--bg-app);
+    --foreground: var(--text-primary);
+    --scrollbar-track: #121212;
+    --scrollbar-thumb: #2D2D2D;
+    --scrollbar-thumb-hover: #A0A0A0;
+  }
+
+  /* Modo Claro */
+  html[data-theme-mode="light"] {
+    color-scheme: light;
+    --bg-app: #F4F5F8;
+    --bg-surface: #FFFFFF;
+    --bg-elevated: #ECEEF3;
+    --bg-hover: #E2E5EC;
+    --border-subtle: #D8DCE6;
+    --border-strong: #BFC5D4;
+    --text-primary: #14161A;
+    --text-secondary: #4E5564;
+    --text-muted: #6E7687;
+    --background: var(--bg-app);
+    --foreground: var(--text-primary);
+    --scrollbar-track: #ECEEF3;
+    --scrollbar-thumb: #D8DCE6;
+    --scrollbar-thumb-hover: #8E8E8E;
+  }
+
+  /* =====================================================================
+     PALETAS BICOLORES (CALIBRADAS COM WCAG AA >= 4.5:1)
+     ===================================================================== */
+
+  /* 1. Roxo & Dourado (Padrão) */
+  :root,
+  html[data-theme-palette="purple-gold"] {
+    --accent-primary: #9D4EDD;
+    --accent-primary-hover: #8B3DCA;
+    --accent-primary-text: #9D4EDD;
+    --on-accent-primary: #FFFFFF;
+
+    --accent-secondary: #FFCC00;
+    --accent-secondary-hover: #E6B800;
+    --accent-secondary-text: #FFCC00;
+    --on-accent-secondary: #121212;
+  }
+  html[data-theme-palette="purple-gold"][data-theme-mode="light"] {
+    --accent-primary: #7B2CBF;
+    --accent-primary-hover: #6A24A6;
+    --accent-primary-text: #6A24A6;
+    --on-accent-primary: #FFFFFF;
+
+    --accent-secondary: #F5B800;
+    --accent-secondary-hover: #D9A000;
+    --accent-secondary-text: #9A6B00;
+    --on-accent-secondary: #121212;
+  }
+
+  /* 2. Azul & Vermelho */
+  html[data-theme-palette="blue-red"] {
+    --accent-primary: #2563EB;
+    --accent-primary-hover: #1D4ED8;
+    --accent-primary-text: #2563EB;
+    --on-accent-primary: #FFFFFF;
+
+    --accent-secondary: #E11D48;
+    --accent-secondary-hover: #BE123C;
+    --accent-secondary-text: #E11D48;
+    --on-accent-secondary: #FFFFFF;
+  }
+  html[data-theme-palette="blue-red"][data-theme-mode="light"] {
+    --accent-primary: #1D4ED8;
+    --accent-primary-hover: #1E40AF;
+    --accent-primary-text: #1D4ED8;
+    --on-accent-primary: #FFFFFF;
+
+    --accent-secondary: #BE123C;
+    --accent-secondary-hover: #9F1239;
+    --accent-secondary-text: #BE123C;
+    --on-accent-secondary: #FFFFFF;
+  }
+
+  /* 3. Rosa & Verde */
+  html[data-theme-palette="pink-green"] {
+    --accent-primary: #DB2777;
+    --accent-primary-hover: #BE185D;
+    --accent-primary-text: #DB2777;
+    --on-accent-primary: #FFFFFF;
+
+    --accent-secondary: #10B981;
+    --accent-secondary-hover: #059669;
+    --accent-secondary-text: #10B981;
+    --on-accent-secondary: #06281E;
+  }
+  html[data-theme-palette="pink-green"][data-theme-mode="light"] {
+    --accent-primary: #BE185D;
+    --accent-primary-hover: #9D174D;
+    --accent-primary-text: #BE185D;
+    --on-accent-primary: #FFFFFF;
+
+    --accent-secondary: #10B981;
+    --accent-secondary-hover: #059669;
+    --accent-secondary-text: #047857;
+    --on-accent-secondary: #06281E;
+  }
+
+  /* 4. Ciano & Âmbar */
+  html[data-theme-palette="cyan-amber"] {
+    --accent-primary: #06B6D4;
+    --accent-primary-hover: #0891B2;
+    --accent-primary-text: #06B6D4;
+    --on-accent-primary: #06262D;
+
+    --accent-secondary: #F59E0B;
+    --accent-secondary-hover: #D97706;
+    --accent-secondary-text: #F59E0B;
+    --on-accent-secondary: #121212;
+  }
+  html[data-theme-palette="cyan-amber"][data-theme-mode="light"] {
+    --accent-primary: #0E7490;
+    --accent-primary-hover: #155E75;
+    --accent-primary-text: #0E7490;
+    --on-accent-primary: #FFFFFF;
+
+    --accent-secondary: #D97706;
+    --accent-secondary-hover: #B45309;
+    --accent-secondary-text: #B45309;
+    --on-accent-secondary: #121212;
+  }
+
+  /* 5. Esmeralda & Violeta */
+  html[data-theme-palette="emerald-violet"] {
+    --accent-primary: #10B981;
+    --accent-primary-hover: #059669;
+    --accent-primary-text: #10B981;
+    --on-accent-primary: #06281E;
+
+    --accent-secondary: #7C3AED;
+    --accent-secondary-hover: #6D28D9;
+    --accent-secondary-text: #7C3AED;
+    --on-accent-secondary: #FFFFFF;
+  }
+  html[data-theme-palette="emerald-violet"][data-theme-mode="light"] {
+    --accent-primary: #047857;
+    --accent-primary-hover: #065F46;
+    --accent-primary-text: #047857;
+    --on-accent-primary: #FFFFFF;
+
+    --accent-secondary: #6D28D9;
+    --accent-secondary-hover: #5B21B6;
+    --accent-secondary-text: #6D28D9;
+    --on-accent-secondary: #FFFFFF;
   }
 
   html {
-    color-scheme: dark;
     forced-color-adjust: none;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Previne Flash na Tipografia da Logo antes da hidratação */
+  .aurtistic-logo-light {
+    display: none !important;
+  }
+  .aurtistic-logo-dark {
+    display: block !important;
+  }
+  html[data-theme-mode="light"] .aurtistic-logo-dark {
+    display: none !important;
+  }
+  html[data-theme-mode="light"] .aurtistic-logo-light {
+    display: block !important;
+  }
+
+  html[data-theme-mode="light"] .themed-logo-text {
+    color: #14161A !important;
+  }
+  html[data-theme-mode="dark"] .themed-logo-text {
+    color: #F5F5F5 !important;
+  }
+  @media (prefers-color-scheme: light) {
+    html:not([data-theme-mode="dark"]) .themed-logo-text {
+      color: #14161A;
+    }
   }
 
   body {
     background-color: var(--background);
     color: var(--foreground);
     font-family: var(--font-body);
-    color-scheme: dark;
   }
 }
 
+/* =====================================================================
+   CÂMARA ESCURA PARA FOTOGRAFIA & LIGHTBOX (PRESERVAÇÃO ÓPTICA)
+   ===================================================================== */
+[data-darkroom="true"] {
+  color-scheme: dark !important;
+  --bg-app: #0A0A0A !important;
+  --bg-surface: #141414 !important;
+  --bg-elevated: #1F1F1F !important;
+  --border-subtle: #2D2D2D !important;
+  --text-primary: #F5F5F5 !important;
+  --text-secondary: #A0A0A0 !important;
+  background-color: #0A0A0A !important;
+  color: #F5F5F5 !important;
+}
+
+/* =====================================================================
+   REGRAS DE ADAPTAÇÃO GLOBAL: MODO CLARO & PALETAS DINÂMICAS
+   Garante transição instantânea de todos os componentes existentes
+   sem quebras de contraste ou elementos esquecidos no escuro.
+   ===================================================================== */
+
+/* Modo Claro: Superfícies e Textos (exceto dentro de câmaras escuras) */
+html[data-theme-mode="light"] body {
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+}
+
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#121212\] {
+  background-color: var(--bg-app) !important;
+}
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#121212\]\/90 {
+  background-color: rgba(244, 245, 248, 0.9) !important;
+}
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#121212\]\/95 {
+  background-color: rgba(244, 245, 248, 0.95) !important;
+}
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#1A1A1A\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#1a1a1a\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#1E1E1E\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#1e1e1e\] {
+  background-color: var(--bg-surface) !important;
+}
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#1A1A1A\]\/95,
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#1A1A1A\]\/80 {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+}
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#242424\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#252525\] {
+  background-color: var(--bg-elevated) !important;
+}
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#2D2D2D\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#2d2d2d\] {
+  background-color: var(--bg-hover) !important;
+}
+
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .border-\[\#2D2D2D\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .border-\[\#2d2d2d\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .border-\[\#353534\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .border-\[\#3D3D3D\] {
+  border-color: var(--border-subtle) !important;
+}
+
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.bg-\[\#FFCC00\]):not(.bg-\[\#ffcc00\]):not(.bg-\[\#9D4EDD\]):not(.bg-\[\#9d4edd\]).text-white {
+  color: var(--text-primary) !important;
+}
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .text-\[\#A0A0A0\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .text-\[\#a0a0a0\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .text-\[\#8E8E8E\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .text-\[\#8e8e8e\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .text-\[\#E0E0E0\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .text-\[\#e0e0e0\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .text-\[\#e5e2e1\] {
+  color: var(--text-secondary) !important;
+}
+
+/* Paletas Dinâmicas: mapeamento das classes arbitrárias de destaque */
+html:not([data-theme-palette="purple-gold"]) .text-\[\#9D4EDD\],
+html:not([data-theme-palette="purple-gold"]) .text-\[\#9d4edd\] {
+  color: var(--accent-primary-text) !important;
+}
+html:not([data-theme-palette="purple-gold"]) .bg-\[\#9D4EDD\],
+html:not([data-theme-palette="purple-gold"]) .bg-\[\#9d4edd\] {
+  background-color: var(--accent-primary) !important;
+  color: var(--on-accent-primary) !important;
+}
+html:not([data-theme-palette="purple-gold"]) .border-\[\#9D4EDD\],
+html:not([data-theme-palette="purple-gold"]) .border-\[\#9d4edd\] {
+  border-color: var(--accent-primary) !important;
+}
+html:not([data-theme-palette="purple-gold"]) .hover\:border-\[\#9D4EDD\]:hover {
+  border-color: var(--accent-primary) !important;
+}
+html:not([data-theme-palette="purple-gold"]) .hover\:text-\[\#9D4EDD\]:hover {
+  color: var(--accent-primary-text) !important;
+}
+
+html:not([data-theme-palette="purple-gold"]) .text-\[\#FFCC00\],
+html:not([data-theme-palette="purple-gold"]) .text-\[\#ffcc00\] {
+  color: var(--accent-secondary-text) !important;
+}
+html:not([data-theme-palette="purple-gold"]) .bg-\[\#FFCC00\],
+html:not([data-theme-palette="purple-gold"]) .bg-\[\#ffcc00\] {
+  background-color: var(--accent-secondary) !important;
+  color: var(--on-accent-secondary) !important;
+}
+html:not([data-theme-palette="purple-gold"]) .hover\:bg-\[\#e6b800\]:hover,
+html:not([data-theme-palette="purple-gold"]) .hover\:bg-\[\#E6B800\]:hover {
+  background-color: var(--accent-secondary-hover) !important;
+}
+html:not([data-theme-palette="purple-gold"]) .border-\[\#FFCC00\],
+html:not([data-theme-palette="purple-gold"]) .border-\[\#ffcc00\] {
+  border-color: var(--accent-secondary) !important;
+}
+html:not([data-theme-palette="purple-gold"]) .hover\:border-\[\#FFCC00\]:hover {
+  border-color: var(--accent-secondary) !important;
+}
+html:not([data-theme-palette="purple-gold"]) .hover\:text-\[\#FFCC00\]:hover {
+  color: var(--accent-secondary-text) !important;
+}
+
+/* Modo Claro: Contraste reforçado para amarelo/ouro quando mantida a paleta padrão */
+html[data-theme-palette="purple-gold"][data-theme-mode="light"] .text-\[\#FFCC00\],
+html[data-theme-palette="purple-gold"][data-theme-mode="light"] .text-\[\#ffcc00\] {
+  color: var(--accent-secondary-text) !important;
+}
+html[data-theme-palette="purple-gold"][data-theme-mode="light"] .text-\[\#9D4EDD\],
+html[data-theme-palette="purple-gold"][data-theme-mode="light"] .text-\[\#9d4edd\] {
+  color: var(--accent-primary-text) !important;
+}
+
+/* =====================================================================
+   DEGRADÊS DINÂMICOS & ADAPTATIVOS DA MARCA
+   ===================================================================== */
+.bg-gradient-brand {
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%) !important;
+}
+.bg-gradient-brand-soft {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 20%, transparent), color-mix(in srgb, var(--accent-secondary) 20%, transparent)) !important;
+}
+.text-gradient-brand {
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+.border-gradient-brand {
+  border-image: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%) 1 !important;
+}
+
+/* Animação indeterminada para barra de carregamento */
+@keyframes indeterminateProgress {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+  100% { transform: translateX(250%); }
+}
+
+.animate-indeterminate {
+  animation: indeterminateProgress 1.4s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Mapeamento dinâmico de degradês legados para respeitar a paleta ativa */
+html:not([data-theme-palette="purple-gold"]) .from-\[\#FFCC00\].via-\[\#FF9900\].to-\[\#9D4EDD\],
+html:not([data-theme-palette="purple-gold"]) .from-\[\#9D4EDD\].to-\[\#FFCC00\],
+html:not([data-theme-palette="purple-gold"]) .from-\[\#FFCC00\].to-\[\#9D4EDD\] {
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%) !important;
+}
+
+
+/* Scrollbars */
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -66,18 +442,17 @@
   scrollbar-width: none;
 }
 
-/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #121212;
+  background: var(--scrollbar-track, #121212);
 }
 ::-webkit-scrollbar-thumb {
-  background: #2D2D2D;
+  background: var(--scrollbar-thumb, #2D2D2D);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #A0A0A0;
+  background: var(--scrollbar-thumb-hover, #A0A0A0);
 }

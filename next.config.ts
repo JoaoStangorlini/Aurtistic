@@ -11,6 +11,11 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
+        source: '/aurtistic/login',
+        destination: '/login',
+        permanent: true,
+      },
+      {
         source: '/aurtistic/privacy-policy',
         destination: '/privacy-policy',
         permanent: true,

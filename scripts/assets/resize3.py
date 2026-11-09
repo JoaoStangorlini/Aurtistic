@@ -1,3 +1,4 @@
+# Este programa é um software livre (Licença AGPLv3)
 from PIL import Image
 
 img_path = "/home/stangorlini/.gemini/antigravity-ide/brain/8c22e501-072a-46f1-9e2b-1cdefc92afd7/aurtistic_promo_banner_v4_1784496498933.png"

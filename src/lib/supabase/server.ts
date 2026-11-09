@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 

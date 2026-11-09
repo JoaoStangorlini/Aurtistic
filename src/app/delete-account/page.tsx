@@ -101,27 +101,27 @@ export default function DeleteAccountPage() {
   };
 
   return (
-    <div className="min-h-full flex flex-col p-4 md:p-8 bg-[#121212] text-[#E0E0E0]">
+    <div className="min-h-full flex flex-col p-4 md:p-8 bg-app text-fg-secondary">
       <div className="max-w-4xl mx-auto w-full">
         <div className="mb-8">
-          <Link href="/" className="text-[#8E8E8E] hover:text-[#FFCC00] text-sm font-bold flex items-center gap-2 mb-4 transition-colors">
+          <Link href="/" className="text-fg-muted hover:text-[#FFCC00] text-sm font-bold flex items-center gap-2 mb-4 transition-colors">
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             Voltar para o Dashboard
           </Link>
           <h1 className="text-3xl font-black text-[#db4437] mb-2 font-['Bukra']">Área de Exclusão</h1>
-          <p className="text-[#8E8E8E]">Gerencie a remoção dos seus dados permanentemente.</p>
+          <p className="text-fg-muted">Gerencie a remoção dos seus dados permanentemente.</p>
         </div>
 
-        <div className="space-y-6 bg-[#1A1A1A] p-6 md:p-10 rounded-2xl border border-[#2D2D2D] shadow-xl">
+        <div className="space-y-6 bg-surface p-6 md:p-10 rounded-2xl border border-border-subtle shadow-xl">
           
           {/* Card: Limpar Dados de Páginas / Subespaços */}
           <div className="border border-[#FFCC00]/30 bg-[#FFCC00]/5 p-6 rounded-xl space-y-4">
             <div>
-              <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+              <h2 className="text-xl font-bold text-fg mb-2 flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#FFCC00]">folder_delete</span>
                 Limpar Dados de Páginas / Subespaços
               </h2>
-              <p className="text-sm text-[#A0A0A0] leading-relaxed">
+              <p className="text-sm text-fg-secondary leading-relaxed">
                 Selecione abaixo quais seções do seu painel você deseja esvaziar permanentemente (apagar todos os dados e voltar ao estado inicial):
               </p>
             </div>
@@ -130,7 +130,7 @@ export default function DeleteAccountPage() {
               {['resumo', 'curriculo', 'portfolio'].map(key => {
                 const label = key === 'resumo' ? 'Resumo Profissional' : key === 'curriculo' ? 'Currículo' : 'Portfólio';
                 return (
-                  <label key={key} className="flex items-center gap-3 p-3 bg-[#242424]/60 border border-[#2D2D2D] rounded-xl cursor-pointer hover:border-red-500/50 transition-colors">
+                  <label key={key} className="flex items-center gap-3 p-3 bg-surface-hover/60 border border-border-subtle rounded-xl cursor-pointer hover:border-red-500/50 transition-colors">
                     <input 
                       type="checkbox" 
                       checked={selectedToDelete.includes(key)}
@@ -141,9 +141,9 @@ export default function DeleteAccountPage() {
                           setSelectedToDelete([...selectedToDelete, key]);
                         }
                       }}
-                      className="w-4 h-4 rounded text-red-600 focus:ring-red-600 bg-[#1A1A1A] border-[#2D2D2D]"
+                      className="w-4 h-4 rounded text-red-600 focus:ring-red-600 bg-surface border-border-subtle"
                     />
-                    <span className="text-white text-xs font-semibold">{label}</span>
+                    <span className="text-fg text-xs font-semibold">{label}</span>
                   </label>
                 );
               })}
@@ -154,7 +154,7 @@ export default function DeleteAccountPage() {
                 <button
                   onClick={handleDeleteSelectedData}
                   disabled={isClearing}
-                  className="bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 rounded-md text-xs font-bold transition-colors flex items-center gap-2 disabled:opacity-50"
+                  className="bg-red-600 hover:bg-red-700 text-fg px-6 py-2.5 rounded-md text-xs font-bold transition-colors flex items-center gap-2 disabled:opacity-50"
                 >
                   <span className="material-symbols-outlined text-[16px]">delete_forever</span>
                   {isClearing ? 'Limpando...' : 'Excluir Dados Selecionados'}
@@ -165,18 +165,18 @@ export default function DeleteAccountPage() {
 
           <div className="border border-[#db4437]/30 bg-[#db4437]/10 p-6 rounded-xl flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
             <div className="flex-1">
-              <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+              <h2 className="text-xl font-bold text-fg mb-2 flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#db4437]">delete</span>
                 Excluir Apenas as Tarefas
               </h2>
-              <p className="text-sm text-[#A0A0A0] leading-relaxed">
+              <p className="text-sm text-fg-secondary leading-relaxed">
                 Todas as tarefas que você criou serão apagadas definitivamente do banco de dados. Sua conta, no entanto, continuará ativa e você poderá criar novas tarefas depois.
               </p>
             </div>
             <button 
               onClick={handleDeleteTasks}
               disabled={isDeletingTasks || isDeletingProfile}
-              className="bg-[#2D2D2D] hover:bg-[#db4437] text-white px-6 py-3 rounded-md text-sm font-bold transition-colors w-full md:w-auto shrink-0 disabled:opacity-50"
+              className="bg-surface-hover hover:bg-[#db4437] text-fg px-6 py-3 rounded-md text-sm font-bold transition-colors w-full md:w-auto shrink-0 disabled:opacity-50"
             >
               {isDeletingTasks ? 'Excluindo...' : 'Excluir Só Tarefas'}
             </button>
@@ -188,14 +188,14 @@ export default function DeleteAccountPage() {
                 <span className="material-symbols-outlined text-[#db4437]">delete_forever</span>
                 Excluir Perfil e Tarefas
               </h2>
-              <p className="text-sm text-[#E0E0E0] leading-relaxed">
+              <p className="text-sm text-fg-secondary leading-relaxed">
                 Aviso Importante: Esta ação é imediata, irreversível e destrutiva. Ao confirmar, todos os seus dados e o seu perfil serão fisicamente deletados, e sua sessão será encerrada.
               </p>
             </div>
             <button 
               onClick={handleDeleteProfile}
               disabled={isDeletingTasks || isDeletingProfile}
-              className="bg-[#db4437] hover:bg-[#b3382c] text-white px-6 py-3 rounded-md text-sm font-bold transition-colors w-full md:w-auto shrink-0 disabled:opacity-50"
+              className="bg-[#db4437] hover:bg-[#b3382c] text-fg px-6 py-3 rounded-md text-sm font-bold transition-colors w-full md:w-auto shrink-0 disabled:opacity-50"
             >
               {isDeletingProfile ? 'Excluindo...' : 'Excluir Tudo'}
             </button>

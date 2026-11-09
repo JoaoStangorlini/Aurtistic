@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aurtistic - Teste de Miniatura de Aba</title>
+  <link id="dynamic-favicon" rel="icon" type="image/png" href="/prototipos/prototipo_2_squircle.png">
+  <style>
+    :root {
+      --bg: #0d0a14;
+      --card: #181424;
+      --border: #2a243a;
+      --gold: #f5b800;
+      --purple: #9d4edd;
+      --text: #f0f0f5;
+      --text-muted: #9e9eb3;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 40px 20px; line-height: 1.5; }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 26px; font-weight: 800; margin-bottom: 8px; background: linear-gradient(90deg, #9d4edd, #f5b800); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    p.subtitle { color: var(--text-muted); margin-bottom: 30px; font-size: 15px; }
+    .interactive-banner { background: #1f1430; border: 1px solid var(--purple); border-radius: 12px; padding: 16px 20px; margin-bottom: 30px; display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+    .banner-text { font-size: 14px; font-weight: 600; color: #e9d5ff; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; margin-bottom: 40px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; align-items: center; text-align: center; transition: all 0.2s ease; }
+    .card:hover { border-color: var(--gold); transform: translateY(-2px); }
+    .card.active { border-color: var(--gold); box-shadow: 0 0 15px rgba(245, 184, 0, 0.25); background: #1e182e; }
+    .preview-box { width: 140px; height: 140px; background: #0c0912; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.06); }
+    .preview-box img { width: 100px; height: 100px; object-fit: contain; }
+    .card h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+    .card p { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; flex-grow: 1; }
+    button.btn-apply { width: 100%; padding: 10px 16px; border-radius: 8px; border: none; font-weight: 700; font-size: 13px; cursor: pointer; transition: 0.15s; background: #2b233d; color: #fff; }
+    button.btn-apply:hover { background: var(--gold); color: #000; }
+    .card.active button.btn-apply { background: var(--gold); color: #000; }
+    .tab-simulation { background: #151120; border: 1px solid var(--border); border-radius: 14px; padding: 24px; margin-bottom: 30px; }
+    .tab-simulation h2 { font-size: 18px; margin-bottom: 16px; font-weight: 700; }
+    .tab-simulation img { width: 100%; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Laboratório Interativo de Miniaturas (Favicon)</h1>
+    <p class="subtitle">Clique em qualquer botão abaixo para <strong>aplicar instantaneamente na guia do seu navegador</strong> e ver como reage em tempo real na sua janela do Opera GX / Chrome.</p>
+
+    <div class="interactive-banner">
+      <span class="banner-text">💡 Dica: Olhe para a aba desta página lá em cima ao clicar em cada opção para ver a transição ao vivo!</span>
+    </div>
+
+    <div class="grid">
+      <!-- Opção 1 -->
+      <div class="card" id="card-1">
+        <div class="preview-box">
+          <img src="/prototipos/prototipo_1_halo.png" alt="Opção 1">
+        </div>
+        <h3>Opção 1: Halo Dourado</h3>
+        <p>Adiciona um traço perolado/dourado de alto contraste ao redor da silhueta do cérebro. O ícone permanece vazado.</p>
+        <button class="btn-apply" onclick="setFavicon('/prototipos/prototipo_1_halo.png', 'card-1')">Aplicar na Minha Guia</button>
+      </div>
+
+      <!-- Opção 2 -->
+      <div class="card active" id="card-2">
+        <div class="preview-box">
+          <img src="/prototipos/prototipo_2_squircle.png" alt="Opção 2">
+        </div>
+        <h3>Opção 2: Squircle Metálico</h3>
+        <p>Emblema tipo "App Icon" com base escura protegida e borda ouro metálico chanfrada. 100% imune à cor da aba.</p>
+        <button class="btn-apply" onclick="setFavicon('/prototipos/prototipo_2_squircle.png', 'card-2')">Aplicar na Minha Guia</button>
+      </div>
+
+      <!-- Opção 3 -->
+      <div class="card" id="card-3">
+        <div class="preview-box">
+          <img src="/prototipos/prototipo_3_luminance.png" alt="Opção 3">
+        </div>
+        <h3>Opção 3: Luminância Tunada</h3>
+        <p>Sem borda nem base. O roxo escuro é elevado para ametista vibrante e o ouro intensificado para brilho máximo.</p>
+        <button class="btn-apply" onclick="setFavicon('/prototipos/prototipo_3_luminance.png', 'card-3')">Aplicar na Minha Guia</button>
+      </div>
+
+      <!-- Original -->
+      <div class="card" id="card-orig">
+        <div class="preview-box">
+          <img src="/icons/icon-purple-gold.png" alt="Original">
+        </div>
+        <h3>Versão Atual (Original)</h3>
+        <p>A arte original intacta sem compensações. Desaparece no lado roxo escuro sobre a aba vinho/grafite.</p>
+        <button class="btn-apply" onclick="setFavicon('/icons/icon-purple-gold.png', 'card-orig')">Aplicar na Minha Guia</button>
+      </div>
+    </div>
+
+    <div class="tab-simulation">
+      <h2>Prancha Comparativa com Simulação de Abas</h2>
+      <img src="/prototipos/comparativo_abas.png" alt="Comparativo de Abas">
+    </div>
+  </div>
+
+  <script>
+    function setFavicon(url, cardId) {
+      const link = document.getElementById('dynamic-favicon');
+      link.href = url + '?t=' + Date.now();
+      
+      document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+      const activeCard = document.getElementById(cardId);
+      if (activeCard) activeCard.classList.add('active');
+    }
+  </script>
+</body>
+</html>
+

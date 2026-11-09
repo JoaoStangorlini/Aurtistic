@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 import { Task } from '@/types';
 
 const DB_NAME = 'AurtisticOfflineDB';

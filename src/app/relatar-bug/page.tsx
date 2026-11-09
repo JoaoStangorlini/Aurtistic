@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import BugReportClient from './BugReportClient';
@@ -9,11 +10,11 @@ export default async function BugReportPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/aurtistic/login');
+    redirect('/login');
   }
 
   return (
-    <main className="min-h-full bg-[#121212] p-4 md:p-8 flex items-center justify-center">
+    <main className="min-h-full bg-app p-4 md:p-8 flex items-center justify-center">
       <div className="w-full max-w-2xl">
         <BugReportClient userEmail={user.email || ''} />
       </div>

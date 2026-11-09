@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 

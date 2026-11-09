@@ -1,3 +1,4 @@
+# Este programa é um software livre (Licença AGPLv3)
 from PIL import Image
 
 def process_image(input_path, output_path):

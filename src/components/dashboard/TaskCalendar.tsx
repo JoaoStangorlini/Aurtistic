@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 import React from 'react';
 import { Task, AgendaEvent } from '@/types';
 import { Badge, getBadgeColorClass } from './Badge';
@@ -87,7 +88,7 @@ export default function TaskCalendar({ tasks, events = [], currentDate, format =
 
   const days = datesToRender.map((item, index) => {
     if (item.isEmpty) {
-      return <div key={`empty-${index}`} className="min-h-[100px] bg-[#1A1A1A]/30 border border-[#2D2D2D] rounded-md p-2"></div>;
+      return <div key={`empty-${index}`} className="min-h-[100px] bg-surface/30 border border-border-subtle rounded-md p-2"></div>;
     }
 
     const cellDate = item.date;
@@ -137,9 +138,9 @@ export default function TaskCalendar({ tasks, events = [], currentDate, format =
       <div 
         key={`day-${cellDateStr}`} 
         onClick={() => setSelectedDateStr(isSelected ? null : cellDateStr)}
-        className={`min-h-[100px] border rounded-md p-1 sm:p-2 flex flex-col gap-1 transition-colors cursor-pointer ${isSelected ? 'border-[#FFCC00] bg-[#FFCC00]/5' : isToday ? 'border-[#9D4EDD] bg-[#9D4EDD]/5' : 'border-[#2D2D2D] bg-[#1A1A1A] hover:border-[#8E8E8E]'}`}
+        className={`min-h-[100px] border rounded-md p-1 sm:p-2 flex flex-col gap-1 transition-colors cursor-pointer ${isSelected ? 'border-[#FFCC00] bg-[#FFCC00]/5' : isToday ? 'border-[#9D4EDD] bg-[#9D4EDD]/5' : 'border-border-subtle bg-surface hover:border-[#8E8E8E]'}`}
       >
-        <div className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full mb-1 ${isSelected ? 'bg-[#FFCC00] text-[#121212]' : isToday ? 'bg-[#9D4EDD] text-white' : 'text-[#8E8E8E]'}`}>
+        <div className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full mb-1 ${isSelected ? 'bg-[#FFCC00] text-[#121212]' : isToday ? 'bg-[var(--accent-primary)] text-white' : 'text-fg-muted'}`}>
           {d}
         </div>
         <div className="flex flex-col gap-1 overflow-y-auto max-h-[150px] custom-scrollbar">
@@ -163,7 +164,7 @@ export default function TaskCalendar({ tasks, events = [], currentDate, format =
             <div 
               key={task.id} 
               onClick={(e) => { e.stopPropagation(); onTaskClick(task); }}
-              className="text-[10px] bg-[#252525] border border-[#333333] hover:border-[#9D4EDD] rounded p-1 cursor-pointer truncate transition-colors flex items-center gap-1"
+              className="text-[10px] bg-surface-hover border border-border-subtle hover:border-[#9D4EDD] rounded p-1 cursor-pointer truncate transition-colors flex items-center gap-1"
               title={task.nome}
             >
               <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: dotColor }}></div>
@@ -177,26 +178,26 @@ export default function TaskCalendar({ tasks, events = [], currentDate, format =
   });
 
   return (
-    <div className="flex flex-col w-full mt-4 bg-[#121212] rounded-lg border border-[#2D2D2D] overflow-hidden">
+    <div className="flex flex-col w-full mt-4 bg-app rounded-lg border border-border-subtle overflow-hidden">
       {/* Calendar Header */}
-      <div className="flex items-center justify-between p-4 bg-[#1A1A1A] border-b border-[#2D2D2D]">
+      <div className="flex items-center justify-between p-4 bg-surface border-b border-border-subtle">
         <div className="flex items-center gap-2">
-          <button onClick={prevPeriod} className="text-[#8E8E8E] hover:text-white transition-colors p-1 rounded hover:bg-[#252525]">
+          <button onClick={prevPeriod} className="text-fg-muted hover:text-fg transition-colors p-1 rounded hover:bg-surface-hover">
             <span className="material-symbols-outlined text-[20px]">chevron_left</span>
           </button>
-          <button onClick={nextPeriod} className="text-[#8E8E8E] hover:text-white transition-colors p-1 rounded hover:bg-[#252525]">
+          <button onClick={nextPeriod} className="text-fg-muted hover:text-fg transition-colors p-1 rounded hover:bg-surface-hover">
             <span className="material-symbols-outlined text-[20px]">chevron_right</span>
           </button>
-          <span className="text-[#E0E0E0] font-bold text-sm">
+          <span className="text-fg-secondary font-bold text-sm">
             {format === 'weekly' 
               ? `${datesToRender[0].date.getDate()} ${monthNames[datesToRender[0].date.getMonth()].substring(0,3)} - ${datesToRender[6].date.getDate()} ${monthNames[datesToRender[6].date.getMonth()].substring(0,3)} de ${datesToRender[6].date.getFullYear()}`
               : `${monthNames[month]} de ${year}`}
           </span>
-          <button onClick={goToToday} className="hidden sm:block text-xs font-bold text-[#8E8E8E] hover:text-white transition-colors px-3 py-1.5 rounded border border-[#2D2D2D] hover:border-[#8E8E8E]">
+          <button onClick={goToToday} className="hidden sm:block text-xs font-bold text-fg-muted hover:text-fg transition-colors px-3 py-1.5 rounded border border-border-subtle hover:border-[#8E8E8E]">
             Hoje
           </button>
         </div>
-        <h3 className="text-sm sm:text-lg font-bold text-white tracking-wider">
+        <h3 className="text-sm sm:text-lg font-bold text-fg tracking-wider">
           {monthNames[month]} {year}
         </h3>
         <div className="w-[80px] sm:w-[100px]"></div> {/* Spacer for balance */}
@@ -209,7 +210,7 @@ export default function TaskCalendar({ tasks, events = [], currentDate, format =
         <div className="p-2 sm:p-4">
           <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
             {dayNames.map(day => (
-              <div key={day} className="text-center text-[10px] sm:text-xs font-bold text-[#8E8E8E] uppercase tracking-wider">
+              <div key={day} className="text-center text-[10px] sm:text-xs font-bold text-fg-muted uppercase tracking-wider">
                 {day}
               </div>
             ))}
@@ -221,13 +222,13 @@ export default function TaskCalendar({ tasks, events = [], currentDate, format =
       ) : (
         <div className="p-2 sm:p-4 overflow-x-auto custom-scrollbar">
           {/* Menu Filtro de Horas */}
-          <div className="flex flex-wrap gap-2 mb-4 items-center bg-[#1A1A1A] p-2 rounded-md border border-[#2D2D2D]">
-            <span className="text-[#8E8E8E] text-xs font-bold uppercase tracking-wider mr-2">Horários:</span>
+          <div className="flex flex-wrap gap-2 mb-4 items-center bg-surface p-2 rounded-md border border-border-subtle">
+            <span className="text-fg-muted text-xs font-bold uppercase tracking-wider mr-2">Horários:</span>
             {['all_day', 'morning', 'afternoon', 'night', 'only_items', 'custom'].map(mode => (
               <button 
                 key={mode}
                 onClick={() => setHoursFilterMode(mode as any)}
-                className={`px-3 py-1 rounded text-[11px] font-bold transition-colors ${hoursFilterMode === mode ? 'bg-[#9D4EDD] text-white' : 'bg-[#252525] text-[#8E8E8E] hover:text-white'}`}
+                className={`px-3 py-1 rounded text-[11px] font-bold transition-colors ${hoursFilterMode === mode ? 'bg-[var(--accent-primary)] text-white' : 'bg-surface-hover text-fg-muted hover:text-fg'}`}
               >
                 {mode === 'all_day' && '7h às 23h'}
                 {mode === 'morning' && '☀️ Manhã'}
@@ -239,21 +240,21 @@ export default function TaskCalendar({ tasks, events = [], currentDate, format =
             ))}
             {hoursFilterMode === 'custom' && (
               <div className="flex items-center gap-2 ml-4">
-                <input type="number" min="0" max="23" value={customStartHour} onChange={e => setCustomStartHour(parseInt(e.target.value))} className="w-12 bg-[#252525] text-white rounded p-1 text-xs text-center border border-[#333333]" />
-                <span className="text-[#8E8E8E]">às</span>
-                <input type="number" min="0" max="23" value={customEndHour} onChange={e => setCustomEndHour(parseInt(e.target.value))} className="w-12 bg-[#252525] text-white rounded p-1 text-xs text-center border border-[#333333]" />
+                <input type="number" min="0" max="23" value={customStartHour} onChange={e => setCustomStartHour(parseInt(e.target.value))} className="w-12 bg-surface-hover text-fg rounded p-1 text-xs text-center border border-border-subtle" />
+                <span className="text-fg-muted">às</span>
+                <input type="number" min="0" max="23" value={customEndHour} onChange={e => setCustomEndHour(parseInt(e.target.value))} className="w-12 bg-surface-hover text-fg rounded p-1 text-xs text-center border border-border-subtle" />
               </div>
             )}
           </div>
 
-          <div className="min-w-[800px] border border-[#2D2D2D] rounded-lg bg-[#121212] overflow-hidden flex flex-col">
+          <div className="min-w-[800px] border border-border-subtle rounded-lg bg-app overflow-hidden flex flex-col">
             {/* Header Dias */}
-            <div className="flex border-b border-[#2D2D2D] bg-[#1A1A1A]">
-              <div className="w-[60px] shrink-0 border-r border-[#2D2D2D]"></div>
+            <div className="flex border-b border-border-subtle bg-surface">
+              <div className="w-[60px] shrink-0 border-r border-border-subtle"></div>
               {datesToRender.map((item, idx) => (
-                <div key={idx} className="flex-1 text-center p-2 border-r border-[#2D2D2D] last:border-r-0">
-                  <div className="text-[10px] text-[#8E8E8E] uppercase">{dayNames[item.date.getDay()]}</div>
-                  <div className={`text-sm font-bold ${item.date.toISOString().split('T')[0] === new Date().toISOString().split('T')[0] ? 'text-[#9D4EDD]' : 'text-white'}`}>
+                <div key={idx} className="flex-1 text-center p-2 border-r border-border-subtle last:border-r-0">
+                  <div className="text-[10px] text-fg-muted uppercase">{dayNames[item.date.getDay()]}</div>
+                  <div className={`text-sm font-bold ${item.date.toISOString().split('T')[0] === new Date().toISOString().split('T')[0] ? 'text-[#9D4EDD]' : 'text-fg'}`}>
                     {item.date.getDate()}
                   </div>
                 </div>
@@ -273,12 +274,12 @@ export default function TaskCalendar({ tasks, events = [], currentDate, format =
                 if (!show) return null;
 
                 return (
-                  <div key={hour} className="flex border-b border-dashed border-[#2D2D2D] h-[60px] group">
-                    <div className="w-[60px] shrink-0 border-r border-[#2D2D2D] bg-[#1A1A1A]/50 flex items-start justify-center pt-1">
-                      <span className="text-[10px] text-[#8E8E8E] font-medium">{String(hour).padStart(2, '0')}:00</span>
+                  <div key={hour} className="flex border-b border-dashed border-border-subtle h-[60px] group">
+                    <div className="w-[60px] shrink-0 border-r border-border-subtle bg-surface/50 flex items-start justify-center pt-1">
+                      <span className="text-[10px] text-fg-muted font-medium">{String(hour).padStart(2, '0')}:00</span>
                     </div>
                     {datesToRender.map((item, dIdx) => (
-                      <div key={dIdx} className="flex-1 border-r border-[#2D2D2D]/30 last:border-r-0 hover:bg-[#252525]/30 relative">
+                      <div key={dIdx} className="flex-1 border-r border-border-subtle/30 last:border-r-0 hover:bg-surface-hover/30 relative">
                          {/* Placeholder para os cartões absolutos - idealmente calculados no topo */}
                       </div>
                     ))}

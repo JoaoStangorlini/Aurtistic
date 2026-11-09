@@ -6,7 +6,13 @@
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "map": "node scripts/build-agent-index.mjs",
+    "verify:silent": "bash scripts/silent-verify.sh",
+    "verify:full": "bash scripts/silent-verify.sh --full",
+    "server:check": "node --check servidor/server.js",
+    "server:deploy": "bash scripts/servidor/deploy-firestick.sh",
+    "server:status": "bash scripts/servidor/status.sh"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",
@@ -19,6 +25,7 @@
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.1",
     "dotenv": "^17.4.2",
+    "fflate": "^0.8.3",
     "next": "16.2.10",
     "nextjs-toploader": "^3.9.17",
     "nodemailer": "^9.0.4",

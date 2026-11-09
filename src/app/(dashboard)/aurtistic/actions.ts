@@ -1,3 +1,4 @@
+// Este programa é um software livre (Licença AGPLv3)
 'use server';
 
 import { revalidatePath } from 'next/cache';
@@ -24,7 +25,7 @@ export async function loginAurtistic(formData: FormData) {
       .toLowerCase();
       
     if (!sanitizedUsername) {
-      redirect(`/aurtistic/login?error=${encodeURIComponent('Usuário inválido.')}`);
+      redirect(`/login?error=${encodeURIComponent('Usuário inválido.')}`);
     }
 
     email = `${sanitizedUsername}@aurtistic.local`;
@@ -33,7 +34,7 @@ export async function loginAurtistic(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    redirect(`/aurtistic/login?error=${encodeURIComponent('Credenciais inválidas')}`);
+    redirect(`/login?error=${encodeURIComponent('Credenciais inválidas')}`);
   }
 
   revalidatePath('/aurtistic', 'layout');
@@ -48,7 +49,7 @@ export async function signupAurtistic(formData: FormData) {
   const confirmPassword = formData.get('confirmPassword') as string;
 
   if (password !== confirmPassword) {
-    redirect(`/aurtistic/login?error=${encodeURIComponent('As senhas não coincidem.')}`);
+    redirect(`/login?error=${encodeURIComponent('As senhas não coincidem.')}`);
   }
 
   // Transformar usuário em email falso para o Supabase (sanitizado)
@@ -59,7 +60,7 @@ export async function signupAurtistic(formData: FormData) {
     .toLowerCase();
     
   if (!sanitizedUsername) {
-    redirect(`/aurtistic/login?error=${encodeURIComponent('Usuário inválido. Use apenas letras e números.')}`);
+    redirect(`/login?error=${encodeURIComponent('Usuário inválido. Use apenas letras e números.')}`);
   }
 
   const email = `${sanitizedUsername}@aurtistic.local`;
@@ -76,7 +77,7 @@ export async function signupAurtistic(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/aurtistic/login?error=${encodeURIComponent('Erro ao criar conta: ' + error.message)}`);
+    redirect(`/login?error=${encodeURIComponent('Erro ao criar conta: ' + error.message)}`);
   }
 
   // Ensure user_profile exists if sign up is confirmed directly
@@ -93,7 +94,7 @@ export async function logoutAurtistic() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   revalidatePath('/', 'layout');
-  redirect('/aurtistic/login');
+  redirect('/login');
 }
 
 export async function deleteAurtisticProfile() {
@@ -120,7 +121,7 @@ export async function deleteAurtisticProfile() {
   // Fazer logout para encerrar a sessão já que o auth.users a princípio não podemos deletar sem master key
   await supabase.auth.signOut();
   revalidatePath('/', 'layout');
-  redirect('/aurtistic/login');
+  redirect('/login');
 }
 
 export async function deleteAllTasks() {
