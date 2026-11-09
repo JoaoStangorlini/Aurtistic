@@ -1,7 +1,7 @@
 # 📌 Estado Atual do Projeto (Memória Curta)
-- **Última Entrega Concluída:** Resolução da falha de compilação da Vercel (Commit `51d1802`):
-  - **Causa Raiz Identificada:** No `.vercelignore`, regras sem barra inicial (ex: `supabase/`, `servidor/`) casavam com qualquer diretório da árvore, fazendo o pipeline da Vercel excluir recursivamente `src/utils/supabase/` e `src/app/(dashboard)/servidor/` antes do `npm run build`.
-  - **Solução Implementada:** Regras ancoradas na raiz com `/` em [`.vercelignore`](file:///home/stangorlini/Aurtistic/.vercelignore#L1-L22) (`/android/`, `/servidor/`, `/supabase/`, etc.), preservando intactos todos os módulos do Next.js.
-  - **Status do Build:** `npm run verify:silent` e `npm run verify:full` com 0 erros (TSC + Lint + Server.js + Testes + Next.js Build).
+- **Última Entrega Concluída:** Resolução do erro do `gradle-server` ao escanear subpastas do Capacitor:
+  - **Causa Raiz Identificada:** A extensão do Gradle no VS Code/Antigravity IDE ativa varredura automática recursiva quando não há `build.gradle` na raiz do workspace. Isso fez o daemon tentar carregar `node_modules/@capacitor/browser/android` como se fosse um projeto raiz independente, falhando a Tooling API.
+  - **Solução Implementada:** Configurado `"gradle.nestedProjects": ["android"]` em [`.vscode/settings.json`](file:///home/stangorlini/Aurtistic/.vscode/settings.json#L3-L5), restringindo a detecção ao diretório raiz Android oficial do Capacitor.
+  - **Status do Build:** `./gradlew assembleDebug` bem-sucedido (202 tasks up-to-date); `npm run verify:silent` com 0 erros.
 - **Próximos Passos:**
-  - Realizar commit e push do `.vercelignore` corrigido para o deploy automático na Vercel ter sucesso imediato.
+  - Seguir com as demandas do projeto.
