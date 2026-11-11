@@ -45,6 +45,7 @@ export interface EcosystemLinksPatch {
   tags?: string[];
   isFavorite?: boolean;
   visibility?: ItemVisibility;
+  exifData?: Record<string, unknown>;
 }
 
 /**
@@ -174,7 +175,11 @@ export async function syncUserFileIndexAction(input: {
       is_favorite: existing?.is_favorite ?? false,
       ...(existing?.title ? { title: existing.title } : {}),
       ...(existing?.description ? { description: existing.description } : {}),
-      ...(mutation.item.exifData ? { exif_data: mutation.item.exifData } : (existing?.exif_data ? { exif_data: existing.exif_data } : {})),
+      exif_data: {
+        ...(existing?.exif_data as Record<string, unknown> || {}),
+        ...(mutation.item.exifData || {}),
+        ...(ecosystemLinks?.exifData || {}),
+      },
     };
 
     if (ecosystemLinks) {
@@ -767,4 +772,126 @@ export async function requestEventQuotaBoostAction(input: {
   revalidatePath('/servidor');
   return { ok: true, expiresAt, boostBytes };
 }
+
+export interface TagFolderDevicesInput {
+  folderPath: string;
+  deviceCategory: 'camera' | 'mobile' | 'drone' | 'other';
+  deviceName: string;
+  recursive?: boolean;
+  organizationId?: string | null;
+}
+
+/**
+ * Marca em massa o dispositivo (câmera ou celular) nas fotos de uma pasta/subpasta,
+ * efetuando MERGE estrito no JSONB exif_data sem apagar campos EXIF originais.
+ */
+export async function tagFolderDevicesAction(input: TagFolderDevicesInput) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Não autenticado.' };
+
+  const { folderPath, deviceCategory, deviceName, recursive = true, organizationId } = input;
+  const cleanFolder = (folderPath || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+
+  let query = supabase
+    .from('user_files_index')
+    .select('id, relative_path, exif_data')
+    .eq('is_directory', false);
+
+  if (organizationId) {
+    query = query.eq('organization_id', organizationId);
+  } else {
+    query = query.eq('user_id', user.id).is('organization_id', null);
+  }
+
+  if (cleanFolder) {
+    if (recursive) {
+      query = query.or(`relative_path.eq.${cleanFolder},relative_path.ilike.${cleanFolder}/%`);
+    } else {
+      query = query.ilike('relative_path', `${cleanFolder}/%`);
+    }
+  }
+
+  const { data: rows, error: fetchErr } = await query;
+  if (fetchErr) {
+    return { ok: false, error: fetchErr.message };
+  }
+
+  if (!rows || rows.length === 0) {
+    return { ok: true, count: 0 };
+  }
+
+  const targetRows = recursive
+    ? rows
+    : rows.filter((r) => {
+        const withoutPrefix = cleanFolder ? r.relative_path.slice(cleanFolder.length + 1) : r.relative_path;
+        return !withoutPrefix.includes('/');
+      });
+
+  let updatedCount = 0;
+  for (const row of targetRows) {
+    const existingExif = (row.exif_data as Record<string, unknown>) || {};
+    const mergedExif = {
+      ...existingExif,
+      deviceCategory,
+      deviceName,
+    };
+
+    const { error: updErr } = await supabase
+      .from('user_files_index')
+      .update({ exif_data: mergedExif })
+      .eq('id', row.id);
+
+    if (!updErr) updatedCount++;
+  }
+
+  revalidatePath('/servidor');
+  revalidatePath('/portfolio');
+  return { ok: true, count: updatedCount };
+}
+
+export async function requestOrgVaultAccessAction(input: { organizationId: string }) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Não autenticado.' };
+
+  const { data, error } = await supabase.rpc('request_org_vault_access', {
+    p_org_id: input.organizationId,
+  });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath('/servidor');
+  return { ok: true, data };
+}
+
+export async function approveOrgVaultAccessAction(input: {
+  organizationId: string;
+  targetUserId: string;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Não autenticado.' };
+
+  const { data, error } = await supabase.rpc('approve_org_vault_access', {
+    p_org_id: input.organizationId,
+    p_target_user_id: input.targetUserId,
+  });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath('/servidor');
+  return { ok: true, data };
+}
+
 

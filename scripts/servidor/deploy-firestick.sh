@@ -38,7 +38,7 @@ else
   SERVER_DIR="$SCRIPT_DIR"
   SCRIPTS_DIR="$SCRIPT_DIR"
 fi
-cd "$PROJECT_ROOT"
+cd "$SERVER_DIR"
 
 FIRESTICK_USER="${FIRESTICK_USER:-u0_a220}"
 FIRESTICK_HOST="${FIRESTICK_HOST:-192.168.0.198}"
@@ -66,6 +66,32 @@ for arg in "$@"; do
       ;;
   esac
 done
+
+prepare_staging() {
+  local staging="$1"
+  mkdir -p "$staging"
+  cp "$SERVER_DIR/package.json" "$SERVER_DIR/server.js" "$staging/"
+  [ -f "$SERVER_DIR/.env.example" ] && cp "$SERVER_DIR/.env.example" "$staging/"
+  [ -d "$SERVER_DIR/public" ] && cp -r "$SERVER_DIR/public" "$staging/"
+  [ -d "$SERVER_DIR/lib" ] && cp -r "$SERVER_DIR/lib" "$staging/"
+  [ -d "$SERVER_DIR/node_modules/fflate" ] && mkdir -p "$staging/node_modules" && cp -r "$SERVER_DIR/node_modules/fflate" "$staging/node_modules/"
+  if [ -d "$SCRIPTS_DIR" ]; then
+    mkdir -p "$staging/scripts"
+    cp -r "$SCRIPTS_DIR"/* "$staging/scripts/"
+  fi
+  if [ -f "$SERVER_DIR/data/disk_snapshot.json" ]; then
+    mkdir -p "$staging/data"
+    cp "$SERVER_DIR/data/disk_snapshot.json" "$staging/data/"
+  fi
+  if [ -f "$SERVER_DIR/data/catalog.json" ]; then
+    mkdir -p "$staging/data"
+    cp "$SERVER_DIR/data/catalog.json" "$staging/data/"
+  fi
+  if [ -f "$SERVER_DIR/data/thumbs/sig_index.json" ]; then
+    mkdir -p "$staging/data/thumbs"
+    cp "$SERVER_DIR/data/thumbs/sig_index.json" "$staging/data/thumbs/"
+  fi
+}
 
 echo "======================================================================"
 echo " Fire Stick Portal v2.0 — Deploy Híbrido Automático (Casa / Remoto)"

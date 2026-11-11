@@ -67,23 +67,35 @@ export function FirstTimeOnboardingModal({
   const router = useRouter();
   const pathname = usePathname();
 
+  const isAuthRoute =
+    pathname === '/login' ||
+    pathname?.startsWith('/auth') ||
+    pathname?.startsWith('/convite') ||
+    pathname?.startsWith('/privacy-policy') ||
+    pathname?.startsWith('/delete-account');
+
   const [modulesConfig, setModulesConfig] = useState<ModulesConfig>(getInitialModulesConfig);
 
   useEffect(() => {
+    if (isAuthRoute || !userId || hasConfiguredModules) {
+      setIsOpen(false);
+      return;
+    }
     if (evaluateOnboardingTrigger(userId, hasConfiguredModules)) {
       setIsOpen(true);
     }
-  }, [userId, hasConfiguredModules]);
+  }, [userId, hasConfiguredModules, isAuthRoute]);
 
   useEffect(() => {
     const handleRelaunch = () => {
+      if (isAuthRoute || !userId) return;
       setModulesConfig(getInitialModulesConfig());
       setActiveTab('modules');
       setIsOpen(true);
     };
     window.addEventListener('aurtistic:relaunch-onboarding', handleRelaunch);
     return () => window.removeEventListener('aurtistic:relaunch-onboarding', handleRelaunch);
-  }, []);
+  }, [isAuthRoute, userId]);
 
   const handleApplyPreset = (presetConfig: ModulesConfig) => {
     setModulesConfig({ ...presetConfig });
@@ -163,7 +175,20 @@ export function FirstTimeOnboardingModal({
     }
   };
 
-  if (!isOpen) return null;
+  const handleDismiss = async () => {
+    setIsOpen(false);
+    if (typeof window !== 'undefined' && userId) {
+      try {
+        localStorage.setItem(`aurtistic_onboarding_dismissed_${userId}`, 'true');
+        localStorage.setItem(ONBOARDING_KEY, 'true');
+      } catch {}
+    }
+    try {
+      await updateModulesConfigAction(modulesConfig);
+    } catch {}
+  };
+
+  if (!isOpen || isAuthRoute || !userId) return null;
 
   // Lista de módulos com descrição amigável e ícones
   const moduleCards: Array<{
@@ -243,7 +268,7 @@ export function FirstTimeOnboardingModal({
 
           <button
             type="button"
-            onClick={() => setIsOpen(false)}
+            onClick={handleDismiss}
             className="w-8 h-8 rounded-full border border-border-subtle bg-app hover:border-[var(--accent-secondary)] hover:text-[#FFCC00] text-fg-muted flex items-center justify-center transition-colors cursor-pointer shrink-0"
             title="Fechar"
             aria-label="Fechar modal"
@@ -504,7 +529,7 @@ export function FirstTimeOnboardingModal({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setIsOpen(false)}
+              onClick={handleDismiss}
               className="px-4 py-2 rounded-xl text-xs font-semibold text-fg-muted hover:text-fg hover:bg-white/5 transition-colors cursor-pointer"
             >
               Cancelar

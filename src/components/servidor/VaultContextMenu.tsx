@@ -8,6 +8,8 @@ export interface FolderCustomMeta {
   color?: string;
   icon?: string;
   isFavorite?: boolean;
+  deviceCategory?: 'camera' | 'mobile' | 'drone' | 'other';
+  deviceName?: string;
 }
 
 export const VAULT_FOLDER_COLORS: { id: string; hex: string; label: string }[] = [
@@ -66,6 +68,13 @@ export interface VaultContextMenuProps {
   onMoveToPortfolio?: (entry: EdgeVaultEntry) => void;
   onBatchMoveToPortfolio?: () => void;
   onToggleCurriculum?: (entry: EdgeVaultEntry) => void;
+  onShareWithClient?: (path: string, name?: string) => void;
+  onTagFolderDevice?: (
+    folderPath: string,
+    category: 'camera' | 'mobile' | 'drone' | 'other',
+    name: string,
+    recursive: boolean
+  ) => void;
   onLinkTask?: (entry: EdgeVaultEntry, taskId: string) => void;
   onCreateFolder?: () => void;
   onCreateNote?: () => void;
@@ -103,6 +112,8 @@ export function VaultContextMenu({
   onMoveToPortfolio,
   onBatchMoveToPortfolio,
   onToggleCurriculum,
+  onShareWithClient,
+  onTagFolderDevice,
   onLinkTask,
   onCreateFolder,
   onCreateNote,
@@ -114,6 +125,12 @@ export function VaultContextMenu({
 }: VaultContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [activeSubmenu, setActiveSubmenu] = useState<'color' | 'icon' | 'tasks' | null>(null);
+  const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
+  const [deviceCategory, setDeviceCategory] = useState<'camera' | 'mobile' | 'drone' | 'other'>(
+    folderMeta?.deviceCategory || 'camera'
+  );
+  const [deviceName, setDeviceName] = useState(folderMeta?.deviceName || '');
+  const [deviceRecursive, setDeviceRecursive] = useState(true);
 
   // Garante que o menu flutuante permaneça dentro dos limites da tela
   const [adjustedPos, setAdjustedPos] = useState({ left: x, top: y });
@@ -404,6 +421,26 @@ export function VaultContextMenu({
               )}
             </div>
 
+            {onTagFolderDevice && (
+              <button
+                type="button"
+                onClick={() => setIsDeviceModalOpen(true)}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-fg hover:bg-surface-hover transition-colors text-left"
+              >
+                <span className="material-symbols-outlined text-[17px] text-[var(--accent-primary)]">
+                  photo_camera
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs">Dispositivo do Ensaio / Pasta</div>
+                  {folderMeta?.deviceName && (
+                    <div className="text-[10px] text-fg-muted truncate">
+                      {folderMeta.deviceName}
+                    </div>
+                  )}
+                </div>
+              </button>
+            )}
+
             {onTogglePin && (
               <button
                 type="button"
@@ -420,6 +457,22 @@ export function VaultContextMenu({
               </button>
             )}
 
+            {onShareWithClient && (
+              <button
+                type="button"
+                onClick={() => {
+                  onShareWithClient(entry.relativePath, entry.name);
+                  onClose();
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-fg hover:bg-surface-hover hover:text-[#9D4EDD] transition-colors text-left font-semibold"
+              >
+                <span className="material-symbols-outlined text-[17px] text-[#9D4EDD]">
+                  share
+                </span>
+                <span>Compartilhar com o Cliente</span>
+              </button>
+            )}
+
             {onDownloadZip && (
               <button
                 type="button"
@@ -427,12 +480,12 @@ export function VaultContextMenu({
                   onDownloadZip(entry.relativePath);
                   onClose();
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-fg hover:bg-surface-hover transition-colors text-left"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-fg hover:bg-surface-hover hover:text-[var(--accent-secondary)] transition-colors text-left font-medium"
               >
-                <span className="material-symbols-outlined text-[17px] text-fg-muted">
-                  download
+                <span className="material-symbols-outlined text-[17px] text-[var(--accent-secondary)]">
+                  folder_zip
                 </span>
-                <span>Baixar Pasta (.ZIP)</span>
+                <span>Baixar em ZIP</span>
               </button>
             )}
           </div>
@@ -492,6 +545,22 @@ export function VaultContextMenu({
                   download
                 </span>
                 <span>Baixar Arquivo</span>
+              </button>
+            )}
+
+            {onShareWithClient && (
+              <button
+                type="button"
+                onClick={() => {
+                  onShareWithClient(entry.relativePath, entry.name);
+                  onClose();
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-fg hover:bg-surface-hover hover:text-[#9D4EDD] transition-colors text-left font-medium"
+              >
+                <span className="material-symbols-outlined text-[17px] text-[#9D4EDD]">
+                  share
+                </span>
+                <span>Compartilhar com o Cliente</span>
               </button>
             )}
 
@@ -734,6 +803,148 @@ export function VaultContextMenu({
               <span>Atualizar Pasta</span>
             </button>
           )}
+        </div>
+      )}
+
+      {/* Modal de Configuração de Dispositivo do Ensaio / Pasta */}
+      {isDeviceModalOpen && entry && (
+        <div
+          className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+        >
+          <div
+            className="w-full max-w-md bg-surface border border-border-subtle rounded-2xl shadow-2xl p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-border-subtle">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[20px] text-[var(--accent-primary)]">
+                  photo_camera
+                </span>
+                <h3 className="text-sm font-bold text-fg">
+                  Dispositivo do Ensaio / Pasta
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDeviceModalOpen(false)}
+                className="p-1 rounded-lg text-fg-muted hover:text-fg hover:bg-surface-hover"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <p className="text-xs text-fg-secondary">
+              Defina o equipamento fotográfico ou celular utilizado nesta pasta (<strong>{entry.name}</strong>).
+            </p>
+
+            {/* Categoria */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-fg">Tipo de Dispositivo</label>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { id: 'camera', label: 'Câmera', icon: 'photo_camera' },
+                  { id: 'mobile', label: 'Celular', icon: 'smartphone' },
+                  { id: 'drone', label: 'Drone', icon: 'flight' },
+                  { id: 'other', label: 'Outro', icon: 'devices' },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => {
+                      setDeviceCategory(cat.id as 'camera' | 'mobile' | 'drone' | 'other');
+                    }}
+                    className={`py-2 px-1.5 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1 transition-all ${
+                      deviceCategory === cat.id
+                        ? 'bg-[var(--accent-primary)]/15 border-[var(--accent-primary)] text-[var(--accent-primary)]'
+                        : 'bg-app border-border-subtle text-fg-muted hover:text-fg'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">{cat.icon}</span>
+                    <span className="text-[11px]">{cat.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Nome do Equipamento */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-fg">Nome do Equipamento</label>
+              <input
+                type="text"
+                value={deviceName}
+                onChange={(e) => setDeviceName(e.target.value)}
+                placeholder={
+                  deviceCategory === 'camera'
+                    ? 'Ex: Sony A7 IV, Canon R6...'
+                    : deviceCategory === 'mobile'
+                      ? 'Ex: iPhone 15 Pro, Samsung S24...'
+                      : 'Ex: DJI Mavic 3...'
+                }
+                className="w-full px-3 py-2 rounded-xl bg-app border border-border-subtle text-xs text-fg placeholder:text-fg-muted focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
+              />
+              {/* Sugestões rápidas */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {(deviceCategory === 'camera'
+                  ? ['Sony A7 IV', 'Canon EOS R6', 'Nikon Z6 II', 'Fuji X-T4']
+                  : deviceCategory === 'mobile'
+                    ? ['iPhone 15 Pro', 'iPhone 14', 'Samsung S24 Ultra', 'Google Pixel 8']
+                    : ['DJI Mini 3 Pro', 'DJI Mavic 3']
+                ).map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setDeviceName(preset)}
+                    className="text-[10px] px-2 py-0.5 rounded-full bg-surface-hover hover:bg-[var(--accent-primary)]/10 text-fg-muted hover:text-[var(--accent-primary)] border border-border-subtle transition-colors"
+                  >
+                    + {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Checkbox Recursivo */}
+            <label className="flex items-center gap-2 cursor-pointer text-xs text-fg pt-1">
+              <input
+                type="checkbox"
+                checked={deviceRecursive}
+                onChange={(e) => setDeviceRecursive(e.target.checked)}
+                className="rounded border-border-subtle accent-[var(--accent-primary)]"
+              />
+              <span>Aplicar a todas as fotos desta pasta e subpastas</span>
+            </label>
+
+            {/* Ações */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border-subtle">
+              <button
+                type="button"
+                onClick={() => setIsDeviceModalOpen(false)}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-fg-muted hover:text-fg hover:bg-surface-hover transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onTagFolderDevice && entry) {
+                    onTagFolderDevice(
+                      entry.relativePath,
+                      deviceCategory,
+                      deviceName.trim() || (deviceCategory === 'camera' ? 'Câmera' : 'Celular'),
+                      deviceRecursive
+                    );
+                  }
+                  setIsDeviceModalOpen(false);
+                  onClose();
+                }}
+                className="px-4 py-1.5 rounded-xl bg-[var(--accent-primary)] text-white text-xs font-bold hover:brightness-110 shadow-md transition-all"
+              >
+                Salvar e Etiquetar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

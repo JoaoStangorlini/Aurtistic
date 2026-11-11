@@ -21,6 +21,8 @@ export interface VaultIdeWorkbenchProps {
   onCloseActiveTab?: () => void;
   onNoteSaved?: () => void;
   onFileDrop?: (e: React.DragEvent) => void;
+  subfolders?: EdgeVaultEntry[];
+  onSelectSubfolder?: (folder: EdgeVaultEntry) => void;
 }
 
 export function VaultIdeWorkbench({
@@ -35,6 +37,8 @@ export function VaultIdeWorkbench({
   onCloseActiveTab,
   onNoteSaved,
   onFileDrop,
+  subfolders,
+  onSelectSubfolder,
 }: VaultIdeWorkbenchProps) {
   // Estado para Notas Markdown
   const [noteContent, setNoteContent] = useState('');
@@ -379,6 +383,32 @@ export function VaultIdeWorkbench({
               </div>
             </button>
           </div>
+
+          {/* Chips compactos das subpastas da pasta aberta no modo IDE */}
+          {subfolders && subfolders.length > 0 && (
+            <div className="w-full space-y-2 text-left bg-surface/50 border border-border-subtle p-3 rounded-2xl">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-fg-muted uppercase tracking-wider">
+                <span className="material-symbols-outlined text-[16px] text-[#FFCC00]">folder</span>
+                <span>Subpastas neste diretório ({subfolders.length})</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {subfolders.map((sub) => (
+                  <button
+                    key={sub.relativePath}
+                    type="button"
+                    onClick={() => onSelectSubfolder?.(sub)}
+                    className="px-3 py-1.5 rounded-xl bg-surface hover:bg-surface-hover border border-border-subtle hover:border-[var(--accent-primary)] text-xs text-fg flex items-center gap-2 transition-all shadow-sm"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-[#FFCC00]">folder</span>
+                    <span className="font-semibold">{sub.name}</span>
+                    {sub.hasPin && (
+                      <span className="material-symbols-outlined text-[13px] text-purple-400">lock</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Zona de Drop Direta */}
           <div className="w-full border-2 border-dashed border-border-subtle rounded-2xl p-6 text-center text-fg-muted hover:border-[var(--accent-primary)] transition-colors">

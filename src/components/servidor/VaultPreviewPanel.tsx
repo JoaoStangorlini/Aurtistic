@@ -18,6 +18,9 @@ export interface VaultPreviewPanelProps {
   onOpenNoteEditor?: (relativePath: string) => void;
   onOpenEcosystemMenu?: (entry: EdgeVaultEntry) => void;
   onEcosystemUpdated?: () => void;
+  panelWidth?: number;
+  isDetached?: boolean;
+  onToggleDetach?: () => void;
 }
 
 export function VaultPreviewPanel({
@@ -31,6 +34,9 @@ export function VaultPreviewPanel({
   onOpenNoteEditor,
   onOpenEcosystemMenu,
   onEcosystemUpdated,
+  panelWidth = 360,
+  isDetached = false,
+  onToggleDetach,
 }: VaultPreviewPanelProps) {
   // Estado de leitura assíncrona de notas .md / .txt
   const [noteContent, setNoteContent] = useState<string | null>(null);
@@ -221,25 +227,44 @@ export function VaultPreviewPanel({
   return (
     <aside
       data-tour="vault-preview-pane"
-      className="w-full sm:w-80 lg:w-96 bg-surface border-l border-border-subtle flex flex-col shrink-0 h-full overflow-hidden shadow-lg z-20 animate-in slide-in-from-right duration-200"
+      style={isDetached ? undefined : { width: `${panelWidth}px` }}
+      className={
+        isDetached
+          ? 'fixed bottom-6 right-6 z-[95] w-96 sm:w-[420px] max-w-[90vw] h-[580px] max-h-[82vh] bg-surface/95 backdrop-blur-xl border border-[var(--accent-primary)]/50 rounded-2xl shadow-[0_16px_50px_rgba(0,0,0,0.6)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200'
+          : 'bg-surface border-l border-border-subtle flex flex-col shrink-0 h-full overflow-hidden shadow-lg z-20 animate-in slide-in-from-right duration-200'
+      }
     >
       {/* Topo do Painel de Visualização */}
-      <div className="h-10 px-4 py-2 border-b border-border-subtle flex items-center justify-between bg-elevated/60">
+      <div className={`h-10 px-4 py-2 border-b border-border-subtle flex items-center justify-between ${isDetached ? 'bg-elevated/80 select-none cursor-move' : 'bg-elevated/60'}`}>
         <div className="flex items-center gap-2 min-w-0">
           <span className="material-symbols-outlined text-[18px] text-[var(--accent-primary)]">
-            view_sidebar
+            {isDetached ? 'picture_in_picture_alt' : 'view_sidebar'}
           </span>
           <span className="text-xs font-bold uppercase tracking-wider text-fg-secondary truncate">
-            Painel de Inspeção
+            {isDetached ? 'Preview Flutuante (PiP)' : 'Painel de Inspeção'}
           </span>
         </div>
         <div className="flex items-center gap-1">
-          <span
-            className="text-[10px] font-mono text-fg-muted bg-app px-1.5 py-0.5 rounded border border-border-subtle hidden sm:inline"
-            title="Atalho de teclado"
-          >
-            Alt+P
-          </span>
+          {onToggleDetach && (
+            <button
+              type="button"
+              onClick={onToggleDetach}
+              className="p-1 rounded-lg text-fg-muted hover:text-fg hover:bg-surface-hover transition-colors"
+              title={isDetached ? 'Encaixar no painel lateral' : 'Desencaixar em Pop-up / Picture-in-Picture'}
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                {isDetached ? 'vertical_align_bottom' : 'open_in_new'}
+              </span>
+            </button>
+          )}
+          {!isDetached && (
+            <span
+              className="text-[10px] font-mono text-fg-muted bg-app px-1.5 py-0.5 rounded border border-border-subtle hidden sm:inline"
+              title="Atalho de teclado"
+            >
+              Alt+P
+            </span>
+          )}
           <button
             type="button"
             onClick={onClose}

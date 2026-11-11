@@ -1,37 +1,27 @@
 // Este programa é um software livre (Licença AGPLv3)
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { UploadItem } from '@/lib/file-upload-helpers';
 import {
   extractFilesFromDataTransfer,
   extractFilesFromFileList,
   extractFilesFromZip,
-  resolveItemTargetFolder,
 } from '@/lib/file-upload-helpers';
-import { uploadTenantFileDirect } from '@/lib/edge-client';
-import { syncUserFileIndexAction, refreshTenantTicketAction } from '@/app/(dashboard)/servidor/actions';
 import { VaultActionDialog } from './VaultActionDialog';
+import { useVaultUpload, type QueuedUploadItem } from '@/contexts/VaultUploadContext';
 
-export interface QueuedUploadItem {
-  id: string;
-  file: File;
-  relativePath: string;
-  targetFolder: string;
-  status: 'idle' | 'uploading' | 'success' | 'error';
-  error?: string;
-  progressPercent?: number;
-}
+export type { QueuedUploadItem };
 
 export interface VaultUploadManagerModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
   initialItems?: UploadItem[];
-  currentFolder: string;
-  ticket: string;
+  currentFolder?: string;
+  ticket?: string;
   serverUrl?: string;
   selectedOrgId?: string | null;
-  onUploadFinished: (results: {
+  onUploadFinished?: (results: {
     successCount: number;
     errorCount: number;
     newUsedBytes?: number;
@@ -85,112 +75,77 @@ export function VaultUploadManagerModal({
   initialItems,
   currentFolder,
   ticket,
-  serverUrl,
   selectedOrgId,
   onUploadFinished,
 }: VaultUploadManagerModalProps) {
-  const [queue, setQueue] = useState<QueuedUploadItem[]>([]);
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
+  const uploadCtx = useVaultUpload();
+
+  const isModalOpen = isOpen !== undefined ? isOpen : uploadCtx.isModalOpen;
+  const handleClose = onClose || uploadCtx.closeModal;
+  const isMinimized = uploadCtx.isMinimized;
+  const setIsMinimized = uploadCtx.setIsMinimized;
+  const queue = uploadCtx.queue;
+  const isUploading = uploadCtx.isUploading;
+  const totalFiles = uploadCtx.totalFiles;
+  const completedFiles = uploadCtx.completedFiles;
+  const errorFiles = uploadCtx.errorFiles;
+  const idleFiles = uploadCtx.idleFiles;
+  const activeItem = uploadCtx.activeItem;
+  const totalBytes = uploadCtx.totalBytes;
+  const uploadedBytes = uploadCtx.uploadedBytes;
+  const overallPercent = uploadCtx.overallPercent;
+  const enqueueItems = uploadCtx.enqueueItems;
+  const handleStartUpload = uploadCtx.startUpload;
+  const handleRetryFailed = uploadCtx.retryFailed;
+  const handleRemoveItem = uploadCtx.removeItem;
+  const handleClearIdle = uploadCtx.clearFinished;
+  const cancelAll = uploadCtx.cancelAll;
+
+  const effectiveTargetFolder =
+    uploadCtx.overrideFolder !== null
+      ? uploadCtx.overrideFolder
+      : currentFolder !== undefined
+        ? currentFolder
+        : uploadCtx.currentFolder || '';
+
   const [isDragOver, setIsDragOver] = useState(false);
   const [isExtractingZip, setIsExtractingZip] = useState(false);
   const [zipStatusText, setZipStatusText] = useState<string | null>(null);
   const [isConfirmingCancel, setIsConfirmingCancel] = useState(false);
   const [errorAlertMessage, setErrorAlertMessage] = useState<string | null>(null);
-  const [overrideFolder, setOverrideFolder] = useState<string | null>(null);
-  const effectiveTargetFolder = overrideFolder !== null ? overrideFolder : (currentFolder || '');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const zipInputRef = useRef<HTMLInputElement>(null);
-  const cancelRequestedRef = useRef(false);
   const dragCounterRef = useRef(0);
-  const currentTicketRef = useRef(ticket);
-  const lastProgressUpdateRef = useRef(0);
 
+  // Sincroniza ticket caso passado via prop
   useEffect(() => {
-    currentTicketRef.current = ticket;
-  }, [ticket]);
-
-  // Adiciona novos itens à fila
-  const enqueueItems = useCallback(
-    (newItems: UploadItem[]) => {
-      if (!newItems || newItems.length === 0) return;
-      const baseFolder = overrideFolder !== null ? overrideFolder : (currentFolder || '');
-      const mapped: QueuedUploadItem[] = newItems.map((it, idx) => {
-        const { targetFolder } = resolveItemTargetFolder(baseFolder, it.relativePath);
-        return {
-          id: `${it.relativePath}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${idx}`,
-          file: it.file,
-          relativePath: it.relativePath,
-          targetFolder,
-          status: 'idle',
-        };
-      });
-
-      setQueue((prev) => {
-        // Evita duplicatas idênticas de caminho relativo ainda em estado idle
-        const existingPaths = new Set(prev.map((i) => i.relativePath));
-        const filtered = mapped.filter((m) => !existingPaths.has(m.relativePath));
-        return [...prev, ...filtered];
-      });
-    },
-    [currentFolder, overrideFolder]
-  );
-
-  const handleSetTargetFolder = (newFolder: string) => {
-    const clean = newFolder.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-    setOverrideFolder(clean);
-    setQueue((prev) =>
-      prev.map((item) => {
-        if (item.status !== 'idle') return item;
-        const { targetFolder } = resolveItemTargetFolder(clean, item.relativePath);
-        return { ...item, targetFolder };
-      })
-    );
-  };
+    if (ticket) {
+      uploadCtx.updateTicket(ticket);
+    }
+  }, [ticket, uploadCtx]);
 
   const prevInitialItemsRef = useRef<UploadItem[] | undefined>(undefined);
-
-  // Quando o modal abre ou recebe novos itens iniciais
   useEffect(() => {
-    if (isOpen && initialItems && initialItems.length > 0 && initialItems !== prevInitialItemsRef.current) {
+    if (isModalOpen && initialItems && initialItems.length > 0 && initialItems !== prevInitialItemsRef.current) {
       prevInitialItemsRef.current = initialItems;
-      const timer = setTimeout(() => {
-        enqueueItems(initialItems);
-      }, 0);
-      return () => clearTimeout(timer);
+      enqueueItems(initialItems, currentFolder, selectedOrgId);
     }
-  }, [isOpen, initialItems, enqueueItems]);
+  }, [isModalOpen, initialItems, enqueueItems, currentFolder, selectedOrgId]);
 
+  const lastReportedTimeRef = useRef(0);
   useEffect(() => {
-    if (!isOpen && !isUploading) {
-      const timer = setTimeout(() => {
-        setQueue([]);
-        setIsMinimized(false);
-        setOverrideFolder(null);
-      }, 0);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, isUploading]);
-
-  // Métricas agregadas
-  const totalFiles = queue.length;
-  const completedFiles = queue.filter((i) => i.status === 'success').length;
-  const errorFiles = queue.filter((i) => i.status === 'error').length;
-  const idleFiles = queue.filter((i) => i.status === 'idle').length;
-  const activeItem = queue.find((i) => i.status === 'uploading');
-
-  const totalBytes = useMemo(() => queue.reduce((acc, i) => acc + i.file.size, 0), [queue]);
-  const uploadedBytes = useMemo(() => {
-    return queue.reduce((acc, i) => {
-      if (i.status === 'success') return acc + i.file.size;
-      if (i.status === 'uploading' && i.progressPercent) {
-        return acc + Math.round((i.file.size * i.progressPercent) / 100);
+    if (
+      uploadCtx.lastCompletedUploadTime > 0 &&
+      uploadCtx.lastCompletedUploadTime !== lastReportedTimeRef.current
+    ) {
+      lastReportedTimeRef.current = uploadCtx.lastCompletedUploadTime;
+      if (uploadCtx.lastUploadResults) {
+        onUploadFinished?.(uploadCtx.lastUploadResults);
       }
-      return acc;
-    }, 0);
-  }, [queue]);
+    }
+  }, [uploadCtx.lastCompletedUploadTime, uploadCtx.lastUploadResults, onUploadFinished]);
 
   const distinctFolders = useMemo(() => {
     const foldersSet = new Set<string>();
@@ -200,163 +155,16 @@ export function VaultUploadManagerModal({
     return foldersSet.size;
   }, [queue]);
 
-  const overallPercent = totalBytes > 0 ? Math.min(100, Math.round((uploadedBytes / totalBytes) * 100)) : 0;
-
-  const handleRetryFailed = () => {
-    if (isUploading) return;
-    setQueue((prev) =>
-      prev.map((it) => (it.status === 'error' ? { ...it, status: 'idle', error: undefined } : it))
-    );
-  };
-
-  // Executa o envio em lote sequencial com barra de progresso em tempo real e auto-renovação de ticket
-  const handleStartUpload = async () => {
-    if (isUploading || queue.length === 0) return;
-    setIsUploading(true);
-    cancelRequestedRef.current = false;
-
-    // 1. Obtém ticket novo e garantido antes de iniciar uploads em lote
-    try {
-      const refreshed = await refreshTenantTicketAction({
-        purpose: 'vault',
-        readOnly: false,
-      });
-      if (refreshed.ok && refreshed.ticket?.ticket) {
-        currentTicketRef.current = refreshed.ticket.ticket;
-      }
-    } catch (e) {
-      console.warn('[VaultUpload] Falha ao renovar ticket antes do lote:', e);
-    }
-
-    let successCount = 0;
-    let errorCount = 0;
-    let lastUsedBytes: number | undefined;
-
-    // Itera pelos itens pendentes ou que deram erro
-    for (let i = 0; i < queue.length; i++) {
-      if (cancelRequestedRef.current) break;
-      const currentItem = queue[i];
-      if (currentItem.status === 'success') continue;
-
-      setQueue((prev) =>
-        prev.map((it, idx) =>
-          idx === i ? { ...it, status: 'uploading', progressPercent: 0, error: undefined } : it
-        )
-      );
-
-      let uploadSuccess = false;
-      let attempt = 0;
-      let lastErr: unknown;
-
-      while (!uploadSuccess && attempt < 2 && !cancelRequestedRef.current) {
-        attempt++;
-        try {
-          const mutation = await uploadTenantFileDirect({
-            file: currentItem.file,
-            folderPath: currentItem.targetFolder,
-            ticket: currentTicketRef.current,
-            serverUrl,
-            onProgress: (pct) => {
-              const now = Date.now();
-              if (now - lastProgressUpdateRef.current > 150 || pct === 100) {
-                lastProgressUpdateRef.current = now;
-                setQueue((prev) =>
-                  prev.map((it, idx) => (idx === i ? { ...it, progressPercent: pct } : it))
-                );
-              }
-            },
-          });
-
-          uploadSuccess = true;
-
-          // Sincroniza metadados no Supabase de forma desacoplada para não invalidar upload em disco
-          try {
-            const normTarget = (currentItem.targetFolder || '').toLowerCase();
-            const isPortfolioFolder =
-              normTarget === 'portfolio' ||
-              normTarget.startsWith('portfolio/') ||
-              normTarget === 'portifolio' ||
-              normTarget.startsWith('portifolio/');
-            const isCurriculumFolder =
-              normTarget === 'curriculo' ||
-              normTarget.startsWith('curriculo/');
-
-            await syncUserFileIndexAction({
-              mutation,
-              ecosystemLinks: {
-                ...(isPortfolioFolder ? { showInPortfolio: true, visibility: 'public' } : {}),
-                ...(isCurriculumFolder ? { showInCurriculum: true, visibility: 'public' } : {}),
-              },
-              organizationId: selectedOrgId || undefined,
-            });
-          } catch (syncErr) {
-            console.warn('[VaultUpload] Aviso de sincronização no Supabase:', syncErr);
-          }
-
-          if (typeof mutation.total_used_bytes === 'number') {
-            lastUsedBytes = mutation.total_used_bytes;
-          }
-
-          successCount++;
-          setQueue((prev) =>
-            prev.map((it, idx) =>
-              idx === i ? { ...it, status: 'success', progressPercent: 100, error: undefined } : it
-            )
-          );
-        } catch (err: unknown) {
-          lastErr = err;
-          const errMsg = err instanceof Error ? err.message : String(err);
-          const isAuthError =
-            errMsg.includes('401') ||
-            errMsg.toLowerCase().includes('ticket') ||
-            errMsg.toLowerCase().includes('expirado') ||
-            errMsg.toLowerCase().includes('permissão');
-
-          if (isAuthError && attempt < 2) {
-            try {
-              const refreshed = await refreshTenantTicketAction({
-                purpose: 'vault',
-                readOnly: false,
-              });
-              if (refreshed.ok && refreshed.ticket?.ticket) {
-                currentTicketRef.current = refreshed.ticket.ticket;
-                continue; // Tenta o upload do mesmo arquivo com o novo ticket
-              }
-            } catch {
-              // Se falhar a renovação, sai do loop
-            }
-          }
-          break;
-        }
-      }
-
-      if (!uploadSuccess && !cancelRequestedRef.current) {
-        errorCount++;
-        const msg = lastErr instanceof Error ? lastErr.message : 'Falha no upload';
-        setQueue((prev) =>
-          prev.map((it, idx) => (idx === i ? { ...it, status: 'error', error: msg } : it))
-        );
-      }
-    }
-
-    setIsUploading(false);
-    onUploadFinished({ successCount, errorCount, newUsedBytes: lastUsedBytes });
+  const handleSetTargetFolder = (newFolder: string) => {
+    uploadCtx.setOverrideFolder(newFolder);
   };
 
   const handleCancelUpload = () => {
     if (isUploading) {
       setIsConfirmingCancel(true);
     } else {
-      onClose();
+      handleClose();
     }
-  };
-
-  const handleRemoveItem = (id: string) => {
-    setQueue((prev) => prev.filter((i) => i.id !== id));
-  };
-
-  const handleClearIdle = () => {
-    setQueue((prev) => prev.filter((i) => i.status === 'uploading'));
   };
 
   const handleZipSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -366,7 +174,7 @@ export function VaultUploadManagerModal({
     setZipStatusText(`Descompactando ${file.name}...`);
     try {
       const items = await extractFilesFromZip(file);
-      enqueueItems(items);
+      enqueueItems(items, effectiveTargetFolder, selectedOrgId);
     } catch (err: unknown) {
       setErrorAlertMessage(err instanceof Error ? err.message : 'Erro ao descompactar .zip');
     } finally {
@@ -376,98 +184,9 @@ export function VaultUploadManagerModal({
     }
   };
 
-  if (!isOpen) return null;
 
-  // MODO 1: DOCK MINIMIZADO (Widget flutuante no canto inferior direito)
-  if (isMinimized) {
-    return (
-      <aside
-        role="region"
-        aria-label="Upload em Segundo Plano"
-        onClick={() => setIsMinimized(false)}
-        className="fixed bottom-5 right-5 z-[100] w-80 sm:w-96 bg-surface/95 backdrop-blur-md border border-border-subtle shadow-2xl rounded-2xl p-4 space-y-3 cursor-pointer select-none transition-all hover:border-[var(--accent-primary)]/60 animate-in slide-in-from-bottom-5 duration-200"
-      >
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            {isUploading ? (
-              <span className="material-symbols-outlined text-[20px] text-[var(--accent-primary)] animate-spin">
-                sync
-              </span>
-            ) : errorFiles > 0 ? (
-              <span className="material-symbols-outlined text-[20px] text-rose-500">
-                error
-              </span>
-            ) : (
-              <span className="material-symbols-outlined text-[20px] text-emerald-500">
-                check_circle
-              </span>
-            )}
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-fg truncate">
-                {isUploading
-                  ? `Enviando (${completedFiles}/${totalFiles})`
-                  : errorFiles > 0
-                    ? `Finalizado com ${errorFiles} erro(s)`
-                    : `Upload concluído (${completedFiles} arquivos)`}
-              </p>
-              <p className="text-[10px] text-fg-muted font-mono truncate">
-                {activeItem ? activeItem.relativePath : `Destino: /${currentFolder || 'raiz'}`}
-              </p>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsMinimized(false);
-              }}
-              className="p-1.5 rounded-lg text-fg-muted hover:text-fg hover:bg-surface-hover"
-              title="Expandir Gerenciador de Uploads"
-            >
-              <span className="material-symbols-outlined text-[18px]">open_in_full</span>
-            </button>
-            {!isUploading && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClose();
-                }}
-                className="p-1.5 rounded-lg text-fg-muted hover:text-fg hover:bg-surface-hover"
-                title="Fechar"
-              >
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Barra de Progresso Compacta */}
-        <div className="space-y-1">
-          <div className="w-full h-1.5 bg-app rounded-full overflow-hidden border border-border-subtle/50">
-            <div
-              className={`h-full transition-all duration-300 ${
-                errorFiles > 0 && !isUploading
-                  ? 'bg-amber-500'
-                  : completedFiles === totalFiles && totalFiles > 0
-                    ? 'bg-emerald-500'
-                    : 'bg-[var(--accent-primary)]'
-              }`}
-              style={{ width: `${overallPercent}%` }}
-            />
-          </div>
-          <div className="flex items-center justify-between text-[10px] text-fg-muted font-mono">
-            <span>{overallPercent}%</span>
-            <span>
-              {formatBytes(uploadedBytes)} / {formatBytes(totalBytes)}
-            </span>
-          </div>
-        </div>
-      </aside>
-    );
-  }
+  if (!isModalOpen || isMinimized) return null;
 
   // MODO 2: MODAL COMPLETO (Popup Centralizado com Confirmação e Acompanhamento)
   return (
@@ -915,7 +634,7 @@ export function VaultUploadManagerModal({
               ) : completedFiles === totalFiles && totalFiles > 0 ? (
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={handleClose}
                   className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
                 >
                   <span className="material-symbols-outlined text-[18px]">check</span>
@@ -925,7 +644,7 @@ export function VaultUploadManagerModal({
                 <>
                   <button
                     type="button"
-                    onClick={onClose}
+                    onClick={handleClose}
                     className="px-4 py-2 rounded-xl text-xs font-bold text-fg-muted hover:text-fg hover:bg-surface-hover transition-colors"
                   >
                     Fechar
@@ -966,7 +685,7 @@ export function VaultUploadManagerModal({
         cancelLabel="Continuar Enviando"
         onConfirm={() => {
           setIsConfirmingCancel(false);
-          cancelRequestedRef.current = true;
+          cancelAll();
         }}
         onCancel={() => setIsConfirmingCancel(false)}
       />

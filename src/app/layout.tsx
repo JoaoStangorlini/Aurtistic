@@ -32,6 +32,9 @@ import { ThemeProvider, ThemedTopLoader } from "@/components/theme/ThemeProvider
 import { CoachMarksProvider } from "@/components/onboarding/CoachMarksProvider";
 import { FirstTimeOnboardingModal } from "@/components/onboarding/FirstTimeOnboardingModal";
 import { SelfCareAlarmProvider } from "@/components/cuidados/SelfCareAlarmProvider";
+import { VaultUploadProvider } from "@/contexts/VaultUploadContext";
+import { GlobalUploadDock } from "@/components/servidor/GlobalUploadDock";
+import { VaultUploadManagerModal } from "@/components/servidor/VaultUploadManagerModal";
 
 export default async function RootLayout({
   children,
@@ -69,7 +72,11 @@ export default async function RootLayout({
       if (profile?.features_config?.theme) {
         initialTheme = profile.features_config.theme;
       }
-      if (profile?.features_config?.modules) {
+      if (
+        profile?.features_config?.modules ||
+        profile?.features_config?.active ||
+        profile?.features_config?.onboarding_completed
+      ) {
         hasConfiguredModules = true;
       }
     } catch {}
@@ -133,16 +140,25 @@ export default async function RootLayout({
                 initialVaultTicket={initialVaultTicket}
                 serverUrl={serverUrl}
               >
-                <ThemedTopLoader />
-                <Suspense fallback={null}>
-                  <GlobalHighlighter />
-                </Suspense>
-                <Navbar initialRole={userRole} initialTargetHref={targetHref} />
-                <main className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden">
-                  {children}
-                </main>
-                <FirstTimeOnboardingModal userId={onboardingUserId} hasConfiguredModules={hasConfiguredModules} />
-                <GlobalAudioDock />
+                <VaultUploadProvider
+                  initialVaultTicket={initialVaultTicket}
+                  serverUrl={serverUrl}
+                >
+                  <ThemedTopLoader />
+                  <Suspense fallback={null}>
+                    <GlobalHighlighter />
+                  </Suspense>
+                  <Navbar initialRole={userRole} initialTargetHref={targetHref} />
+                  <main className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden">
+                    {children}
+                  </main>
+                  {Boolean(onboardingUserId) && (
+                    <FirstTimeOnboardingModal userId={onboardingUserId} hasConfiguredModules={hasConfiguredModules} />
+                  )}
+                  <GlobalAudioDock />
+                  <GlobalUploadDock />
+                  <VaultUploadManagerModal />
+                </VaultUploadProvider>
               </AurtisticMediaProvider>
             </SelfCareAlarmProvider>
           </CoachMarksProvider>

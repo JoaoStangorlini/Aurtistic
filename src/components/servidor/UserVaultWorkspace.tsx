@@ -36,9 +36,12 @@ import {
   syncUserFileIndexAction,
   refreshOrganizationTicketAction,
   requestEventQuotaBoostAction,
+  requestOrgVaultAccessAction,
   cascadeFolderUpdateAction,
   updateFileEcosystemLinksAction,
+  tagFolderDevicesAction,
 } from '@/app/(dashboard)/servidor/actions';
+import { useVaultUpload } from '@/contexts/VaultUploadContext';
 import {
   type UploadItem,
   extractFilesFromDataTransfer,
@@ -84,6 +87,7 @@ export interface UserVaultWorkspaceProps {
   initialShareLinks: ShareLinkRow[];
   userTasks: Task[];
   userOrganizations?: UserOrganizationVaultOption[];
+  userName?: string;
 }
 
 type ActiveTab = 'vault' | 'shares' | 'trash' | 'admin_quotas' | 'admin_telemetry';
@@ -121,9 +125,12 @@ export function UserVaultWorkspace({
   initialShareLinks,
   userTasks,
   userOrganizations = [],
+  userName,
 }: UserVaultWorkspaceProps) {
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
   const [orgVaultTicket, setOrgVaultTicket] = useState<string | null>(null);
+  // Guard to prevent race-condition when switching between personal/org scopes
+  const [switchingScope, setSwitchingScope] = useState(false);
 
   // Modal Boost Evento
   const [isBoostModalOpen, setIsBoostModalOpen] = useState(false);
@@ -138,7 +145,28 @@ export function UserVaultWorkspace({
     return userOrganizations.find((o) => o.id === selectedOrgId) || null;
   }, [userOrganizations, selectedOrgId]);
 
+  // Solicitação de Acesso ao Cofre de Organização
+  const [requestingOrgAccess, setRequestingOrgAccess] = useState(false);
+  const [orgAccessRequested, setOrgAccessRequested] = useState(false);
+
+  const handleRequestOrgVaultAccess = async () => {
+    if (!selectedOrgId) return;
+    setRequestingOrgAccess(true);
+    try {
+      const res = await requestOrgVaultAccessAction({ organizationId: selectedOrgId });
+      if (res.ok) {
+        setOrgAccessRequested(true);
+      } else {
+        setDirError(res.error || 'Erro ao solicitar acesso de escrita no cofre.');
+      }
+    } finally {
+      setRequestingOrgAccess(false);
+    }
+  };
+
   const [activeTab, setActiveTab] = useState<ActiveTab>('vault');
+  const defaultPersonalLabel = userName ? `Cofre ${userName}` : 'Meus Arquivos';
+
   const [currentFolder, setCurrentFolder] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search).get('folder');
@@ -147,12 +175,13 @@ export function UserVaultWorkspace({
     return '';
   });
   const [breadcrumbs, setBreadcrumbs] = useState<Array<{ name: string; path: string }>>(() => {
+    const rootName = userName ? `Cofre ${userName}` : 'Meus Arquivos';
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search).get('folder');
       if (p) {
         const clean = p.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
         const parts = clean.split('/');
-        const crumbs = [{ name: 'Meus Arquivos', path: '' }];
+        const crumbs = [{ name: rootName, path: '' }];
         let cur = '';
         for (const pt of parts) {
           cur = cur ? `${cur}/${pt}` : pt;
@@ -161,7 +190,7 @@ export function UserVaultWorkspace({
         return crumbs;
       }
     }
-    return [{ name: 'Meus Arquivos', path: '' }];
+    return [{ name: rootName, path: '' }];
   });
   const [folders, setFolders] = useState<EdgeVaultEntry[]>([]);
   const [files, setFiles] = useState<EdgeVaultEntry[]>([]);
@@ -202,14 +231,54 @@ export function UserVaultWorkspace({
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const dragCounter = useRef(0);
 
-  // Gerenciador de Uploads (Pop-up de Confirmação & Dock Minimizado)
-  const [uploadManagerOpen, setUploadManagerOpen] = useState(false);
-  const [uploadManagerInitialItems, setUploadManagerInitialItems] = useState<UploadItem[]>([]);
+  // Contexto Global de Uploads Persistentes
+  const uploadCtx = useVaultUpload();
 
   const handleOpenUploadManager = (items?: UploadItem[]) => {
-    setUploadManagerInitialItems(items || []);
-    setUploadManagerOpen(true);
+    uploadCtx.openModal(items, currentFolder, selectedOrgId);
   };
+
+  // Redimensionamento do Painel de Inspeção (280px - 650px) e Modo PiP Flutuante
+  const [panelWidth, setPanelWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return 360;
+    try {
+      const saved = localStorage.getItem('aurtistic_vault_preview_panel_width');
+      const parsed = saved ? parseInt(saved, 10) : 360;
+      return !isNaN(parsed) && parsed >= 280 && parsed <= 650 ? parsed : 360;
+    } catch {
+      return 360;
+    }
+  });
+  const [isResizingPanel, setIsResizingPanel] = useState(false);
+  const [isDetachedPreview, setIsDetachedPreview] = useState(false);
+
+  const handleStartResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizingPanel(true);
+    document.body.classList.add('select-none');
+
+    const startX = e.clientX;
+    const startWidth = panelWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const delta = startX - moveEvent.clientX;
+      const nextWidth = Math.min(650, Math.max(280, startWidth + delta));
+      setPanelWidth(nextWidth);
+      try {
+        localStorage.setItem('aurtistic_vault_preview_panel_width', String(nextWidth));
+      } catch {}
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingPanel(false);
+      document.body.classList.remove('select-none');
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  }, [panelWidth]);
 
   // Prevenção global de comportamento padrão do navegador em Drag & Drop
   // Evita que soltar arquivos fora da área específica abra arquivos em nova aba ou exiba cursor proibido
@@ -594,7 +663,7 @@ export function UserVaultWorkspace({
 
       const segments = cleanTarget ? cleanTarget.split('/') : [];
       const breadcrumbs = [
-        { name: selectedOrg ? selectedOrg.name : 'Meus Arquivos', path: '' },
+        { name: selectedOrg ? selectedOrg.name : defaultPersonalLabel, path: '' },
         ...segments.map((seg, i) => ({
           name: i === 0 && (seg.toLowerCase() === 'portfolio' || seg.toLowerCase() === 'portifolio') ? 'Portfólio' : seg,
           path: segments.slice(0, i + 1).join('/'),
@@ -647,7 +716,7 @@ export function UserVaultWorkspace({
         setBreadcrumbs(
           res.breadcrumbs || [
             {
-              name: selectedOrg ? selectedOrg.name : 'Meus Arquivos',
+              name: selectedOrg ? selectedOrg.name : defaultPersonalLabel,
               path: '',
             },
           ]
@@ -688,8 +757,20 @@ export function UserVaultWorkspace({
     [isApprovedForStorage, profile.storage_role, activeTicket, serverUrl, indexedMap, selectedOrg, selectedOrgId, resolveFallbackFolderListing]
   );
 
+  useEffect(() => {
+    if (uploadCtx.lastCompletedUploadTime > 0) {
+      if (typeof uploadCtx.lastUploadResults?.newUsedBytes === 'number') {
+        setUsedBytes(uploadCtx.lastUploadResults.newUsedBytes);
+      }
+      if (uploadCtx.lastUploadResults?.successCount) {
+        void loadDirectory(currentFolder);
+      }
+    }
+  }, [uploadCtx.lastCompletedUploadTime, uploadCtx.lastUploadResults, currentFolder, loadDirectory]);
+
   const handleSwitchScope = async (orgId: string | null) => {
     if (orgId === selectedOrgId) return;
+    setSwitchingScope(true);
     setSelectedOrgId(orgId);
     setCurrentFolder('');
     setSelectedPaths(new Set());
@@ -703,31 +784,69 @@ export function UserVaultWorkspace({
       setFolderMetaMap({});
     }
 
-    if (!orgId) {
-      setOrgVaultTicket(null);
-      setUsedBytes(profile.used_bytes || 0);
-      setBreadcrumbs([{ name: 'Meus Arquivos', path: '' }]);
-      await loadDirectory('', ticket);
-    } else {
-      const org = userOrganizations.find((o) => o.id === orgId);
-      if (org) {
-        setUsedBytes(org.usedBytes);
-        setBreadcrumbs([{ name: org.name, path: '' }]);
-      }
-      setLoadingDir(true);
-      const res = await refreshOrganizationTicketAction({
-        organizationId: orgId,
-        unlockedPins,
-      });
-      if (res.ok && res.session?.vaultTicket?.ticket) {
-        setOrgVaultTicket(res.session.vaultTicket.ticket);
-        await loadDirectory('', res.session.vaultTicket.ticket);
+    try {
+      if (!orgId) {
+        setOrgVaultTicket(null);
+        setUsedBytes(profile.used_bytes || 0);
+        setBreadcrumbs([{ name: userName ? `Cofre ${userName}` : 'Meus Arquivos', path: '' }]);
+        await loadDirectory('', ticket);
       } else {
-        setDirError(res.error || 'Falha ao acessar o cofre da organização.');
-        setLoadingDir(false);
+        const org = userOrganizations.find((o) => o.id === orgId);
+        if (org) {
+          setUsedBytes(org.usedBytes);
+          setBreadcrumbs([{ name: org.name, path: '' }]);
+        }
+        setLoadingDir(true);
+        const res = await refreshOrganizationTicketAction({
+          organizationId: orgId,
+          unlockedPins,
+        });
+        if (res.ok && res.session?.vaultTicket?.ticket) {
+          setOrgVaultTicket(res.session.vaultTicket.ticket);
+          await loadDirectory('', res.session.vaultTicket.ticket);
+        } else {
+          setDirError(res.error || 'Falha ao acessar o cofre da organização.');
+          setLoadingDir(false);
+        }
       }
+    } finally {
+      setSwitchingScope(false);
     }
   };
+
+  const handleTagFolderDevice = useCallback(
+    async (
+      folderPath: string,
+      deviceCategory: 'camera' | 'mobile' | 'drone' | 'other',
+      deviceName: string,
+      recursive = true
+    ) => {
+      const updated = {
+        ...folderMetaMap,
+        [folderPath]: {
+          ...(folderMetaMap[folderPath] || {}),
+          deviceCategory,
+          deviceName,
+        },
+      };
+      saveFolderMeta(updated);
+
+      try {
+        await tagFolderDevicesAction({
+          folderPath,
+          deviceCategory,
+          deviceName,
+          recursive,
+          organizationId: selectedOrgId || undefined,
+        });
+        void loadDirectory(currentFolder);
+      } catch (err) {
+        console.warn('[UserVaultWorkspace] Falha ao marcar dispositivo na pasta:', err);
+      }
+    },
+    [folderMetaMap, saveFolderMeta, selectedOrgId, currentFolder, loadDirectory]
+  );
+
 
   useEffect(() => {
     const handleEnsurePreview = () => {
@@ -739,6 +858,8 @@ export function UserVaultWorkspace({
 
   useEffect(() => {
     let ignore = false;
+    // Abort auto-reload while switching between personal/org scope to avoid race condition
+    if (switchingScope) return;
     if (activeTab === 'vault' && (isApprovedForStorage || profile.storage_role === 'admin')) {
       fetchTenantDirectory(currentFolder, activeTicket, { serverUrl })
         .then((res) => {
@@ -765,7 +886,7 @@ export function UserVaultWorkspace({
           setBreadcrumbs(
             res.breadcrumbs || [
               {
-                name: selectedOrg ? selectedOrg.name : 'Meus Arquivos',
+                name: selectedOrg ? selectedOrg.name : defaultPersonalLabel,
                 path: '',
               },
             ]
@@ -850,7 +971,7 @@ export function UserVaultWorkspace({
     } finally {
       setLoadingTrash(false);
     }
-  }, [activeTicket, serverUrl]);
+  }, [activeTicket, serverUrl, setUsedBytes, setDirError]);
 
   const handleUploadItems = (items: UploadItem[]) => {
     handleOpenUploadManager(items);
@@ -1171,7 +1292,21 @@ export function UserVaultWorkspace({
       setFiles(prevFiles);
       setDirError(err instanceof Error ? err.message : 'Erro ao excluir itens selecionados.');
     }
-  }, [selectedPaths, folders, files, selectedEntry, activeTicket, serverUrl, selectedOrgId, currentFolder, loadDirectory]);
+  }, [
+    selectedPaths,
+    folders,
+    files,
+    selectedEntry,
+    activeTicket,
+    serverUrl,
+    selectedOrgId,
+    currentFolder,
+    loadDirectory,
+    setFolders,
+    setFiles,
+    setUsedBytes,
+    setDirError,
+  ]);
 
   const handleBatchDelete = useCallback(() => {
     if (selectedPaths.size === 0) return;
@@ -1501,7 +1636,7 @@ export function UserVaultWorkspace({
             }`}
           >
             <span className="material-symbols-outlined text-[16px]">person</span>
-            <span>Meu Cofre Pessoal</span>
+            <span>{userName ? `Cofre ${userName}` : 'Meu Cofre Pessoal'}</span>
           </button>
 
           {userOrganizations.map((org) => (
@@ -1597,7 +1732,7 @@ export function UserVaultWorkspace({
             <span className="material-symbols-outlined text-[18px]">
               {selectedOrg ? 'domain' : 'folder_special'}
             </span>
-            <span>{selectedOrg ? `Cofre ${selectedOrg.name}` : 'Meu Espaço'}</span>
+            <span>{selectedOrg ? `Cofre ${selectedOrg.name}` : (userName ? `Cofre ${userName}` : 'Meu Espaço')}</span>
           </button>
 
           <button
@@ -1682,6 +1817,42 @@ export function UserVaultWorkspace({
       {/* ABA 1: EXPLORER DO COFRE ("MEU ESPAÇO") */}
       {activeTab === 'vault' && (isApprovedForStorage || profile.storage_role === 'admin') && (
         <div className="space-y-4">
+          {/* Banner de Acesso Read-Only no Cofre de Organização se não aprovado */}
+          {selectedOrg && !selectedOrg.can_upload_vault && profile.storage_role !== 'admin' && (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-amber-500 text-[24px] shrink-0">
+                  visibility
+                </span>
+                <div>
+                  <p className="font-bold text-fg">
+                    Acesso de Leitura no Cofre {selectedOrg.name}
+                  </p>
+                  <p className="text-fg-muted">
+                    Você pode visualizar e baixar os arquivos compartilhados. Para enviar ou excluir arquivos, é necessária a aprovação de um administrador da organização.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={requestingOrgAccess || orgAccessRequested}
+                onClick={() => void handleRequestOrgVaultAccess()}
+                className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:bg-amber-500/40 text-black font-bold flex items-center gap-1.5 transition-all shrink-0"
+              >
+                <span className="material-symbols-outlined text-[16px]">
+                  {orgAccessRequested ? 'check' : 'key'}
+                </span>
+                <span>
+                  {orgAccessRequested
+                    ? 'Acesso Solicitado'
+                    : requestingOrgAccess
+                      ? 'Solicitando...'
+                      : 'Solicitar Acesso de Envio'}
+                </span>
+              </button>
+            </div>
+          )}
+
           {/* Barra de Ferramentas e Caminho do Arquivo */}
           <div className="bg-surface border border-border-subtle rounded-2xl p-3.5 sm:p-4 space-y-3">
             {/* Linha 1: Controles de Exibição e Ações Principais */}
@@ -1810,14 +1981,60 @@ export function UserVaultWorkspace({
                   onChange={(e) => void handleNoteUpload(e)}
                 />
 
+                {/* Botão Recarregar adjacente ao botão [+ Novo] */}
+                <button
+                  type="button"
+                  onClick={() => void loadDirectory(currentFolder, activeTicket)}
+                  disabled={loadingDir}
+                  className="px-3 py-2 rounded-xl bg-app hover:bg-surface-hover text-fg-secondary hover:text-fg border border-border-subtle text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  title="Recarregar Arquivos e Pastas"
+                >
+                  <span className={`material-symbols-outlined text-[18px] ${loadingDir ? 'animate-spin' : ''}`}>
+                    refresh
+                  </span>
+                  <span className="hidden sm:inline">Recarregar</span>
+                </button>
+
+                {/* Botão Gerenciador de Uploads (Fora do menu + Novo, acompanha a fila em tempo real) */}
+                <button
+                  type="button"
+                  onClick={() => handleOpenUploadManager([])}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border ${
+                    uploadCtx.isUploading
+                      ? 'bg-[var(--accent-primary)]/20 border-[var(--accent-primary)] text-[var(--accent-primary)]'
+                      : uploadCtx.queue.length > 0
+                        ? 'bg-surface border-border-subtle text-fg hover:border-[var(--accent-primary)]'
+                        : 'bg-app hover:bg-surface-hover text-fg-secondary hover:text-fg border border-border-subtle'
+                  }`}
+                  title="Gerenciador de Uploads e Acompanhamento da Fila"
+                >
+                  <span
+                    className={`material-symbols-outlined text-[18px] ${
+                      uploadCtx.isUploading ? 'animate-spin text-[var(--accent-primary)]' : ''
+                    }`}
+                  >
+                    {uploadCtx.isUploading ? 'sync' : 'cloud_upload'}
+                  </span>
+                  <span className="hidden md:inline">Uploads</span>
+                  {uploadCtx.queue.length > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--accent-primary)] text-white">
+                      {uploadCtx.completedFiles}/{uploadCtx.totalFiles}
+                    </span>
+                  )}
+                </button>
+
                 {/* Botão Único [+] com Menu Suspenso de Ações */}
                 <div className="relative" ref={addMenuRef}>
                   <button
                     type="button"
-                    disabled={uploading}
+                    disabled={uploading || (Boolean(selectedOrg) && !selectedOrg?.can_upload_vault && profile.storage_role !== 'admin')}
                     onClick={() => setIsAddMenuOpen((prev) => !prev)}
                     className="px-3.5 py-2 rounded-xl bg-[#FFCC00] hover:bg-[#e6b800] text-[#121212] text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95 disabled:opacity-50"
-                    title="Adicionar ou Criar (+)"
+                    title={
+                      selectedOrg && !selectedOrg?.can_upload_vault && profile.storage_role !== 'admin'
+                        ? 'Cofre em modo apenas leitura. Solicite aprovação para enviar arquivos.'
+                        : 'Adicionar ou Criar (+)'
+                    }
                   >
                     <span className="material-symbols-outlined text-[20px] font-bold leading-none">
                       add
@@ -1987,29 +2204,6 @@ export function UserVaultWorkspace({
                           </p>
                           <p className="text-[10px] text-fg-muted truncate">
                             Criar novo diretório no caminho atual
-                          </p>
-                        </div>
-                      </button>
-
-                      {/* 6. Abrir Gerenciador de Uploads */}
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setIsAddMenuOpen(false);
-                          handleOpenUploadManager([]);
-                        }}
-                        className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-fg hover:bg-surface-hover flex items-center gap-2.5 transition-colors group"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)]/15 flex items-center justify-center text-[var(--accent-primary)] group-hover:scale-110 transition-transform">
-                          <span className="material-symbols-outlined text-[18px]">cloud_upload</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-fg group-hover:text-[var(--accent-primary)] transition-colors">
-                            Gerenciador de Uploads
-                          </p>
-                          <p className="text-[10px] text-fg-muted truncate">
-                            Painel de envio com fila e minimização
                           </p>
                         </div>
                       </button>
@@ -2891,6 +3085,19 @@ export function UserVaultWorkspace({
               )}
             </div>
 
+            {/* Divisor Arrastável de Redimensionamento */}
+            {isPreviewOpen && !isDetachedPreview && (
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                onMouseDown={handleStartResize}
+                className="w-1.5 hover:w-2 bg-transparent hover:bg-[var(--accent-primary)]/50 active:bg-[var(--accent-primary)] cursor-col-resize transition-all shrink-0 z-30 flex items-center justify-center group select-none"
+                title="Arraste para redimensionar o painel de inspeção"
+              >
+                <div className="w-0.5 h-8 bg-border-subtle group-hover:bg-white rounded-full transition-colors" />
+              </div>
+            )}
+
             {/* Painel Lateral de Inspeção & Metadados (Alt+P) */}
             <VaultPreviewPanel
               entry={selectedEntry}
@@ -2900,6 +3107,9 @@ export function UserVaultWorkspace({
               serverUrl={serverUrl}
               indexedRow={selectedEntry ? indexedMap.get(selectedEntry.relativePath) : undefined}
               availableTasks={userTasks}
+              panelWidth={panelWidth}
+              isDetached={isDetachedPreview}
+              onToggleDetach={() => setIsDetachedPreview((prev) => !prev)}
               onOpenNoteEditor={(relPath) => {
                 setEditingNotePath(relPath);
                 setNoteDrawerOpen(true);
@@ -3367,24 +3577,6 @@ export function UserVaultWorkspace({
           </div>
         </div>
       )}
-      {/* Gerenciador de Uploads (Pop-up de Confirmação & Dock Minimizado) */}
-      <VaultUploadManagerModal
-        isOpen={uploadManagerOpen}
-        onClose={() => setUploadManagerOpen(false)}
-        initialItems={uploadManagerInitialItems}
-        currentFolder={currentFolder}
-        ticket={activeTicket}
-        serverUrl={serverUrl}
-        selectedOrgId={selectedOrgId}
-        onUploadFinished={({ successCount, newUsedBytes }) => {
-          if (typeof newUsedBytes === 'number') {
-            setUsedBytes(newUsedBytes);
-          }
-          if (successCount > 0) {
-            void loadDirectory(currentFolder);
-          }
-        }}
-      />
 
       {/* Barra de Ações em Lote para Seleção Múltipla */}
       {selectedPaths.size > 0 && (
@@ -3479,6 +3671,11 @@ export function UserVaultWorkspace({
           }}
           onDownloadZip={(folderPath) => handleDownloadFolderZip(folderPath)}
           onDownloadBatchZip={handleDownloadBatchZip}
+          onShareWithClient={(targetPath, name) => {
+            setShareFolder(targetPath);
+            setShareTitle(name || targetPath.split('/').pop() || 'Álbum');
+            setShareModalOpen(true);
+          }}
           onRename={(entry) => void handleRenameEntry(entry)}
           onDelete={(entry) => void handleDeleteEntry(entry)}
           onBatchDelete={() => void handleBatchDelete()}

@@ -351,12 +351,12 @@ async function moveDirectoryContentsRecursive(srcDir, destDir) {
     const destPath = path.join(destDir, ent.name);
     if (ent.isDirectory()) {
       await moveDirectoryContentsRecursive(srcPath, destPath);
-      await fs.promises.rmdir(srcPath).catch(() => {});
+      await fs.promises.rm(srcPath, { recursive: true, force: true }).catch(() => {});
     } else if (ent.isFile()) {
       await moveFileSafe(srcPath, destPath);
     }
   }
-  await fs.promises.rmdir(srcDir).catch(() => {});
+  await fs.promises.rm(srcDir, { recursive: true, force: true }).catch(() => {});
 }
 
 // Renomeação segura em sistemas FAT32/exFAT case-insensitive e Android FUSE
@@ -6410,16 +6410,41 @@ app.get('/api/admin/beta-signups', requireAdminSession, async (_req, res) => {
 // - Ciclo completo de Lixeira (.trash) isolada por usuário
 // ============================================================================
 const PRIMARY_ADMIN_UUID = 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e';
-const USERS_ROOT_DIR = path.join(STORAGE_DIR, 'users');
-const ORGS_ROOT_DIR = path.join(STORAGE_DIR, 'orgs');
+// Determine base directory for tenant roots. On FireStick USB storage the raw mount point (/storage/XXXX-XXXX) is read‑only for direct mkdir; we use the hub_data sub‑folder which Termux creates with full permissions.
+function getTenantBaseDir() {
+  // STORAGE_DIR is set earlier via env or discovery logic
+  const base = STORAGE_DIR;
+  if (base && base.startsWith('/storage/')) {
+    // Prefer a writable subfolder inside hub_data if it exists, otherwise fallback to fallback internal storage
+    const hubPath = path.join(base, 'hub_data');
+    try {
+      if (!fs.existsSync(hubPath)) fs.mkdirSync(hubPath, { recursive: true });
+      return hubPath;
+    } catch (e) {
+      console.warn(`[TenantBase] Não pôde criar hub_data em ${base}: ${e.message}`);
+      // fallback to internal safe dir
+    }
+  }
+  // Fallback for dev or non‑USB mounts
+  const fallback = path.join(__dirname, 'storage');
+  try { fs.mkdirSync(fallback, { recursive: true }); } catch {}
+  return fallback;
+}
+
+// Roots for user and org tenants – use the writable base
+const TENANT_BASE_DIR = getTenantBaseDir();
+const USERS_ROOT_DIR = path.join(TENANT_BASE_DIR, 'users');
+const ORGS_ROOT_DIR  = path.join(TENANT_BASE_DIR, 'orgs');
 const DEFAULT_TENANT_SUBFOLDERS = [];
 const TENANT_PINS_FILE = path.join(INTERNAL_DATA_DIR, 'tenant_folder_pins.json');
-const TENANT_UPLOAD_STAGING_DIR = path.join(STORAGE_DIR, 'tmp_tenant_uploads');
+const TENANT_UPLOAD_STAGING_DIR = path.join(TENANT_BASE_DIR, 'tmp_tenant_uploads');
 
 for (const d of [USERS_ROOT_DIR, ORGS_ROOT_DIR, TENANT_UPLOAD_STAGING_DIR]) {
   try {
     if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
-  } catch {}
+  } catch (e) {
+    console.warn(`[StorageInit] Não foi possível criar ${d}: ${e.message}`);
+  }
 }
 
 let tenantFolderPinsStore = {};
@@ -7524,6 +7549,10 @@ app.delete('/api/tenant/entry', verifyTenantTicket, async (req, res) => {
 
     if (descriptor.isDirectory) {
       await renameDirectorySafeFAT32(targetFull, trashDest);
+      // Assegura remoção limpa do diretório de origem caso o sistema de arquivos tenha bloqueado rmdir
+      if (fs.existsSync(targetFull)) {
+        await fs.promises.rm(targetFull, { recursive: true, force: true }).catch(() => {});
+      }
     } else {
       await moveFileSafe(targetFull, trashDest);
     }

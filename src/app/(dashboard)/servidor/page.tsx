@@ -116,6 +116,20 @@ export default async function ServidorPage() {
   const userOrgsRes = await getUserOrganizationsAction();
   let rawOrgs = userOrgsRes.ok ? userOrgsRes.organizations || [] : [];
 
+  // Busca perfil para obter nome/username amigável
+  const { data: userProfileData } = await supabase
+    .from('user_profiles')
+    .select('username')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const userDisplayName =
+    user.user_metadata?.full_name ||
+    userProfileData?.username ||
+    user.user_metadata?.username ||
+    user.user_metadata?.name ||
+    (user.email ? user.email.split('@')[0] : 'Pessoal');
+
   // Se a lista estiver vazia e o usuário for o Admin primário ou tiver perfil admin, inclui LabDiv como padrão
   if (
     rawOrgs.length === 0 &&
@@ -164,6 +178,7 @@ export default async function ServidorPage() {
         initialShareLinks={shareLinks || []}
         userTasks={userTasks || []}
         userOrganizations={formattedOrgs}
+        userName={userDisplayName}
       />
     </div>
   );

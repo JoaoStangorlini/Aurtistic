@@ -72,6 +72,43 @@ const ALBUM_ICONS: Record<string, string> = {
   PAULISTA: 'location_city',
 };
 
+export function resolveItemDeviceInfo(item: PhotoInspectItem): {
+  category: 'camera' | 'mobile' | 'drone' | 'other' | 'unknown';
+  name: string;
+} {
+  const exif = (item.exif_data || {}) as Record<string, unknown>;
+  if (exif.deviceCategory) {
+    return {
+      category: exif.deviceCategory as 'camera' | 'mobile' | 'drone' | 'other',
+      name: String(exif.deviceName || exif.camera || exif.model || 'Dispositivo'),
+    };
+  }
+
+  const rawModel = String(exif.camera || exif.model || exif.make || '').trim();
+  const lower = rawModel.toLowerCase();
+
+  if (/canon|nikon|sony|fujifilm|fuji|leica|hasselblad|panasonic|olympus|pentax/i.test(lower)) {
+    return { category: 'camera', name: rawModel || 'Câmera Profissional' };
+  }
+  if (/iphone|apple|samsung|galaxy|xiaomi|redmi|poco|motorola|moto|pixel|google|huawei|oppo|oneplus|realme|asus|lg/i.test(lower)) {
+    return { category: 'mobile', name: rawModel || 'Celular' };
+  }
+  if (/dji|mavic|phantom|mini \d|air \d|autel/i.test(lower)) {
+    return { category: 'drone', name: rawModel || 'Drone' };
+  }
+
+  return { category: 'unknown', name: rawModel };
+}
+
+export function parseItemTimestamp(item: PhotoInspectItem): number {
+  const exif = (item.exif_data || {}) as Record<string, unknown>;
+  const rawDate = exif.dateTimeOriginal || exif.dateTaken || item.created_at || '';
+  if (!rawDate) return 0;
+  const normalized = String(rawDate).trim().replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3');
+  const parsed = Date.parse(normalized);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
 export function AurtisticGalleryGrid({
   items,
   serverUrl,
@@ -99,6 +136,11 @@ export function AurtisticGalleryGrid({
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Filtros Avançados de Dispositivo e Ordenação Temporal
+  const [deviceCategoryFilter, setDeviceCategoryFilter] = useState<'all' | 'camera' | 'mobile'>('all');
+  const [selectedDeviceName, setSelectedDeviceName] = useState<string>('all');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'name' | 'default'>('newest');
 
   // Modal de Inspeção Fotográfica
   const [inspectIndex, setInspectIndex] = useState<number | null>(null);
@@ -176,9 +218,27 @@ export function AurtisticGalleryGrid({
     [items]
   );
 
+  // Lista Dinâmica de Equipamentos Encontrados no Acervo
+  const discoveredDevices = useMemo(() => {
+    const map = new Map<string, { category: string; count: number }>();
+    for (const item of items) {
+      const dev = resolveItemDeviceInfo(item);
+      if (dev.name && dev.category !== 'unknown') {
+        const existing = map.get(dev.name);
+        map.set(dev.name, {
+          category: dev.category,
+          count: (existing?.count || 0) + 1,
+        });
+      }
+    }
+    return Array.from(map.entries())
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.count - a.count);
+  }, [items]);
+
   // Filtragem Geral de Itens
   const filteredItems = useMemo(() => {
-    return items.filter((item) => {
+    const list = items.filter((item) => {
       if (onlyFavorites && !item.is_favorite) return false;
 
       // Filtro de Álbum
@@ -199,6 +259,18 @@ export function AurtisticGalleryGrid({
         if (itemSub !== selectedSubfolder) return false;
       }
 
+      // Filtro de Dispositivo (Câmera / Celular)
+      if (deviceCategoryFilter !== 'all') {
+        const dev = resolveItemDeviceInfo(item);
+        if (dev.category !== deviceCategoryFilter) return false;
+      }
+
+      // Filtro de Equipamento Específico
+      if (selectedDeviceName !== 'all') {
+        const dev = resolveItemDeviceInfo(item);
+        if (dev.name !== selectedDeviceName) return false;
+      }
+
       // Busca Textual
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
@@ -206,8 +278,9 @@ export function AurtisticGalleryGrid({
         const nameMatch = item.filename?.toLowerCase().includes(q);
         const albumMatch = item.album?.toLowerCase().includes(q);
         const tagMatch = item.tags?.some((t) => t.toLowerCase().includes(q));
+        const dev = resolveItemDeviceInfo(item);
         const cameraMatch = String(
-          item.exif_data?.camera || item.exif_data?.model || ''
+          item.exif_data?.camera || item.exif_data?.model || dev.name || ''
         ).toLowerCase().includes(q);
         const lensMatch = String(item.exif_data?.lens || '').toLowerCase().includes(q);
         if (!titleMatch && !nameMatch && !albumMatch && !tagMatch && !cameraMatch && !lensMatch) {
@@ -217,7 +290,27 @@ export function AurtisticGalleryGrid({
 
       return true;
     });
-  }, [items, onlyFavorites, selectedAlbum, selectedSubfolder, searchQuery]);
+
+    // Ordenação Temporal
+    if (sortOrder === 'newest') {
+      list.sort((a, b) => parseItemTimestamp(b) - parseItemTimestamp(a));
+    } else if (sortOrder === 'oldest') {
+      list.sort((a, b) => parseItemTimestamp(a) - parseItemTimestamp(b));
+    } else if (sortOrder === 'name') {
+      list.sort((a, b) => (a.filename || '').localeCompare(b.filename || ''));
+    }
+
+    return list;
+  }, [
+    items,
+    onlyFavorites,
+    selectedAlbum,
+    selectedSubfolder,
+    deviceCategoryFilter,
+    selectedDeviceName,
+    sortOrder,
+    searchQuery,
+  ]);
 
   // Agrupamento por Seção/Subpasta quando no modo 'subfolders'
   const groupedSections = useMemo(() => {
@@ -612,6 +705,117 @@ export function AurtisticGalleryGrid({
             <span className="hidden sm:inline">Baixar Álbum (.ZIP)</span>
             <span className="sm:hidden">.ZIP</span>
           </button>
+        </div>
+      </div>
+
+      {/* 3.1 FILTROS AVANÇADOS: DISPOSITIVO (CÂMERAS / CELULARES), EQUIPAMENTO E ORDENAÇÃO TEMPORAL */}
+      <div className="bg-surface/80 border border-border-subtle p-2.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
+        {/* Esquerda: Filtro de Dispositivo (Todas / Câmeras / Celulares) */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-mono font-bold text-fg-muted uppercase">
+            Dispositivo:
+          </span>
+          <div className="inline-flex rounded-xl bg-app p-1 border border-border-subtle shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setDeviceCategoryFilter('all');
+                setSelectedDeviceName('all');
+              }}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                deviceCategoryFilter === 'all'
+                  ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm'
+                  : 'text-fg-secondary hover:text-fg'
+              }`}
+            >
+              <span>Todos</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDeviceCategoryFilter('camera');
+                setSelectedDeviceName('all');
+              }}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                deviceCategoryFilter === 'camera'
+                  ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm'
+                  : 'text-fg-secondary hover:text-fg'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[15px]">photo_camera</span>
+              <span>Câmeras</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDeviceCategoryFilter('mobile');
+                setSelectedDeviceName('all');
+              }}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                deviceCategoryFilter === 'mobile'
+                  ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm'
+                  : 'text-fg-secondary hover:text-fg'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[15px]">smartphone</span>
+              <span>Celulares</span>
+            </button>
+          </div>
+
+          {/* Dropdown de Equipamento Específico */}
+          {discoveredDevices.length > 0 && (
+            <div className="flex items-center gap-1.5 ml-1">
+              <select
+                value={selectedDeviceName}
+                onChange={(e) => setSelectedDeviceName(e.target.value)}
+                className="bg-app border border-border-subtle rounded-xl px-2.5 py-1 text-xs text-fg focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] font-mono"
+              >
+                <option value="all">Equipamentos ({discoveredDevices.length})</option>
+                {discoveredDevices
+                  .filter((d) => deviceCategoryFilter === 'all' || d.category === deviceCategoryFilter)
+                  .map((d) => (
+                    <option key={d.name} value={d.name}>
+                      {d.name} ({d.count})
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Direita: Ordenação Temporal */}
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-mono font-bold text-fg-muted uppercase">
+            Ordenar:
+          </span>
+          <div className="inline-flex rounded-xl bg-app p-1 border border-border-subtle shrink-0">
+            <button
+              type="button"
+              onClick={() => setSortOrder('newest')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors ${
+                sortOrder === 'newest'
+                  ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm'
+                  : 'text-fg-secondary hover:text-fg'
+              }`}
+              title="Mais recentes primeiro (Data EXIF)"
+            >
+              <span className="material-symbols-outlined text-[15px]">schedule</span>
+              <span>Mais Recentes</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSortOrder('oldest')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors ${
+                sortOrder === 'oldest'
+                  ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm'
+                  : 'text-fg-secondary hover:text-fg'
+              }`}
+              title="Mais antigas primeiro (Data EXIF)"
+            >
+              <span className="material-symbols-outlined text-[15px]">history</span>
+              <span>Mais Antigas</span>
+            </button>
+          </div>
         </div>
       </div>
 

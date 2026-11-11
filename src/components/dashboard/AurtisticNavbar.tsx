@@ -169,7 +169,8 @@ export default function AurtisticNavbar() {
   const hasOrgsOrServer = hasOrgs || hasServidor;
 
   const isOrgsActive = pathname === '/labdiv' || pathname === '/organizacoes' || pathname === '/servidor';
-  const orgsHref = hasServidor ? '/servidor' : '/labdiv';
+  // Cofre de Arquivos é sempre a landing padrão da aba Gestão; LabDiv é sub-aba dentro do Cofre
+  const orgsHref = hasOrgsOrServer ? '/servidor' : '/labdiv';
   const orgsLabel = customLabels.organizacoes || 'Gestão';
 
   const hasPortfolio = modulesConfig.portfolio && activeTabs.includes('portfolio');
