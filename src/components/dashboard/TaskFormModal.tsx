@@ -497,17 +497,18 @@ export function TaskFormModal({
                       </div>
                     )}
 
-                    {/* Seletor de Subequipa */}
+                    {/* Seletor de Categoria / Eixo Obrigatório */}
                     <div className={organizations.length > 1 ? '' : 'md:col-span-2'}>
                       <label className="block text-[11px] text-fg-muted uppercase tracking-wider mb-1 font-bold">
-                        Subequipa Responsável
+                        Categoria da Tarefa (Eixo Obrigatório) *
                       </label>
                       <select
+                        required
                         value={formData.subteam_id || ''}
                         onChange={e => setFormData(prev => ({ ...prev, subteam_id: e.target.value || null }))}
                         className="w-full bg-surface border border-border-subtle text-white rounded-lg px-3 py-2 text-xs font-bold focus:border-[#FFCC00] focus:outline-none"
                       >
-                        <option value="">Geral / Sem Subequipa Específica</option>
+                        <option value="">Selecione o Eixo (Programação, Comunicação, Pesquisa, Administração)...</option>
                         {subteams.map(sub => (
                           <option key={sub.id} value={sub.id}>
                             👥 {sub.name}
@@ -516,12 +517,30 @@ export function TaskFormModal({
                       </select>
                     </div>
 
-                    {/* Seletor de Membros Responsáveis com Indicador de Bateria Cognitiva */}
+                    {/* Seletor de Atribuição: Toda a Equipe ou Membro Específico */}
                     <div className="md:col-span-2">
-                      <label className="block text-[11px] text-fg-muted uppercase tracking-wider mb-1 font-bold">
-                        Membros Responsáveis (com Bateria Cognitiva)
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[11px] text-fg-muted uppercase tracking-wider font-bold">
+                          Atribuição da Tarefa
+                        </label>
+                        <span className="text-[10px] text-teal-300">
+                          {(!formData.assigned_member_ids || formData.assigned_member_ids.length === 0)
+                            ? '👥 Atribuída a Toda a Equipe da Categoria'
+                            : '👤 Membro(s) Específico(s)'}
+                        </span>
+                      </div>
                       <div className="flex flex-wrap gap-2 p-2 bg-surface border border-border-subtle rounded-xl max-h-36 overflow-y-auto">
+                        <button
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, assigned_member_ids: [], responsavel: null }))}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                            (!formData.assigned_member_ids || formData.assigned_member_ids.length === 0)
+                              ? 'bg-amber-500/20 border-amber-500 text-amber-200 shadow-sm'
+                              : 'bg-surface border-border-subtle text-fg-muted hover:text-white'
+                          }`}
+                        >
+                          👥 Toda a Equipe
+                        </button>
                         {members.length === 0 ? (
                           <span className="text-xs text-fg-muted p-1">Nenhum membro encontrado na organização.</span>
                         ) : (

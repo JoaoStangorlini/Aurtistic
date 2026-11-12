@@ -20,6 +20,8 @@ export interface Task {
   is_personal?: boolean;
   organization_id?: string | null;
   subteam_id?: string | null;
+  assignee_id?: string | null;
+  goal_id?: string | null;
   assigned_member_ids?: string[];
   id: string;
   created_at: string;

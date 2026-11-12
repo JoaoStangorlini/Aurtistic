@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import { useSelfCareAlarms } from './SelfCareAlarmProvider';
 import { type SelfCareSound, type SelfCarePillarKey, SELF_CARE_TEMPLATES } from '@/lib/self-care-config';
+import { HealthMedicalRemindersPanel } from './HealthMedicalRemindersPanel';
 
 function getInitialNotificationState(): NotificationPermission | 'unsupported' {
   if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -506,6 +507,9 @@ export function SelfCareHub() {
               )}
             </div>
           )}
+
+          {/* Painel de Consultas, Exames & Saúde Preventiva (LGPD Local) */}
+          <HealthMedicalRemindersPanel />
         </div>
       )}
 

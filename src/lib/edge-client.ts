@@ -104,7 +104,7 @@ export async function uploadTenantFileDirect(input: {
   folderPath: string;
   ticket: string;
   serverUrl?: string;
-  onProgress?: (percent: number) => void;
+  onProgress?: (percent: number, loadedBytes?: number, totalBytes?: number) => void;
 }): Promise<EdgeMutationResponse> {
   const base = resolveClientEdgeServerUrl(input.serverUrl);
   const formData = new FormData();
@@ -120,7 +120,7 @@ export async function uploadTenantFileDirect(input: {
       xhr.upload.onprogress = (evt) => {
         if (evt.lengthComputable && input.onProgress) {
           const pct = Math.min(100, Math.round((evt.loaded / evt.total) * 100));
-          input.onProgress(pct);
+          input.onProgress(pct, evt.loaded, evt.total);
         }
       };
 

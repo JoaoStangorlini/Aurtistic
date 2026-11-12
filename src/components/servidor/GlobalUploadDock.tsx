@@ -2,7 +2,7 @@
 'use client';
 
 import React from 'react';
-import { useVaultUpload } from '@/contexts/VaultUploadContext';
+import { useVaultUpload, formatEta, formatSpeed } from '@/contexts/VaultUploadContext';
 
 function formatBytes(bytes: number): string {
   if (!bytes || bytes === 0) return '0 B';
@@ -25,6 +25,8 @@ export function GlobalUploadDock() {
     totalBytes,
     uploadedBytes,
     overallPercent,
+    uploadSpeedMbps,
+    etaSeconds,
     openModal,
     startUpload,
     cancelAll,
@@ -116,6 +118,18 @@ export function GlobalUploadDock() {
                 <span>
                   {formatBytes(uploadedBytes)} / {formatBytes(totalBytes)}
                 </span>
+                {isUploading && (
+                  <>
+                    <span>•</span>
+                    <span className="text-[var(--accent-primary)] font-semibold">
+                      {formatSpeed(uploadSpeedMbps)}
+                    </span>
+                    <span>•</span>
+                    <span>
+                      {formatEta(etaSeconds)}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>

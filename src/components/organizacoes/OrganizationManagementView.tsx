@@ -17,6 +17,9 @@ import { TeamProgressPanel } from './TeamProgressPanel';
 import { When2MeetSchedulerGrid } from './When2MeetSchedulerGrid';
 import { OrganizationPlaybooksModal } from './OrganizationPlaybooksModal';
 import { LiveMeetingSplitWorkspace } from './LiveMeetingSplitWorkspace';
+import { OrganizationGoalsPanel } from './OrganizationGoalsPanel';
+import { OrganizationRequestsPanel } from './OrganizationRequestsPanel';
+import { OrganizationScheduleAttendancePanel } from './OrganizationScheduleAttendancePanel';
 import {
   getOrCreateActiveInviteAction,
   createOrganizationMeetingAction,
@@ -142,7 +145,7 @@ export function OrganizationManagementView({
             className="flex items-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-2 text-xs font-bold text-indigo-300 hover:bg-indigo-500/20 transition-colors shadow-sm"
           >
             <span className="material-symbols-outlined text-[16px]">menu_book</span>
-            Playbooks
+            Roteiros
           </button>
 
           <Link
@@ -217,6 +220,32 @@ export function OrganizationManagementView({
         subteams={subteams}
         members={members}
         tasks={tasks}
+      />
+
+      {/* Painel de Metas Globais e por Categoria */}
+      <OrganizationGoalsPanel
+        organization={organization}
+        subteams={subteams}
+        tasks={tasks}
+      />
+
+      {/* Horários, Escalas e Controle de Presenças com QR Code */}
+      <OrganizationScheduleAttendancePanel
+        organization={organization}
+        subteams={subteams}
+        members={members}
+        currentUserId={currentUserId}
+        currentUserName={myMember?.full_name || 'Membro do Laboratório'}
+        isAdmin={isOrgAdmin}
+      />
+
+      {/* Canal de Pedidos e Sugestões da Organização */}
+      <OrganizationRequestsPanel
+        organization={organization}
+        subteams={subteams}
+        currentUserId={currentUserId}
+        currentUserName={myMember?.full_name || 'Membro do Laboratório'}
+        isAdmin={isOrgAdmin}
       />
 
       {/* Seção de Reuniões, When2Meet e Transcrição Híbrida */}

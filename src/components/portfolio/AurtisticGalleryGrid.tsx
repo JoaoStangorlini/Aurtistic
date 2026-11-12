@@ -5,7 +5,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import type { UserFileIndexRow } from '@/types';
-import { buildTenantThumbUrl, buildTenantZipUrl, formatStorageBytes } from '@/lib/edge-urls';
+import { buildTenantThumbUrl, buildTenantZipUrl, formatStorageBytes, resolveClientEdgeServerUrl } from '@/lib/edge-urls';
 import { PhotoInspectModal, type PhotoInspectItem } from './PhotoInspectModal';
 import { useAurtisticMedia } from '@/components/media/AurtisticMediaContext';
 import { getPortfolioAlbumZipUrlAction } from '@/app/(dashboard)/actions';
@@ -100,6 +100,21 @@ export function resolveItemDeviceInfo(item: PhotoInspectItem): {
   return { category: 'unknown', name: rawModel };
 }
 
+export function resolveItemLensInfo(item: PhotoInspectItem): string | null {
+  const exif = (item.exif_data || {}) as Record<string, unknown>;
+  const rawLens =
+    exif.lens ||
+    exif.lensModel ||
+    exif.LensModel ||
+    exif.lensMake ||
+    exif.Lens ||
+    (exif.raw as Record<string, unknown> | undefined)?.LensModel ||
+    null;
+  if (!rawLens) return null;
+  const s = String(rawLens).trim();
+  return s && s !== 'null' && s !== 'undefined' ? s : null;
+}
+
 export function parseItemTimestamp(item: PhotoInspectItem): number {
   const exif = (item.exif_data || {}) as Record<string, unknown>;
   const rawDate = exif.dateTimeOriginal || exif.dateTaken || item.created_at || '';
@@ -138,9 +153,31 @@ export function AurtisticGalleryGrid({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Filtros Avançados de Dispositivo e Ordenação Temporal
-  const [deviceCategoryFilter, setDeviceCategoryFilter] = useState<'all' | 'camera' | 'mobile'>('all');
+  const [deviceCategoryFilter, setDeviceCategoryFilter] = useState<'all' | 'camera' | 'mobile' | 'mixed'>('all');
   const [selectedDeviceName, setSelectedDeviceName] = useState<string>('all');
+  const [selectedLensName, setSelectedLensName] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'name' | 'default'>('newest');
+
+  // Ordem Customizada dos Álbuns (Persistida em localStorage)
+  const [customAlbumOrder, setCustomAlbumOrder] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem('aurtistic_portfolio_album_order');
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return [];
+  });
+  const [isReorderingAlbums, setIsReorderingAlbums] = useState(false);
+
+  // Álbuns Marcados como Equipamento Misto (Persistido em localStorage)
+  const [mixedAlbums, setMixedAlbums] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      const stored = localStorage.getItem('aurtistic_portfolio_mixed_albums');
+      if (stored) return new Set(JSON.parse(stored));
+    } catch {}
+    return new Set();
+  });
 
   // Modal de Inspeção Fotográfica
   const [inspectIndex, setInspectIndex] = useState<number | null>(null);
@@ -154,7 +191,7 @@ export function AurtisticGalleryGrid({
     }, 3000);
   }, []);
 
-  // Extrai e Ordena Álbuns de acordo com a Hierarquia do Fire Stick
+  // Extrai e Ordena Álbuns respeitando a Ordem Personalizada ou a Padrão
   const sortedAlbums = useMemo(() => {
     const rawAlbums = new Set<string>();
     for (const item of items) {
@@ -163,12 +200,102 @@ export function AurtisticGalleryGrid({
       }
     }
     const found = Array.from(rawAlbums);
+    const orderToUse = customAlbumOrder.length > 0 ? customAlbumOrder : PREFERRED_ALBUM_ORDER;
     const ordered = [
-      ...PREFERRED_ALBUM_ORDER.filter((a) => found.includes(a)),
-      ...found.filter((a) => !PREFERRED_ALBUM_ORDER.includes(a)).sort(),
+      ...orderToUse.filter((a) => found.includes(a)),
+      ...found.filter((a) => !orderToUse.includes(a)).sort(),
     ];
     return ordered;
+  }, [items, customAlbumOrder]);
+
+  // Estatísticas de Equipamentos (Câmeras + Lentes) por Álbum
+  const albumEquipmentStats = useMemo(() => {
+    const stats: Record<string, { cameras: Set<string>; lenses: Set<string> }> = {};
+    for (const item of items) {
+      const alb = item.album || 'Geral';
+      if (!stats[alb]) {
+        stats[alb] = { cameras: new Set(), lenses: new Set() };
+      }
+      const dev = resolveItemDeviceInfo(item);
+      if (dev.name && dev.category !== 'unknown') {
+        stats[alb].cameras.add(dev.name);
+      }
+      const lens = resolveItemLensInfo(item);
+      if (lens) {
+        stats[alb].lenses.add(lens);
+      }
+    }
+    return stats;
   }, [items]);
+
+  // Verifica se um Álbum é considerado Misto (automático ou marcado manualmente)
+  const isAlbumMixed = useCallback(
+    (alb: string) => {
+      if (mixedAlbums.has(alb)) return true;
+      const st = albumEquipmentStats[alb];
+      if (!st) return false;
+      return st.cameras.size > 1 || st.lenses.size > 1;
+    },
+    [mixedAlbums, albumEquipmentStats]
+  );
+
+  // Alterna Marcação de Álbum Misto
+  const handleToggleMixedAlbum = useCallback(
+    (alb: string) => {
+      setMixedAlbums((prev) => {
+        const next = new Set(prev);
+        if (next.has(alb)) {
+          next.delete(alb);
+          showToast(`Álbum "${alb}" desmarcado de Misto.`);
+        } else {
+          next.add(alb);
+          showToast(`Álbum "${alb}" marcado como Equipamento Misto!`);
+        }
+        try {
+          localStorage.setItem('aurtistic_portfolio_mixed_albums', JSON.stringify(Array.from(next)));
+        } catch {}
+        return next;
+      });
+    },
+    [showToast]
+  );
+
+  // Move a Ordem de um Álbum
+  const handleMoveAlbum = useCallback(
+    (albumName: string, direction: -1 | 1) => {
+      setCustomAlbumOrder((prevOrder) => {
+        const baseList = prevOrder.length > 0 ? [...prevOrder] : [...sortedAlbums];
+        const fullList = Array.from(new Set([...baseList, ...sortedAlbums]));
+        const idx = fullList.indexOf(albumName);
+        const targetIdx = idx + direction;
+        if (idx === -1 || targetIdx < 0 || targetIdx >= fullList.length) return prevOrder;
+
+        const tmp = fullList[idx];
+        fullList[idx] = fullList[targetIdx];
+        fullList[targetIdx] = tmp;
+
+        try {
+          localStorage.setItem('aurtistic_portfolio_album_order', JSON.stringify(fullList));
+        } catch {}
+
+        // Sincronização assíncrona com o servidor Edge (PUT /api/portfolio/layout)
+        try {
+          const edgeBase = resolveClientEdgeServerUrl(serverUrl);
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (effectiveTicket) headers['Authorization'] = `Bearer ${effectiveTicket}`;
+          fetch(`${edgeBase}/api/portfolio/layout`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({ albumOrder: fullList }),
+          }).catch(() => {});
+        } catch {}
+
+        showToast(`Ordem alterada: "${albumName}" movido.`);
+        return fullList;
+      });
+    },
+    [sortedAlbums, showToast, serverUrl, effectiveTicket]
+  );
 
   // Contagem por Álbum
   const albumCounts = useMemo(() => {
@@ -236,6 +363,20 @@ export function AurtisticGalleryGrid({
       .sort((a, b) => b.count - a.count);
   }, [items]);
 
+  // Lista Dinâmica de Lentes Encontradas no Acervo
+  const discoveredLenses = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of items) {
+      const lens = resolveItemLensInfo(item);
+      if (lens) {
+        map.set(lens, (map.get(lens) || 0) + 1);
+      }
+    }
+    return Array.from(map.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [items]);
+
   // Filtragem Geral de Itens
   const filteredItems = useMemo(() => {
     const list = items.filter((item) => {
@@ -259,16 +400,25 @@ export function AurtisticGalleryGrid({
         if (itemSub !== selectedSubfolder) return false;
       }
 
-      // Filtro de Dispositivo (Câmera / Celular)
-      if (deviceCategoryFilter !== 'all') {
+      // Filtro de Dispositivo (Câmera / Celular / Álbum Misto)
+      if (deviceCategoryFilter === 'mixed') {
+        const isMixed = isAlbumMixed(item.album || 'Geral');
+        if (!isMixed) return false;
+      } else if (deviceCategoryFilter !== 'all') {
         const dev = resolveItemDeviceInfo(item);
         if (dev.category !== deviceCategoryFilter) return false;
       }
 
-      // Filtro de Equipamento Específico
+      // Filtro de Equipamento Específico (Câmera / Celular)
       if (selectedDeviceName !== 'all') {
         const dev = resolveItemDeviceInfo(item);
         if (dev.name !== selectedDeviceName) return false;
+      }
+
+      // Filtro de Lente Específica
+      if (selectedLensName !== 'all') {
+        const lens = resolveItemLensInfo(item);
+        if (lens !== selectedLensName) return false;
       }
 
       // Busca Textual
@@ -308,6 +458,8 @@ export function AurtisticGalleryGrid({
     selectedSubfolder,
     deviceCategoryFilter,
     selectedDeviceName,
+    selectedLensName,
+    isAlbumMixed,
     sortOrder,
     searchQuery,
   ]);
@@ -563,31 +715,91 @@ export function AurtisticGalleryGrid({
         </button>
 
         {/* Chips de Cada Álbum */}
-        {sortedAlbums.map((alb) => {
+        {sortedAlbums.map((alb, albIdx) => {
           const count = albumCounts[alb] || 0;
           const isSelected = selectedAlbum === alb;
           const icon = ALBUM_ICONS[alb] || 'folder';
+          const mixed = isAlbumMixed(alb);
 
           return (
-            <button
+            <div
               key={alb}
-              type="button"
-              onClick={() => {
-                setSelectedAlbum(alb);
-                setSelectedSubfolder('all');
-              }}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap flex items-center gap-2 transition-all border ${
+              className={`inline-flex items-center rounded-xl transition-all border shrink-0 ${
                 isSelected
                   ? 'bg-[#FFCC00] text-[#121212] border-[#FFCC00] shadow-lg shadow-[#FFCC00]/10 font-black'
                   : 'bg-surface hover:bg-surface-hover text-fg-secondary hover:text-fg border-border-subtle'
               }`}
             >
-              <span className="material-symbols-outlined text-[18px]">{icon}</span>
-              <span>{alb}</span>
-              <span className="font-mono text-xs opacity-80">({count})</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedAlbum(alb);
+                  setSelectedSubfolder('all');
+                }}
+                className="px-3.5 py-2 text-xs sm:text-sm font-bold whitespace-nowrap flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[18px]">{icon}</span>
+                <span>{alb}</span>
+                <span className="font-mono text-xs opacity-80">({count})</span>
+                {mixed && (
+                  <span
+                    className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-black border ${
+                      isSelected
+                        ? 'bg-black/20 text-[#121212] border-black/30'
+                        : 'bg-[#9D4EDD]/15 text-[#C77DFF] border-[#9D4EDD]/40'
+                    }`}
+                    title="Álbum com múltiplos equipamentos (sessão mista)"
+                  >
+                    🔀 Misto
+                  </span>
+                )}
+              </button>
+
+              {/* Botões de Mover Ordem (Quando modo reordenar ativo) */}
+              {isReorderingAlbums && (
+                <div className="flex items-center gap-0.5 pr-2 pl-0.5 border-l border-current/20" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    disabled={albIdx === 0}
+                    onClick={() => handleMoveAlbum(alb, -1)}
+                    className="p-1 rounded hover:bg-black/20 text-current disabled:opacity-20 transition-transform active:scale-90"
+                    title={`Mover "${alb}" para a esquerda`}
+                  >
+                    ◀
+                  </button>
+                  <button
+                    type="button"
+                    disabled={albIdx === sortedAlbums.length - 1}
+                    onClick={() => handleMoveAlbum(alb, 1)}
+                    className="p-1 rounded hover:bg-black/20 text-current disabled:opacity-20 transition-transform active:scale-90"
+                    title={`Mover "${alb}" para a direita`}
+                  >
+                    ▶
+                  </button>
+                </div>
+              )}
+            </div>
           );
         })}
+
+        {/* Botão de Ativar/Desativar Reordenação */}
+        {isOwner && (
+          <button
+            type="button"
+            onClick={() => setIsReorderingAlbums((prev) => !prev)}
+            className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all border shrink-0 ${
+              isReorderingAlbums
+                ? 'bg-[#9D4EDD] text-white border-[#9D4EDD] shadow-sm'
+                : 'bg-surface hover:bg-surface-hover text-fg-muted hover:text-fg border-border-subtle'
+            }`}
+            title="Mudar a ordem das pastas/álbuns do portfólio"
+          >
+            <span className="material-symbols-outlined text-[16px]">
+              {isReorderingAlbums ? 'done' : 'swap_horiz'}
+            </span>
+            <span>{isReorderingAlbums ? 'Concluir' : 'Mover Ordem'}</span>
+          </button>
+        )}
       </div>
 
       {/* 3. BARRA DE SUBPASTAS, MODO DE EXIBIÇÃO, COLUNAS E DOWNLOAD .ZIP */}
@@ -621,6 +833,23 @@ export function AurtisticGalleryGrid({
               <span>Por Subpastas</span>
             </button>
           </div>
+
+          {/* Botão de Marcar Álbum como Misto (Múltiplos Equipamentos) */}
+          {selectedAlbum !== 'all' && isOwner && (
+            <button
+              type="button"
+              onClick={() => handleToggleMixedAlbum(selectedAlbum)}
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all shrink-0 ${
+                isAlbumMixed(selectedAlbum)
+                  ? 'bg-[#9D4EDD]/20 border-[#9D4EDD] text-[#C77DFF] font-black'
+                  : 'bg-app hover:bg-surface border-border-subtle text-fg-muted hover:text-fg'
+              }`}
+              title="Marcar ou desmarcar este álbum como sessão fotográfica mista (múltiplos equipamentos/câmeras/lentes)"
+            >
+              <span>🔀</span>
+              <span>{isAlbumMixed(selectedAlbum) ? 'Álbum Misto (Ativo)' : 'Marcar como Misto'}</span>
+            </button>
+          )}
 
           {/* Prefixo Dinâmico de Subpastas */}
           <span className="text-xs font-mono text-[#FFCC00] font-bold hidden sm:inline shrink-0">
@@ -760,15 +989,33 @@ export function AurtisticGalleryGrid({
               <span className="material-symbols-outlined text-[15px]">smartphone</span>
               <span>Celulares</span>
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDeviceCategoryFilter((prev) => (prev === 'mixed' ? 'all' : 'mixed'));
+                setSelectedDeviceName('all');
+                setSelectedLensName('all');
+              }}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                deviceCategoryFilter === 'mixed'
+                  ? 'bg-[#9D4EDD] text-white font-bold shadow-sm'
+                  : 'text-fg-secondary hover:text-fg'
+              }`}
+              title="Filtrar por sessões/álbuns onde foram usados múltiplos equipamentos"
+            >
+              <span>🔀</span>
+              <span>Mistos</span>
+            </button>
           </div>
 
-          {/* Dropdown de Equipamento Específico */}
+          {/* Dropdown de Equipamento Específico (Câmeras / Celulares) */}
           {discoveredDevices.length > 0 && (
             <div className="flex items-center gap-1.5 ml-1">
               <select
                 value={selectedDeviceName}
                 onChange={(e) => setSelectedDeviceName(e.target.value)}
-                className="bg-app border border-border-subtle rounded-xl px-2.5 py-1 text-xs text-fg focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] font-mono"
+                className="bg-app border border-border-subtle rounded-xl px-2.5 py-1 text-xs text-fg focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] font-mono max-w-[180px] truncate"
+                title="Filtrar por modelo de câmera / dispositivo"
               >
                 <option value="all">Equipamentos ({discoveredDevices.length})</option>
                 {discoveredDevices
@@ -778,6 +1025,25 @@ export function AurtisticGalleryGrid({
                       {d.name} ({d.count})
                     </option>
                   ))}
+              </select>
+            </div>
+          )}
+
+          {/* Dropdown de Lente Específica */}
+          {discoveredLenses.length > 0 && (
+            <div className="flex items-center gap-1.5 ml-1">
+              <select
+                value={selectedLensName}
+                onChange={(e) => setSelectedLensName(e.target.value)}
+                className="bg-app border border-border-subtle rounded-xl px-2.5 py-1 text-xs text-fg focus:outline-none focus:ring-1 focus:ring-[#FFCC00] font-mono max-w-[200px] truncate"
+                title="Filtrar por modelo de lente"
+              >
+                <option value="all">🔍 Todas as Lentes ({discoveredLenses.length})</option>
+                {discoveredLenses.map((l) => (
+                  <option key={l.name} value={l.name}>
+                    {l.name} ({l.count})
+                  </option>
+                ))}
               </select>
             </div>
           )}

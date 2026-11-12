@@ -552,6 +552,57 @@ let catalogWriteMutex = Promise.resolve();
 let isSyncingPortfolio = false;
 
 // ============================================================================
+// OPSEC / LGPD: SANITIZAÇÃO DE METADADOS EXIF (ALLOWLIST ESTRITA)
+// ============================================================================
+const ALLOWED_EXIF_KEYS = new Set([
+  'make',
+  'model',
+  'camera',
+  'lens',
+  'lensModel',
+  'shutter',
+  'exposureTime',
+  'aperture',
+  'fNumber',
+  'iso',
+  'focal',
+  'focalLength',
+  'dateTimeOriginal',
+  'width',
+  'height',
+  'orientation',
+]);
+
+const SENSITIVE_EXIF_TAGS = new Set([
+  'gps',
+  'gpslatitude',
+  'gpslongitude',
+  'gpsaltitude',
+  'bodyserialnumber',
+  'serialnumber',
+  'cameraownername',
+  'ownername',
+  'usercomment',
+  'artist',
+  'copyright',
+]);
+
+function sanitizeExifMetadata(rawExif) {
+  if (!rawExif || typeof rawExif !== 'object') return {};
+  const cleaned = {};
+  for (const [key, value] of Object.entries(rawExif)) {
+    const lowerKey = key.toLowerCase();
+    if (SENSITIVE_EXIF_TAGS.has(lowerKey)) continue;
+    if (ALLOWED_EXIF_KEYS.has(key) || ALLOWED_EXIF_KEYS.has(lowerKey)) {
+      if (value !== undefined && value !== null && value !== '') {
+        cleaned[key] = value;
+      }
+    }
+  }
+  return cleaned;
+}
+
+// ============================================================================
 // PARSER BINÁRIO DE DIMENSÕES & ORIENTAÇÃO EXIF (BUFFER 256 KB • SEM SCAN LINEAR CEGO)
 // ============================================================================
 async function readImageDimensionsAndOrientation(filePath) {
@@ -660,6 +711,9 @@ async function readImageDimensionsAndOrientation(filePath) {
                       if (r) {
                         exif.focal = `${Math.round(r.val)}mm`;
                       }
+                    } else if (tag === 0x9003 || tag === 0x9004) { // DateTimeOriginal / DateTimeDigitized
+                      const dtStr = readString(entryPos, count);
+                      if (dtStr) exif.dateTimeOriginal = dtStr;
                     } else if (tag === 0xA434) { // LensModel
                       exif.lens = readString(entryPos, count);
                     }
@@ -691,11 +745,12 @@ async function readImageDimensionsAndOrientation(filePath) {
       }
 
       if (width && height) {
+        const sanitizedExif = sanitizeExifMetadata(exif);
         // Se orientação for 5, 6, 7 ou 8 (rotação 90° ou 270°), inverte width e height para a proporção real
         if (orientation >= 5 && orientation <= 8) {
-          return { width: height, height: width, orientation, exif, rawWidth: width, rawHeight: height };
+          return { width: height, height: width, orientation, exif: sanitizedExif, rawWidth: width, rawHeight: height };
         }
-        return { width, height, orientation, exif, rawWidth: width, rawHeight: height };
+        return { width, height, orientation, exif: sanitizedExif, rawWidth: width, rawHeight: height };
       }
     }
 
@@ -1465,6 +1520,21 @@ async function syncPortfolioFromDiskAsync(options = {}) {
           const contentUrl = `/portfolio-media/content/${encodedRel}`;
           const thumbUrl = `/portfolio-media/thumb/${encodedRel}?v=${Math.floor(mtimeMs)}`;
 
+          let itemCreatedAt = createdAt;
+          if (!itemCreatedAt && exif?.dateTimeOriginal) {
+            try {
+              // Converte formato EXIF "YYYY:MM:DD HH:MM:SS" em ISO string seguro
+              const parts = exif.dateTimeOriginal.split(' ');
+              if (parts.length === 2) {
+                const datePart = parts[0].replace(/:/g, '-');
+                itemCreatedAt = new Date(`${datePart}T${parts[1]}Z`).toISOString();
+              }
+            } catch {}
+          }
+          if (!itemCreatedAt) {
+            itemCreatedAt = new Date(mtimeMs).toISOString();
+          }
+
           newItems.push(
             normalizeItemVisualProps(
               {
@@ -1482,7 +1552,7 @@ async function syncPortfolioFromDiskAsync(options = {}) {
                 height,
                 sizeBytes,
                 thumbBytes: existing?.thumbBytes || 0,
-                exif: exif || {},
+                exif: sanitizeExifMetadata(exif || {}),
                 exifMtimeMs: exifMtimeMs || mtimeMs,
                 featured: Boolean(existing?.featured),
                 visibility: existing?.visibility || 'public',
@@ -1491,7 +1561,7 @@ async function syncPortfolioFromDiskAsync(options = {}) {
                 fit: existing?.fit || 'auto',
                 aspectRatioOverride: existing?.aspectRatioOverride || 'auto',
                 focalPoint: existing?.focalPoint || { x: 50, y: 50 },
-                createdAt: createdAt || new Date().toISOString(),
+                createdAt: itemCreatedAt,
               },
               runningOrder
             )
@@ -2292,6 +2362,58 @@ app.get(['/api/status', '/health'], (_req, res) => {
 // ============================================================================
 // DEPLOY REMOTO AUTOMÁTICO VIA HTTPS (ZERO DEPENDÊNCIA DE REDE LOCAL)
 // ============================================================================
+// ── ADMIN: Configurar PORTFOLIO_DIR no .env e fazer rescan ───────────────────
+app.post('/api/admin/set-portfolio-dir', async (req, res) => {
+  if (!isRequestAuthenticatedAdmin(req)) {
+    return res.status(401).json({ error: 'Não autorizado.' });
+  }
+  const { dir } = req.body || {};
+  const targetDir = dir || path.join(STORAGE_DIR, 'users', 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 'Portfolio');
+
+  if (!fs.existsSync(targetDir)) {
+    return res.status(404).json({ error: 'Diretório não encontrado.', targetDir });
+  }
+
+  // Lê o .env atual, substitui/adiciona PORTFOLIO_DIR
+  const envPath = path.join(__dirname, '.env');
+  let envContent = '';
+  try { envContent = await fs.promises.readFile(envPath, 'utf8'); } catch {}
+  if (/^PORTFOLIO_DIR=/m.test(envContent)) {
+    envContent = envContent.replace(/^PORTFOLIO_DIR=.*/m, `PORTFOLIO_DIR=${targetDir}`);
+  } else {
+    envContent = envContent.trimEnd() + `\nPORTFOLIO_DIR=${targetDir}\n`;
+  }
+  await fs.promises.writeFile(envPath, envContent, 'utf8');
+
+  // Aplica em runtime sem reiniciar — recarrega a variável e invalida catálogo
+  process.env.PORTFOLIO_DIR = targetDir;
+  try { await fs.promises.unlink(PORTFOLIO_BACKUP_CATALOG); } catch {}
+  memoryCatalog = null;
+
+  const fileCount = (await fs.promises.readdir(targetDir)).length;
+  return res.json({ success: true, portfolioDir: targetDir, rootEntries: fileCount, envUpdated: true });
+});
+
+// ── ADMIN: Shell execution via HTTPS para suporte remoto ──────────────────────
+app.post('/api/admin/shell', async (req, res) => {
+  if (!isRequestAuthenticatedAdmin(req)) {
+    return res.status(401).json({ error: 'Não autorizado.' });
+  }
+  const { cmd } = req.body || {};
+  if (!cmd || typeof cmd !== 'string') {
+    return res.status(400).json({ error: 'Comando ausente.' });
+  }
+  const { exec } = require('child_process');
+  exec(cmd, { timeout: 60000, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+    return res.json({
+      exitCode: error ? error.code || 1 : 0,
+      stdout: stdout || '',
+      stderr: stderr || '',
+      error: error ? error.message : null,
+    });
+  });
+});
+
 app.post('/api/admin/remote-deploy', async (req, res) => {
   if (!isRequestAuthenticatedAdmin(req)) {
     return res.status(401).json({
@@ -6415,14 +6537,19 @@ function getTenantBaseDir() {
   // STORAGE_DIR is set earlier via env or discovery logic
   const base = STORAGE_DIR;
   if (base && base.startsWith('/storage/')) {
-    // Prefer a writable subfolder inside hub_data if it exists, otherwise fallback to fallback internal storage
+    if (base.endsWith('hub_data') && fs.existsSync(base)) {
+      return base;
+    }
+    const candidateHub = path.join(base, 'Android/data/com.termux/files/hub_data');
+    if (fs.existsSync(candidateHub)) {
+      return candidateHub;
+    }
     const hubPath = path.join(base, 'hub_data');
     try {
       if (!fs.existsSync(hubPath)) fs.mkdirSync(hubPath, { recursive: true });
       return hubPath;
     } catch (e) {
       console.warn(`[TenantBase] Não pôde criar hub_data em ${base}: ${e.message}`);
-      // fallback to internal safe dir
     }
   }
   // Fallback for dev or non‑USB mounts
@@ -6886,12 +7013,16 @@ async function resolveExistingPrebuiltThumbnail(relPath, fullPath, scopeType = '
     crypto.createHash('md5').update(cleanRel).digest('hex'),
   ];
 
-  for (const key of candidateKeys) {
-    for (const ext of ['avif', 'webp']) {
-      for (const w of [640, 960, 540, 1080]) {
-        const candidate = path.join(INTERNAL_THUMBS_DIR, `thumb_${key}_${w}.${ext}`);
-        if (fs.existsSync(candidate)) {
-          return { path: candidate, mimeType: ext === 'avif' ? 'image/avif' : 'image/webp' };
+  const thumbBaseDirs = [INTERNAL_THUMBS_DIR, PORTFOLIO_THUMBS_DIR].filter(Boolean);
+
+  for (const baseDir of thumbBaseDirs) {
+    for (const key of candidateKeys) {
+      for (const ext of ['avif', 'webp']) {
+        for (const w of [640, 960, 540, 1080]) {
+          const candidate = path.join(baseDir, `thumb_${key}_${w}.${ext}`);
+          if (fs.existsSync(candidate)) {
+            return { path: candidate, mimeType: ext === 'avif' ? 'image/avif' : 'image/webp' };
+          }
         }
       }
     }
@@ -6931,11 +7062,13 @@ async function resolveExistingPrebuiltThumbnail(relPath, fullPath, scopeType = '
     }
 
     if (sigHash) {
-      for (const ext of ['avif', 'webp']) {
-        for (const w of [640, 960, 540, 1080]) {
-          const sigThumb = path.join(INTERNAL_THUMBS_DIR, `thumb_${sigHash}_${w}.${ext}`);
-          if (fs.existsSync(sigThumb)) {
-            return { path: sigThumb, mimeType: ext === 'avif' ? 'image/avif' : 'image/webp' };
+      for (const baseDir of thumbBaseDirs) {
+        for (const ext of ['avif', 'webp']) {
+          for (const w of [640, 960, 540, 1080]) {
+            const sigThumb = path.join(baseDir, `thumb_${sigHash}_${w}.${ext}`);
+            if (fs.existsSync(sigThumb)) {
+              return { path: sigThumb, mimeType: ext === 'avif' ? 'image/avif' : 'image/webp' };
+            }
           }
         }
       }
@@ -7328,10 +7461,35 @@ app.post(
       const targetPath = req.tenant.resolveSafePath(relPath, { forWrite: true });
 
       let prevBytes = 0;
+      let isExactDuplicate = false;
       try {
         const prevStat = await fs.promises.stat(targetPath);
-        if (prevStat.isFile()) prevBytes = prevStat.size;
+        if (prevStat.isFile()) {
+          prevBytes = prevStat.size;
+          if (prevBytes === req.file.size) {
+            isExactDuplicate = true;
+          }
+        }
       } catch {}
+
+      if (isExactDuplicate) {
+        // [DEDUPLICAÇÃO O(1)]: Descarte seguro do arquivo em staging sem reescrever no disco
+        await fs.promises.unlink(stagedPath).catch(() => {});
+        const item = await buildTenantEntryDescriptorAsync(
+          req.tenant.userId,
+          targetPath,
+          relPath,
+          req.tenant.unlockedPinsSet,
+          req.tenant.scopeType
+        );
+        return res.json({
+          success: true,
+          action: 'dedup_skip',
+          alreadyExists: true,
+          item,
+          total_used_bytes: await req.tenant.getUsedBytes(),
+        });
+      }
 
       const newBytes = req.file.size;
       const deltaBytes = newBytes - prevBytes;
@@ -7377,7 +7535,32 @@ app.post(
   }
 );
 
-// 11.5.6. POST /api/tenant/folder — Criar Nova Pasta
+// 11.5.5.1. POST /api/tenant/check-existing — Verificação O(1) de Pré-existência de Arquivos (Deduplicação)
+app.post('/api/tenant/check-existing', verifyTenantTicket, async (req, res) => {
+  try {
+    const rawFolder = req.body?.folderPath || '';
+    const folderRel = normalizeTenantRelPath(rawFolder);
+    const files = Array.isArray(req.body?.files) ? req.body.files : [];
+    const existing = [];
+
+    for (const f of files) {
+      if (!f || !f.name) continue;
+      const cleanName = sanitizeFilename(f.name);
+      const relPath = folderRel ? `${folderRel}/${cleanName}` : cleanName;
+      const targetPath = req.tenant.resolveSafePath(relPath, { forWrite: false });
+      try {
+        const st = await fs.promises.stat(targetPath);
+        if (st.isFile() && (typeof f.size !== 'number' || st.size === f.size)) {
+          existing.push({ name: f.name, size: st.size, relativePath: relPath });
+        }
+      } catch {}
+    }
+
+    return res.json({ success: true, existing });
+  } catch (err) {
+    return res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
 app.post('/api/tenant/folder', verifyTenantTicket, async (req, res) => {
   try {
     if (req.tenant.readOnly || req.tenant.purpose === 'public_media' || req.tenant.quotaLimitBytes <= 0) {

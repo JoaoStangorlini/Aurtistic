@@ -86,7 +86,7 @@ export function OrganizationPlaybooksModal({
         templateId,
       });
       if (res.ok) {
-        setStatusMsg('Playbook instanciado com sucesso em suas tarefas!');
+        setStatusMsg('Roteiro instanciado com sucesso em suas tarefas!');
         onPlaybookApplied?.();
         setTimeout(() => setStatusMsg(null), 3500);
       }
@@ -106,10 +106,10 @@ export function OrganizationPlaybooksModal({
             </span>
             <div>
               <h2 className="text-base font-bold text-fg font-['Bukra']">
-                Playbooks & Templates de Equipe
+                Roteiros de Trabalho & Modelos de Equipe
               </h2>
               <p className="text-xs text-fg-secondary">
-                Rotinas operacionais padronizadas que geram tarefas e subtarefas em 1 clique.
+                Rotinas operacionais padronizadas que geram tarefas e subtarefas em 1 clique (ex: recepção de novos membros, ciclos recorrentes de trabalho).
               </p>
             </div>
           </div>
@@ -134,32 +134,32 @@ export function OrganizationPlaybooksModal({
           {isCreating ? (
             <form onSubmit={handleCreateTemplate} className="space-y-4">
               <h3 className="text-xs font-bold text-fg uppercase tracking-wider">
-                Novo Playbook
+                Novo Roteiro de Trabalho
               </h3>
               <div>
                 <label className="block text-[11px] font-bold text-fg-secondary mb-1">
-                  Título do Playbook
+                  Título do Roteiro
                 </label>
                 <input
                   type="text"
                   required
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="Ex: Onboarding de Novo Pesquisador"
+                  placeholder="Ex: Recepção de Novos Membros, Ciclo Recorrente de Pesquisa"
                   className="w-full bg-app border border-border-subtle rounded-xl px-3.5 py-2 text-xs text-fg outline-none focus:border-[var(--accent-secondary)]"
                 />
               </div>
 
               <div>
                 <label className="block text-[11px] font-bold text-fg-secondary mb-1">
-                  Subequipe Relacionada (opcional)
+                  Categoria / Equipe Relacionada (obrigatório)
                 </label>
                 <select
                   value={newSubteamId}
                   onChange={(e) => setNewSubteamId(e.target.value)}
                   className="w-full bg-app border border-border-subtle rounded-xl px-3.5 py-2 text-xs text-fg outline-none focus:border-[var(--accent-secondary)]"
                 >
-                  <option value="">Geral / Todas</option>
+                  <option value="">Selecione a categoria (Programação, Comunicação, Pesquisa, Administração)...</option>
                   {subteams.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -193,7 +193,7 @@ export function OrganizationPlaybooksModal({
                   type="submit"
                   className="px-5 py-2 bg-[var(--accent-secondary)] text-[#121212] font-black rounded-xl text-xs uppercase tracking-wider shadow-sm"
                 >
-                  Salvar Playbook
+                  Salvar Roteiro
                 </button>
               </div>
             </form>
@@ -201,7 +201,7 @@ export function OrganizationPlaybooksModal({
             <>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-fg-secondary uppercase tracking-wider">
-                  {templates.length} Playbooks Disponíveis
+                  {templates.length} Roteiros Disponíveis
                 </span>
                 <button
                   type="button"
@@ -209,17 +209,17 @@ export function OrganizationPlaybooksModal({
                   className="px-3 py-1.5 rounded-xl bg-app border border-border-subtle hover:border-[var(--accent-secondary)] text-fg text-xs font-bold transition-all flex items-center gap-1.5"
                 >
                   <span className="material-symbols-outlined text-[16px]">add</span>
-                  <span>Criar Playbook</span>
+                  <span>Criar Roteiro</span>
                 </button>
               </div>
 
               {loading ? (
                 <div className="py-12 text-center text-xs text-fg-muted">
-                  Carregando playbooks...
+                  Carregando roteiros...
                 </div>
               ) : templates.length === 0 ? (
                 <div className="py-12 text-center text-xs text-fg-muted border border-dashed border-border-subtle rounded-2xl">
-                  Nenhum playbook cadastrado ainda. Crie o primeiro acima!
+                  Nenhum roteiro cadastrado ainda. Crie o primeiro acima!
                 </div>
               ) : (
                 <div className="space-y-3">

@@ -473,7 +473,11 @@ export default function PortfolioClient({
                           <div className="w-20 h-20 rounded-2xl bg-app border border-border-subtle p-2 flex items-center justify-center shrink-0">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
-                              src={proj.image_url}
+                              src={
+                                proj.title === 'HUB LabDiv'
+                                  ? '/icone-HUBLabDiv.svg'
+                                  : proj.image_url
+                              }
                               alt={proj.title}
                               className="max-w-full max-h-full object-contain"
                               onError={(e) => {

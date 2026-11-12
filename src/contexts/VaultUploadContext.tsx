@@ -35,6 +35,32 @@ export interface UploadFinishedResults {
   newUsedBytes?: number;
 }
 
+export function formatEta(seconds: number | null): string {
+  if (seconds === null || !Number.isFinite(seconds) || seconds < 0) {
+    return 'Calculando...';
+  }
+  if (seconds < 60) {
+    return `${Math.max(1, Math.round(seconds))} s`;
+  }
+  if (seconds < 3600) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    return `${mins} min ${secs} s`;
+  }
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.round(seconds % 60);
+  return `${hours} h ${mins} min ${secs} s`;
+}
+
+export function formatSpeed(mbps: number): string {
+  if (!mbps || mbps <= 0) return '0.0 Mbps';
+  if (mbps < 0.1) {
+    return `${(mbps * 1000).toFixed(0)} Kbps`;
+  }
+  return `${mbps.toFixed(1)} Mbps`;
+}
+
 interface VaultUploadContextType {
   queue: QueuedUploadItem[];
   isUploading: boolean;
@@ -55,6 +81,8 @@ interface VaultUploadContextType {
   totalBytes: number;
   uploadedBytes: number;
   overallPercent: number;
+  uploadSpeedMbps: number;
+  etaSeconds: number | null;
   enqueueItems: (
     items: UploadItem[],
     targetFolder?: string,
@@ -111,11 +139,15 @@ export function VaultUploadProvider({
   const [activeTicket, setActiveTicket] = useState(initialVaultTicket);
   const [lastCompletedUploadTime, setLastCompletedUploadTime] = useState(0);
   const [lastUploadResults, setLastUploadResults] = useState<UploadFinishedResults | null>(null);
+  const [uploadSpeedMbps, setUploadSpeedMbps] = useState(0);
+  const [etaSeconds, setEtaSeconds] = useState<number | null>(null);
 
   const currentTicketRef = useRef(activeTicket);
   const lastTicketRefreshRef = useRef(Date.now());
   const cancelRequestedRef = useRef(false);
   const lastProgressUpdateRef = useRef(0);
+  const speedSampleRef = useRef<{ time: number; loaded: number } | null>(null);
+  const emaSpeedRef = useRef<number>(0);
 
   useEffect(() => {
     if (initialVaultTicket && !activeTicket) {
@@ -296,6 +328,10 @@ export function VaultUploadProvider({
     if (isUploading || queue.length === 0) return;
     setIsUploading(true);
     cancelRequestedRef.current = false;
+    speedSampleRef.current = null;
+    emaSpeedRef.current = 0;
+    setUploadSpeedMbps(0);
+    setEtaSeconds(null);
 
     await ensureFreshTicket(false);
 
@@ -303,10 +339,16 @@ export function VaultUploadProvider({
     let errorCount = 0;
     let lastUsedBytes: number | undefined;
 
+    const totalBatchBytes = queue.reduce((acc, item) => acc + item.file.size, 0);
+
     for (let i = 0; i < queue.length; i++) {
       if (cancelRequestedRef.current) break;
       const currentItem = queue[i];
       if (currentItem.status === 'success') continue;
+
+      const completedBytesBeforeThis = queue
+        .slice(0, i)
+        .reduce((acc, it) => acc + (it.status === 'success' ? it.file.size : 0), 0);
 
       setQueue((prev) =>
         prev.map((it, idx) =>
@@ -328,8 +370,38 @@ export function VaultUploadProvider({
             folderPath: currentItem.targetFolder,
             ticket: ticketToUse,
             serverUrl,
-            onProgress: (pct) => {
+            onProgress: (pct, loadedBytes) => {
               const now = Date.now();
+              const currentLoaded = loadedBytes ?? Math.round((currentItem.file.size * pct) / 100);
+              const totalUploadedNow = completedBytesBeforeThis + currentLoaded;
+
+              // Amostragem de velocidade (EMA) e estimativa de tempo restante (ETA)
+              if (!speedSampleRef.current) {
+                speedSampleRef.current = { time: now, loaded: totalUploadedNow };
+              } else {
+                const timeDelta = (now - speedSampleRef.current.time) / 1000;
+                if (timeDelta >= 0.25) {
+                  const bytesDelta = totalUploadedNow - speedSampleRef.current.loaded;
+                  if (bytesDelta >= 0) {
+                    const instantSpeed = bytesDelta / timeDelta;
+                    const alpha = 0.25;
+                    emaSpeedRef.current =
+                      emaSpeedRef.current === 0
+                        ? instantSpeed
+                        : alpha * instantSpeed + (1 - alpha) * emaSpeedRef.current;
+                    const mbps = (emaSpeedRef.current * 8) / 1_000_000;
+                    setUploadSpeedMbps(mbps);
+                    const remainingBytes = Math.max(0, totalBatchBytes - totalUploadedNow);
+                    const eta =
+                      emaSpeedRef.current > 512
+                        ? Math.max(0, Math.round(remainingBytes / emaSpeedRef.current))
+                        : null;
+                    setEtaSeconds(eta);
+                  }
+                  speedSampleRef.current = { time: now, loaded: totalUploadedNow };
+                }
+              }
+
               if (now - lastProgressUpdateRef.current > 150 || pct === 100) {
                 lastProgressUpdateRef.current = now;
                 setQueue((prev) =>
@@ -421,6 +493,10 @@ export function VaultUploadProvider({
     }
 
     setIsUploading(false);
+    setUploadSpeedMbps(0);
+    setEtaSeconds(null);
+    speedSampleRef.current = null;
+    emaSpeedRef.current = 0;
     const results: UploadFinishedResults = {
       successCount,
       errorCount,
@@ -471,6 +547,8 @@ export function VaultUploadProvider({
       totalBytes,
       uploadedBytes,
       overallPercent,
+      uploadSpeedMbps,
+      etaSeconds,
       enqueueItems,
       setOverrideFolder: handleSetOverrideFolder,
       setCurrentFolder,
@@ -507,6 +585,8 @@ export function VaultUploadProvider({
       totalBytes,
       uploadedBytes,
       overallPercent,
+      uploadSpeedMbps,
+      etaSeconds,
       enqueueItems,
       handleSetOverrideFolder,
       openModal,

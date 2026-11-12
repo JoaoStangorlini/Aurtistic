@@ -360,7 +360,7 @@ export async function getUserProfile() {
       description: 'Plataforma completa de comunicação e difusão científica do IFUSP, com fluxo de informações e artes integradas.',
       link: 'https://hub-lab-div.vercel.app',
       tags: ['PWA', 'Next.js', 'Supabase', 'TailwindCSS'],
-      image_url: '/labdiv-logo.png'
+      image_url: '/icone-HUBLabDiv.svg'
     },
     {
       title: 'Aurtistic',
@@ -431,6 +431,21 @@ export async function getUserProfile() {
       updates.portfolio = joaoPortfolio;
       data.portfolio = joaoPortfolio;
       updated = true;
+    } else if (Array.isArray(data.portfolio)) {
+      // Garante desinversão e integridade dos logos oficiais do portfólio
+      let portfolioChanged = false;
+      const fixedPortfolio = data.portfolio.map((proj: any) => {
+        if (proj.title === 'HUB LabDiv' && proj.image_url !== '/icone-HUBLabDiv.svg') {
+          portfolioChanged = true;
+          return { ...proj, image_url: '/icone-HUBLabDiv.svg' };
+        }
+        return proj;
+      });
+      if (portfolioChanged) {
+        updates.portfolio = fixedPortfolio;
+        data.portfolio = fixedPortfolio;
+        updated = true;
+      }
     }
     if (updated) {
       await supabase.from('user_profiles').update(updates).eq('id', user.id);

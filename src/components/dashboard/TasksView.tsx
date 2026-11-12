@@ -112,6 +112,7 @@ export function TasksView({
   advancedSettings = {},
   initialUserFiles = [],
   initialOrganizations = [],
+  showUnassignedBanner,
 }: {
   initialTasks: Task[];
   initialEvents?: AgendaEvent[];
@@ -124,6 +125,7 @@ export function TasksView({
   advancedSettings?: any;
   initialUserFiles?: UserFileIndexRow[];
   initialOrganizations?: any[];
+  showUnassignedBanner?: boolean;
 }) {
   const enableSubtasks = advancedSettings.enable_subtasks !== false;
   const enableAdminFilters = advancedSettings.enable_admin_filters !== false;
@@ -166,6 +168,8 @@ export function TasksView({
   const [userFiles, setUserFiles] = useState<UserFileIndexRow[]>(initialUserFiles || []);
   const [onlyMyTasks, setOnlyMyTasks] = useState(false);
   const [isQuickFiltersExpanded, setIsQuickFiltersExpanded] = useState(false);
+  const [isUnassignedTasksExpanded, setIsUnassignedTasksExpanded] = useState(false);
+  const [isBatchAssigningUnassigned, setIsBatchAssigningUnassigned] = useState(false);
 
   const activeOrg = organizations.find((o) => o.id === activeOrgId) || organizations[0] || null;
 
@@ -2208,6 +2212,121 @@ export function TasksView({
           </div>
         )}
       </div>
+
+      {/* Seção Expansível de Tarefas Sem Responsável na Área de Tarefas (Apenas na aba Gestão ou no filtro de Organização) */}
+      {(() => {
+        const isOrgContext =
+          showUnassignedBanner === true ||
+          activeScope === 'organization';
+
+        if (!isOrgContext) return null;
+
+        const unassignedList = localTasks.filter(
+          (t) =>
+            (!t.responsavel || t.responsavel.trim() === '' || t.responsavel === 'Sem Responsável') &&
+            (!t.assigned_member_ids || t.assigned_member_ids.length === 0)
+        );
+        if (unassignedList.length === 0) return null;
+
+        return (
+          <div className="w-full mt-3 p-3 sm:p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setIsUnassignedTasksExpanded((prev) => !prev)}
+                className="flex items-center gap-2 cursor-pointer text-left group"
+              >
+                <span className="material-symbols-outlined text-amber-400 text-[20px] group-hover:scale-110 transition-transform">
+                  assignment_late
+                </span>
+                <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+                  Tarefas Sem Responsável ({unassignedList.length})
+                </span>
+                <span className="material-symbols-outlined text-amber-400/80 text-[16px]">
+                  {isUnassignedTasksExpanded ? 'expand_less' : 'expand_more'}
+                </span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isBatchAssigningUnassigned}
+                  onClick={async () => {
+                    setIsBatchAssigningUnassigned(true);
+                    try {
+                      const myName = userId === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e' ? 'João' : 'Eu';
+                      for (const t of unassignedList) {
+                        const updated: Task = {
+                          ...t,
+                          responsavel: myName,
+                          user_id: userId || t.user_id,
+                        };
+                        await saveTask(updated);
+                      }
+                      setLocalTasks((prev) =>
+                        prev.map((t) => {
+                          const isUn =
+                            (!t.responsavel || t.responsavel.trim() === '' || t.responsavel === 'Sem Responsável') &&
+                            (!t.assigned_member_ids || t.assigned_member_ids.length === 0);
+                          if (isUn) {
+                            return {
+                              ...t,
+                              responsavel: myName,
+                              user_id: userId || t.user_id,
+                            };
+                          }
+                          return t;
+                        })
+                      );
+                    } finally {
+                      setIsBatchAssigningUnassigned(false);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 transition-colors cursor-pointer shadow-sm disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[15px]">done_all</span>
+                  <span>{isBatchAssigningUnassigned ? 'Atribuindo...' : 'Atribuir Todas para Mim'}</span>
+                </button>
+              </div>
+            </div>
+
+            {isUnassignedTasksExpanded && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-2 border-t border-amber-500/20">
+                {unassignedList.map((task) => (
+                  <div
+                    key={task.id}
+                    className="p-2.5 rounded-lg bg-surface border border-border-subtle flex items-center justify-between gap-2 text-xs"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <span className="font-semibold text-fg block truncate">{task.nome}</span>
+                      <span className="text-[10px] text-fg-muted">{task.categoria || 'Geral'}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const myName = userId === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e' ? 'João' : 'Eu';
+                        const updated: Task = {
+                          ...task,
+                          responsavel: myName,
+                          user_id: userId || task.user_id,
+                        };
+                        await saveTask(updated);
+                        setLocalTasks((prev) =>
+                          prev.map((t) => (t.id === task.id ? updated : t))
+                        );
+                      }}
+                      className="px-2.5 py-1 rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500 hover:text-slate-950 border border-amber-500/40 text-[11px] font-bold transition-colors cursor-pointer shrink-0"
+                    >
+                      Assumir
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {viewMode === 'list' && displayMode !== 'eventos' && (
         <div data-tour="tasks-main-view" className="flex flex-col gap-2 mt-4 custom-scrollbar overflow-x-auto w-full border border-border-subtle rounded-lg relative overflow-hidden" style={{ minHeight: '600px' }}>
           <div ref={desktopContainerRef} style={{ overflowAnchor: 'none' }} className="hidden md:block overflow-x-auto bg-surface border border-border-subtle rounded-lg relative">

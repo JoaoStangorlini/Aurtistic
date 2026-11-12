@@ -2,7 +2,7 @@
 // ARQUIVO: src/components/organizacoes/LabDivWorkspaceClient.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import type { Task, TaskColumn, AgendaEvent } from '@/types';
 import type {
@@ -17,12 +17,17 @@ import { MemberCapacityQuickSelector } from './MemberCapacityQuickSelector';
 import { OrganizationPlaybooksModal } from './OrganizationPlaybooksModal';
 import { When2MeetSchedulerGrid } from './When2MeetSchedulerGrid';
 import { LiveMeetingSplitWorkspace } from './LiveMeetingSplitWorkspace';
+import { OrganizationGoalsPanel } from './OrganizationGoalsPanel';
+import { OrganizationRequestsPanel } from './OrganizationRequestsPanel';
+import { OrganizationScheduleAttendancePanel } from './OrganizationScheduleAttendancePanel';
+import { OrganizationAdminModal } from './OrganizationAdminModal';
 import { TasksView } from '@/components/dashboard/TasksView';
 import {
   createOrganizationMeetingAction,
   getOrganizationDetailsAction,
   getOrganizationMeetingsAction,
 } from '@/app/(dashboard)/organizacoes/actions';
+import { saveTask } from '@/app/(dashboard)/actions';
 import { JoinOrganizationModal } from './JoinOrganizationModal';
 import { CreateOrganizationModal } from './CreateOrganizationModal';
 
@@ -62,12 +67,31 @@ export function LabDivWorkspaceClient({
   const [currentOrg, setCurrentOrg] = useState<Organization>(initialOrg);
   const [subteams, setSubteams] = useState<OrganizationSubteam[]>(initialSubteams);
   const [members, setMembers] = useState<OrganizationMember[]>(initialMembers);
-  const [tasks] = useState<Task[]>(initialTasks);
+  const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [meetings, setMeetings] = useState<OrganizationMeeting[]>(initialMeetings);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const organization = currentOrg;
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`aurtistic_subteams_${organization.id}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSubteams(parsed);
+        }
+      }
+    } catch {}
+  }, [organization.id]);
+
+  const handleUpdateSubteams = (updated: OrganizationSubteam[]) => {
+    setSubteams(updated);
+    try {
+      localStorage.setItem(`aurtistic_subteams_${organization.id}`, JSON.stringify(updated));
+    } catch {}
+  };
 
   const handleSwitchOrg = async (orgId: string) => {
     const selected = userOrganizations.find((o) => o.id === orgId);
@@ -88,6 +112,10 @@ export function LabDivWorkspaceClient({
   const [activeMeetingForLive, setActiveMeetingForLive] = useState<OrganizationMeeting | null>(null);
   const [selectedMeetingForWhen2Meet, setSelectedMeetingForWhen2Meet] = useState<OrganizationMeeting | null>(null);
   const [showMeetingsSection, setShowMeetingsSection] = useState(false);
+  const [showGoalsSection, setShowGoalsSection] = useState(false);
+  const [showScheduleSection, setShowScheduleSection] = useState(false);
+  const [showRequestsSection, setShowRequestsSection] = useState(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [isCreatingMeeting, setIsCreatingMeeting] = useState(false);
   const [newMeetingTitle, setNewMeetingTitle] = useState('');
   const [selectedMemberFilter, setSelectedMemberFilter] = useState<string | null>(null);
@@ -113,6 +141,78 @@ export function LabDivWorkspaceClient({
     } finally {
       setIsCreatingMeeting(false);
     }
+  };
+
+  const handleClaimTask = async (taskId: string) => {
+    const target = tasks.find((t) => t.id === taskId);
+    if (!target) return;
+    const currentMember = members.find((m) => m.user_id === currentUserId) || myMember;
+    const updated = {
+      ...target,
+      assignee_id: currentUserId,
+      assigned_member_ids: currentMember ? [currentMember.id] : [],
+      responsavel: currentMember ? currentMember.full_name : target.responsavel,
+    };
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+    try {
+      await saveTask(updated);
+    } catch {}
+  };
+
+  const handleAssignAllToMe = async () => {
+    if (!myMember) return;
+    const unassigned = tasks.filter(
+      (t) =>
+        (!t.assigned_member_ids || t.assigned_member_ids.length === 0) &&
+        (!t.responsavel || t.responsavel.trim() === '' || t.responsavel === 'Sem Responsável')
+    );
+    if (unassigned.length === 0) return;
+
+    for (const t of unassigned) {
+      const updated: Task = {
+        ...t,
+        assignee_id: currentUserId,
+        responsavel: myMember.full_name || 'João Stangorlini',
+        assigned_member_ids: [myMember.id],
+        organization_id: organization.id,
+      };
+      await saveTask(updated);
+    }
+
+    setTasks((prev) =>
+      prev.map((t) => {
+        const isUn =
+          (!t.assigned_member_ids || t.assigned_member_ids.length === 0) &&
+          (!t.responsavel || t.responsavel.trim() === '' || t.responsavel === 'Sem Responsável');
+        if (isUn) {
+          return {
+            ...t,
+            assignee_id: currentUserId,
+            responsavel: myMember.full_name || 'João Stangorlini',
+            assigned_member_ids: [myMember.id],
+            organization_id: organization.id,
+          };
+        }
+        return t;
+      })
+    );
+  };
+
+  const handleRelieveTask = async (taskId: string, targetMemberName: string) => {
+    const target = tasks.find((t) => t.id === taskId);
+    if (!target) return;
+    const currentMember = members.find((m) => m.user_id === currentUserId) || myMember;
+    const helperName = currentMember ? currentMember.full_name : 'colega';
+    const updated = {
+      ...target,
+      assignee_id: currentUserId,
+      assigned_member_ids: currentMember ? [currentMember.id] : [],
+      responsavel: helperName,
+    };
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+    try {
+      await saveTask(updated);
+    } catch {}
   };
 
   return (
@@ -151,26 +251,13 @@ export function LabDivWorkspaceClient({
             </Link>
           </div>
         </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('aurtistic:relaunch-onboarding'));
-            }
-          }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--accent-secondary,#FFCC00)]/30 bg-[var(--accent-secondary,#FFCC00)]/10 text-[var(--accent-secondary,#FFCC00)] hover:bg-[var(--accent-secondary,#FFCC00)]/20 text-xs font-bold transition-colors cursor-pointer"
-        >
-          <span className="material-symbols-outlined text-[16px]">tune</span>
-          <span>Personalizar Módulos</span>
-        </button>
       </div>
 
       {/* Topo: Identidade da Organização e Ações Rápidas */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-surface border border-border-subtle rounded-2xl p-5 shadow-lg">
         <div className="flex items-center gap-4">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-teal-500/10 border border-teal-500/30 overflow-hidden p-2">
-            <img src="/icone-HUBLabDiv.svg" alt="HUB LabDiv" className="w-full h-full object-contain" />
+            <img src="/labdiv-logo.png" alt="LabDiv" className="w-full h-full object-contain" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -210,16 +297,20 @@ export function LabDivWorkspaceClient({
           <button
             type="button"
             onClick={() => setIsPlaybooksOpen(true)}
-            className="flex items-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-2 text-xs font-bold text-indigo-300 hover:bg-indigo-500/20 transition-colors"
+            className="flex items-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-2 text-xs font-bold text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer"
           >
             <span className="material-symbols-outlined text-[16px]">menu_book</span>
-            Playbooks
+            Roteiros
           </button>
 
           <button
             type="button"
             onClick={() => setShowMeetingsSection((prev) => !prev)}
-            className="flex items-center gap-1.5 rounded-xl border border-teal-500/30 bg-teal-500/10 px-3.5 py-2 text-xs font-bold text-teal-300 hover:bg-teal-500/20 transition-colors"
+            className={`flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
+              showMeetingsSection
+                ? 'border-teal-500 bg-teal-500/20 text-teal-200 shadow-sm'
+                : 'border-teal-500/30 bg-teal-500/10 text-teal-300 hover:bg-teal-500/20'
+            }`}
           >
             <span className="material-symbols-outlined text-[16px]">calendar_today</span>
             Reuniões ({meetings.length})
@@ -227,22 +318,107 @@ export function LabDivWorkspaceClient({
               {showMeetingsSection ? 'expand_less' : 'expand_more'}
             </span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setShowGoalsSection((prev) => !prev)}
+            className={`flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
+              showGoalsSection
+                ? 'border-teal-500 bg-teal-500/20 text-teal-200 shadow-sm'
+                : 'border-teal-500/30 bg-teal-500/10 text-teal-300 hover:bg-teal-500/20'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">flag</span>
+            Metas & Objetivos
+            <span className="material-symbols-outlined text-[16px]">
+              {showGoalsSection ? 'expand_less' : 'expand_more'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowScheduleSection((prev) => !prev)}
+            className={`flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
+              showScheduleSection
+                ? 'border-teal-500 bg-teal-500/20 text-teal-200 shadow-sm'
+                : 'border-teal-500/30 bg-teal-500/10 text-teal-300 hover:bg-teal-500/20'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">calendar_clock</span>
+            Escalas & Presenças (QR)
+            <span className="material-symbols-outlined text-[16px]">
+              {showScheduleSection ? 'expand_less' : 'expand_more'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowRequestsSection((prev) => !prev)}
+            className={`flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
+              showRequestsSection
+                ? 'border-amber-500 bg-amber-500/20 text-amber-200 shadow-sm'
+                : 'border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">forward_to_inbox</span>
+            Pedidos & Sugestões
+            <span className="material-symbols-outlined text-[16px]">
+              {showRequestsSection ? 'expand_less' : 'expand_more'}
+            </span>
+          </button>
+
+          {isOrgAdmin && (
+            <button
+              type="button"
+              onClick={() => setIsAdminModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-purple-500/30 bg-purple-500/10 px-3.5 py-2 text-xs font-bold text-purple-300 hover:bg-purple-500/20 transition-colors cursor-pointer shadow-sm"
+            >
+              <span className="material-symbols-outlined text-[16px]">shield_person</span>
+              Painel Administrativo
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Painel de Progresso da Equipe e Subequipes */}
-      <TeamProgressPanel
-        organization={organization}
-        subteams={subteams}
-        members={members}
-        tasks={tasks}
-        onSelectMemberFilter={setSelectedMemberFilter}
-        selectedMemberId={selectedMemberFilter}
-      />
+      {/* Painéis Expansíveis dos Botões do Topo (Abertura Imediatamente Abaixo da Barra de Ações) */}
+      {showGoalsSection && (
+        <div className="animate-in fade-in duration-200">
+          <OrganizationGoalsPanel
+            organization={organization}
+            subteams={subteams}
+            tasks={tasks}
+          />
+        </div>
+      )}
+
+      {showScheduleSection && (
+        <div className="animate-in fade-in duration-200">
+          <OrganizationScheduleAttendancePanel
+            organization={organization}
+            subteams={subteams}
+            members={members}
+            currentUserId={currentUserId}
+            currentUserName={myMember?.full_name || 'Membro do Laboratório'}
+            isAdmin={isOrgAdmin}
+          />
+        </div>
+      )}
+
+      {showRequestsSection && (
+        <div className="animate-in fade-in duration-200">
+          <OrganizationRequestsPanel
+            organization={organization}
+            subteams={subteams}
+            currentUserId={currentUserId}
+            currentUserName={myMember?.full_name || 'Membro do Laboratório'}
+            isAdmin={isOrgAdmin}
+          />
+        </div>
+      )}
 
       {/* Seção Expansível de Reuniões e When2Meet */}
       {showMeetingsSection && (
-        <div data-tour="org-meetings-section" className="bg-surface border border-border-subtle rounded-2xl p-5 shadow-lg space-y-4">
+        <div data-tour="org-meetings-section" className="bg-surface border border-border-subtle rounded-2xl p-5 shadow-lg space-y-4 animate-in fade-in duration-200">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-3">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-[20px] text-teal-400">calendar_month</span>
@@ -347,6 +523,33 @@ export function LabDivWorkspaceClient({
         </div>
       )}
 
+      {/* Painel de Progresso da Equipe e Subequipes */}
+      <TeamProgressPanel
+        organization={organization}
+        subteams={subteams}
+        members={members}
+        tasks={tasks}
+        currentUserId={currentUserId}
+        onSelectMemberFilter={setSelectedMemberFilter}
+        selectedMemberId={selectedMemberFilter}
+        onClaimTask={handleClaimTask}
+        onRelieveTask={handleRelieveTask}
+        onAssignAllToMe={handleAssignAllToMe}
+      />
+
+      {/* Modal Administrativo de Governança, Atribuições e Perfis */}
+      <OrganizationAdminModal
+        isOpen={isAdminModalOpen}
+        onClose={() => setIsAdminModalOpen(false)}
+        organization={organization}
+        subteams={subteams}
+        members={members}
+        tasks={tasks}
+        currentUserId={currentUserId}
+        onTasksUpdated={(updatedTasks) => setTasks(updatedTasks)}
+        onSubteamsUpdated={handleUpdateSubteams}
+      />
+
       {/* Lista de Tarefas com Todas as Funcionalidades de TasksView */}
       <div className="pt-2">
         <TasksView
@@ -356,6 +559,7 @@ export function LabDivWorkspaceClient({
           initialQuickFilters={quickFilters}
           initialQuickSorts={quickSorts}
           advancedSettings={advancedSettings}
+          showUnassignedBanner={true}
         />
       </div>
 

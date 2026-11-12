@@ -9,7 +9,12 @@ import {
   extractFilesFromZip,
 } from '@/lib/file-upload-helpers';
 import { VaultActionDialog } from './VaultActionDialog';
-import { useVaultUpload, type QueuedUploadItem } from '@/contexts/VaultUploadContext';
+import {
+  useVaultUpload,
+  type QueuedUploadItem,
+  formatEta,
+  formatSpeed,
+} from '@/contexts/VaultUploadContext';
 
 export type { QueuedUploadItem };
 
@@ -94,6 +99,8 @@ export function VaultUploadManagerModal({
   const totalBytes = uploadCtx.totalBytes;
   const uploadedBytes = uploadCtx.uploadedBytes;
   const overallPercent = uploadCtx.overallPercent;
+  const uploadSpeedMbps = uploadCtx.uploadSpeedMbps;
+  const etaSeconds = uploadCtx.etaSeconds;
   const enqueueItems = uploadCtx.enqueueItems;
   const handleStartUpload = uploadCtx.startUpload;
   const handleRetryFailed = uploadCtx.retryFailed;
@@ -604,6 +611,19 @@ export function VaultUploadManagerModal({
                   style={{ width: `${overallPercent}%` }}
                 />
               </div>
+
+              {isUploading && (
+                <div className="flex items-center justify-between text-[11px] font-mono text-fg-muted pt-1">
+                  <span className="flex items-center gap-1.5 text-[var(--accent-primary)] font-semibold">
+                    <span className="material-symbols-outlined text-[15px]">speed</span>
+                    <span>{formatSpeed(uploadSpeedMbps)}</span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[15px]">timer</span>
+                    <span>Restante: <strong className="text-fg font-bold">{formatEta(etaSeconds)}</strong></span>
+                  </span>
+                </div>
+              )}
             </div>
           )}
 

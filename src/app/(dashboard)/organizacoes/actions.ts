@@ -174,9 +174,10 @@ export async function getOrganizationDetailsAction(orgId: string) {
       ok: true,
       organization: LABDIV_DEFAULT_ORG,
       subteams: [
-        { id: '1ab41410-0000-4000-8000-000000000101', organization_id: LABDIV_ORG_ID, name: 'Comunicação & Mídias', description: 'Gestão de redes, vídeos, podcasts e divulgação científica', color: '#9D4EDD' },
-        { id: '1ab41410-0000-4000-8000-000000000102', organization_id: LABDIV_ORG_ID, name: 'Pesquisa & Extensão', description: 'Projetos científicos, artigos, dados e parcerias acadêmicas', color: '#049FFF' },
-        { id: '1ab41410-0000-4000-8000-000000000103', organization_id: LABDIV_ORG_ID, name: 'Administração & Coordenação', description: 'Governança institucional, finanças e cronogramas gerais', color: '#FFCC00' }
+        { id: '1ab41410-0000-4000-8000-000000000100', organization_id: LABDIV_ORG_ID, name: 'Programação', description: 'Desenvolvimento de software, infraestrutura e automação', color: '#3B82F6' },
+        { id: '1ab41410-0000-4000-8000-000000000101', organization_id: LABDIV_ORG_ID, name: 'Comunicação', description: 'Design, redes, eventos e divulgação científica', color: '#06B6D4' },
+        { id: '1ab41410-0000-4000-8000-000000000102', organization_id: LABDIV_ORG_ID, name: 'Pesquisa', description: 'Projetos acadêmicos, artigos e neurociência', color: '#10B981' },
+        { id: '1ab41410-0000-4000-8000-000000000103', organization_id: LABDIV_ORG_ID, name: 'Administração', description: 'Gestão institucional, finanças e processos internos', color: '#F59E0B' }
       ],
       members: [
         { id: '1ab41410-m001', organization_id: LABDIV_ORG_ID, full_name: 'João Paulo Stangorlini', email: 'joaopaulostangorlini@usp.br', org_role: 'admin', is_placeholder: false, can_upload_org_vault: true, cognitive_capacity: 'normal' },

@@ -1605,19 +1605,6 @@ export function UserVaultWorkspace({
             </div>
           </div>
         </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('aurtistic:relaunch-onboarding'));
-            }
-          }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--accent-secondary,#FFCC00)]/30 bg-[var(--accent-secondary,#FFCC00)]/10 text-[var(--accent-secondary,#FFCC00)] hover:bg-[var(--accent-secondary,#FFCC00)]/20 text-xs font-bold transition-colors cursor-pointer"
-        >
-          <span className="material-symbols-outlined text-[16px]">tune</span>
-          <span>Personalizar Módulos</span>
-        </button>
       </div>
 
       {/* Seletor de Escopo: Cofre Pessoal vs Org Vault */}
