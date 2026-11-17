@@ -1,23 +1,34 @@
 # ACTIVE_STATE — Aurtistic & HUB LabDiv
 
-## Concluído na Frente 5 (Checkpoint 5 Final)
-1. **5 Correções Obrigatórias da Frente 4:**
-   - 4 Abas principais restritas (`Imagens`, `Edição`, `Textos`, `Camadas`); ferramentas auxiliares no header.
-   - Auto-divisão de texto longo em slides + 4 Presets de Diagramação Rápida em `StudioTextPanel.tsx`.
-   - Galeria vetorial completa em `StudioElementsGallery.tsx` e `canvas-renderer.ts` (setas, hexágono, triângulo, callouts e símbolos científicos).
-   - Modo Split-Screen 50/50 e Smart Snapping com Safe Zones em `StudioCanvasStage.tsx`.
-   - Amostragem real de luminância de pixels via `ctx.getImageData` com WCAG AAA real em `StudioDesignAssistant.tsx`.
-2. **Produtividade, Histórico, Exportação & Cofre (Frente 5):**
-   - `useStudioHistory.ts` (51 LOC): Pilha imutável Undo/Redo (50 estados).
-   - `useStudioKeyboard.ts` (98 LOC): Atalhos globais (`Ctrl+Z`, `Ctrl+Y`, `Del`, `Ctrl+D`, `Setas`, `[`, `]`, `Ctrl+S`, `Esc`).
-   - `studio-idb.ts` (101 LOC): IndexedDB nativo (`aurtistic_studio_v4`, store `draft_slots`, sanitização canônica).
-   - Migration `13_studio_draft_versions_v4.sql`: Tabela de versões com slots 1..3 e RLS por usuário/organização.
-   - `StudioDraftVersionsDrawer.tsx` (115 LOC): Gaveta de histórico de versões e comparação side-by-side.
-   - `studio-exporter.ts` (76 LOC): Motor de exportação PNG 1x, 2x Retina e upload estruturado para o Cofre.
-   - `StudioPublishModal.tsx` (203 LOC): Mockups Feed/Stories, gerador de legenda, exportação e despacho HUB.
-3. **Métricas & Validação:**
-   - Todos os 25 arquivos modularizados estritamente abaixo de 250 LOC (`OrganizationPostStudio.tsx` com 65 LOC).
-   - `npm run verify:silent` = 0 erros | `npm run build` = 100% sucesso na produção.
+## ✅ Concluído — Auditoria Final Frente 5 (Studio v4 Fechado)
+
+1. **Ponto 1 — PDF Multi-Página + Alt Text:**
+   - `studio-exporter.ts`: `exportCarouselToPdf()` com `jsPDF` (dynamic import, proporção exata por `ASPECT_DIMENSIONS`).
+   - `StudioPublishModal.tsx`: Botão `PDF (N pág.)` com estado `pdfLoading`.
+
+2. **Ponto 2 — `user_files_index` + Galeria de Modelos Dinâmica:**
+   - `src/app/api/studio/vault-save/route.ts`: UPSERT em `user_files_index` (album, category, visibility, is_directory).
+   - `src/app/api/studio/org-templates/route.ts`: Lê modelos da tabela por `relative_path LIKE '%/studio/modelos/%'`.
+
+3. **Ponto 3 — Re-hidratação de `resolvedUrl` + Preservação de Uploads Locais:**
+   - `studio-idb.ts`: `rehydrateDraft()` exportada — reconstrói `resolvedUrl` e `src` para camadas com `vaultRelativePath`.
+   - `sanitizeDraftForStorage()`: Uploads locais (sem `vaultRelativePath`) são preservados intactos com data URL.
+   - `StudioImagePanel.tsx`: Upload local agora usa `FileReader.readAsDataURL()` (data URL persistível) em vez de `URL.createObjectURL()` (blob temporário).
+   - `types.ts`: Campo `resolvedUrl?: string` adicionado em `StudioImageLayer`.
+
+4. **Ponto 4 — Guarda de Foco em Inputs (`useStudioKeyboard.ts`):**
+   - Verificação dupla: `document.activeElement` E `e.target`, cobrindo `input`, `textarea`, `select` e `isContentEditable`.
+   - Se digitando em campo: apenas `Ctrl+S` (salvar rascunho) é processado; todos os demais atalhos de canvas são bloqueados.
+
+5. **Ponto 5 — StudioContext ⇄ studio-idb + Supabase UPSERT:**
+   - `StudioContext.tsx`: Substituído `localStorage` provisório por `getAllDraftsFromIdb()` + sync com `/api/studio/drafts` (GET).
+   - `saveCurrentToDraftSlot()`: Grava em `saveDraftToIdb()` + POST para `/api/studio/drafts` (Supabase UPSERT `ON CONFLICT (user_id, org_id, slot_index)`).
+   - `src/app/api/studio/drafts/route.ts`: GET + POST com UPSERT correto na tabela `studio_draft_versions`.
+
+## Verificação Final
+- `npm run verify:full` → ✅ TSC + Lint + Server.js + Testes + Build Next.js (0 erros)
+- Build prod: 22 rotas (3 novas API Studio visíveis no manifest)
+- Todos os 25 arquivos do Studio abaixo de 250 LOC
 
 ## Próximo Passo
-- Validação do usuário do Checkpoint 5 e entrega final do módulo Post Studio v4.
+- Aplicar migration SQL `13_studio_draft_versions_v4.sql` no banco de produção via Dashboard do Supabase.
