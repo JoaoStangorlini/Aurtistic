@@ -17,9 +17,11 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
   const localTemplates = getOrgStudioTemplates(effectiveSlug, tokens);
 
   useEffect(() => {
-    fetch(`/api/studio/org-templates?org=${encodeURIComponent(effectiveSlug)}`)
+    fetch(`/api/studio/org-templates?orgSlug=${encodeURIComponent(effectiveSlug)}`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => { if (Array.isArray(data?.templates)) setServerTemplates(data.templates); })
+      .then((data) => {
+        if (Array.isArray(data?.templates)) setServerTemplates(data.templates);
+      })
       .catch(() => {});
   }, [effectiveSlug]);
 
@@ -96,9 +98,14 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
               className="p-4 rounded-2xl border border-white/15 bg-white/5 hover:border-[#FFCC00] hover:bg-white/10 transition-all cursor-pointer flex items-center justify-between gap-3 shadow-md"
             >
               <div>
-                <span className="text-[10px] font-mono text-amber-300 uppercase block">{tpl.aspectRatio}</span>
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <span className="text-[10px] font-mono text-amber-300 uppercase block">{tpl.aspectRatio}</span>
+                  {tpl.category === 'equipe' && (
+                    <span className="text-[9px] font-mono bg-amber-400/20 text-amber-300 px-1.5 py-0.2 rounded font-bold">COFRE DA EQUIPE</span>
+                  )}
+                </div>
                 <h3 className="text-sm font-bold text-white">{tpl.title}</h3>
-                <p className="text-xs text-slate-400 mt-1">Preset na IDV com tipografia e cores oficiais.</p>
+                <p className="text-xs text-slate-400 mt-1">{tpl.description || 'Preset na IDV com tipografia e cores oficiais.'}</p>
               </div>
               <button
                 type="button"

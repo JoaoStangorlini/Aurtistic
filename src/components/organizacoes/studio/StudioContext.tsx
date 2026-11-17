@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import type { AspectRatioKey, StudioStage, StudioActiveTab, StudioSlide, StudioLayer, StudioDraft, StudioTemplate, StudioTextLayer } from './types';
 import { useOrganizationBrand } from '../OrganizationBrandProvider';
 import { saveDraftToIdb, getAllDraftsFromIdb, rehydrateDraft } from '@/lib/studio/studio-idb';
+import { rehydrateStudioDraftAction } from '@/app/(dashboard)/organizacoes/studio-actions';
 
 interface StudioContextValue {
   orgSlug?: string | null;
@@ -168,14 +169,18 @@ export function StudioProvider({ children, orgSlug }: { children: React.ReactNod
   }, []);
 
   const loadDraft = useCallback((draft: StudioDraft) => {
-    const rehydrated = rehydrateDraft(draft);
-    setSlides(rehydrated.slides);
-    setAspectRatio(rehydrated.aspectRatio);
-    setActiveDraftSlot(rehydrated.slotIndex);
-    if (rehydrated.slides[0]) setActiveSlideId(rehydrated.slides[0].id);
+    const slug = orgSlug || tokens.themeId;
+    const local = rehydrateDraft(draft);
+    setSlides(local.slides);
+    setAspectRatio(local.aspectRatio);
+    setActiveDraftSlot(local.slotIndex);
+    if (local.slides[0]) setActiveSlideId(local.slides[0].id);
     setSelectedLayerId(null);
     setStage('editor');
-  }, []);
+    rehydrateStudioDraftAction(draft, slug).then((res) => {
+      if (res?.ok && res.draft) setSlides(res.draft.slides);
+    }).catch(() => {});
+  }, [orgSlug, tokens.themeId]);
 
   const loadTemplate = useCallback((tpl: StudioTemplate) => {
     setSlides(tpl.slides);
@@ -184,7 +189,9 @@ export function StudioProvider({ children, orgSlug }: { children: React.ReactNod
     if (tpl.slides[0]) setActiveSlideId(tpl.slides[0].id);
     setSelectedLayerId(null);
     setStage('editor');
-  }, []);
+    const slug = orgSlug || tokens.themeId;
+    rehydrateStudioDraftAction({ id: tpl.id, slotIndex: 1, title: tpl.title, aspectRatio: tpl.aspectRatio, updatedAt: '', slides: tpl.slides }, slug).then((r) => { if (r?.ok && r.draft) setSlides(r.draft.slides); }).catch(() => {});
+  }, [orgSlug, tokens.themeId]);
 
   const saveCurrentToDraftSlot = useCallback((slot: 1 | 2 | 3, title?: string) => {
     const newDraft: StudioDraft = {

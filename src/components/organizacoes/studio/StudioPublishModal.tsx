@@ -25,11 +25,13 @@ export function StudioPublishModal({ orgSlug }: { orgSlug?: string | null }) {
 
   const handleDownloadPng = (scale = 1) => {
     slides.forEach((slide, idx) => {
-      const dataUrl = exportSlideToPngDataUrl(slide, aspectRatio, scale, tokens);
-      const a = document.createElement('a');
-      a.href = dataUrl;
-      a.download = `${effectiveSlug}-slide-${idx + 1}-${scale}x.png`;
-      a.click();
+      setTimeout(() => {
+        const dataUrl = exportSlideToPngDataUrl(slide, aspectRatio, scale, tokens);
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `${effectiveSlug}-slide-${idx + 1}-${scale}x.png`;
+        a.click();
+      }, idx * 180);
     });
   };
 

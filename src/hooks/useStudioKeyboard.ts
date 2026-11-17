@@ -93,8 +93,8 @@ export function useStudioKeyboard(actions: StudioKeyboardActions) {
         return;
       }
 
-      // Movimentação por setas
-      const step = e.shiftKey ? 0.05 : 0.01;
+      // Movimentação por setas (precisão: 0.001 ~1px, Shift: 0.01 ~10px em canvas de 1080px)
+      const step = e.shiftKey ? 0.01 : 0.001;
       if (e.key === 'ArrowLeft') { e.preventDefault(); actions.onMoveLayer(actions.selectedLayer.id, -step, 0); }
       if (e.key === 'ArrowRight') { e.preventDefault(); actions.onMoveLayer(actions.selectedLayer.id, step, 0); }
       if (e.key === 'ArrowUp') { e.preventDefault(); actions.onMoveLayer(actions.selectedLayer.id, 0, -step); }

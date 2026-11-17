@@ -13,7 +13,7 @@
 - **`src/app/(dashboard)/loading.tsx`** (7L): L4:DashboardLoading
 - **`src/app/(dashboard)/organizacoes/actions.ts`** (1404L): L148:ensureEcosystemOrganizationsSeeded | L223:getUserOrganizationsAction | L410:syncHubOrganizationsAction | L527:getOrganizationDetailsAction | L684:updateMemberCapacityAction | L705:createOrganizationInviteAction | L738:getOrganizationTaskTemplatesAction | L752:createOrganizationTaskTemplateAction | L782:convertMeetingAgendaItemToTaskAction | L870:applyPlaybookToTasksAction | L940:getOrganizationMeetingsAction | L958:createOrganizationMeetingAction | L995:getMeetingDetailsAction | L1026:updateMeetingNotesAction | L1078:submitMeetingReviewAction | L1113:publishMeetingAtaAction | L1139:createOrganizationAction | L1179:getOrganizationInvitePreviewAction | L1203:joinOrganizationByCodeAction | L1367:getOrCreateActiveInviteAction
 - **`src/app/(dashboard)/organizacoes/page.tsx`** (15L): L5:OrganizacoesPage
-- **`src/app/(dashboard)/organizacoes/studio-actions.ts`** (418L): L8:StudioGalleryMediaItem | L231:getStudioGalleryMediaAction
+- **`src/app/(dashboard)/organizacoes/studio-actions.ts`** (464L): L8:StudioGalleryMediaItem | L231:getStudioGalleryMediaAction | L419:rehydrateStudioDraftAction
 - **`src/app/(dashboard)/servidor/actions.ts`** (1575L): L43:EcosystemLinksPatch | L63:syncUserFileIndexAction | L236:updateFileEcosystemLinksAction | L272:reconcileFolderIndexAction | L326:adminListStorageUsersAction | L346:adminUpdateGovernanceAction | L393:syncLegacyPortfolioCatalogAction | L488:refreshTenantTicketAction | L530:createShareLinkAction | L585:deleteShareLinkAction | L608:cascadeFolderUpdateAction | L689:updateStoragePublicSlugAction | L714:refreshOrganizationTicketAction | L741:requestEventQuotaBoostAction | L787:TagFolderDevicesInput | L799:tagFolderDevicesAction | L866:requestOrgVaultAccessAction | L889:getGalleryTimelinePageAction | L1138:getGalleryAlbumsAction | L1235:getPhotoExifDetailAction | L1258:checkBackupHashesAction | L1290:recordBackupProxyMetadataAction | L1326:syncShortcutInSupabaseAction | L1408:getShortcutTargetFallbackEntriesAction | L1465:removeShortcutFromSupabaseAction | L1495:createOrgFolderShortcutAction | L1544:deleteOrgFolderShortcutAction
 - **`src/app/(dashboard)/servidor/page.tsx`** (245L): L11:ServidorPage
 - **`src/app/[username]/SharedWorkspaceClient.tsx`** (246L): L21:SharedWorkspaceClient
@@ -25,9 +25,9 @@
 - **`src/app/api/meetings/analyze/route.ts`** (92L): L6:POST
 - **`src/app/api/meetings/transcribe-chunk/route.ts`** (63L): L6:POST
 - **`src/app/api/org/[slug]/ops-state/route.ts`** (165L): L8:corsHeaders | L18:getHubBaseUrl | L22:signServerToServer | L34:OPTIONS | L41:GET | L101:POST
-- **`src/app/api/studio/drafts/route.ts`** (67L): L5:GET | L38:POST
-- **`src/app/api/studio/org-templates/route.ts`** (32L): L5:GET
-- **`src/app/api/studio/vault-save/route.ts`** (45L): L5:POST
+- **`src/app/api/studio/drafts/route.ts`** (77L): L5:GET | L43:POST
+- **`src/app/api/studio/org-templates/route.ts`** (73L): L8:GET
+- **`src/app/api/studio/vault-save/route.ts`** (110L): L6:POST
 - **`src/app/auth/actions.ts`** (318L): L19:linkExistingAccountAction | L241:createAccountFromHubAction | L272:unlinkHubAccountAction
 - **`src/app/auth/callback/route.ts`** (60L): L6:GET
 - **`src/app/auth/hub-callback/route.ts`** (347L): L14:GET
@@ -124,22 +124,22 @@
 - **`src/components/organizacoes/studio/OrganizationPostStudio.tsx`** (66L): L8:OrganizationPostStudioProps | L42:StudioStageRouter | L57:OrganizationPostStudio
 - **`src/components/organizacoes/studio/StudioCanvasStage.tsx`** (161L): L10:StudioCanvasStage
 - **`src/components/organizacoes/studio/StudioCarouselStrip.tsx`** (115L): L11:SlideThumbnail | L56:StudioCarouselStrip
-- **`src/components/organizacoes/studio/StudioContext.tsx`** (242L): L48:createDefaultSlide | L80:StudioProvider | L237:useStudio
+- **`src/components/organizacoes/studio/StudioContext.tsx`** (249L): L49:createDefaultSlide | L81:StudioProvider | L244:useStudio
 - **`src/components/organizacoes/studio/StudioDesignAssistant.tsx`** (155L): L8:StudioDesignAssistantProps | L13:StudioDesignAssistant
-- **`src/components/organizacoes/studio/StudioDraftVersionsDrawer.tsx`** (117L): L8:StudioDraftVersionsDrawerProps | L13:StudioDraftVersionsDrawer
+- **`src/components/organizacoes/studio/StudioDraftVersionsDrawer.tsx`** (174L): L9:StudioDraftVersionsDrawerProps | L14:StudioDraftVersionsDrawer
 - **`src/components/organizacoes/studio/StudioEditionPanel.tsx`** (186L): L8:StudioEditionPanel
 - **`src/components/organizacoes/studio/StudioElementsGallery.tsx`** (126L): L11:StudioElementsGallery
 - **`src/components/organizacoes/studio/StudioImagePanel.tsx`** (231L): L10:StudioImagePanel
-- **`src/components/organizacoes/studio/StudioLauncherView.tsx`** (185L): L10:StudioLauncherView
+- **`src/components/organizacoes/studio/StudioLauncherView.tsx`** (192L): L10:StudioLauncherView
 - **`src/components/organizacoes/studio/StudioLayersPanel.tsx`** (179L): L8:StudioLayersPanel
 - **`src/components/organizacoes/studio/StudioMaskBrushModal.tsx`** (214L): L10:StudioMaskBrushModal
 - **`src/components/organizacoes/studio/StudioPaletteCenter.tsx`** (168L): L9:StudioPaletteCenter
-- **`src/components/organizacoes/studio/StudioPublishModal.tsx`** (214L): L9:StudioPublishModal
+- **`src/components/organizacoes/studio/StudioPublishModal.tsx`** (216L): L9:StudioPublishModal
 - **`src/components/organizacoes/studio/StudioTextPanel.tsx`** (236L): L11:StudioTextPanel
 - **`src/components/organizacoes/studio/StudioToolbarTabs.tsx`** (45L): L15:StudioToolbarTabs
 - **`src/components/organizacoes/studio/StudioWorkspaceView.tsx`** (177L): L21:StudioWorkspaceView
 - **`src/components/organizacoes/studio/studio-presets.ts`** (102L): L5:getOrgStudioTemplates
-- **`src/components/organizacoes/studio/types.ts`** (183L): L2:AspectRatioKey | L4:AspectDimension | L18:StudioLayerFilterConfig | L38:StudioLayerBase | L53:StudioImageLayer | L67:StudioTextLayer | L84:StudioShapeType | L100:StudioShapeLayer | L110:StudioMathLayer | L117:LogoPreset | L119:StudioLogoLayer | L127:StudioLayer | L134:StudioSlide | L149:StudioDraft | L159:StudioTemplate | L170:StudioStage | L171:StudioActiveTab | L173:StudioPublishPayload
+- **`src/components/organizacoes/studio/types.ts`** (184L): L2:AspectRatioKey | L4:AspectDimension | L18:StudioLayerFilterConfig | L38:StudioLayerBase | L53:StudioImageLayer | L67:StudioTextLayer | L84:StudioShapeType | L100:StudioShapeLayer | L110:StudioMathLayer | L117:LogoPreset | L119:StudioLogoLayer | L127:StudioLayer | L134:StudioSlide | L149:StudioDraft | L159:StudioTemplate | L171:StudioStage | L172:StudioActiveTab | L174:StudioPublishPayload
 - **`src/components/portfolio/AurtisticGalleryGrid.tsx`** (1522L): L13:AurtisticGalleryGridProps | L79:resolveItemDeviceInfo | L114:resolveItemLensInfo | L129:parseItemTimestamp | L138:AurtisticGalleryGrid
 - **`src/components/portfolio/InstagramMuralSection.tsx`** (527L): L18:parseInstagramPostUrl | L37:buildInstagramEmbedSrc | L42:LazyInstagramEmbedFrame | L96:InstagramMuralSection
 - **`src/components/portfolio/PhotoInspectModal.tsx`** (463L): L10:PhotoInspectItem | L16:PhotoInspectModalProps | L26:PhotoInspectModal
@@ -234,7 +234,7 @@
 - **`supabase/migrations/newsqls/10_org_idv_and_post_studio_presets.sql`** (165L): L30:public.create_new_organization
 - **`supabase/migrations/newsqls/11_gallery_timeline_and_smart_backup.sql`** (113L): L15:public.try_parse_exif_timestamp | L60:public.sync_user_files_captured_at | L93:trg_sync_user_files_captured_at
 - **`supabase/migrations/newsqls/12_seed_hub_organizations_and_sso.sql`** (155L): L95:public.ensure_sso_member
-- **`supabase/migrations/newsqls/13_studio_draft_versions_v4.sql`** (33L): L5:public.studio_draft_versions
+- **`supabase/migrations/newsqls/13_studio_draft_versions_v4.sql`** (46L): L5:public.studio_draft_versions
 - **`supabase/migrations/newsqls/1_dynamic_columns.sql`** (84L): L4:public.task_columns
 - **`supabase/migrations/newsqls/2_aurtistic_planner.sql`** (42L): L4:public.user_profiles
 - **`supabase/migrations/newsqls/tabela inicial.sql`** (324L): L9:tasks

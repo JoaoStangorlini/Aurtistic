@@ -159,12 +159,13 @@ export interface StudioDraft {
 export interface StudioTemplate {
   id: string;
   title: string;
-  category: 'modelo' | 'pronto';
+  category: 'modelo' | 'pronto' | 'equipe';
   orgSlug: string;
   aspectRatio: AspectRatioKey;
   previewUrl: string;
   slides: StudioSlide[];
   badgeTag?: string;
+  description?: string;
 }
 
 export type StudioStage = 'launcher' | 'editor' | 'publish';

@@ -34,7 +34,7 @@ export async function exportCarouselToPdf(
   const doc = new jsPDF({ orientation, unit: 'mm', format: [mmW, mmH] });
   for (let i = 0; i < slides.length; i++) {
     if (i > 0) doc.addPage([mmW, mmH], orientation);
-    const dataUrl = exportSlideToPngDataUrl(slides[i], aspectRatio, 1, tokens);
+    const dataUrl = exportSlideToPngDataUrl(slides[i], aspectRatio, 2, tokens);
     doc.addImage(dataUrl, 'PNG', 0, 0, mmW, mmH, undefined, 'FAST');
   }
   doc.save(`carrossel-studio-${Date.now()}.pdf`);

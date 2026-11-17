@@ -5,7 +5,7 @@
 CREATE TABLE IF NOT EXISTS public.studio_draft_versions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  org_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE,
+  org_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
   slot_index INT NOT NULL CHECK (slot_index BETWEEN 1 AND 3),
   title TEXT NOT NULL DEFAULT 'Rascunho',
   aspect_ratio TEXT NOT NULL DEFAULT '1:1',
@@ -30,3 +30,16 @@ CREATE POLICY "Usuários gerenciam seus próprios rascunhos de studio"
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Org members can view org drafts" ON public.studio_draft_versions;
+CREATE POLICY "Org members can view org drafts"
+  ON public.studio_draft_versions
+  FOR SELECT
+  TO authenticated
+  USING (
+    auth.uid() = user_id OR
+    EXISTS (
+      SELECT 1 FROM public.organization_members om
+      WHERE om.organization_id = studio_draft_versions.org_id
+        AND om.user_id = auth.uid()
+    )
+  );

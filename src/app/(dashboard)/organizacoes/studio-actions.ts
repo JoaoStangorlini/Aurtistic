@@ -415,3 +415,49 @@ export async function getStudioGalleryMediaAction(input?: {
     };
   }
 }
+
+export async function rehydrateStudioDraftAction(
+  draft: import('@/components/organizacoes/studio/types').StudioDraft,
+  orgSlug: string
+): Promise<{ ok: boolean; draft: import('@/components/organizacoes/studio/types').StudioDraft }> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+    const userId = user?.id || 'studio-vault-user';
+
+    const rehydratedSlides = draft.slides.map((slide) => ({
+      ...slide,
+      layers: slide.layers.map((layer) => {
+        if (layer.type !== 'image') return layer;
+        const img = layer as import('@/components/organizacoes/studio/types').StudioImageLayer;
+        if (!img.vaultRelativePath) return img;
+
+        if (img.vaultRelativePath.startsWith('http') || img.vaultRelativePath.startsWith('/galeria') || img.vaultRelativePath.startsWith('/show') || img.vaultRelativePath.startsWith('/Logo')) {
+          return { ...img, resolvedUrl: img.vaultRelativePath, src: img.vaultRelativePath };
+        }
+
+        try {
+          const signed = signEdgeTenantTicket({
+            userId,
+            scopeType: 'org',
+            orgSlug,
+            role: 'member',
+            purpose: 'share',
+            allowedPaths: [img.vaultRelativePath],
+            readOnly: true,
+            allowDownload: true,
+            ttlMs: 24 * 60 * 60 * 1000,
+          });
+          const streamUrl = buildTenantStreamUrl(img.vaultRelativePath, signed.ticket);
+          return { ...img, resolvedUrl: streamUrl, src: streamUrl };
+        } catch {
+          return img;
+        }
+      }),
+    }));
+
+    return { ok: true, draft: { ...draft, slides: rehydratedSlides } };
+  } catch {
+    return { ok: true, draft };
+  }
+}

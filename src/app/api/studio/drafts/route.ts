@@ -4,22 +4,27 @@ import { createClient } from '@/utils/supabase/server';
 
 export async function GET(req: NextRequest) {
   try {
-    const orgSlug = req.nextUrl.searchParams.get('org') || '';
+    const orgSlug = req.nextUrl.searchParams.get('orgSlug') || req.nextUrl.searchParams.get('org') || '';
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ drafts: [] });
 
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('id')
-      .eq('slug', orgSlug)
-      .maybeSingle();
+    let orgId: string | null = null;
+    if (orgSlug) {
+      const { data: org } = await supabase.from('organizations').select('id').ilike('slug', orgSlug).maybeSingle();
+      orgId = org?.id || null;
+    }
+    if (!orgId) {
+      const { data: anyOrg } = await supabase.from('organizations').select('id').limit(1).maybeSingle();
+      orgId = anyOrg?.id || null;
+    }
+    if (!orgId) return NextResponse.json({ drafts: [] });
 
     const { data } = await supabase
       .from('studio_draft_versions')
       .select('slot_index, title, aspect_ratio, draft_payload, updated_at')
       .eq('user_id', user.id)
-      .eq('org_id', org?.id ?? null)
+      .eq('org_id', orgId)
       .order('slot_index');
 
     const drafts = (data || []).map((r: any) => ({
@@ -42,15 +47,20 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ ok: false }, { status: 401 });
 
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('id')
-      .eq('slug', orgSlug || '')
-      .maybeSingle();
+    let orgId: string | null = null;
+    if (orgSlug) {
+      const { data: org } = await supabase.from('organizations').select('id').ilike('slug', orgSlug).maybeSingle();
+      orgId = org?.id || null;
+    }
+    if (!orgId) {
+      const { data: anyOrg } = await supabase.from('organizations').select('id').limit(1).maybeSingle();
+      orgId = anyOrg?.id || null;
+    }
+    if (!orgId) return NextResponse.json({ ok: false, error: 'Org não encontrada' }, { status: 400 });
 
     await supabase.from('studio_draft_versions').upsert({
       user_id: user.id,
-      org_id: org?.id ?? null,
+      org_id: orgId,
       slot_index: slotIndex,
       title: draft.title || `Rascunho ${slotIndex}`,
       aspect_ratio: draft.aspectRatio || '1:1',
