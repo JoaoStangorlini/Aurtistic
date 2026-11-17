@@ -1,42 +1,46 @@
 // Este programa é um software livre (Licença AGPLv3)
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStudio } from './StudioContext';
 import { useOrganizationBrand } from '../OrganizationBrandProvider';
 import { getOrgStudioTemplates } from './studio-presets';
-import type { AspectRatioKey } from './types';
+import type { AspectRatioKey, StudioTemplate } from './types';
 
 export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
   const { drafts, loadDraft, loadTemplate, resetToBlank } = useStudio();
   const { tokens } = useOrganizationBrand();
-  const [replaceSlotModal, setReplaceSlotModal] = useState<AspectRatioKey | null>(null);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const [serverTemplates, setServerTemplates] = useState<StudioTemplate[]>([]);
 
   const effectiveSlug = orgSlug || tokens.themeId;
-  const orgTemplates = getOrgStudioTemplates(effectiveSlug, tokens);
+  const localTemplates = getOrgStudioTemplates(effectiveSlug, tokens);
 
-  const handleStartBlank = (aspect: AspectRatioKey) => {
+  useEffect(() => {
+    fetch(`/api/studio/org-templates?org=${encodeURIComponent(effectiveSlug)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (Array.isArray(data?.templates)) setServerTemplates(data.templates); })
+      .catch(() => {});
+  }, [effectiveSlug]);
+
+  const allTemplates = [...localTemplates, ...serverTemplates];
+
+  const handleActionWithSlotCheck = (action: () => void) => {
     if (drafts.length >= 3) {
-      setReplaceSlotModal(aspect);
+      setPendingAction(() => action);
     } else {
-      resetToBlank(aspect);
+      action();
     }
   };
 
   return (
     <div className="space-y-8 p-4 md:p-6 max-w-5xl mx-auto animate-in fade-in">
-      {/* Cabeçalho Ambientado na IDV */}
+      {/* Cabeçalho */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-5">
         <div>
-          <span className="text-xs font-mono uppercase tracking-widest text-[#FFCC00]">
-            {tokens.badgeTag} • HUB STUDIO
-          </span>
-          <h1 className="text-2xl md:text-3xl font-black text-white mt-1">
-            Criador Visual & Publicações
-          </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Escolha um dos seus 3 rascunhos, um modelo da organização ou comece do zero.
-          </p>
+          <span className="text-xs font-mono uppercase tracking-widest text-[#FFCC00]">{tokens.badgeTag} • HUB STUDIO</span>
+          <h1 className="text-2xl md:text-3xl font-black text-white mt-1">Criador Visual & Publicações</h1>
+          <p className="text-xs text-slate-400 mt-0.5">Escolha um dos seus 3 rascunhos, um modelo da organização ou comece do zero.</p>
         </div>
       </div>
 
@@ -54,9 +58,7 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
                 key={slot}
                 onClick={() => draft && loadDraft(draft)}
                 className={`p-4 rounded-2xl border transition-all flex flex-col justify-between min-h-[140px] ${
-                  draft
-                    ? 'border-white/20 bg-white/5 hover:border-[#FFCC00] hover:bg-white/10 cursor-pointer shadow-md'
-                    : 'border-dashed border-white/10 bg-transparent text-slate-500'
+                  draft ? 'border-white/20 bg-white/5 hover:border-[#FFCC00] hover:bg-white/10 cursor-pointer shadow-md' : 'border-dashed border-white/10 bg-transparent text-slate-500'
                 }`}
               >
                 <div>
@@ -87,10 +89,10 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
           <span>Modelos Pré-Prontos da Organização ({effectiveSlug})</span>
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {orgTemplates.map((tpl) => (
+          {allTemplates.map((tpl) => (
             <div
               key={tpl.id}
-              onClick={() => loadTemplate(tpl)}
+              onClick={() => handleActionWithSlotCheck(() => loadTemplate(tpl))}
               className="p-4 rounded-2xl border border-white/15 bg-white/5 hover:border-[#FFCC00] hover:bg-white/10 transition-all cursor-pointer flex items-center justify-between gap-3 shadow-md"
             >
               <div>
@@ -127,7 +129,7 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
             <button
               key={fmt.key}
               type="button"
-              onClick={() => handleStartBlank(fmt.key)}
+              onClick={() => handleActionWithSlotCheck(() => resetToBlank(fmt.key))}
               className="p-4 rounded-2xl border border-white/10 bg-white/5 hover:border-[#FFCC00] hover:bg-white/10 transition-all flex flex-col items-center justify-center gap-2 text-center cursor-pointer shadow-sm group"
             >
               <span className="material-symbols-outlined text-[28px] text-slate-400 group-hover:text-[#FFCC00] transition-colors">
@@ -142,13 +144,13 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
         </div>
       </div>
 
-      {/* Modal de Substituição de Slot se Cheio */}
-      {replaceSlotModal && (
+      {/* Modal de Substituição de Slot se Cheio (3/3) */}
+      {pendingAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <div className="bg-[#0f172a] border border-amber-400/40 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
             <h3 className="text-base font-bold text-white">Slots de Rascunho Cheios (3/3)</h3>
             <p className="text-xs text-slate-300">
-              Você atingiu o limite de 3 rascunhos ativos. Selecione qual slot deseja sobrescrever:
+              Você atingiu o limite de 3 rascunhos ativos. Selecione qual slot deseja sobrescrever para carregar o novo post:
             </p>
             <div className="space-y-2">
               {drafts.map((d) => (
@@ -156,8 +158,9 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
                   key={d.slotIndex}
                   type="button"
                   onClick={() => {
-                    resetToBlank(replaceSlotModal);
-                    setReplaceSlotModal(null);
+                    const action = pendingAction;
+                    setPendingAction(null);
+                    action();
                   }}
                   className="w-full p-3 rounded-xl border border-white/15 bg-white/5 hover:border-amber-400 text-left text-xs font-bold text-white flex justify-between"
                 >
@@ -168,7 +171,7 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
             </div>
             <button
               type="button"
-              onClick={() => setReplaceSlotModal(null)}
+              onClick={() => setPendingAction(null)}
               className="w-full py-2 text-xs text-slate-400 hover:text-white"
             >
               Cancelar

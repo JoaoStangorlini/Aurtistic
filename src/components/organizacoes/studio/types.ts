@@ -16,23 +16,23 @@ export const ASPECT_DIMENSIONS: Record<AspectRatioKey, AspectDimension> = {
 };
 
 export interface StudioLayerFilterConfig {
-  brightness: number; // 0..200 (100 = default)
-  contrast: number; // 0..200 (100 = default)
-  saturation: number; // 0..200 (100 = default)
-  blur: number; // 0..50 (0 = default)
-  grayscale: number; // 0..100 (0 = default)
-  sepia: number; // 0..100 (0 = default)
+  brightness: number;   // 0..200 (100 = default)
+  contrast: number;     // 0..200 (100 = default)
+  saturation: number;   // 0..200 (100 = default)
+  blur: number;         // 0..50 (0 = default)
+  grayscale: number;    // 0..100 (0 = default)
+  sepia: number;        // 0..100 (0 = default)
+  overlayDark: number;  // 0..85 — overlay escuro sobre a imagem/camada
+  temperature: number;  // -50..50 (negativo=frio/azul, positivo=quente/laranja)
+  vignette: number;     // 0..100 — vigência de borda
   targetMaskAreaOnly?: boolean;
+  isCutoutMask?: boolean; // true = recorte total, false = edição seletiva
 }
 
 export const DEFAULT_FILTERS: StudioLayerFilterConfig = {
-  brightness: 100,
-  contrast: 100,
-  saturation: 100,
-  blur: 0,
-  grayscale: 0,
-  sepia: 0,
-  targetMaskAreaOnly: false,
+  brightness: 100, contrast: 100, saturation: 100, blur: 0,
+  grayscale: 0, sepia: 0, overlayDark: 0, temperature: 0, vignette: 0,
+  targetMaskAreaOnly: false, isCutoutMask: false,
 };
 
 export interface StudioLayerBase {
@@ -60,6 +60,7 @@ export interface StudioImageLayer extends StudioLayerBase {
   cropY: number; // 0..1
   cropWidth: number; // 0..1
   cropHeight: number; // 0..1
+  vaultRelativePath?: string;
 }
 
 export interface StudioTextLayer extends StudioLayerBase {
@@ -95,11 +96,22 @@ export interface StudioMathLayer extends StudioLayerBase {
   color: string;
 }
 
+export type LogoPreset = 'show-da-fisica-tricolor' | 'ifusp' | 'org-logo' | 'custom';
+
+export interface StudioLogoLayer extends StudioLayerBase {
+  type: 'logo';
+  preset: LogoPreset;
+  src?: string;           // para 'custom'
+  preserveAspect: boolean;
+  tintColor?: string;
+}
+
 export type StudioLayer =
   | StudioImageLayer
   | StudioTextLayer
   | StudioShapeLayer
-  | StudioMathLayer;
+  | StudioMathLayer
+  | StudioLogoLayer;
 
 export interface StudioSlide {
   id: string;
@@ -136,7 +148,7 @@ export interface StudioTemplate {
 }
 
 export type StudioStage = 'launcher' | 'editor' | 'publish';
-export type StudioActiveTab = 'images' | 'edition' | 'texts' | 'layers';
+export type StudioActiveTab = 'images' | 'edition' | 'texts' | 'layers' | 'elements' | 'palette' | 'assistant';
 
 export interface StudioPublishPayload {
   title: string;

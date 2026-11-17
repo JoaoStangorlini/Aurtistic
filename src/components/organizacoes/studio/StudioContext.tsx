@@ -2,16 +2,18 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { AspectRatioKey, StudioStage, StudioActiveTab, StudioSlide, StudioLayer, StudioDraft, StudioTemplate } from './types';
+import type { AspectRatioKey, StudioStage, StudioActiveTab, StudioSlide, StudioLayer, StudioDraft, StudioTemplate, StudioTextLayer } from './types';
 import { useOrganizationBrand } from '../OrganizationBrandProvider';
 
 interface StudioContextValue {
+  orgSlug?: string | null;
   stage: StudioStage;
   setStage: (s: StudioStage) => void;
   activeTab: StudioActiveTab;
   setActiveTab: (t: StudioActiveTab) => void;
   aspectRatio: AspectRatioKey;
   setAspectRatio: (a: AspectRatioKey) => void;
+  adaptFormatTo: (newAspect: AspectRatioKey) => void;
   slides: StudioSlide[];
   activeSlideId: string;
   activeSlide: StudioSlide;
@@ -35,6 +37,9 @@ interface StudioContextValue {
   resetToBlank: (aspect: AspectRatioKey) => void;
   maskModalLayerId: string | null;
   setMaskModalLayerId: (id: string | null) => void;
+  activeOverlay: 'none' | 'thirds' | 'golden' | 'diagonals';
+  setActiveOverlay: (ov: 'none' | 'thirds' | 'golden' | 'diagonals') => void;
+  fillEventPlaceholders: (replacements: Record<string, string>) => void;
 }
 
 const StudioContext = createContext<StudioContextValue | null>(null);
@@ -45,7 +50,7 @@ function createDefaultSlide(id: string, aspect: AspectRatioKey, brand: ReturnTyp
     title: 'Tela 1',
     aspectRatio: aspect,
     backgroundColor: brand.bgApp || '#07090e',
-    globalFilters: { brightness: 100, contrast: 105, saturation: 105, blur: 0, grayscale: 0, sepia: 0 },
+    globalFilters: { brightness: 100, contrast: 105, saturation: 105, blur: 0, grayscale: 0, sepia: 0, overlayDark: 0, temperature: 0, vignette: 0 },
     showBrandBadge: true,
     brandBadgeText: brand.badgeTag,
     layers: [
@@ -56,11 +61,7 @@ function createDefaultSlide(id: string, aspect: AspectRatioKey, brand: ReturnTyp
         visible: true,
         locked: false,
         opacity: 1,
-        x: 0.1,
-        y: 0.12,
-        width: 0.8,
-        height: 0.2,
-        rotation: 0,
+        x: 0.1, y: 0.12, width: 0.8, height: 0.2, rotation: 0,
         text: brand.defaultPostTitle || 'NOVIDADE NA EQUIPE',
         fontFamily: brand.fontDisplay,
         fontSize: 64,
@@ -86,6 +87,7 @@ export function StudioProvider({ children, orgSlug }: { children: React.ReactNod
   const [maskModalLayerId, setMaskModalLayerId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<StudioDraft[]>([]);
   const [activeDraftSlot, setActiveDraftSlot] = useState<1 | 2 | 3 | null>(null);
+  const [activeOverlay, setActiveOverlay] = useState<'none' | 'thirds' | 'golden' | 'diagonals'>('none');
 
   useEffect(() => {
     try {
@@ -104,11 +106,13 @@ export function StudioProvider({ children, orgSlug }: { children: React.ReactNod
     setSlides((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }, []);
 
+  const adaptFormatTo = useCallback((newAspect: AspectRatioKey) => {
+    setAspectRatio(newAspect);
+    setSlides((prev) => prev.map((s) => ({ ...s, aspectRatio: newAspect })));
+  }, []);
+
   const addSlide = useCallback(() => {
-    const newSlide: StudioSlide = {
-      ...createDefaultSlide(`slide-${Date.now()}`, aspectRatio, tokens),
-      title: `Tela ${slides.length + 1}`,
-    };
+    const newSlide = { ...createDefaultSlide(`slide-${Date.now()}`, aspectRatio, tokens), title: `Tela ${slides.length + 1}` };
     setSlides((prev) => [...prev, newSlide]);
     setActiveSlideId(newSlide.id);
   }, [slides.length, aspectRatio, tokens]);
@@ -152,11 +156,25 @@ export function StudioProvider({ children, orgSlug }: { children: React.ReactNod
       ...target,
       id: `${target.id}-mask-top-${Date.now()}`,
       name: `${target.name} (Máscara Topo)`,
-      filters: { ...(target.filters || { brightness: 100, contrast: 100, saturation: 100, blur: 0, grayscale: 0, sepia: 0 }), targetMaskAreaOnly: true },
+      filters: { ...(target.filters || { brightness: 100, contrast: 100, saturation: 100, blur: 0, grayscale: 0, sepia: 0, overlayDark: 0, temperature: 0, vignette: 0 }), targetMaskAreaOnly: true, isCutoutMask: true },
     };
     updateSlide(activeSlide.id, { layers: [...activeSlide.layers, copy] });
     setSelectedLayerId(copy.id);
   }, [activeSlide, updateSlide]);
+
+  const fillEventPlaceholders = useCallback((replacements: Record<string, string>) => {
+    setSlides((prev) => prev.map((slide) => ({
+      ...slide,
+      layers: slide.layers.map((layer) => {
+        if (layer.type !== 'text') return layer;
+        let txt = (layer as StudioTextLayer).text;
+        for (const [k, v] of Object.entries(replacements)) {
+          if (v) txt = txt.split(`{${k}}`).join(v);
+        }
+        return { ...layer, text: txt } as StudioTextLayer;
+      }),
+    })));
+  }, []);
 
   const loadDraft = useCallback((draft: StudioDraft) => {
     setSlides(draft.slides);
@@ -209,11 +227,11 @@ export function StudioProvider({ children, orgSlug }: { children: React.ReactNod
   return (
     <StudioContext.Provider
       value={{
-        stage, setStage, activeTab, setActiveTab, aspectRatio, setAspectRatio,
+        orgSlug, stage, setStage, activeTab, setActiveTab, aspectRatio, setAspectRatio, adaptFormatTo,
         slides, activeSlideId, activeSlide, setActiveSlideId, selectedLayerId, selectedLayer, setSelectedLayerId,
         updateSlide, addSlide, removeSlide, addLayer, updateLayer, removeLayer, reorderLayers, duplicateLayerWithMaskOnTop,
         drafts, activeDraftSlot, loadDraft, loadTemplate, saveCurrentToDraftSlot, resetToBlank,
-        maskModalLayerId, setMaskModalLayerId,
+        maskModalLayerId, setMaskModalLayerId, activeOverlay, setActiveOverlay, fillEventPlaceholders,
       }}
     >
       {children}

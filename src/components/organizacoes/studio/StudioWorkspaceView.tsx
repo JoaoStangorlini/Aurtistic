@@ -9,6 +9,9 @@ import { StudioImagePanel } from './StudioImagePanel';
 import { StudioEditionPanel } from './StudioEditionPanel';
 import { StudioTextPanel } from './StudioTextPanel';
 import { StudioLayersPanel } from './StudioLayersPanel';
+import { StudioElementsGallery } from './StudioElementsGallery';
+import { StudioPaletteCenter } from './StudioPaletteCenter';
+import { StudioDesignAssistant } from './StudioDesignAssistant';
 import { StudioCanvasStage } from './StudioCanvasStage';
 import { StudioCarouselStrip } from './StudioCarouselStrip';
 import { StudioMaskBrushModal } from './StudioMaskBrushModal';
@@ -19,9 +22,11 @@ export function StudioWorkspaceView() {
     setStage,
     activeTab,
     aspectRatio,
-    setAspectRatio,
+    adaptFormatTo,
     saveCurrentToDraftSlot,
     activeDraftSlot,
+    activeOverlay,
+    setActiveOverlay,
   } = useStudio();
 
   return (
@@ -38,18 +43,17 @@ export function StudioWorkspaceView() {
             <span>Tela Inicial</span>
           </button>
 
-          {/* Seletor de Aspect Ratio */}
+          {/* Seletor de Aspect Ratio com Format Adapt */}
           <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/10">
             {(Object.keys(ASPECT_DIMENSIONS) as AspectRatioKey[]).map((key) => (
               <button
                 key={key}
                 type="button"
-                onClick={() => setAspectRatio(key)}
+                onClick={() => adaptFormatTo(key)}
                 className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  aspectRatio === key
-                    ? 'bg-[#FFCC00] text-[#121212] shadow-xs'
-                    : 'text-slate-400 hover:text-white'
+                  aspectRatio === key ? 'bg-[#FFCC00] text-[#121212] shadow-xs' : 'text-slate-400 hover:text-white'
                 }`}
+                title={`Adaptar formato para ${key}`}
               >
                 {key}
               </button>
@@ -81,18 +85,23 @@ export function StudioWorkspaceView() {
       {/* Grid de Edição Principal: Abas à esquerda e Canvas + Carrossel à direita */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Coluna da Esquerda (Painéis de Ferramentas) */}
-        <div className="lg:col-span-5 xl:col-span-4 space-y-3 flex flex-col">
+        <div className="lg:col-span-5 xl:col-span-5 space-y-3 flex flex-col">
           <StudioToolbarTabs />
-          <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 min-h-[380px] shadow-sm">
+          <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 min-h-[400px] shadow-sm">
             {activeTab === 'images' && <StudioImagePanel />}
             {activeTab === 'edition' && <StudioEditionPanel />}
             {activeTab === 'texts' && <StudioTextPanel />}
             {activeTab === 'layers' && <StudioLayersPanel />}
+            {activeTab === 'elements' && <StudioElementsGallery />}
+            {activeTab === 'palette' && <StudioPaletteCenter />}
+            {activeTab === 'assistant' && (
+              <StudioDesignAssistant activeOverlay={activeOverlay} onToggleOverlay={setActiveOverlay} />
+            )}
           </div>
         </div>
 
         {/* Coluna da Direita (Canvas Central + Tira de Slides) */}
-        <div className="lg:col-span-7 xl:col-span-8 flex flex-col items-center justify-between bg-black/40 border border-white/10 rounded-2xl p-4 shadow-inner min-h-[440px]">
+        <div className="lg:col-span-7 xl:col-span-7 flex flex-col items-center justify-between bg-black/40 border border-white/10 rounded-2xl p-4 shadow-inner min-h-[440px]">
           <div className="w-full flex-1 flex items-center justify-center">
             <StudioCanvasStage />
           </div>
@@ -105,4 +114,3 @@ export function StudioWorkspaceView() {
     </div>
   );
 }
-

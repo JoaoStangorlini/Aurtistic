@@ -3,7 +3,10 @@ import type { StudioTemplate } from './types';
 import type { OrgBrandTokens } from '../../../lib/org-brand-tokens';
 
 export function getOrgStudioTemplates(orgSlug: string, tokens: OrgBrandTokens): StudioTemplate[] {
-  const defaultFilters = { brightness: 100, contrast: 100, saturation: 100, blur: 0, grayscale: 0, sepia: 0 };
+  const defaultFilters = {
+    brightness: 100, contrast: 100, saturation: 100, blur: 0, grayscale: 0, sepia: 0,
+    overlayDark: 0, temperature: 0, vignette: 0,
+  };
 
   return [
     {
