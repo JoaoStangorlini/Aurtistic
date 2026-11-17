@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { AspectRatioKey, StudioStage, StudioActiveTab, StudioSlide, StudioLayer, StudioDraft, StudioTemplate, StudioTextLayer } from './types';
 import { useOrganizationBrand } from '../OrganizationBrandProvider';
+import { saveDraftToIdb, getAllDraftsFromIdb, rehydrateDraft } from '@/lib/studio/studio-idb';
 
 interface StudioContextValue {
   orgSlug?: string | null;
@@ -90,13 +91,18 @@ export function StudioProvider({ children, orgSlug }: { children: React.ReactNod
   const [activeOverlay, setActiveOverlay] = useState<'none' | 'thirds' | 'golden' | 'diagonals'>('none');
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(`aurtistic_studio_drafts_${orgSlug || tokens.themeId}`);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) setDrafts(parsed.slice(0, 3));
-      }
-    } catch {}
+    getAllDraftsFromIdb().then((local) => {
+      if (local?.length) setDrafts(local);
+    });
+    const slug = orgSlug || tokens.themeId;
+    fetch(`/api/studio/drafts?org=${encodeURIComponent(slug)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (Array.isArray(data?.drafts) && data.drafts.length) {
+          setDrafts(data.drafts.map(rehydrateDraft));
+        }
+      })
+      .catch(() => {});
   }, [orgSlug, tokens.themeId]);
 
   const activeSlide = slides.find((s) => s.id === activeSlideId) || slides[0];
@@ -152,35 +158,21 @@ export function StudioProvider({ children, orgSlug }: { children: React.ReactNod
   const duplicateLayerWithMaskOnTop = useCallback((id: string) => {
     const target = activeSlide.layers.find((l) => l.id === id);
     if (!target) return;
-    const copy: StudioLayer = {
-      ...target,
-      id: `${target.id}-mask-top-${Date.now()}`,
-      name: `${target.name} (Máscara Topo)`,
-      filters: { ...(target.filters || { brightness: 100, contrast: 100, saturation: 100, blur: 0, grayscale: 0, sepia: 0, overlayDark: 0, temperature: 0, vignette: 0 }), targetMaskAreaOnly: true, isCutoutMask: true },
-    };
+    const copy: StudioLayer = { ...target, id: `${target.id}-mask-top-${Date.now()}`, name: `${target.name} (Máscara Topo)`, filters: { ...(target.filters || { brightness: 100, contrast: 100, saturation: 100, blur: 0, grayscale: 0, sepia: 0, overlayDark: 0, temperature: 0, vignette: 0 }), targetMaskAreaOnly: true, isCutoutMask: true } };
     updateSlide(activeSlide.id, { layers: [...activeSlide.layers, copy] });
     setSelectedLayerId(copy.id);
   }, [activeSlide, updateSlide]);
 
   const fillEventPlaceholders = useCallback((replacements: Record<string, string>) => {
-    setSlides((prev) => prev.map((slide) => ({
-      ...slide,
-      layers: slide.layers.map((layer) => {
-        if (layer.type !== 'text') return layer;
-        let txt = (layer as StudioTextLayer).text;
-        for (const [k, v] of Object.entries(replacements)) {
-          if (v) txt = txt.split(`{${k}}`).join(v);
-        }
-        return { ...layer, text: txt } as StudioTextLayer;
-      }),
-    })));
+    setSlides((prev) => prev.map((slide) => ({ ...slide, layers: slide.layers.map((layer) => { if (layer.type !== 'text') return layer; let txt = (layer as StudioTextLayer).text; for (const [k, v] of Object.entries(replacements)) { if (v) txt = txt.split(`{${k}}`).join(v); } return { ...layer, text: txt } as StudioTextLayer; }) })));
   }, []);
 
   const loadDraft = useCallback((draft: StudioDraft) => {
-    setSlides(draft.slides);
-    setAspectRatio(draft.aspectRatio);
-    setActiveDraftSlot(draft.slotIndex);
-    if (draft.slides[0]) setActiveSlideId(draft.slides[0].id);
+    const rehydrated = rehydrateDraft(draft);
+    setSlides(rehydrated.slides);
+    setAspectRatio(rehydrated.aspectRatio);
+    setActiveDraftSlot(rehydrated.slotIndex);
+    if (rehydrated.slides[0]) setActiveSlideId(rehydrated.slides[0].id);
     setSelectedLayerId(null);
     setStage('editor');
   }, []);
@@ -203,13 +195,16 @@ export function StudioProvider({ children, orgSlug }: { children: React.ReactNod
       updatedAt: new Date().toISOString(),
       slides,
     };
+    saveDraftToIdb(newDraft);
+    const slug = orgSlug || tokens.themeId;
+    fetch('/api/studio/drafts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slotIndex: slot, orgSlug: slug, draft: newDraft }),
+    }).catch(() => {});
     setDrafts((prev) => {
       const filtered = prev.filter((d) => d.slotIndex !== slot);
-      const updated = [...filtered, newDraft].sort((a, b) => a.slotIndex - b.slotIndex).slice(0, 3);
-      try {
-        localStorage.setItem(`aurtistic_studio_drafts_${orgSlug || tokens.themeId}`, JSON.stringify(updated));
-      } catch {}
-      return updated;
+      return [...filtered, newDraft].sort((a, b) => a.slotIndex - b.slotIndex).slice(0, 3);
     });
     setActiveDraftSlot(slot);
   }, [aspectRatio, slides, orgSlug, tokens.themeId]);

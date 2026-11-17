@@ -19,22 +19,33 @@ interface StudioKeyboardActions {
 export function useStudioKeyboard(actions: StudioKeyboardActions) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignora se estiver digitando em campos de texto
-      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      const isInput = tag === 'input' || tag === 'textarea' || (e.target as HTMLElement)?.isContentEditable;
+      // Guarda de foco: se estiver em input, textarea, select ou elemento editável
+      const activeEl = document.activeElement as HTMLElement | null;
+      const targetEl = e.target as HTMLElement | null;
+      const isInput =
+        ['input', 'textarea', 'select'].includes(activeEl?.tagName?.toLowerCase() || '') ||
+        ['input', 'textarea', 'select'].includes(targetEl?.tagName?.toLowerCase() || '') ||
+        Boolean(activeEl?.isContentEditable || targetEl?.isContentEditable);
 
       const isCtrlOrCmd = e.ctrlKey || e.metaKey;
 
+      // Se estiver digitando em campo de texto, NUNCA executa atalhos de canvas
+      if (isInput) {
+        if (isCtrlOrCmd && e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          actions.onSaveDraft();
+        }
+        return;
+      }
+
       // Undo / Redo
       if (isCtrlOrCmd && e.key.toLowerCase() === 'z') {
-        if (isInput) return;
         e.preventDefault();
         if (e.shiftKey) actions.onRedo();
         else actions.onUndo();
         return;
       }
       if (isCtrlOrCmd && e.key.toLowerCase() === 'y') {
-        if (isInput) return;
         e.preventDefault();
         actions.onRedo();
         return;
@@ -55,8 +66,6 @@ export function useStudioKeyboard(actions: StudioKeyboardActions) {
         actions.onClearSelection();
         return;
       }
-
-      if (isInput) return;
 
       // Delete / Backspace: excluir camada se não estiver bloqueada
       if ((e.key === 'Delete' || e.key === 'Backspace') && !actions.selectedLayer.locked) {
@@ -96,3 +105,4 @@ export function useStudioKeyboard(actions: StudioKeyboardActions) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [actions]);
 }
+

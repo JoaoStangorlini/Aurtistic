@@ -22,8 +22,12 @@ export function StudioImagePanel() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const blobUrl = URL.createObjectURL(file);
-    createAndAddImageLayer(blobUrl, `Upload ${imageLayers.length + 1}`);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      createAndAddImageLayer(dataUrl, `Upload ${imageLayers.length + 1}`);
+    };
+    reader.readAsDataURL(file);
     e.target.value = '';
   };
 

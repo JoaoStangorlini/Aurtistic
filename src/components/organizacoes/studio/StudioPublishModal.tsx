@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { useStudio } from './StudioContext';
 import { useOrganizationBrand } from '../OrganizationBrandProvider';
-import { exportSlideToPngDataUrl, generatePostCaptionAndAlt, saveToOrgVaultAction } from '@/lib/studio/studio-exporter';
+import { exportSlideToPngDataUrl, exportCarouselToPdf, generatePostCaptionAndAlt, saveToOrgVaultAction } from '@/lib/studio/studio-exporter';
 
 export function StudioPublishModal({ orgSlug }: { orgSlug?: string | null }) {
   const { stage, setStage, slides, aspectRatio } = useStudio();
@@ -14,6 +14,7 @@ export function StudioPublishModal({ orgSlug }: { orgSlug?: string | null }) {
   const [copiedCaption, setCopiedCaption] = useState(false);
   const [copiedAlt, setCopiedAlt] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   if (stage !== 'publish') return null;
@@ -30,6 +31,15 @@ export function StudioPublishModal({ orgSlug }: { orgSlug?: string | null }) {
       a.download = `${effectiveSlug}-slide-${idx + 1}-${scale}x.png`;
       a.click();
     });
+  };
+
+  const handleDownloadPdf = async () => {
+    setPdfLoading(true);
+    try {
+      await exportCarouselToPdf(slides, aspectRatio, tokens);
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
   const handleSaveVault = async (type: 'prontos' | 'modelos') => {
@@ -180,10 +190,10 @@ export function StudioPublishModal({ orgSlug }: { orgSlug?: string | null }) {
                 PNG 2x Retina
               </button>
               <button
-                type="button" onClick={() => handleDownloadPng(1)}
-                className="py-2 rounded-xl border border-white/10 bg-black/40 text-xs font-bold text-slate-300 hover:text-white text-center"
+                type="button" disabled={pdfLoading} onClick={handleDownloadPdf}
+                className="py-2 rounded-xl border border-white/10 bg-black/40 text-xs font-bold text-slate-300 hover:text-white text-center disabled:opacity-50"
               >
-                Carrossel PDF
+                {pdfLoading ? 'Gerando…' : `PDF (${slides.length} pág.)`}
               </button>
             </div>
 

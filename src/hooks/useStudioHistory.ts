@@ -49,3 +49,4 @@ export function useStudioHistory(initialSlides: StudioSlide[]) {
     redo,
   };
 }
+

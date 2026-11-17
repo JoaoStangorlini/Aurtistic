@@ -113,3 +113,4 @@ export function StudioDraftVersionsDrawer({ isOpen, onClose }: StudioDraftVersio
     </div>
   );
 }
+

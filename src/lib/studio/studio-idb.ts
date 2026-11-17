@@ -22,6 +22,28 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
+export function rehydrateDraft(draft: StudioDraft): StudioDraft {
+  return {
+    ...draft,
+    slides: draft.slides.map((s) => ({
+      ...s,
+      layers: s.layers.map((l) => {
+        if (l.type === 'image') {
+          const img = l as StudioImageLayer;
+          if (img.vaultRelativePath) {
+            const resolved = img.resolvedUrl ||
+              (img.vaultRelativePath.startsWith('http') || img.vaultRelativePath.startsWith('/')
+                ? img.vaultRelativePath
+                : '/' + img.vaultRelativePath.replace(/^\/+/, ''));
+            return { ...img, resolvedUrl: resolved, src: resolved };
+          }
+        }
+        return l;
+      }),
+    })),
+  };
+}
+
 function sanitizeDraftForStorage(draft: StudioDraft): StudioDraft {
   return {
     ...draft,
@@ -30,10 +52,11 @@ function sanitizeDraftForStorage(draft: StudioDraft): StudioDraft {
       layers: s.layers.map((l) => {
         if (l.type === 'image') {
           const img = l as StudioImageLayer;
-          // Se tiver caminho no cofre e src for data:blob, preserva o caminho canônico
+          // Se tiver caminho canônico do cofre e src for blob temporário, salva o caminho canônico
           if (img.vaultRelativePath && img.src.startsWith('blob:')) {
-            return { ...img, src: img.vaultRelativePath };
+            return { ...img, src: img.vaultRelativePath, resolvedUrl: undefined };
           }
+          // Se for upload local (sem vaultRelativePath), preserva img intacta (data URL)
         }
         return l;
       }),
@@ -64,7 +87,10 @@ export async function getDraftFromIdb(slotIndex: 1 | 2 | 3): Promise<StudioDraft
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
       const req = store.get(slotIndex);
-      req.onsuccess = () => resolve((req.result as StudioDraft) || null);
+      req.onsuccess = () => {
+        const d = req.result as StudioDraft | undefined;
+        resolve(d ? rehydrateDraft(d) : null);
+      };
       req.onerror = () => reject(req.error);
     });
   } catch {
@@ -79,7 +105,10 @@ export async function getAllDraftsFromIdb(): Promise<StudioDraft[]> {
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
       const req = store.getAll();
-      req.onsuccess = () => resolve(((req.result as StudioDraft[]) || []).sort((a, b) => a.slotIndex - b.slotIndex));
+      req.onsuccess = () => {
+        const arr = (req.result as StudioDraft[]) || [];
+        resolve(arr.map(rehydrateDraft).sort((a, b) => a.slotIndex - b.slotIndex));
+      };
       req.onerror = () => reject(req.error);
     });
   } catch {
@@ -99,3 +128,4 @@ export async function deleteDraftFromIdb(slotIndex: 1 | 2 | 3): Promise<void> {
     });
   } catch {}
 }
+

@@ -53,6 +53,7 @@ export interface StudioLayerBase {
 export interface StudioImageLayer extends StudioLayerBase {
   type: 'image';
   src: string;
+  resolvedUrl?: string; // URL hidratada em runtime (não persiste)
   naturalWidth?: number;
   naturalHeight?: number;
   zoom: number; // 1..3

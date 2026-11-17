@@ -1,3 +1,4 @@
+-- Este programa é um software livre (Licença AGPLv3)
 -- Migration: 13_studio_draft_versions_v4.sql
 -- Tabela para persistência dos 3 Slots de Rascunho do Studio por Usuário e Organização
 
@@ -28,3 +29,4 @@ CREATE POLICY "Usuários gerenciam seus próprios rascunhos de studio"
   TO authenticated
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
+

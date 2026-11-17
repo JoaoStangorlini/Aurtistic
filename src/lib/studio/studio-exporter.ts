@@ -16,12 +16,28 @@ export function exportSlideToPngDataUrl(
   off.height = dims.height * scale;
   const ctx = off.getContext('2d');
   if (!ctx) return '';
-
-  if (scale !== 1) {
-    ctx.scale(scale, scale);
-  }
+  if (scale !== 1) ctx.scale(scale, scale);
   renderSlideToCanvas(ctx, slide, dims.width, dims.height, tokens);
   return off.toDataURL('image/png', 0.95);
+}
+
+export async function exportCarouselToPdf(
+  slides: StudioSlide[],
+  aspectRatio: AspectRatioKey,
+  tokens?: OrgBrandTokens
+): Promise<void> {
+  const { jsPDF } = await import('jspdf');
+  const dims = ASPECT_DIMENSIONS[aspectRatio];
+  const mmW = 210;
+  const mmH = Math.round((dims.height / dims.width) * mmW);
+  const orientation = mmW >= mmH ? 'l' : 'p';
+  const doc = new jsPDF({ orientation, unit: 'mm', format: [mmW, mmH] });
+  for (let i = 0; i < slides.length; i++) {
+    if (i > 0) doc.addPage([mmW, mmH], orientation);
+    const dataUrl = exportSlideToPngDataUrl(slides[i], aspectRatio, 1, tokens);
+    doc.addImage(dataUrl, 'PNG', 0, 0, mmW, mmH, undefined, 'FAST');
+  }
+  doc.save(`carrossel-studio-${Date.now()}.pdf`);
 }
 
 export function generatePostCaptionAndAlt(
@@ -32,42 +48,27 @@ export function generatePostCaptionAndAlt(
   const firstSlide = slides[0];
   const textLayers = firstSlide?.layers.filter((l) => l.type === 'text') || [];
   const mainTitle = textLayers[0] && 'text' in textLayers[0] ? (textLayers[0] as any).text : tokens.defaultPostTitle;
-
   const caption = `${mainTitle}\n\n` +
     `Post oficial da equipe ${tokens.displayName}.\n\n` +
     `Acompanhe as nossas novidades, atividades científicas e divulgações acadêmicas.\n\n` +
     `#${orgSlug} #LabDiv #IFUSP #Física #Ciência #UniversidadeDeSãoPaulo`;
-
   const altText = `Imagem informativa da organização ${tokens.displayName} com o título: "${mainTitle}". ` +
-    `Contém elementos visuais na paleta oficial (${tokens.badgeTag}) e diagramação acessível.`;
-
+    `Contém ${slides.length} tela(s) de carrossel na paleta oficial (${tokens.badgeTag}).`;
   return { caption, altText };
 }
 
 export async function saveToOrgVaultAction(
   type: 'prontos' | 'modelos',
   orgSlug: string,
-  payload: {
-    title: string;
-    slides: StudioSlide[];
-    aspectRatio: AspectRatioKey;
-    previewDataUrl: string;
-  }
+  payload: { title: string; slides: StudioSlide[]; aspectRatio: AspectRatioKey; previewDataUrl: string; }
 ): Promise<{ ok: boolean; path?: string; error?: string }> {
   try {
     const res = await fetch('/api/studio/vault-save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        targetFolder: `/orgs/${orgSlug}/studio/${type}`,
-        fileName: `${type === 'modelos' ? 'modelo' : 'post'}-${Date.now()}.json`,
-        payload,
-      }),
+      body: JSON.stringify({ targetFolder: `/orgs/${orgSlug}/studio/${type}`, fileName: `${type === 'modelos' ? 'modelo' : 'post'}-${Date.now()}.json`, orgSlug, payload }),
     });
-    if (!res.ok) {
-      // Fallback local caso rota do servidor esteja offline
-      return { ok: true, path: `/orgs/${orgSlug}/studio/${type}/salvo-localmente` };
-    }
+    if (!res.ok) return { ok: true, path: `/orgs/${orgSlug}/studio/${type}/salvo-localmente` };
     const data = await res.json().catch(() => ({}));
     return { ok: true, path: data.path };
   } catch {
