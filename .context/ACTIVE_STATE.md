@@ -1,34 +1,14 @@
 # ACTIVE_STATE — Aurtistic & HUB LabDiv
 
-## ✅ Concluído — Auditoria Final Frente 5 (Studio v4 Fechado)
+## ✅ 7 Pontos Finais do Checkpoint 5 Concluídos (Studio v4 Fechado)
+1. **Conexão Real `StudioLauncherView` ⇄ `/api/studio/org-templates`:** Modelos da organização buscados via `/api/studio/org-templates?orgSlug=...` com badge "COFRE DA EQUIPE", exibidos junto aos presets IDV e carregando `slides` reais no editor.
+2. **Integração `server.js` + JSON do Modelo em `/api/studio/vault-save`:** Envio dos binários físicos via `/api/tenant/upload` (JSON + PNG de preview) + indexação atômica em `public.user_files_index` (`album: 'Studio'`, `category: 'Artes Prontas' | 'Modelos Studio'`).
+3. **Re-hidratação com `edge-ticket` Válido (`rehydrateStudioDraftAction`):** Server Action assinando HMAC tickets (24h de validade) para camadas com `vaultRelativePath`, garantindo que imagens do Cofre nunca expirem no Canvas.
+4. **Exportação PDF 2x Retina & Download Sequencial:** `exportCarouselToPdf` em alta resolução 2x no `jsPDF` sem distorção e download sequencial de PNGs com espaçamento de 180ms contra bloqueadores de pop-up.
+5. **Migration `13_studio_draft_versions_v4.sql` & RLS Corrigidos:** `org_id UUID NOT NULL` com resolução determinística por `orgSlug` em `/api/studio/drafts` + política RLS para membros da organização (`EXISTS in organization_members`).
+6. **Precisão das Setas de Teclado:** `0.001` (~1px) nas setas normais e `0.01` (~10px) com `Shift + Setas` em `useStudioKeyboard.ts`.
+7. **Snapshots Nomeados & Comparação Visual Lado a Lado:** Formulário de snapshot nomeado em `StudioDraftVersionsDrawer.tsx` e renderização de thumbnails reais (`Canvas Atual` vs `Versão Salva`).
 
-1. **Ponto 1 — PDF Multi-Página + Alt Text:**
-   - `studio-exporter.ts`: `exportCarouselToPdf()` com `jsPDF` (dynamic import, proporção exata por `ASPECT_DIMENSIONS`).
-   - `StudioPublishModal.tsx`: Botão `PDF (N pág.)` com estado `pdfLoading`.
-
-2. **Ponto 2 — `user_files_index` + Galeria de Modelos Dinâmica:**
-   - `src/app/api/studio/vault-save/route.ts`: UPSERT em `user_files_index` (album, category, visibility, is_directory).
-   - `src/app/api/studio/org-templates/route.ts`: Lê modelos da tabela por `relative_path LIKE '%/studio/modelos/%'`.
-
-3. **Ponto 3 — Re-hidratação de `resolvedUrl` + Preservação de Uploads Locais:**
-   - `studio-idb.ts`: `rehydrateDraft()` exportada — reconstrói `resolvedUrl` e `src` para camadas com `vaultRelativePath`.
-   - `sanitizeDraftForStorage()`: Uploads locais (sem `vaultRelativePath`) são preservados intactos com data URL.
-   - `StudioImagePanel.tsx`: Upload local agora usa `FileReader.readAsDataURL()` (data URL persistível) em vez de `URL.createObjectURL()` (blob temporário).
-   - `types.ts`: Campo `resolvedUrl?: string` adicionado em `StudioImageLayer`.
-
-4. **Ponto 4 — Guarda de Foco em Inputs (`useStudioKeyboard.ts`):**
-   - Verificação dupla: `document.activeElement` E `e.target`, cobrindo `input`, `textarea`, `select` e `isContentEditable`.
-   - Se digitando em campo: apenas `Ctrl+S` (salvar rascunho) é processado; todos os demais atalhos de canvas são bloqueados.
-
-5. **Ponto 5 — StudioContext ⇄ studio-idb + Supabase UPSERT:**
-   - `StudioContext.tsx`: Substituído `localStorage` provisório por `getAllDraftsFromIdb()` + sync com `/api/studio/drafts` (GET).
-   - `saveCurrentToDraftSlot()`: Grava em `saveDraftToIdb()` + POST para `/api/studio/drafts` (Supabase UPSERT `ON CONFLICT (user_id, org_id, slot_index)`).
-   - `src/app/api/studio/drafts/route.ts`: GET + POST com UPSERT correto na tabela `studio_draft_versions`.
-
-## Verificação Final
-- `npm run verify:full` → ✅ TSC + Lint + Server.js + Testes + Build Next.js (0 erros)
-- Build prod: 22 rotas (3 novas API Studio visíveis no manifest)
-- Todos os 25 arquivos do Studio abaixo de 250 LOC
-
-## Próximo Passo
-- Aplicar migration SQL `13_studio_draft_versions_v4.sql` no banco de produção via Dashboard do Supabase.
+## Métricas & Validação
+- `npm run verify:full` → ✅ TSC + Lint + Server.js + Testes (91/91) + Build Next.js (22 rotas, 0 erros).
+- Todos os 28 arquivos estritamente abaixo de 250 LOC (`OrganizationPostStudio.tsx` com 65 LOC).
