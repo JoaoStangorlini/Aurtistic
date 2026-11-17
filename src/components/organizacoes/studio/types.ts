@@ -80,13 +80,30 @@ export interface StudioTextLayer extends StudioLayerBase {
   shadowBlur?: number;
 }
 
+export type StudioShapeType =
+  | 'rectangle'
+  | 'circle'
+  | 'line'
+  | 'triangle'
+  | 'hexagon'
+  | 'callout'
+  | 'arrow'
+  | 'arrow-curved'
+  | 'arrow-double'
+  | 'science-atom'
+  | 'science-wave'
+  | 'science-lens'
+  | 'science-micro'
+  | 'science-dna';
+
 export interface StudioShapeLayer extends StudioLayerBase {
   type: 'shape';
-  shapeType: 'rectangle' | 'circle' | 'line';
+  shapeType: StudioShapeType;
   fillColor: string;
   strokeColor?: string;
   strokeWidth?: number;
   borderRadius?: number;
+  tailDirection?: 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right';
 }
 
 export interface StudioMathLayer extends StudioLayerBase {
@@ -124,6 +141,8 @@ export interface StudioSlide {
   layers: StudioLayer[];
   showBrandBadge: boolean;
   brandBadgeText?: string;
+  splitScreen?: 'none' | 'vertical' | 'horizontal';
+  splitRatio?: number; // padrão 0.5
 }
 
 export interface StudioDraft {
@@ -148,7 +167,7 @@ export interface StudioTemplate {
 }
 
 export type StudioStage = 'launcher' | 'editor' | 'publish';
-export type StudioActiveTab = 'images' | 'edition' | 'texts' | 'layers' | 'elements' | 'palette' | 'assistant';
+export type StudioActiveTab = 'images' | 'edition' | 'texts' | 'layers';
 
 export interface StudioPublishPayload {
   title: string;

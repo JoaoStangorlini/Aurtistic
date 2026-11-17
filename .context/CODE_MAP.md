@@ -119,23 +119,24 @@
 - **`src/components/organizacoes/TeamProgressPanel.tsx`** (547L): L13:TeamProgressPanelProps | L28:TeamProgressPanel
 - **`src/components/organizacoes/When2MeetSchedulerGrid.tsx`** (232L): L10:When2MeetSchedulerGridProps | L21:When2MeetSchedulerGrid
 - **`src/components/organizacoes/studio/OrganizationPostStudio.tsx`** (66L): L8:OrganizationPostStudioProps | L42:StudioStageRouter | L57:OrganizationPostStudio
-- **`src/components/organizacoes/studio/StudioCanvasStage.tsx`** (150L): L10:StudioCanvasStage
+- **`src/components/organizacoes/studio/StudioCanvasStage.tsx`** (161L): L10:StudioCanvasStage
 - **`src/components/organizacoes/studio/StudioCarouselStrip.tsx`** (115L): L11:SlideThumbnail | L56:StudioCarouselStrip
 - **`src/components/organizacoes/studio/StudioContext.tsx`** (247L): L47:createDefaultSlide | L79:StudioProvider | L242:useStudio
-- **`src/components/organizacoes/studio/StudioDesignAssistant.tsx`** (119L): L7:StudioDesignAssistantProps | L12:StudioDesignAssistant
+- **`src/components/organizacoes/studio/StudioDesignAssistant.tsx`** (155L): L8:StudioDesignAssistantProps | L13:StudioDesignAssistant
+- **`src/components/organizacoes/studio/StudioDraftVersionsDrawer.tsx`** (116L): L8:StudioDraftVersionsDrawerProps | L13:StudioDraftVersionsDrawer
 - **`src/components/organizacoes/studio/StudioEditionPanel.tsx`** (186L): L8:StudioEditionPanel
-- **`src/components/organizacoes/studio/StudioElementsGallery.tsx`** (159L): L12:StudioElementsGallery
+- **`src/components/organizacoes/studio/StudioElementsGallery.tsx`** (126L): L11:StudioElementsGallery
 - **`src/components/organizacoes/studio/StudioImagePanel.tsx`** (227L): L10:StudioImagePanel
 - **`src/components/organizacoes/studio/StudioLauncherView.tsx`** (185L): L10:StudioLauncherView
 - **`src/components/organizacoes/studio/StudioLayersPanel.tsx`** (179L): L8:StudioLayersPanel
 - **`src/components/organizacoes/studio/StudioMaskBrushModal.tsx`** (214L): L10:StudioMaskBrushModal
-- **`src/components/organizacoes/studio/StudioPaletteCenter.tsx`** (167L): L9:StudioPaletteCenter
-- **`src/components/organizacoes/studio/StudioPublishModal.tsx`** (151L): L10:StudioPublishModal
-- **`src/components/organizacoes/studio/StudioTextPanel.tsx`** (247L): L11:StudioTextPanel
-- **`src/components/organizacoes/studio/StudioToolbarTabs.tsx`** (48L): L18:StudioToolbarTabs
-- **`src/components/organizacoes/studio/StudioWorkspaceView.tsx`** (117L): L19:StudioWorkspaceView
+- **`src/components/organizacoes/studio/StudioPaletteCenter.tsx`** (168L): L9:StudioPaletteCenter
+- **`src/components/organizacoes/studio/StudioPublishModal.tsx`** (204L): L9:StudioPublishModal
+- **`src/components/organizacoes/studio/StudioTextPanel.tsx`** (236L): L11:StudioTextPanel
+- **`src/components/organizacoes/studio/StudioToolbarTabs.tsx`** (45L): L15:StudioToolbarTabs
+- **`src/components/organizacoes/studio/StudioWorkspaceView.tsx`** (177L): L21:StudioWorkspaceView
 - **`src/components/organizacoes/studio/studio-presets.ts`** (102L): L5:getOrgStudioTemplates
-- **`src/components/organizacoes/studio/types.ts`** (163L): L2:AspectRatioKey | L4:AspectDimension | L18:StudioLayerFilterConfig | L38:StudioLayerBase | L53:StudioImageLayer | L66:StudioTextLayer | L83:StudioShapeLayer | L92:StudioMathLayer | L99:LogoPreset | L101:StudioLogoLayer | L109:StudioLayer | L116:StudioSlide | L129:StudioDraft | L139:StudioTemplate | L150:StudioStage | L151:StudioActiveTab | L153:StudioPublishPayload
+- **`src/components/organizacoes/studio/types.ts`** (182L): L2:AspectRatioKey | L4:AspectDimension | L18:StudioLayerFilterConfig | L38:StudioLayerBase | L53:StudioImageLayer | L66:StudioTextLayer | L83:StudioShapeType | L99:StudioShapeLayer | L109:StudioMathLayer | L116:LogoPreset | L118:StudioLogoLayer | L126:StudioLayer | L133:StudioSlide | L148:StudioDraft | L158:StudioTemplate | L169:StudioStage | L170:StudioActiveTab | L172:StudioPublishPayload
 - **`src/components/portfolio/AurtisticGalleryGrid.tsx`** (1522L): L13:AurtisticGalleryGridProps | L79:resolveItemDeviceInfo | L114:resolveItemLensInfo | L129:parseItemTimestamp | L138:AurtisticGalleryGrid
 - **`src/components/portfolio/InstagramMuralSection.tsx`** (527L): L18:parseInstagramPostUrl | L37:buildInstagramEmbedSrc | L42:LazyInstagramEmbedFrame | L96:InstagramMuralSection
 - **`src/components/portfolio/PhotoInspectModal.tsx`** (463L): L10:PhotoInspectItem | L16:PhotoInspectModalProps | L26:PhotoInspectModal
@@ -161,6 +162,8 @@
 - **`src/contexts/VaultUploadContext.tsx`** (707L): L29:QueuedUploadItem | L39:UploadFinishedResults | L45:formatEta | L63:formatSpeed | L120:useVaultUpload | L134:VaultUploadProvider
 - **`src/hooks/useBackgroundSpeechTranscription.ts`** (182L): L7:UseBackgroundSpeechTranscriptionOptions | L14:useBackgroundSpeechTranscription
 - **`src/hooks/useEdgeUpload.ts`** (82L): L8:UseEdgeUploadOptions | L15:useEdgeUpload
+- **`src/hooks/useStudioHistory.ts`** (52L): L9:useStudioHistory
+- **`src/hooks/useStudioKeyboard.ts`** (99L): L19:useStudioKeyboard
 - **`src/hooks/useSwipeTabs.ts`** (118L): L21:shouldIgnore | L49:useSwipeTabs
 - **`src/hooks/useTenantTicketRefresh.ts`** (71L): L9:useTenantTicketRefresh
 - **`src/idv/index.ts`** (292L): L288:getAurtisticIdv
@@ -182,8 +185,10 @@
 - **`src/lib/portfolio-catalog.ts`** (215L): L10:EnsurePortfolioCatalogOptions | L23:ensurePortfolioCatalogLoaded
 - **`src/lib/proxy-signature.ts`** (49L): L10:appendProxySignatureTrailer | L23:hasProxySignatureMarker | L41:computeFileSha256
 - **`src/lib/self-care-config.ts`** (194L): L4:SelfCarePillarKey | L13:SelfCareSound | L15:SelfCareAlarmConfig | L33:SelfCareDailyLog | L128:getTodayKey | L133:getCurrentHHMM | L138:loadSelfCareConfigs | L154:saveSelfCareConfigs | L161:loadDailySelfCareLog | L188:saveDailySelfCareLog
-- **`src/lib/studio/canvas-renderer.ts`** (245L): L12:getImageSync | L16:preloadImage | L33:buildCssFilter | L45:applyPostEffects | L72:renderImageWithMask | L127:renderLogoLayer | L153:renderSlideToCanvas
-- **`src/lib/studio/color-harmony.ts`** (137L): L4:hexToRgb | L12:rgbToHex | L18:srgbToLinear | L24:linearToSrgb | L29:rgbToOklch | L45:oklchToRgb | L62:oklchToHex | L68:getHarmonies | L88:applyPaletteStyle | L102:getRelativeLuminance | L111:getContrastRatio | L120:searchPaletteByKeyword
+- **`src/lib/studio/canvas-renderer.ts`** (221L): L12:getImageSync | L14:preloadImage | L31:buildCssFilter | L43:applyPostEffects | L61:renderImageWithMask | L96:renderVectorShape | L138:renderLogoLayer | L158:renderSlideToCanvas
+- **`src/lib/studio/color-harmony.ts`** (138L): L4:hexToRgb | L12:rgbToHex | L18:srgbToLinear | L24:linearToSrgb | L29:rgbToOklch | L45:oklchToRgb | L62:oklchToHex | L68:getHarmonies | L88:applyPaletteStyle | L102:getRelativeLuminance | L111:getContrastRatio | L120:searchPaletteByKeyword
+- **`src/lib/studio/studio-exporter.ts`** (77L): L7:exportSlideToPngDataUrl | L27:generatePostCaptionAndAlt | L47:saveToOrgVaultAction
+- **`src/lib/studio/studio-idb.ts`** (102L): L8:openDb | L25:sanitizeDraftForStorage | L44:saveDraftToIdb | L60:getDraftFromIdb | L75:getAllDraftsFromIdb | L90:deleteDraftFromIdb
 - **`src/lib/supabase/client.ts`** (10L): L4:createClient
 - **`src/lib/supabase/server.ts`** (30L): L5:createClient
 - **`src/lib/theme-config.ts`** (259L): L3:ThemeMode | L4:ResolvedThemeMode | L5:ThemePaletteId | L16:ThemePreferences | L21:PaletteDefinition | L256:buildThemeInitScript
@@ -226,6 +231,7 @@
 - **`supabase/migrations/newsqls/10_org_idv_and_post_studio_presets.sql`** (165L): L30:public.create_new_organization
 - **`supabase/migrations/newsqls/11_gallery_timeline_and_smart_backup.sql`** (113L): L15:public.try_parse_exif_timestamp | L60:public.sync_user_files_captured_at | L93:trg_sync_user_files_captured_at
 - **`supabase/migrations/newsqls/12_seed_hub_organizations_and_sso.sql`** (155L): L95:public.ensure_sso_member
+- **`supabase/migrations/newsqls/13_studio_draft_versions_v4.sql`** (31L): L4:public.studio_draft_versions
 - **`supabase/migrations/newsqls/1_dynamic_columns.sql`** (84L): L4:public.task_columns
 - **`supabase/migrations/newsqls/2_aurtistic_planner.sql`** (42L): L4:public.user_profiles
 - **`supabase/migrations/newsqls/tabela inicial.sql`** (324L): L9:tasks

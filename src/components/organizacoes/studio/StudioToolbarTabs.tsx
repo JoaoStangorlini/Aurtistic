@@ -10,9 +10,6 @@ const TABS: { id: StudioActiveTab; label: string; icon: string }[] = [
   { id: 'edition', label: '2. Edição', icon: 'tune' },
   { id: 'texts', label: '3. Textos', icon: 'title' },
   { id: 'layers', label: '4. Camadas', icon: 'layers' },
-  { id: 'elements', label: '5. Elementos', icon: 'category' },
-  { id: 'palette', label: '6. Paletas', icon: 'palette' },
-  { id: 'assistant', label: '7. Assistente', icon: 'auto_fix_high' },
 ];
 
 export function StudioToolbarTabs() {
@@ -28,11 +25,11 @@ export function StudioToolbarTabs() {
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex-1 justify-center ${
               isActive ? 'bg-[#FFCC00] text-[#121212] shadow-sm' : 'text-slate-300 hover:text-white hover:bg-white/5'
             }`}
           >
-            <span className="material-symbols-outlined text-[15px]">{tab.icon}</span>
+            <span className="material-symbols-outlined text-[16px]">{tab.icon}</span>
             <span>{tab.label}</span>
             {tab.id === 'layers' && (
               <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${isActive ? 'bg-black/20 text-black' : 'bg-white/10 text-slate-400'}`}>
