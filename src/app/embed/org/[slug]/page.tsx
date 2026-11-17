@@ -23,10 +23,10 @@ export default async function EmbedOrgPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ ticket?: string }>;
+  searchParams: Promise<{ ticket?: string; view?: string }>;
 }) {
   const { slug } = await params;
-  const { ticket } = await searchParams;
+  const { ticket, view } = await searchParams;
   const normalizedSlug = normalizeOrgBrandSlug(slug);
   const preset = ORG_BRAND_PRESETS[normalizedSlug];
 
@@ -178,6 +178,7 @@ export default async function EmbedOrgPage({
             userOrganizations={[organization]}
             isEmbed={true}
             ticket={ticket}
+            initialView={view === 'studio' ? 'studio' : 'organizacoes'}
           />
         )}
       </OrganizationBrandProvider>

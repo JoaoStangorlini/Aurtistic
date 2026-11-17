@@ -107,6 +107,19 @@ export function EmbedAuthBridge({
     };
   }, [ticket, orgSlug, hasServerUser, router]);
 
+  // Notifica o host pai (HUB LabDiv) quando o embed estiver pronto e autenticado
+  useEffect(() => {
+    if (ready && typeof window !== 'undefined' && window.parent && window.parent !== window) {
+      window.parent.postMessage(
+        {
+          type: 'AURTISTIC_EMBED_READY',
+          org: orgSlug || null,
+        },
+        '*'
+      );
+    }
+  }, [ready, orgSlug]);
+
   if (!ready) {
     return (
       <div className="min-h-[320px] flex items-center justify-center text-xs text-slate-300 font-mono">

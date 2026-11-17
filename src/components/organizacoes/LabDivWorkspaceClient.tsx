@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useTransition } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSwipeTabs } from '@/hooks/useSwipeTabs';
 import type { Task, TaskColumn, AgendaEvent } from '@/types';
 import type {
@@ -35,7 +35,7 @@ import {
 import { saveTask } from '@/app/(dashboard)/actions';
 import { JoinOrganizationModal } from './JoinOrganizationModal';
 import { CreateOrganizationModal } from './CreateOrganizationModal';
-import { OrganizationBrandProvider } from './OrganizationBrandProvider';
+import { OrganizationBrandProvider, useOrganizationBrand } from './OrganizationBrandProvider';
 
 export interface LabDivWorkspaceClientProps {
   organization: Organization;
@@ -128,8 +128,26 @@ export function LabDivWorkspaceClient({
       }
     }
   };
-  const [activeMacroView, setActiveMacroView] = useState<'organizacoes' | 'studio'>(initialView);
-  const [studioVisited, setStudioVisited] = useState(initialView === 'studio');
+  const { tokens } = useOrganizationBrand();
+  const searchParams = useSearchParams();
+  const queryView = searchParams?.get('view');
+  const userSwitchedRef = React.useRef(false);
+  const [activeMacroView, setActiveMacroView] = useState<'organizacoes' | 'studio'>(
+    queryView === 'studio' ? 'studio' : initialView
+  );
+  const [studioVisited, setStudioVisited] = useState(
+    queryView === 'studio' || initialView === 'studio'
+  );
+
+  // Sincronização reativa da aba Studio vs Equipe quando initialView ou query param ?view mudar
+  useEffect(() => {
+    if (userSwitchedRef.current) return;
+    const target = queryView === 'studio' ? 'studio' : (initialView || 'organizacoes');
+    setActiveMacroView(target);
+    if (target === 'studio') {
+      setStudioVisited(true);
+    }
+  }, [initialView, queryView]);
   const [showInlineVault, setShowInlineVault] = useState(true);
   const [isPlaybooksOpen, setIsPlaybooksOpen] = useState(false);
   const [activeMeetingForLive, setActiveMeetingForLive] = useState<OrganizationMeeting | null>(null);
@@ -155,10 +173,20 @@ export function LabDivWorkspaceClient({
   };
 
   const selectMacroView = (view: 'organizacoes' | 'studio') => {
+    userSwitchedRef.current = true;
     if (view === 'studio') setStudioVisited(true);
     startSwitchTransition(() => {
       setActiveMacroView(view);
     });
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (view === 'studio') {
+        url.searchParams.set('view', 'studio');
+      } else {
+        url.searchParams.delete('view');
+      }
+      window.history.replaceState(null, '', url.toString());
+    }
   };
   const swipeHandlers = useSwipeTabs({
     enabled: !isEmbed,
@@ -329,13 +357,58 @@ export function LabDivWorkspaceClient({
           </div>
           {activeMacroView === 'studio' && (
             <div
-              className="flex items-center gap-1.5 text-[10px] font-bold text-fg-muted"
-              title="O Studio une as iniciativas HUB LabDiv e Aurtistic"
+              className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-2xl bg-surface/90 border border-border-subtle shadow-xs backdrop-blur-xs transition-all animate-in fade-in duration-200"
+              title="Integração Oficial de Ecossistema: HUB LabDiv × Aurtistic"
             >
-              <img src="/icone-HUBLabDiv.svg" alt="HUB LabDiv" className="h-4 w-4 object-contain" />
-              <span className="text-fg-secondary">HUB LabDiv</span>
-              <span className="opacity-60">×</span>
-              <span className="text-fg-secondary">Aurtistic</span>
+              <div className="flex items-center gap-1.5">
+                <img
+                  src="/icone-HUBLabDiv.svg"
+                  alt="HUB LabDiv"
+                  className="h-4.5 w-4.5 object-contain"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+                <span className="font-black text-xs text-fg tracking-tight">HUB</span>
+                <span
+                  className="font-black text-xs tracking-tight bg-clip-text text-transparent"
+                  style={{
+                    backgroundImage: `linear-gradient(90deg, ${tokens.containerColor || '#0F4780'}, ${tokens.primaryColor || '#1F9FCF'})`,
+                  }}
+                >
+                  LabDiv
+                </span>
+              </div>
+
+              <span className="text-[11px] font-bold text-fg-muted opacity-60">×</span>
+
+              <div className="flex items-center gap-1.5">
+                <img
+                  src="/icons/icon-purple-gold.png"
+                  alt="Aurtistic"
+                  className="h-4 w-4 object-contain rounded-xs"
+                  onError={(e) => {
+                    const el = e.currentTarget as HTMLImageElement;
+                    if (!el.src.includes('aurtistic-icon.png')) {
+                      el.src = '/aurtistic-icon.png';
+                    }
+                  }}
+                />
+                <span className="font-black text-xs bg-gradient-to-r from-[#9D4EDD] via-[#C77DFF] to-[#FFCC00] bg-clip-text text-transparent tracking-tight">
+                  Aurtistic
+                </span>
+              </div>
+
+              <a
+                href="https://hublabdiv.com.br"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-1 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider border border-border-subtle bg-app text-fg-secondary hover:text-fg hover:bg-surface transition-all shadow-xs"
+                title="Conferir portal institucional do HUB LabDiv"
+              >
+                <span>Conferir</span>
+                <span className="material-symbols-outlined text-[12px]">open_in_new</span>
+              </a>
             </div>
           )}
         </div>
@@ -405,34 +478,7 @@ export function LabDivWorkspaceClient({
       </div>
 
       {activeMacroView === 'studio' ? (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3 bg-surface border border-border-subtle rounded-2xl p-4 shadow-md">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[var(--md-sys-color-secondary)]/15 border border-[var(--md-sys-color-secondary)]/30 flex items-center justify-center">
-                <span className="material-symbols-outlined text-[20px] text-[var(--md-sys-color-secondary)]">
-                  palette
-                </span>
-              </div>
-              <div>
-                <h2 className="text-sm font-black uppercase tracking-wider text-fg">
-                  HUB Studio • {currentOrg.name}
-                </h2>
-                <p className="text-xs text-fg-muted">
-                  Criador visual integrado Aurtistic + HUB LabDiv com identidade da organização.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setActiveMacroView('organizacoes')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border-subtle bg-app text-xs font-bold text-fg hover:bg-surface-hover cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-              <span>Voltar à Gestão</span>
-            </button>
-          </div>
-          <OrganizationPostStudio organizationId={currentOrg.id} orgSlug={currentOrg.slug} />
-        </div>
+        <OrganizationPostStudio organizationId={currentOrg.id} orgSlug={currentOrg.slug} />
       ) : (
       <div className="space-y-6">
       {/* Bento Grid Operacional (Nível 1 - 8px Grid) + Navigation Bar M3 (Seleção Única - 5 Módulos) */}

@@ -39,7 +39,7 @@
 - **`src/app/curriculo/page.tsx`** (58L): L13:CurriculoPage
 - **`src/app/delete-account/page.tsx`** (209L): L11:DeleteAccountPage
 - **`src/app/divulgacao/page.tsx`** (97L): L7:AurtisticDivulgacaoPage
-- **`src/app/embed/org/[slug]/page.tsx`** (188L): L21:EmbedOrgPage
+- **`src/app/embed/org/[slug]/page.tsx`** (189L): L21:EmbedOrgPage
 - **`src/app/embed/studio/page.tsx`** (148L): L20:EmbedStudioPage
 - **`src/app/exportar-importar/page.tsx`** (205L): L9:ExportImportPage
 - **`src/app/galeria/page.tsx`** (10L): L7:GaleriaPage
@@ -88,7 +88,7 @@
 - **`src/components/dashboard/TaskFormModal.tsx`** (1314L): L36:TaskFormModal
 - **`src/components/dashboard/TasksView.tsx`** (3356L): L39:WidgetPluginPlugin | L51:formatDate | L57:getDaysUntil | L73:getStatusWeight | L83:getPriorityWeight | L91:HighlightedText | L109:TasksView
 - **`src/components/dashboard/WidgetPreviews.tsx`** (724L): L4:WidgetTasksPreview | L74:WidgetCalendarPreview | L248:WidgetWeeklyCalendarPreview | L445:WidgetGlobalPreview
-- **`src/components/embed/EmbedAuthBridge.tsx`** (129L): L20:EmbedAuthBridge
+- **`src/components/embed/EmbedAuthBridge.tsx`** (142L): L20:EmbedAuthBridge
 - **`src/components/galeria/GooglePhotosTimelineView.tsx`** (683L): L21:TimelineSkeletonRow | L38:GooglePhotosTimelineViewProps | L44:GooglePhotosTimelineView
 - **`src/components/galeria/SmartBackupSettingsModal.tsx`** (191L): L17:loadSmartBackupPreferences | L28:saveSmartBackupPreferences | L41:SmartBackupSettingsModal
 - **`src/components/media/AurtisticMediaContext.tsx`** (590L): L19:MediaTrack | L31:InPlaceNoteState | L39:InPlacePreviewState | L49:AurtisticMediaContextType | L110:useAurtisticMedia | L118:AurtisticMediaProviderProps | L125:AurtisticMediaProvider
@@ -100,7 +100,7 @@
 - **`src/components/organizacoes/CreateOrganizationModal.tsx`** (173L): L8:CreateOrganizationModalProps | L14:CreateOrganizationModal
 - **`src/components/organizacoes/InviteAcceptClient.tsx`** (177L): L11:InviteAcceptClientProps | L18:InviteAcceptClient
 - **`src/components/organizacoes/JoinOrganizationModal.tsx`** (252L): L11:JoinOrganizationModalProps | L17:JoinOrganizationModal
-- **`src/components/organizacoes/LabDivWorkspaceClient.tsx`** (953L): L40:LabDivWorkspaceClientProps | L60:LabDivWorkspaceClient
+- **`src/components/organizacoes/LabDivWorkspaceClient.tsx`** (999L): L40:LabDivWorkspaceClientProps | L60:LabDivWorkspaceClient
 - **`src/components/organizacoes/LiveMeetingSplitWorkspace.tsx`** (617L): L15:LiveMeetingSplitWorkspaceProps | L23:LiveMeetingSplitWorkspace
 - **`src/components/organizacoes/MatrixCodeRain.tsx`** (132L): L16:MatrixCodeRain
 - **`src/components/organizacoes/MeetingReviewApprovalModal.tsx`** (228L): L15:MeetingReviewApprovalModalProps | L23:MeetingReviewApprovalModal
@@ -118,7 +118,21 @@
 - **`src/components/organizacoes/OrganizationScopeToolbar.tsx`** (231L): L10:OrganizationScopeToolbarProps | L22:OrganizationScopeToolbar
 - **`src/components/organizacoes/TeamProgressPanel.tsx`** (547L): L13:TeamProgressPanelProps | L28:TeamProgressPanel
 - **`src/components/organizacoes/When2MeetSchedulerGrid.tsx`** (232L): L10:When2MeetSchedulerGridProps | L21:When2MeetSchedulerGrid
-- **`src/components/organizacoes/studio/OrganizationPostStudio.tsx`** (1568L): L71:StudioSliderControl | L134:OrganizationPostStudioProps | L139:OrganizationPostStudio
+- **`src/components/organizacoes/studio/OrganizationPostStudio.tsx`** (66L): L8:OrganizationPostStudioProps | L42:StudioStageRouter | L57:OrganizationPostStudio
+- **`src/components/organizacoes/studio/StudioCanvasStage.tsx`** (139L): L10:StudioCanvasStage
+- **`src/components/organizacoes/studio/StudioCarouselStrip.tsx`** (79L): L8:StudioCarouselStrip
+- **`src/components/organizacoes/studio/StudioContext.tsx`** (229L): L42:createDefaultSlide | L78:StudioProvider | L224:useStudio
+- **`src/components/organizacoes/studio/StudioEditionPanel.tsx`** (168L): L8:StudioEditionPanel
+- **`src/components/organizacoes/studio/StudioImagePanel.tsx`** (193L): L8:StudioImagePanel
+- **`src/components/organizacoes/studio/StudioLauncherView.tsx`** (182L): L10:StudioLauncherView
+- **`src/components/organizacoes/studio/StudioLayersPanel.tsx`** (135L): L7:StudioLayersPanel
+- **`src/components/organizacoes/studio/StudioMaskBrushModal.tsx`** (210L): L8:StudioMaskBrushModal
+- **`src/components/organizacoes/studio/StudioPublishModal.tsx`** (151L): L10:StudioPublishModal
+- **`src/components/organizacoes/studio/StudioTextPanel.tsx`** (175L): L9:StudioTextPanel
+- **`src/components/organizacoes/studio/StudioToolbarTabs.tsx`** (53L): L15:StudioToolbarTabs
+- **`src/components/organizacoes/studio/StudioWorkspaceView.tsx`** (109L): L16:StudioWorkspaceView
+- **`src/components/organizacoes/studio/studio-presets.ts`** (99L): L5:getOrgStudioTemplates
+- **`src/components/organizacoes/studio/types.ts`** (151L): L2:AspectRatioKey | L4:AspectDimension | L18:StudioLayerFilterConfig | L38:StudioLayerBase | L53:StudioImageLayer | L65:StudioTextLayer | L82:StudioShapeLayer | L91:StudioMathLayer | L98:StudioLayer | L104:StudioSlide | L117:StudioDraft | L127:StudioTemplate | L138:StudioStage | L139:StudioActiveTab | L141:StudioPublishPayload
 - **`src/components/portfolio/AurtisticGalleryGrid.tsx`** (1522L): L13:AurtisticGalleryGridProps | L79:resolveItemDeviceInfo | L114:resolveItemLensInfo | L129:parseItemTimestamp | L138:AurtisticGalleryGrid
 - **`src/components/portfolio/InstagramMuralSection.tsx`** (527L): L18:parseInstagramPostUrl | L37:buildInstagramEmbedSrc | L42:LazyInstagramEmbedFrame | L96:InstagramMuralSection
 - **`src/components/portfolio/PhotoInspectModal.tsx`** (463L): L10:PhotoInspectItem | L16:PhotoInspectModalProps | L26:PhotoInspectModal
@@ -165,6 +179,7 @@
 - **`src/lib/portfolio-catalog.ts`** (215L): L10:EnsurePortfolioCatalogOptions | L23:ensurePortfolioCatalogLoaded
 - **`src/lib/proxy-signature.ts`** (49L): L10:appendProxySignatureTrailer | L23:hasProxySignatureMarker | L41:computeFileSha256
 - **`src/lib/self-care-config.ts`** (194L): L4:SelfCarePillarKey | L13:SelfCareSound | L15:SelfCareAlarmConfig | L33:SelfCareDailyLog | L128:getTodayKey | L133:getCurrentHHMM | L138:loadSelfCareConfigs | L154:saveSelfCareConfigs | L161:loadDailySelfCareLog | L188:saveDailySelfCareLog
+- **`src/lib/studio/canvas-renderer.ts`** (204L): L10:getImageSync | L14:preloadImage | L40:buildCssFilter | L52:renderImageWithMask | L103:renderSlideToCanvas
 - **`src/lib/supabase/client.ts`** (10L): L4:createClient
 - **`src/lib/supabase/server.ts`** (30L): L5:createClient
 - **`src/lib/theme-config.ts`** (259L): L3:ThemeMode | L4:ResolvedThemeMode | L5:ThemePaletteId | L16:ThemePreferences | L21:PaletteDefinition | L256:buildThemeInitScript
