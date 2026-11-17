@@ -27,7 +27,17 @@ export function ThemedAurtisticLogo({
   iconOnly = false,
 }: ThemedAurtisticLogoProps) {
   const { palette, resolvedMode } = useTheme();
-  const currentPalette = palette || 'purple-gold';
+  const rawPalette = palette || 'purple-gold';
+  const currentPalette =
+    rawPalette === 'labdiv'
+      ? 'cyan-amber'
+      : rawPalette === 'show-da-fisica'
+        ? 'blue-red'
+        : rawPalette === 'hs'
+          ? 'emerald-violet'
+          : rawPalette === 'profis'
+            ? 'cyan-amber'
+            : rawPalette;
   const currentMode = resolvedMode || 'dark';
 
   // Modo somente ícone (circular / 1:1, ideal para avatares, spinners de carregamento e atalhos)

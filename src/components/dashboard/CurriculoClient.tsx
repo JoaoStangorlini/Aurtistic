@@ -355,7 +355,7 @@ export default function CurriculoClient({
                   type="text"
                   value={cvData.name}
                   onChange={e => setCvData({...cvData, name: e.target.value})}
-                  className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-[#9D4EDD]"
+                  className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-accent-primary"
                 />
               </div>
               <div>
@@ -364,7 +364,7 @@ export default function CurriculoClient({
                   type="text"
                   value={cvData.role}
                   onChange={e => setCvData({...cvData, role: e.target.value})}
-                  className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-[#9D4EDD]"
+                  className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-accent-primary"
                 />
               </div>
               <div>
@@ -373,7 +373,7 @@ export default function CurriculoClient({
                   type="text"
                   value={cvData.phone}
                   onChange={e => setCvData({...cvData, phone: e.target.value})}
-                  className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-[#9D4EDD]"
+                  className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-accent-primary"
                 />
               </div>
               <div>
@@ -382,7 +382,7 @@ export default function CurriculoClient({
                   type="email"
                   value={cvData.email}
                   onChange={e => setCvData({...cvData, email: e.target.value})}
-                  className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-[#9D4EDD]"
+                  className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-accent-primary"
                 />
               </div>
               <div>
@@ -391,7 +391,7 @@ export default function CurriculoClient({
                   type="text"
                   value={cvData.address}
                   onChange={e => setCvData({...cvData, address: e.target.value})}
-                  className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-[#9D4EDD]"
+                  className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-accent-primary"
                 />
               </div>
               <div>
@@ -401,7 +401,7 @@ export default function CurriculoClient({
                   value={cvData.github}
                   onChange={e => setCvData({...cvData, github: e.target.value})}
                   placeholder="Ex: /JoaoStangorlini"
-                  className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-[#9D4EDD]"
+                  className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-accent-primary"
                 />
               </div>
               <div>
@@ -411,7 +411,7 @@ export default function CurriculoClient({
                   value={cvData.linkedin || ''}
                   onChange={e => setCvData({...cvData, linkedin: e.target.value})}
                   placeholder="Ex: /in/joaostangorlini"
-                  className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-[#9D4EDD]"
+                  className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-accent-primary"
                 />
               </div>
               <div>
@@ -421,7 +421,7 @@ export default function CurriculoClient({
                   value={cvData.instagram || ''}
                   onChange={e => setCvData({...cvData, instagram: e.target.value})}
                   placeholder="Ex: @stangorlini"
-                  className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-[#9D4EDD]"
+                  className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-accent-primary"
                 />
               </div>
             </div>
@@ -454,7 +454,7 @@ export default function CurriculoClient({
                       type="text"
                       value={exp.role}
                       onChange={e => updateExperience(idx, 'role', e.target.value)}
-                      className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-[#9D4EDD]"
+                      className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-accent-primary"
                     />
                   </div>
                   <div>
@@ -463,7 +463,7 @@ export default function CurriculoClient({
                       type="text"
                       value={exp.company}
                       onChange={e => updateExperience(idx, 'company', e.target.value)}
-                      className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-[#9D4EDD]"
+                      className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-accent-primary"
                     />
                   </div>
                   <div>
@@ -472,7 +472,7 @@ export default function CurriculoClient({
                       type="text"
                       value={exp.period}
                       onChange={e => updateExperience(idx, 'period', e.target.value)}
-                      className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-[#9D4EDD]"
+                      className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-accent-primary"
                     />
                   </div>
                 </div>
@@ -482,7 +482,7 @@ export default function CurriculoClient({
                     value={exp.bullets ? exp.bullets.join('\n') : ''}
                     onChange={e => updateExperience(idx, 'bullets', e.target.value.split('\n'))}
                     rows={3}
-                    className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-[#9D4EDD] resize-y"
+                    className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-accent-primary resize-y"
                   />
                 </div>
               </div>
@@ -516,7 +516,7 @@ export default function CurriculoClient({
                       type="text"
                       value={edu.institution}
                       onChange={e => updateEducation(idx, 'institution', e.target.value)}
-                      className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-[#9D4EDD]"
+                      className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-accent-primary"
                     />
                   </div>
                   <div>
@@ -525,7 +525,7 @@ export default function CurriculoClient({
                       type="text"
                       value={edu.degree}
                       onChange={e => updateEducation(idx, 'degree', e.target.value)}
-                      className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-[#9D4EDD]"
+                      className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-accent-primary"
                     />
                   </div>
                   <div>
@@ -534,7 +534,7 @@ export default function CurriculoClient({
                       type="text"
                       value={edu.period}
                       onChange={e => updateEducation(idx, 'period', e.target.value)}
-                      className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-[#9D4EDD]"
+                      className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-accent-primary"
                     />
                   </div>
                 </div>
@@ -544,7 +544,7 @@ export default function CurriculoClient({
                     value={edu.bullets ? edu.bullets.join('\n') : ''}
                     onChange={e => updateEducation(idx, 'bullets', e.target.value.split('\n'))}
                     rows={3}
-                    className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-[#9D4EDD] resize-y"
+                    className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-accent-primary resize-y"
                   />
                 </div>
               </div>
@@ -561,11 +561,11 @@ export default function CurriculoClient({
                 value={newSkill}
                 onChange={e => setNewSkill(e.target.value)}
                 placeholder="Ex: Next.js"
-                className="bg-app border border-border-subtle rounded-lg px-4 py-2 text-xs text-fg focus:outline-none focus:border-[#9D4EDD]"
+                className="bg-app border border-border-subtle rounded-lg px-4 py-2 text-xs text-fg focus:outline-none focus:border-accent-primary"
               />
               <button 
                 type="submit"
-                className="px-4 py-2 bg-[#9D4EDD] hover:bg-[#8B3DCA] text-fg rounded-lg text-xs font-bold transition-colors"
+                className="px-4 py-2 bg-accent-primary hover:bg-accent-primary-hover text-on-accent-primary rounded-lg text-xs font-bold transition-colors"
               >
                 Adicionar
               </button>

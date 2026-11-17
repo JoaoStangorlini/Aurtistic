@@ -45,10 +45,10 @@ export function StorageQuotaCard({
   const barColor = isCritical
     ? 'bg-[#F14343]'
     : isNearLimit
-      ? 'bg-[#FFCC00]'
+      ? 'bg-accent-secondary'
       : hasActiveEventBoost
-        ? 'bg-[#9D4EDD]'
-        : 'bg-[#FFCC00]';
+        ? 'bg-accent-primary'
+        : 'bg-accent-secondary';
 
   const [renderNow] = React.useState(() => Date.now());
 
@@ -132,7 +132,7 @@ export function StorageQuotaCard({
             {hasActiveEventBoost && (
               <span
                 title={tempQuotaReason || 'Boost temporário de evento ativo'}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#9D4EDD]/20 text-[#E0AAFF] border border-[#9D4EDD]/40"
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-accent-primary/20 text-accent-primary border border-accent-primary/40"
               >
                 <span className="material-symbols-outlined text-[14px]">bolt</span>
                 Boost Evento{remainingDays ? ` (+${remainingDays}d)` : ''}
@@ -153,7 +153,7 @@ export function StorageQuotaCard({
                     Vitrine pública:{' '}
                     <a
                       href={`/portfolio/${publicSlug}`}
-                      className="text-[#FFCC00] hover:underline font-medium"
+                      className="text-accent-secondary hover:underline font-medium"
                     >
                       /portfolio/{publicSlug}
                     </a>
@@ -185,7 +185,7 @@ export function StorageQuotaCard({
           />
         </div>
         {hasActiveEventBoost && tempQuotaReason && (
-          <div className="mt-1.5 text-[11px] text-[#E0AAFF] truncate">
+          <div className="mt-1.5 text-[11px] text-accent-primary truncate">
             Evento: {tempQuotaReason}
           </div>
         )}

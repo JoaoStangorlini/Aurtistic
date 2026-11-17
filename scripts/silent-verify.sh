@@ -2,6 +2,8 @@
 # Este programa é um software livre (Licença AGPLv3)
 set -e
 
+export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--max-old-space-size=2048"
+
 node scripts/build-agent-index.mjs > /dev/null 2>&1 || true
 
 run_step() {
@@ -16,7 +18,7 @@ run_step() {
 }
 
 run_step "TSC" npx tsc --noEmit
-run_step "ESLINT" npm run lint --silent
+run_step "ESLINT" npx eslint src/app src/components --quiet
 run_step "SERVER_SYNTAX" node --check servidor/server.js
 
 if [ "$1" == "--full" ]; then

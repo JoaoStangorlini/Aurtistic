@@ -17,7 +17,7 @@ export default function PrivacyPolicyPage() {
         <div className="space-y-8 bg-surface p-6 md:p-10 rounded-2xl border border-border-subtle shadow-xl">
           <section>
             <h2 className="text-xl font-bold text-fg mb-4 flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#9D4EDD]">shield</span>
+              <span className="material-symbols-outlined text-accent-primary">shield</span>
               Seus Dados, Seu Controle
             </h2>
             <p className="leading-relaxed mb-4 text-fg-secondary">
@@ -30,7 +30,7 @@ export default function PrivacyPolicyPage() {
 
           <section>
             <h2 className="text-xl font-bold text-fg mb-4 flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#9D4EDD]">storage</span>
+              <span className="material-symbols-outlined text-accent-primary">storage</span>
               Armazenamento das Tarefas
             </h2>
             <p className="leading-relaxed text-fg-secondary">
@@ -53,7 +53,7 @@ export default function PrivacyPolicyPage() {
 
           <section>
             <h2 className="text-xl font-bold text-fg mb-4 flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#9D4EDD]">download</span>
+              <span className="material-symbols-outlined text-accent-primary">download</span>
               Exportação e Portabilidade
             </h2>
             <p className="leading-relaxed text-fg-secondary">

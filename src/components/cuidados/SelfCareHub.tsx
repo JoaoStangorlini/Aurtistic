@@ -140,19 +140,19 @@ export function SelfCareHub() {
           onClick={toggleExpanded}
           className="flex items-center gap-2.5 text-left group min-w-0"
         >
-          <div className="w-8 h-8 rounded-xl bg-[var(--accent-primary,#9D4EDD)]/15 border border-[var(--accent-primary,#9D4EDD)]/30 flex items-center justify-center text-[var(--accent-primary,#9D4EDD)] shrink-0 group-hover:scale-105 transition-transform">
+          <div className="w-8 h-8 rounded-xl bg-accent-primary/15 border border-accent-primary/30 flex items-center justify-center text-accent-primary shrink-0 group-hover:scale-105 transition-transform">
             <span className="material-symbols-outlined text-[18px]">spa</span>
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary,#F5F5F5)] group-hover:text-[var(--accent-secondary,#FFCC00)] transition-colors">
+              <span className="text-xs font-bold uppercase tracking-wider text-fg group-hover:text-accent-secondary transition-colors">
                 Autocuidado & Interocepção
               </span>
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--surface-secondary,#242424)] text-[var(--text-secondary,#A0A0A0)]">
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-elevated text-fg-secondary">
                 Neurodivergente
               </span>
               {isHyperfocusActive && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--accent-secondary,#FFCC00)] text-[#121212] flex items-center gap-1">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-accent-secondary text-on-accent-secondary flex items-center gap-1">
                   <span className="material-symbols-outlined text-[12px]">psychology</span>
                   Hiperfoco ({hyperfocusRemainingMin}m)
                 </span>
@@ -161,18 +161,18 @@ export function SelfCareHub() {
 
             {/* Subtítulo no modo expandido vs Chips de status no modo compacto */}
             {isExpanded ? (
-              <p className="text-[11px] text-[var(--text-muted,#8E8E8E)] mt-0.5">
+              <p className="text-[11px] text-fg-muted mt-0.5">
                 Pausas sensoriais, hidratação, refeições e proteção da visão contra fadiga de hiperfoco.
               </p>
             ) : (
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                 {configs.length === 0 ? (
-                  <span className="text-[11px] text-[var(--text-muted,#8E8E8E)]">
+                  <span className="text-[11px] text-fg-muted">
                     Nenhum lembrete ativo (toque para expandir)
                   </span>
                 ) : (
                   <>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[var(--surface-secondary,#242424)] text-[var(--accent-primary,#9D4EDD)] border border-[var(--border-subtle,#2D2D2D)]">
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-elevated text-accent-primary border border-border-subtle">
                       {configs.filter((c) => c.enabled).length} ativos
                     </span>
                     {configs.some((c) => c.key === 'hydration' && c.enabled) && (
@@ -257,7 +257,7 @@ export function SelfCareHub() {
                 className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-[var(--surface-secondary,#242424)] hover:bg-[var(--surface-hover,#2D2D2D)] text-[var(--text-secondary,#A0A0A0)] hover:text-[var(--text-primary,#F5F5F5)] border border-[var(--border-subtle,#2D2D2D)] flex items-center gap-1 transition-colors"
                 title="Criar novo alarme de autocuidado"
               >
-                <span className="material-symbols-outlined text-[14px] text-[var(--accent-primary,#9D4EDD)]">add</span>
+                <span className="material-symbols-outlined text-[14px] text-[var(--accent-primary)]">add</span>
                 <span className="hidden sm:inline">Novo Cuidado</span>
               </button>
 
@@ -289,7 +289,7 @@ export function SelfCareHub() {
             <button
               type="button"
               onClick={() => setIsNewCareModalOpen(true)}
-              className="p-1.5 rounded-lg text-[var(--text-muted,#8E8E8E)] hover:text-[var(--accent-primary,#9D4EDD)] hover:bg-[var(--surface-hover,#2D2D2D)] transition-colors"
+              className="p-1.5 rounded-lg text-[var(--text-muted,#8E8E8E)] hover:text-[var(--accent-primary)] hover:bg-[var(--surface-hover,#2D2D2D)] transition-colors"
               title="Definir novo lembrete de autocuidado"
             >
               <span className="material-symbols-outlined text-[18px]">add</span>
@@ -321,7 +321,7 @@ export function SelfCareHub() {
           {configs.length === 0 ? (
             <div className="mt-2 p-4 rounded-xl bg-[var(--surface-secondary,#242424)] border border-dashed border-[var(--border-subtle,#2D2D2D)] flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[var(--accent-primary,#9D4EDD)]/15 border border-[var(--accent-primary,#9D4EDD)]/30 text-[var(--accent-primary,#9D4EDD)] flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-[var(--accent-primary)]/15 border border-[var(--accent-primary)]/30 text-[var(--accent-primary)] flex items-center justify-center shrink-0">
                   <span className="material-symbols-outlined text-[20px]">alarm_on</span>
                 </div>
                 <div>
@@ -336,7 +336,7 @@ export function SelfCareHub() {
               <button
                 type="button"
                 onClick={() => setIsNewCareModalOpen(true)}
-                className="px-3.5 py-2 rounded-xl bg-[var(--accent-primary,#9D4EDD)] text-white hover:opacity-90 font-bold text-xs flex items-center gap-1.5 transition-all shrink-0 shadow-sm"
+                className="px-3.5 py-2 rounded-xl bg-[var(--accent-primary)] text-white hover:opacity-90 font-bold text-xs flex items-center gap-1.5 transition-all shrink-0 shadow-sm"
               >
                 <span className="material-symbols-outlined text-[16px]">add</span>
                 <span>Definir Lembrete</span>
@@ -453,7 +453,7 @@ export function SelfCareHub() {
                   title="Checagem sensorial de bexiga / banheiro"
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="material-symbols-outlined text-[20px] text-purple-400 group-hover:scale-110 transition-transform">
+                    <span className="material-symbols-outlined text-[20px] text-accent-primary group-hover:scale-110 transition-transform">
                       wc
                     </span>
                     <div className="min-w-0">
@@ -463,7 +463,7 @@ export function SelfCareHub() {
                       </span>
                     </div>
                   </div>
-                  <span className="material-symbols-outlined text-[16px] text-purple-400 opacity-60 group-hover:opacity-100">
+                  <span className="material-symbols-outlined text-[16px] text-accent-primary opacity-60 group-hover:opacity-100">
                     done
                   </span>
                 </button>
@@ -523,7 +523,7 @@ export function SelfCareHub() {
           <div className="w-full max-w-lg bg-[var(--surface-primary,#1A1A1A)] border border-[var(--border-subtle,#2D2D2D)] rounded-2xl p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[var(--border-subtle,#2D2D2D)] pb-3">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[20px] text-[var(--accent-primary,#9D4EDD)]">
+                <span className="material-symbols-outlined text-[20px] text-[var(--accent-primary)]">
                   add_circle
                 </span>
                 <h3 className="text-sm font-bold text-[var(--text-primary,#F5F5F5)]">
@@ -559,11 +559,11 @@ export function SelfCareHub() {
                       className={`p-2.5 rounded-xl border text-left flex items-center justify-between gap-2 transition-all ${
                         isAlreadyAdded
                           ? 'bg-[var(--surface-secondary,#242424)]/50 border-[var(--border-subtle,#2D2D2D)] opacity-50 cursor-not-allowed'
-                          : 'bg-[var(--surface-secondary,#242424)] hover:bg-[var(--surface-hover,#2D2D2D)] border-[var(--border-subtle,#2D2D2D)] hover:border-[var(--accent-primary,#9D4EDD)]'
+                          : 'bg-[var(--surface-secondary,#242424)] hover:bg-[var(--surface-hover,#2D2D2D)] border-[var(--border-subtle,#2D2D2D)] hover:border-[var(--accent-primary)]'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="material-symbols-outlined text-[18px] text-[var(--accent-primary,#9D4EDD)]">
+                        <span className="material-symbols-outlined text-[18px] text-[var(--accent-primary)]">
                           {tmpl.icon}
                         </span>
                         <div className="min-w-0">
@@ -575,7 +575,7 @@ export function SelfCareHub() {
                           </span>
                         </div>
                       </div>
-                      <span className="text-xs font-bold text-[var(--accent-primary,#9D4EDD)] shrink-0">
+                      <span className="text-xs font-bold text-[var(--accent-primary)] shrink-0">
                         {isAlreadyAdded ? 'Ativo ✓' : '+ Ativar'}
                       </span>
                     </button>
@@ -601,7 +601,7 @@ export function SelfCareHub() {
                     value={newCareName}
                     onChange={(e) => setNewCareName(e.target.value)}
                     placeholder="Ex: Descansar Ombros, Gotas nos Olhos..."
-                    className="w-full bg-[var(--surface-secondary,#242424)] border border-[var(--border-subtle,#2D2D2D)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary,#F5F5F5)] focus:outline-none focus:border-[var(--accent-primary,#9D4EDD)]"
+                    className="w-full bg-[var(--surface-secondary,#242424)] border border-[var(--border-subtle,#2D2D2D)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary,#F5F5F5)] focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
 
@@ -614,7 +614,7 @@ export function SelfCareHub() {
                     value={newCareDesc}
                     onChange={(e) => setNewCareDesc(e.target.value)}
                     placeholder="Ex: Respiração profunda em 4 tempos"
-                    className="w-full bg-[var(--surface-secondary,#242424)] border border-[var(--border-subtle,#2D2D2D)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary,#F5F5F5)] focus:outline-none focus:border-[var(--accent-primary,#9D4EDD)]"
+                    className="w-full bg-[var(--surface-secondary,#242424)] border border-[var(--border-subtle,#2D2D2D)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary,#F5F5F5)] focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
 
@@ -666,7 +666,7 @@ export function SelfCareHub() {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[var(--accent-primary,#9D4EDD)] text-white hover:opacity-90"
+                    className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[var(--accent-primary)] text-white hover:opacity-90"
                   >
                     Salvar Cuidado
                   </button>
@@ -700,7 +700,7 @@ export function SelfCareHub() {
                 className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-[var(--surface-primary,#1A1A1A)] border border-[var(--border-subtle,#2D2D2D)] flex-wrap"
               >
                 <div className="flex items-center gap-2 min-w-[180px]">
-                  <span className="material-symbols-outlined text-[20px] text-[var(--accent-primary,#9D4EDD)]">
+                  <span className="material-symbols-outlined text-[20px] text-[var(--accent-primary)]">
                     {cfg.icon}
                   </span>
                   <div>
@@ -756,7 +756,7 @@ export function SelfCareHub() {
                     <button
                       type="button"
                       onClick={() => playSound(cfg.soundPreference)}
-                      className="p-1 text-[var(--text-muted,#8E8E8E)] hover:text-[var(--accent-primary,#9D4EDD)]"
+                      className="p-1 text-[var(--text-muted,#8E8E8E)] hover:text-[var(--accent-primary)]"
                       title="Testar som"
                     >
                       <span className="material-symbols-outlined text-[16px]">volume_up</span>
@@ -769,7 +769,7 @@ export function SelfCareHub() {
                     onClick={() => updateConfig(cfg.id, { enabled: !cfg.enabled })}
                     className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
                       cfg.enabled
-                        ? 'bg-[var(--accent-primary,#9D4EDD)] text-white'
+                        ? 'bg-[var(--accent-primary)] text-white'
                         : 'bg-[var(--surface-secondary,#242424)] text-[var(--text-muted,#8E8E8E)] hover:text-white'
                     }`}
                   >

@@ -7,7 +7,11 @@ export type ThemePaletteId =
   | 'blue-red'
   | 'pink-green'
   | 'cyan-amber'
-  | 'emerald-violet';
+  | 'emerald-violet'
+  | 'labdiv'
+  | 'show-da-fisica'
+  | 'hs'
+  | 'profis';
 
 export interface ThemePreferences {
   mode: ThemeMode;
@@ -149,9 +153,99 @@ export const THEME_PALETTES: Record<ThemePaletteId, PaletteDefinition> = {
       secondary: '#7C3AED',
     },
   },
+  labdiv: {
+    id: 'labdiv',
+    name: 'LabDiv (IFUSP)',
+    primary: {
+      dark: '#1F9FCF',
+      light: '#0F4780',
+      onDark: '#041222',
+      onLight: '#FFFFFF',
+    },
+    secondary: {
+      dark: '#FFCC00',
+      light: '#F14343',
+      textLight: '#B91C1C',
+      onDark: '#121212',
+      onLight: '#FFFFFF',
+    },
+    preview: {
+      primary: '#1F9FCF',
+      secondary: '#FFCC00',
+    },
+  },
+  'show-da-fisica': {
+    id: 'show-da-fisica',
+    name: 'Show de Física',
+    primary: {
+      dark: '#0066FF',
+      light: '#0052CC',
+      onDark: '#FFFFFF',
+      onLight: '#FFFFFF',
+    },
+    secondary: {
+      dark: '#FF1E56',
+      light: '#E11D48',
+      textLight: '#BE123C',
+      onDark: '#FFFFFF',
+      onLight: '#FFFFFF',
+    },
+    preview: {
+      primary: '#0066FF',
+      secondary: '#FF1E56',
+    },
+  },
+  hs: {
+    id: 'hs',
+    name: 'Hackerspace IFUSP',
+    primary: {
+      dark: '#00FF66',
+      light: '#059669',
+      onDark: '#041A0E',
+      onLight: '#FFFFFF',
+    },
+    secondary: {
+      dark: '#FFCC00',
+      light: '#D97706',
+      textLight: '#B45309',
+      onDark: '#121212',
+      onLight: '#121212',
+    },
+    preview: {
+      primary: '#00FF66',
+      secondary: '#FFCC00',
+    },
+  },
+  profis: {
+    id: 'profis',
+    name: 'Pró-Física (ProFis)',
+    primary: {
+      dark: '#F59E0B',
+      light: '#D97706',
+      onDark: '#121212',
+      onLight: '#FFFFFF',
+    },
+    secondary: {
+      dark: '#38BDF8',
+      light: '#0284C7',
+      textLight: '#0369A1',
+      onDark: '#082F49',
+      onLight: '#FFFFFF',
+    },
+    preview: {
+      primary: '#F59E0B',
+      secondary: '#38BDF8',
+    },
+  },
 };
 
-export const PALETTE_LIST = Object.values(THEME_PALETTES);
+export const ORG_PALETTE_IDS: ThemePaletteId[] = ['labdiv', 'show-da-fisica', 'hs', 'profis'];
+
+export const PALETTE_LIST = Object.values(THEME_PALETTES).filter(
+  (p) => !ORG_PALETTE_IDS.includes(p.id)
+);
+
+export const ORG_PALETTE_LIST = ORG_PALETTE_IDS.map((id) => THEME_PALETTES[id]);
 
 /**
  * Script inline síncrono para execução no <head> antes do primeiro paint.
@@ -160,5 +254,5 @@ export const PALETTE_LIST = Object.values(THEME_PALETTES);
  * Previne Hydration Mismatch e elimina 100% do FOUC (Flash of Unstyled Content).
  */
 export function buildThemeInitScript(): string {
-  return `(function(){try{var k='${THEME_STORAGE_KEY}';var raw=localStorage.getItem(k);var p=null;if(raw){try{p=JSON.parse(raw)}catch(e){}}var m=(p&&p.mode)?p.mode:'system';var pal=(p&&p.palette)?p.palette:'';if(!pal){var ck=document.cookie.match(/(?:^|; )aurtistic_palette=([^;]*)/);if(ck){pal=decodeURIComponent(ck[1]);}}if(!pal){pal='purple-gold';}var valid=['purple-gold','blue-red','pink-green','cyan-amber','emerald-violet'];if(valid.indexOf(pal)===-1)pal='purple-gold';var res=m;if(m==='system'){var mql=window.matchMedia('(prefers-color-scheme: dark)');res=mql.matches?'dark':'light'}else if(m!=='dark'&&m!=='light'){res='dark'}var d=document.documentElement;d.setAttribute('data-theme-mode',res);d.setAttribute('data-theme-palette',pal);d.style.colorScheme=res}catch(e){}})();`;
+  return `(function(){try{var k='${THEME_STORAGE_KEY}';var raw=localStorage.getItem(k);var p=null;if(raw){try{p=JSON.parse(raw)}catch(e){}}var m=(p&&p.mode)?p.mode:'system';var pal=(p&&p.palette)?p.palette:'';if(!pal){var ck=document.cookie.match(/(?:^|; )aurtistic_palette=([^;]*)/);if(ck){pal=decodeURIComponent(ck[1]);}}if(!pal){pal='purple-gold';}var valid=['purple-gold','blue-red','pink-green','cyan-amber','emerald-violet','labdiv','show-da-fisica','hs','profis'];if(valid.indexOf(pal)===-1)pal='purple-gold';var res=m;if(m==='system'){var mql=window.matchMedia('(prefers-color-scheme: dark)');res=mql.matches?'dark':'light'}else if(m!=='dark'&&m!=='light'){res='dark'}var d=document.documentElement;d.setAttribute('data-theme-mode',res);d.setAttribute('data-theme-palette',pal);d.style.colorScheme=res}catch(e){}})();`;
 }

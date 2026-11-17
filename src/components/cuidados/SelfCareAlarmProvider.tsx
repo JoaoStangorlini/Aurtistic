@@ -550,42 +550,42 @@ export function SelfCareAlarmProvider({ children }: { children: React.ReactNode 
       {activeAlarm && !isEyeRestOpen && (
         <div
           role="alert"
-          className="fixed bottom-6 right-6 z-[160] max-w-sm w-full bg-[var(--surface-primary,#1A1A1A)] border-2 border-[var(--accent-primary,#9D4EDD)] rounded-2xl p-4 shadow-2xl animate-in slide-in-from-bottom duration-300 space-y-3"
+          className="fixed bottom-6 right-6 z-[160] max-w-sm w-full bg-surface border-2 border-accent-primary rounded-2xl p-4 shadow-2xl animate-in slide-in-from-bottom duration-300 space-y-3"
         >
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[var(--accent-primary,#9D4EDD)]/15 border border-[var(--accent-primary,#9D4EDD)]/30 flex items-center justify-center shrink-0 text-[var(--accent-primary,#9D4EDD)]">
+            <div className="w-10 h-10 rounded-xl bg-accent-primary/15 border border-accent-primary/30 flex items-center justify-center shrink-0 text-accent-primary">
               <span className="material-symbols-outlined text-[24px]">
                 {activeAlarm.icon}
               </span>
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent-primary,#9D4EDD)]">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-accent-primary">
                   Lembrete de Autocuidado
                 </span>
                 <button
                   type="button"
                   onClick={() => dismissAlarm(activeAlarm.id)}
-                  className="p-0.5 text-[var(--text-muted,#8E8E8E)] hover:text-[var(--text-primary,#F5F5F5)]"
+                  className="p-0.5 text-fg-muted hover:text-fg"
                 >
                   <span className="material-symbols-outlined text-[16px]">close</span>
                 </button>
               </div>
-              <h4 className="text-sm font-bold text-[var(--text-primary,#F5F5F5)] truncate">
+              <h4 className="text-sm font-bold text-fg truncate">
                 {activeAlarm.name}
               </h4>
-              <p className="text-xs text-[var(--text-secondary,#A0A0A0)] mt-0.5 leading-relaxed">
+              <p className="text-xs text-fg-secondary mt-0.5 leading-relaxed">
                 {activeAlarm.description}
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[var(--border-subtle,#2D2D2D)]">
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border-subtle">
             {/* Botão Modo Hiperfoco 1h */}
             <button
               type="button"
               onClick={() => activateHyperfocus(60)}
-              className="text-[11px] font-bold text-[var(--accent-secondary,#FFCC00)] hover:underline flex items-center gap-1"
+              className="text-[11px] font-bold text-accent-secondary hover:underline flex items-center gap-1"
               title="Pausa alertas leves por 60 min (mantém apenas medicação e refeições)"
             >
               <span className="material-symbols-outlined text-[14px]">psychology</span>
@@ -596,14 +596,14 @@ export function SelfCareAlarmProvider({ children }: { children: React.ReactNode 
               <button
                 type="button"
                 onClick={() => dismissAlarm(activeAlarm.id)}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[var(--text-muted,#8E8E8E)] hover:text-[var(--text-primary,#F5F5F5)] hover:bg-[var(--surface-hover,#2D2D2D)] transition-colors"
+                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-fg-muted hover:text-fg hover:bg-surface-hover transition-colors"
               >
                 Dispensar
               </button>
               <button
                 type="button"
                 onClick={() => snoozeAlarm(activeAlarm.id, 5)}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-[var(--surface-secondary,#242424)] text-[var(--text-secondary,#A0A0A0)] hover:text-[var(--text-primary,#F5F5F5)] border border-[var(--border-subtle,#2D2D2D)] transition-colors"
+                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-elevated text-fg-secondary hover:text-fg border border-border-subtle transition-colors"
               >
                 +5m
               </button>
@@ -615,7 +615,7 @@ export function SelfCareAlarmProvider({ children }: { children: React.ReactNode 
                     setActiveAlarm(null);
                     setIsEyeRestOpen(true);
                   }}
-                  className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-[var(--accent-primary,#9D4EDD)] text-white hover:opacity-90 transition-opacity flex items-center gap-1 shadow-sm"
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-accent-primary text-on-accent-primary hover:opacity-90 transition-opacity flex items-center gap-1 shadow-sm"
                 >
                   <span className="material-symbols-outlined text-[14px]">timer</span>
                   Iniciar
@@ -624,7 +624,7 @@ export function SelfCareAlarmProvider({ children }: { children: React.ReactNode 
                 <button
                   type="button"
                   onClick={() => logCompleted(activeAlarm.key)}
-                  className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-[var(--accent-primary,#9D4EDD)] text-white hover:opacity-90 transition-opacity flex items-center gap-1 shadow-sm"
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-accent-primary text-on-accent-primary hover:opacity-90 transition-opacity flex items-center gap-1 shadow-sm"
                 >
                   <span className="material-symbols-outlined text-[14px]">check</span>
                   Feito ✓

@@ -81,7 +81,7 @@ export function InviteAcceptClient({
     <div className="w-full max-w-md mx-auto p-6 md:p-8 bg-surface/90 backdrop-blur-xl border border-border-subtle rounded-2xl shadow-2xl">
       <div className="flex flex-col items-center text-center mb-6">
         <ThemedAurtisticLogo size="md" />
-        <div className="mt-4 w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#9D4EDD]/20 to-[#FFCC00]/20 border border-border-subtle flex items-center justify-center text-2xl font-bold text-[var(--accent-secondary)] shadow-sm">
+        <div className="mt-4 w-14 h-14 rounded-2xl bg-gradient-to-tr from-accent-primary/20 to-accent-secondary/20 border border-border-subtle flex items-center justify-center text-2xl font-bold text-[var(--accent-secondary)] shadow-sm">
           {org.name.slice(0, 2).toUpperCase()}
         </div>
         <h1 className="text-xl md:text-2xl font-black text-fg mt-3 font-['Bukra']">

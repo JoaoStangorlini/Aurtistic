@@ -203,7 +203,7 @@ export function FirstTimeOnboardingModal({
       title: 'Tarefas & Planejamento',
       desc: 'Lista, semanal, mensal e filtros avançados',
       icon: 'task_alt',
-      color: 'text-[#9D4EDD]',
+      color: 'text-accent-primary',
     },
     {
       key: 'servidor',
@@ -231,14 +231,14 @@ export function FirstTimeOnboardingModal({
       title: 'Currículo Técnico',
       desc: 'Histórico acadêmico, formação e certificações',
       icon: 'badge',
-      color: 'text-blue-400',
+      color: 'text-accent-primary',
     },
     {
       key: 'resumo',
       title: 'Resumo Profissional',
       desc: 'Apresentação pessoal e cartão de visitas',
       icon: 'account_circle',
-      color: 'text-purple-400',
+      color: 'text-accent-secondary',
     },
   ];
 
@@ -250,7 +250,7 @@ export function FirstTimeOnboardingModal({
     >
       <div className="w-full max-w-2xl bg-surface border border-border-subtle rounded-3xl p-5 sm:p-7 shadow-2xl relative overflow-hidden flex flex-col max-h-[92vh]">
         {/* Halo decorativo de fundo */}
-        <div className="absolute -top-32 -right-32 w-80 h-80 rounded-full bg-[#9D4EDD]/15 blur-3xl pointer-events-none" />
+        <div className="absolute -top-32 -right-32 w-80 h-80 rounded-full bg-accent-primary/15 blur-3xl pointer-events-none" />
 
         {/* Topo do Modal: Logo, Título e Botão Fechar (X) */}
         <div className="flex items-center justify-between pb-4 border-b border-border-subtle">
@@ -332,7 +332,7 @@ export function FirstTimeOnboardingModal({
                         onClick={() => handleApplyPreset(p.config)}
                         className={`p-2.5 rounded-xl border text-left flex flex-col gap-1 transition-all cursor-pointer ${
                           isSelected
-                            ? 'bg-[#9D4EDD]/20 border-[#9D4EDD] ring-1 ring-[#9D4EDD]'
+                            ? 'bg-accent-primary/20 border-accent-primary ring-1 ring-accent-primary'
                             : 'bg-app border-border-subtle hover:bg-surface-hover text-fg-secondary'
                         }`}
                       >
@@ -388,7 +388,7 @@ export function FirstTimeOnboardingModal({
                         {/* Switch visual */}
                         <div
                           className={`w-10 h-5 rounded-full flex items-center p-0.5 transition-colors shrink-0 ${
-                            isChecked ? 'bg-[#9D4EDD]' : 'bg-surface-hover'
+                            isChecked ? 'bg-accent-primary' : 'bg-surface-hover'
                           }`}
                         >
                           <div
@@ -501,7 +501,7 @@ export function FirstTimeOnboardingModal({
                           </div>
 
                           {isSelected && (
-                            <span className="material-symbols-outlined text-[18px] text-[#9D4EDD]">
+                            <span className="material-symbols-outlined text-[18px] text-accent-primary">
                               check_circle
                             </span>
                           )}
@@ -539,7 +539,7 @@ export function FirstTimeOnboardingModal({
               type="button"
               disabled={isSaving}
               onClick={() => handleSave(false)}
-              className="px-5 py-2 rounded-xl text-xs font-bold bg-[var(--accent-primary)] text-white hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-md shadow-[#9D4EDD]/20 cursor-pointer disabled:opacity-50"
+              className="px-5 py-2 rounded-xl text-xs font-bold bg-accent-primary text-on-accent-primary hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-md shadow-accent-primary/20 cursor-pointer disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-[16px]">check</span>
               <span>{isSaving ? 'Salvando...' : 'Salvar Preferências'}</span>

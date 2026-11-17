@@ -119,7 +119,7 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-border-subtle bg-surface">
           <h2 className="text-xl font-bold text-fg flex items-center gap-2">
-            <span className="material-symbols-outlined text-[#9D4EDD]">event</span>
+            <span className="material-symbols-outlined text-accent-primary">event</span>
             {event ? 'Editar Evento' : 'Novo Evento'}
           </h2>
           <button onClick={onClose} className="text-fg-muted hover:text-fg transition-colors">
@@ -138,7 +138,7 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
                 type="text"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
-                className="w-full bg-surface border border-border-subtle text-fg px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] focus:ring-1 focus:ring-[#9D4EDD] transition-all"
+                className="w-full bg-surface border border-border-subtle text-fg px-4 py-3 rounded-lg focus:outline-none focus:border-accent-primary focus:ring-1 focus:ring-accent-primary transition-all"
                 placeholder="Ex: Reunião Semanal, Aula de Design..."
                 required
               />
@@ -152,7 +152,7 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
                   type="datetime-local"
                   value={dataInicio}
                   onChange={(e) => setDataInicio(e.target.value)}
-                  className="w-full bg-surface border border-border-subtle text-fg px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] transition-all color-scheme-dark"
+                  className="w-full bg-surface border border-border-subtle text-fg px-4 py-3 rounded-lg focus:outline-none focus:border-accent-primary transition-all color-scheme-dark"
                 />
               </div>
               <div>
@@ -161,7 +161,7 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
                   type="datetime-local"
                   value={dataFim}
                   onChange={(e) => setDataFim(e.target.value)}
-                  className="w-full bg-surface border border-border-subtle text-fg px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] transition-all color-scheme-dark"
+                  className="w-full bg-surface border border-border-subtle text-fg px-4 py-3 rounded-lg focus:outline-none focus:border-accent-primary transition-all color-scheme-dark"
                 />
               </div>
             </div>
@@ -186,7 +186,7 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value as any)}
-                  className="w-full bg-surface border border-border-subtle text-fg px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] transition-all color-scheme-dark font-medium"
+                  className="w-full bg-surface border border-border-subtle text-fg px-4 py-3 rounded-lg focus:outline-none focus:border-accent-primary transition-all color-scheme-dark font-medium"
                 >
                   <option value="confirmado">Confirmado</option>
                   <option value="rascunho">Rascunho</option>
@@ -198,20 +198,20 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
             {/* Rotina Semanal */}
             <div className="mt-2 border border-border-subtle bg-surface/50 rounded-xl p-5">
               <h3 className="text-sm font-bold text-fg mb-1 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#9D4EDD] text-[18px]">update</span>
+                <span className="material-symbols-outlined text-accent-primary text-[18px]">update</span>
                 Rotina Semanal
               </h3>
               <p className="text-xs text-fg-muted mb-4">Selecione os dias em que o evento se repete e defina os horários.</p>
               
               <div className="flex flex-col gap-3">
                 {DIAS_SEMANA.map(dia => (
-                  <div key={dia} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border border-border-subtle bg-surface hover:border-[#9D4EDD]/50 transition-colors">
+                  <div key={dia} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border border-border-subtle bg-surface hover:border-accent-primary/50 transition-colors">
                     <label className="flex items-center gap-3 cursor-pointer min-w-[120px]">
                       <input 
                         type="checkbox" 
                         checked={!!horarios[dia]} 
                         onChange={() => handleDiaToggle(dia)}
-                        className="w-5 h-5 accent-[#9D4EDD] rounded cursor-pointer"
+                        className="w-5 h-5 accent-[var(--accent-primary)] rounded cursor-pointer"
                       />
                       <span className={`font-bold text-sm ${horarios[dia] ? 'text-fg' : 'text-fg-muted'}`}>{dia}</span>
                     </label>
@@ -222,14 +222,14 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
                           type="time"
                           value={horarios[dia].inicio}
                           onChange={(e) => handleTimeChange(dia, 'inicio', e.target.value)}
-                          className="bg-app border border-border-subtle text-fg px-3 py-1.5 rounded text-sm focus:outline-none focus:border-[#9D4EDD] color-scheme-dark"
+                          className="bg-app border border-border-subtle text-fg px-3 py-1.5 rounded text-sm focus:outline-none focus:border-accent-primary color-scheme-dark"
                         />
                         <span className="text-fg-muted text-xs font-bold">ATÉ</span>
                         <input
                           type="time"
                           value={horarios[dia].fim}
                           onChange={(e) => handleTimeChange(dia, 'fim', e.target.value)}
-                          className="bg-app border border-border-subtle text-fg px-3 py-1.5 rounded text-sm focus:outline-none focus:border-[#9D4EDD] color-scheme-dark"
+                          className="bg-app border border-border-subtle text-fg px-3 py-1.5 rounded text-sm focus:outline-none focus:border-accent-primary color-scheme-dark"
                         />
                       </div>
                     )}
@@ -244,7 +244,7 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
               <textarea
                 value={descricao}
                 onChange={(e) => setDescricao(e.target.value)}
-                className="w-full bg-surface border border-border-subtle text-fg px-4 py-3 rounded-lg focus:outline-none focus:border-[#9D4EDD] transition-all resize-y min-h-[100px] custom-scrollbar"
+                className="w-full bg-surface border border-border-subtle text-fg px-4 py-3 rounded-lg focus:outline-none focus:border-accent-primary transition-all resize-y min-h-[100px] custom-scrollbar"
                 placeholder="Detalhes adicionais sobre o evento..."
               />
             </div>
@@ -265,7 +265,7 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
             type="submit" 
             form="event-form"
             disabled={isSubmitting || !nome.trim()}
-            className="px-6 py-2.5 rounded-lg font-bold bg-[var(--accent-primary)] text-white hover:bg-[#8338c7] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-[#9D4EDD]/20"
+            className="px-6 py-2.5 rounded-lg font-bold bg-accent-primary text-on-accent-primary hover:bg-accent-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-accent-primary/20"
           >
             {isSubmitting ? (
               <><span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> Salvando...</>

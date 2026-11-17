@@ -183,11 +183,11 @@ export function OrganizationAdminModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-surface border border-purple-500/40 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-surface border border-accent-primary/40 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header do Modal */}
         <div className="flex items-center justify-between p-4 sm:p-5 border-b border-border-subtle bg-app/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+            <div className="w-10 h-10 rounded-xl bg-accent-primary/10 border border-accent-primary/30 flex items-center justify-center text-accent-primary">
               <span className="material-symbols-outlined text-[24px]">admin_panel_settings</span>
             </div>
             <div>
@@ -210,12 +210,12 @@ export function OrganizationAdminModal({
 
         {/* Notificação de Status */}
         {statusMessage && (
-          <div className="px-5 py-2.5 bg-purple-500/15 border-b border-purple-500/30 text-purple-200 text-xs flex items-center justify-between">
+          <div className="px-5 py-2.5 bg-accent-primary/15 border-b border-accent-primary/30 text-fg text-xs flex items-center justify-between">
             <span>{statusMessage}</span>
             <button
               type="button"
               onClick={() => setStatusMessage(null)}
-              className="text-purple-300 hover:text-white"
+              className="text-accent-primary hover:text-white"
             >
               ✕
             </button>
@@ -229,7 +229,7 @@ export function OrganizationAdminModal({
             onClick={() => setActiveTab('associar')}
             className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-t-lg border-b-2 transition-colors cursor-pointer ${
               activeTab === 'associar'
-                ? 'border-purple-400 text-purple-300 bg-surface'
+                ? 'border-accent-primary text-accent-primary bg-surface'
                 : 'border-transparent text-fg-secondary hover:text-white'
             }`}
           >
@@ -242,7 +242,7 @@ export function OrganizationAdminModal({
             onClick={() => setActiveTab('reatribuir')}
             className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-t-lg border-b-2 transition-colors cursor-pointer ${
               activeTab === 'reatribuir'
-                ? 'border-purple-400 text-purple-300 bg-surface'
+                ? 'border-accent-primary text-accent-primary bg-surface'
                 : 'border-transparent text-fg-secondary hover:text-white'
             }`}
           >
@@ -255,7 +255,7 @@ export function OrganizationAdminModal({
             onClick={() => setActiveTab('categorias')}
             className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-t-lg border-b-2 transition-colors cursor-pointer ${
               activeTab === 'categorias'
-                ? 'border-purple-400 text-purple-300 bg-surface'
+                ? 'border-accent-primary text-accent-primary bg-surface'
                 : 'border-transparent text-fg-secondary hover:text-white'
             }`}
           >
@@ -268,7 +268,7 @@ export function OrganizationAdminModal({
             onClick={() => setActiveTab('lote')}
             className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-t-lg border-b-2 transition-colors cursor-pointer ${
               activeTab === 'lote'
-                ? 'border-purple-400 text-purple-300 bg-surface'
+                ? 'border-accent-primary text-accent-primary bg-surface'
                 : 'border-transparent text-fg-secondary hover:text-white'
             }`}
           >
@@ -281,7 +281,7 @@ export function OrganizationAdminModal({
             onClick={() => setActiveTab('membros')}
             className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-t-lg border-b-2 transition-colors cursor-pointer ${
               activeTab === 'membros'
-                ? 'border-purple-400 text-purple-300 bg-surface'
+                ? 'border-accent-primary text-accent-primary bg-surface'
                 : 'border-transparent text-fg-secondary hover:text-white'
             }`}
           >
@@ -318,7 +318,7 @@ export function OrganizationAdminModal({
                       <div>
                         <span className="font-bold text-fg block text-sm">{name}</span>
                         <span className="text-[11px] text-fg-muted block">
-                          Presente em <strong className="text-purple-300">{count}</strong> {count === 1 ? 'tarefa' : 'tarefas'}
+                          Presente em <strong className="text-accent-primary">{count}</strong> {count === 1 ? 'tarefa' : 'tarefas'}
                         </span>
                       </div>
                     </div>
@@ -329,7 +329,7 @@ export function OrganizationAdminModal({
                         onChange={(e) =>
                           setNameMapping((prev) => ({ ...prev, [name]: e.target.value }))
                         }
-                        className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs text-fg focus:border-purple-500 focus:outline-none cursor-pointer min-w-[200px]"
+                        className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs text-fg focus:border-accent-primary focus:outline-none cursor-pointer min-w-[200px]"
                       >
                         <option value="">-- Selecionar Perfil Oficial --</option>
                         {members.map((m) => (
@@ -343,7 +343,7 @@ export function OrganizationAdminModal({
                         type="button"
                         disabled={isProcessing || !nameMapping[name]}
                         onClick={() => handleLinkNameToMember(name)}
-                        className="px-3 py-1.5 rounded-lg bg-purple-600 text-white font-bold text-xs hover:bg-purple-500 transition-colors disabled:opacity-50 cursor-pointer shadow-sm flex items-center gap-1"
+                        className="px-3 py-1.5 rounded-lg bg-accent-primary text-on-accent-primary font-bold text-xs hover:bg-accent-primary-hover transition-colors disabled:opacity-50 cursor-pointer shadow-sm flex items-center gap-1"
                       >
                         <span className="material-symbols-outlined text-[15px]">sync</span>
                         <span>Vincular</span>
@@ -368,7 +368,7 @@ export function OrganizationAdminModal({
                     placeholder="Buscar tarefa por título ou responsável..."
                     value={taskSearch}
                     onChange={(e) => setTaskSearch(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-border-subtle bg-app text-xs text-fg focus:border-purple-500 focus:outline-none"
+                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-border-subtle bg-app text-xs text-fg focus:border-accent-primary focus:outline-none"
                   />
                 </div>
                 {taskSearch && (
@@ -412,7 +412,7 @@ export function OrganizationAdminModal({
                           onChange={(e) =>
                             handleReassignTask(task.id, assignedMember?.id || null, e.target.value || null)
                           }
-                          className="rounded-lg border border-border-subtle bg-surface px-2.5 py-1.5 text-xs text-fg focus:border-purple-500 focus:outline-none cursor-pointer"
+                          className="rounded-lg border border-border-subtle bg-surface px-2.5 py-1.5 text-xs text-fg focus:border-accent-primary focus:outline-none cursor-pointer"
                         >
                           <option value="">Geral</option>
                           {subteams.map((s) => (
@@ -428,7 +428,7 @@ export function OrganizationAdminModal({
                           onChange={(e) =>
                             handleReassignTask(task.id, e.target.value || null)
                           }
-                          className="rounded-lg border border-border-subtle bg-surface px-2.5 py-1.5 text-xs text-fg focus:border-purple-500 focus:outline-none cursor-pointer min-w-[170px]"
+                          className="rounded-lg border border-border-subtle bg-surface px-2.5 py-1.5 text-xs text-fg focus:border-accent-primary focus:outline-none cursor-pointer min-w-[170px]"
                         >
                           <option value="">Sem Responsável</option>
                           {members.map((m) => (
@@ -466,9 +466,9 @@ export function OrganizationAdminModal({
                   setNewCategoryDesc('');
                   setStatusMessage(`Categoria "${newSub.name}" criada com sucesso!`);
                 }}
-                className="p-4 rounded-xl bg-app border border-purple-500/30 space-y-3"
+                className="p-4 rounded-xl bg-app border border-accent-primary/30 space-y-3"
               >
-                <h4 className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                <h4 className="text-xs font-bold text-accent-primary uppercase tracking-wider flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[16px]">add_circle</span>
                   <span>Criar Nova Categoria / Subequipe</span>
                 </h4>
@@ -484,7 +484,7 @@ export function OrganizationAdminModal({
                       value={newCategoryName}
                       onChange={(e) => setNewCategoryName(e.target.value)}
                       placeholder="Ex: Robótica, Audiovisual, Eventos..."
-                      className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border-subtle text-xs text-fg focus:outline-none focus:border-purple-400"
+                      className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border-subtle text-xs text-fg focus:outline-none focus:border-accent-primary"
                     />
                   </div>
                   <div>
@@ -496,7 +496,7 @@ export function OrganizationAdminModal({
                       value={newCategoryDesc}
                       onChange={(e) => setNewCategoryDesc(e.target.value)}
                       placeholder="Ex: Produção de vídeos e divulgação..."
-                      className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border-subtle text-xs text-fg focus:outline-none focus:border-purple-400"
+                      className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border-subtle text-xs text-fg focus:outline-none focus:border-accent-primary"
                     />
                   </div>
                   <div>
@@ -512,7 +512,7 @@ export function OrganizationAdminModal({
                       />
                       <button
                         type="submit"
-                        className="flex-1 py-1.5 px-3 rounded-lg bg-purple-500 text-slate-950 font-bold text-xs hover:bg-purple-400 transition-colors cursor-pointer"
+                        className="flex-1 py-1.5 px-3 rounded-lg bg-accent-primary text-on-accent-primary font-bold text-xs hover:bg-accent-primary-hover transition-colors cursor-pointer"
                       >
                         + Criar Categoria
                       </button>
@@ -639,7 +639,7 @@ export function OrganizationAdminModal({
                 </div>
                 <div className="p-3 rounded-xl bg-app border border-border-subtle space-y-1">
                   <span className="text-[10px] font-bold text-fg-muted uppercase">Categorias Oficiais</span>
-                  <span className="text-2xl font-black text-indigo-400 block">{subteams.length}</span>
+                  <span className="text-2xl font-black text-accent-primary block">{subteams.length}</span>
                 </div>
               </div>
 

@@ -74,9 +74,11 @@ export function TeamProgressPanel({
   // Agrupamento por subequipe
   const subteamProgress = useMemo(() => {
     return subteams.map((sub) => {
-      const subTasks = orgTasks.filter((t) => t.subteam_id === sub.id);
+      const subTasks = orgTasks.filter(
+        (t) => t.subteam_id === sub.id || (t.assigned_subteam_ids || []).includes(sub.id)
+      );
       const subTotal = subTasks.length;
-      const subDone = subTasks.filter((t) => t.status === 'Concluído').length;
+      const subDone = subTasks.filter((t) => ['Concluído', 'completa', 'concluída'].includes(t.status)).length;
       const percent = subTotal > 0 ? Math.round((subDone / subTotal) * 100) : 0;
       return {
         ...sub,
@@ -97,24 +99,53 @@ export function TeamProgressPanel({
         Boolean(t.assignee_id) ||
         Boolean(t.responsavel);
       if (hasAssignee) return false;
-      if (activeSubteamTab !== 'all' && t.subteam_id !== activeSubteamTab) return false;
+      if (
+        activeSubteamTab !== 'all' &&
+        t.subteam_id !== activeSubteamTab &&
+        !(t.assigned_subteam_ids || []).includes(activeSubteamTab)
+      ) return false;
       return true;
     });
   }, [orgTasks, activeSubteamTab]);
 
-  // Membros com sobrecarga/esgotamento e suas tarefas pendentes
+  // Meu membro atual na organização
+  const myMember = useMemo(
+    () => members.find((m) => m.user_id === currentUserId),
+    [members, currentUserId]
+  );
+
+  // Membros com sobrecarga/esgotamento e suas tarefas pendentes (excluindo o próprio usuário logado)
   const overloadedMembersData = useMemo(() => {
     return members
       .map((m) => {
+        // 1. Exclui estritamente o próprio usuário logado da lista de sobrecarregados
+        if (m.user_id === currentUserId || (myMember && m.id === myMember.id)) {
+          return null;
+        }
+
         const isDepleted = m.cognitive_capacity === 'depleted';
-        const memberTasks = orgTasks.filter(
-          (t) =>
-            t.status !== 'Concluído' &&
-            t.status !== 'done' &&
-            ((t.assigned_member_ids && t.assigned_member_ids.includes(m.id)) ||
-              (m.user_id && t.user_id === m.user_id) ||
-              (t.responsavel && t.responsavel.toLowerCase().includes(m.full_name.toLowerCase())))
-        );
+        const memberTasks = orgTasks.filter((t) => {
+          const isDone = t.status === 'Concluído' || t.status === 'done';
+          if (isDone) return false;
+
+          // Nunca incluir tarefas onde o próprio usuário logado já está atribuído ou responsável
+          const isMeAssigned =
+            (myMember && t.assigned_member_ids && t.assigned_member_ids.includes(myMember.id)) ||
+            (currentUserId && t.assigned_member_ids && t.assigned_member_ids.includes(currentUserId)) ||
+            (myMember && t.responsavel && t.responsavel.toLowerCase().includes(myMember.full_name.toLowerCase())) ||
+            (t.user_id === currentUserId && (!t.assigned_member_ids || t.assigned_member_ids.length === 0));
+          if (isMeAssigned) return false;
+
+          // Verifica se a tarefa está de fato sob a responsabilidade do colega
+          const isColleagueAssigned =
+            (t.assigned_member_ids && t.assigned_member_ids.includes(m.id)) ||
+            (m.user_id && t.assigned_member_ids && t.assigned_member_ids.includes(m.user_id)) ||
+            (t.responsavel && t.responsavel.toLowerCase().includes(m.full_name.toLowerCase())) ||
+            (m.user_id && t.user_id === m.user_id && (!t.assigned_member_ids || t.assigned_member_ids.length === 0));
+
+          return isColleagueAssigned;
+        });
+
         // Sobrecarga automática: mais de 4 tarefas ativas ou capacidade 'depleted'
         const isOverloaded = isDepleted || memberTasks.length >= 5;
         return {
@@ -123,8 +154,10 @@ export function TeamProgressPanel({
           isOverloaded,
         };
       })
-      .filter((d) => d.isOverloaded && d.tasks.length > 0);
-  }, [members, orgTasks]);
+      .filter((d): d is { member: typeof members[0]; tasks: typeof orgTasks; isOverloaded: boolean } => 
+        Boolean(d && d.isOverloaded && d.tasks.length > 0)
+      );
+  }, [members, orgTasks, currentUserId, myMember]);
 
   const handleClaim = async (taskId: string) => {
     if (!onClaimTask) return;
@@ -147,7 +180,7 @@ export function TeamProgressPanel({
   };
 
   return (
-    <div data-tour="team-progress-panel" className="p-4 md:p-6 bg-surface/90 backdrop-blur-xl border border-border-subtle rounded-2xl shadow-xl space-y-6">
+    <div data-tour="team-progress-panel" className="org-card p-4 md:p-6 bg-surface/90 backdrop-blur-xl border border-border-subtle rounded-2xl shadow-xl space-y-6">
       {/* Cabeçalho do Painel de Equipe */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-subtle pb-4">
         <div>
@@ -201,7 +234,7 @@ export function TeamProgressPanel({
               <div className="flex items-center justify-between mb-1.5">
                 <span
                   className="w-2.5 h-2.5 rounded-full"
-                  style={{ backgroundColor: sub.color || '#9D4EDD' }}
+                  style={{ backgroundColor: sub.color || 'var(--accent-primary)' }}
                 ></span>
                 <span className="text-[11px] font-bold text-fg-secondary">
                   {sub.percent}%
@@ -382,8 +415,8 @@ export function TeamProgressPanel({
                           <span
                             className="text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider"
                             style={{
-                              backgroundColor: `${subteam?.color || '#9D4EDD'}20`,
-                              color: subteam?.color || '#9D4EDD',
+                              backgroundColor: `${subteam?.color || 'var(--accent-primary)'}20`,
+                              color: subteam?.color || 'var(--accent-primary)',
                             }}
                           >
                             {subteam?.name || 'Geral'}
@@ -477,7 +510,7 @@ export function TeamProgressPanel({
                       return (
                         <div
                           key={t.id}
-                          className="p-2.5 rounded-lg bg-surface border border-border-subtle flex flex-col justify-between gap-2"
+                          className="org-card p-2.5 rounded-lg bg-surface border border-border-subtle flex flex-col justify-between gap-2"
                         >
                           <div className="space-y-0.5">
                             <span className="text-[10px] text-fg-muted block">

@@ -277,7 +277,7 @@ export function VaultIdeWorkbench({
       case 'image':
         return { icon: 'image', color: 'text-amber-400', label: 'Imagem' };
       case 'audio':
-        return { icon: 'audiotrack', color: 'text-purple-400', label: 'Áudio' };
+        return { icon: 'audiotrack', color: 'text-accent-primary', label: 'Áudio' };
       case 'video':
         return { icon: 'movie', color: 'text-red-400', label: 'Vídeo' };
       case 'note':
@@ -402,7 +402,7 @@ export function VaultIdeWorkbench({
                     <span className="material-symbols-outlined text-[16px] text-[#FFCC00]">folder</span>
                     <span className="font-semibold">{sub.name}</span>
                     {sub.hasPin && (
-                      <span className="material-symbols-outlined text-[13px] text-purple-400">lock</span>
+                      <span className="material-symbols-outlined text-[13px] text-accent-primary">lock</span>
                     )}
                   </button>
                 ))}
@@ -750,7 +750,7 @@ export function VaultIdeWorkbench({
           /* CASO 3: REPRODUTOR DE ÁUDIO */
           <div className="flex-1 flex flex-col items-center justify-center p-8 bg-surface/30">
             <div className="w-full max-w-md bg-surface border border-border-subtle rounded-2xl p-6 shadow-xl flex flex-col items-center space-y-4">
-              <div className="w-16 h-16 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
+              <div className="w-16 h-16 rounded-2xl bg-accent-primary/10 text-accent-primary flex items-center justify-center">
                 <span className="material-symbols-outlined text-[32px]">audiotrack</span>
               </div>
               <div className="text-center">

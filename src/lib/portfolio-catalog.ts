@@ -30,6 +30,7 @@ export async function ensurePortfolioCatalogLoaded(
     return [];
   }
 
+  let supabaseRows: UserFileIndexRow[] = [];
   try {
     let query = supabase
       .from('user_files_index')
@@ -41,10 +42,17 @@ export async function ensurePortfolioCatalogLoaded(
       query = query.eq('visibility', 'public');
     }
 
-    const { data: rawPhotos, error } = await query.order('created_at', { ascending: false });
+    const { data: rawPhotos, error } = await query.order('created_at', { ascending: false }).limit(5000);
 
     if (!error && Array.isArray(rawPhotos) && rawPhotos.length > 0) {
-      return rawPhotos as UserFileIndexRow[];
+      supabaseRows = rawPhotos as UserFileIndexRow[];
+      const hasSubfolders = supabaseRows.some((r) => {
+        const clean = String(r.relative_path || '').replace(/^Portfolio\//i, '');
+        return clean.includes('/');
+      });
+      if (supabaseRows.length >= 1000 && hasSubfolders) {
+        return supabaseRows;
+      }
     }
   } catch (err) {
     console.warn('[PortfolioCatalog] Erro ao buscar do Supabase:', err);
@@ -127,6 +135,11 @@ export async function ensurePortfolioCatalogLoaded(
     }
 
     if (legacyItems.length > 0) {
+      const existingByPath = new Map<string, UserFileIndexRow>();
+      for (const r of supabaseRows) {
+        if (r.relative_path) existingByPath.set(r.relative_path.toLowerCase(), r);
+      }
+
       const mapped: UserFileIndexRow[] = legacyItems
         .filter((it: any) => !options?.isPublicRoute || it.visibility === 'public' || it.visibility === undefined)
         .map((it: any, idx: number) => {
@@ -134,33 +147,43 @@ export async function ensurePortfolioCatalogLoaded(
           const parts = cleanRel.split('/');
           const albumName = it.album || (parts.length > 1 ? parts[0] : 'Geral');
           const subalbumName = it.subalbum || (parts.length > 2 ? parts[1] : undefined);
+          const fullRelPath = cleanRel.startsWith('Portfolio/') ? cleanRel : `Portfolio/${cleanRel}`;
+          const existing = existingByPath.get(fullRelPath.toLowerCase());
           return {
-            id: it.id || `pf_${idx}`,
+            id: existing?.id || it.id || `pf_${idx}`,
             user_id: userId,
-            relative_path: cleanRel.startsWith('Portfolio/') ? cleanRel : `Portfolio/${cleanRel}`,
+            relative_path: fullRelPath,
             filename: it.originalFile || it.filename || path.basename(cleanRel),
             mime_type: it.mimeType || 'image/jpeg',
-            size_bytes: Number(it.sizeBytes) || 0,
+            size_bytes: Number(it.sizeBytes) || existing?.size_bytes || 0,
             is_directory: false,
             has_pin: false,
-            linked_task_id: null,
-            linked_task_ids: [],
-            show_in_portfolio: true,
-            show_in_curriculum: false,
-            curriculum_label: null,
-            title: it.title || it.originalFile || path.basename(cleanRel),
-            description: it.description || null,
-            album: albumName,
-            category: subalbumName || it.subalbum || 'Fotografia',
-            tags: Array.isArray(it.tags) ? it.tags : [],
-            exif_data: it.exif || it.exifData || {},
-            is_favorite: Boolean(it.isFavorite),
-            visibility: 'public' as const,
-            display_order: typeof it.order === 'number' ? it.order : idx,
-            created_at: it.createdAt || new Date().toISOString(),
+            linked_task_id: existing?.linked_task_id || null,
+            linked_task_ids: existing?.linked_task_ids || [],
+            show_in_portfolio: existing ? Boolean(existing.show_in_portfolio) : true,
+            show_in_curriculum: existing ? Boolean(existing.show_in_curriculum) : false,
+            curriculum_label: existing?.curriculum_label || null,
+            title: existing?.title || it.title || it.originalFile || path.basename(cleanRel),
+            description: existing?.description || it.description || null,
+            album: existing?.album && existing.album !== 'Geral' ? existing.album : albumName,
+            category: existing?.category || subalbumName || it.subalbum || 'Fotografia',
+            tags: Array.isArray(existing?.tags) && existing.tags.length > 0 ? existing.tags : Array.isArray(it.tags) ? it.tags : [],
+            exif_data: existing?.exif_data && Object.keys(existing.exif_data).length > 0 ? existing.exif_data : (it.exif || it.exifData || {}),
+            is_favorite: existing ? Boolean(existing.is_favorite) : Boolean(it.isFavorite),
+            visibility: (existing?.visibility || 'public') as 'public' | 'private',
+            display_order: typeof existing?.display_order === 'number' ? existing.display_order : (typeof it.order === 'number' ? it.order : idx),
+            created_at: existing?.created_at || it.createdAt || new Date().toISOString(),
             updated_at: new Date().toISOString(),
           };
         });
+
+      // Inclui itens extras do Supabase que não estavam no catalog.json
+      const mappedSet = new Set(mapped.map((m) => m.relative_path.toLowerCase()));
+      for (const extra of supabaseRows) {
+        if (extra.relative_path && !mappedSet.has(extra.relative_path.toLowerCase())) {
+          mapped.push(extra);
+        }
+      }
 
       // Persiste no Supabase SOMENTE se o visitante autenticado for o dono
       const canPersist = options?.currentAuthUserId === userId;
@@ -186,6 +209,6 @@ export async function ensurePortfolioCatalogLoaded(
     console.error('[PortfolioCatalog] Falha crítica ao carregar catálogo:', err);
   }
 
-  return [];
+  return supabaseRows;
 }
 

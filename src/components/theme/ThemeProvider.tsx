@@ -49,6 +49,10 @@ function getInitialPreferences(): ThemePreferences {
         'pink-green',
         'cyan-amber',
         'emerald-violet',
+        'labdiv',
+        'show-da-fisica',
+        'hs',
+        'profis',
       ];
       const validModes: ThemeMode[] = ['system', 'light', 'dark'];
       return {

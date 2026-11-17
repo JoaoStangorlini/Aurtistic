@@ -61,13 +61,13 @@ export const systemLinks: SystemLinkDef[] = [
     name: 'Site Público', 
     icon: <HubIcon />, 
     href: 'https://hub-lab-div.vercel.app',
-    hoverClass: 'hover:border-[#FFCC00] hover:text-[#FFCC00] hover:bg-gradient-to-r hover:from-blue-500/20 hover:via-yellow-500/20 hover:to-red-500/20'
+    hoverClass: 'hover:border-[#FFCC00] hover:text-[#FFCC00] hover:bg-gradient-to-r hover:from-[#1F9FCF]/20 hover:via-[#FFCC00]/20 hover:to-[#F14343]/20'
   },
   { 
     name: 'Vercel Testes', 
     icon: <VercelIcon />, 
     href: 'https://hub-labdiv-testes.vercel.app/',
-    hoverClass: 'hover:border-[#FFF] hover:text-white hover:bg-gradient-to-r hover:from-blue-500/20 hover:via-yellow-500/20 hover:to-red-500/20'
+    hoverClass: 'hover:border-[#FFF] hover:text-white hover:bg-gradient-to-r hover:from-[#1F9FCF]/20 hover:via-[#FFCC00]/20 hover:to-[#F14343]/20'
   },
   { 
     name: 'Canva IDV', 

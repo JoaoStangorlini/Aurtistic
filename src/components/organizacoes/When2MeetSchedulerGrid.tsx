@@ -147,7 +147,7 @@ export function When2MeetSchedulerGrid({
         <button
           type="button"
           onClick={handlePreFillWithAgenda}
-          className="px-3.5 py-2 bg-gradient-to-r from-[#9D4EDD]/20 to-[#FFCC00]/20 hover:from-[#9D4EDD]/30 hover:to-[#FFCC00]/30 border border-[#9D4EDD]/40 text-fg text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm self-start sm:self-auto"
+          className="px-3.5 py-2 bg-gradient-to-r from-accent-primary/20 to-accent-secondary/20 hover:from-accent-primary/30 hover:to-accent-secondary/30 border border-accent-primary/40 text-fg text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm self-start sm:self-auto"
         >
           <span className="material-symbols-outlined text-[16px] text-[var(--accent-secondary)]">
             bolt

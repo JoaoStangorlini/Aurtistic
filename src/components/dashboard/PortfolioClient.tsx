@@ -2,12 +2,21 @@
 // ARQUIVO: src/components/dashboard/PortfolioClient.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { saveUserProfileData, syncPortfolioAction } from '@/app/(dashboard)/actions';
 import { AurtisticGalleryGrid } from '@/components/portfolio/AurtisticGalleryGrid';
 import { PhotoInspectItem } from '@/components/portfolio/PhotoInspectModal';
 import { TaskFilePickerModal } from '@/components/tarefas/TaskFilePickerModal';
 import { useAurtisticMedia } from '@/components/media/AurtisticMediaContext';
+import { PressClippingsSection } from '@/components/portfolio/PressClippingsSection';
+import { InstagramMuralSection } from '@/components/portfolio/InstagramMuralSection';
+import type {
+  InstagramMentionEmbed,
+  PressClippingItem,
+  PortfolioSectionConfig,
+  PortfolioSectionId,
+} from '@/types/portfolio';
 
 export interface PortfolioClientProps {
   initialProfile: Record<string, any> | null; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -24,7 +33,15 @@ interface PortfolioProject {
   link: string;
   tags: string[];
   image_url: string;
+  hidden?: boolean;
 }
+
+const DEFAULT_PORTFOLIO_SECTIONS: PortfolioSectionConfig[] = [
+  { id: 'photos', title: 'Fotografia Autoral & Acervo', enabled: true, order: 0 },
+  { id: 'press', title: 'Na Mídia / Jornal', enabled: true, order: 1 },
+  { id: 'instagram', title: 'Mural Instagram', enabled: true, order: 2 },
+  { id: 'projects', title: 'Projetos de Software & Design', enabled: true, order: 3 },
+];
 
 export default function PortfolioClient({
   initialProfile,
@@ -34,12 +51,154 @@ export default function PortfolioClient({
   serverUrl,
 }: PortfolioClientProps) {
   const [profile, setProfile] = useState(initialProfile);
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Sub-abas do Portfólio Unificado (Fotografia em primeiro lugar)
-  const [activeSubTab, setActiveSubTab] = useState<'photos' | 'projects'>('photos');
+  // Sub-abas do Portfólio Unificado e Configuração Modular de Seções
+  const [sectionsConfig, setSectionsConfig] = useState<PortfolioSectionConfig[]>(() => {
+    const saved = profile?.features_config?.portfolio_sections;
+    if (Array.isArray(saved) && saved.length > 0) {
+      const merged = DEFAULT_PORTFOLIO_SECTIONS.map((def) => {
+        const found = saved.find((s: PortfolioSectionConfig) => s.id === def.id);
+        return found ? { ...def, ...found } : def;
+      });
+      return merged.sort((a, b) => a.order - b.order);
+    }
+    return DEFAULT_PORTFOLIO_SECTIONS;
+  });
+  const [isCustomizingSections, setIsCustomizingSections] = useState(false);
+
+  const visibleSections = useMemo(() => {
+    return sectionsConfig.filter((s) => s.enabled);
+  }, [sectionsConfig]);
+
+  const [activeSubTab, setActiveSubTab] = useState<PortfolioSectionId>(() => {
+    const firstEnabled = sectionsConfig.find((s) => s.enabled);
+    return firstEnabled ? firstEnabled.id : 'photos';
+  });
+
+  useEffect(() => {
+    if (visibleSections.length > 0 && !visibleSections.some((s: PortfolioSectionConfig) => s.id === activeSubTab)) {
+      setActiveSubTab(visibleSections[0].id);
+    }
+  }, [visibleSections, activeSubTab]);
+
+  const moveSection = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= sectionsConfig.length) return;
+    const next = [...sectionsConfig];
+    const [moved] = next.splice(index, 1);
+    next.splice(targetIndex, 0, moved);
+    const updated = next.map((item, idx) => ({ ...item, order: idx }));
+    setSectionsConfig(updated);
+  };
+
+  const toggleSectionEnabled = (id: PortfolioSectionId) => {
+    const next = sectionsConfig.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s));
+    if (!next.some((s) => s.enabled)) {
+      alert('Ao menos uma seção do portfólio deve permanecer ativa.');
+      return;
+    }
+    setSectionsConfig(next);
+  };
+
+  const updateSectionTitle = (id: PortfolioSectionId, newTitle: string) => {
+    setSectionsConfig((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, title: newTitle } : s))
+    );
+  };
+
+  // Curadoria Centralizada de Itens da Vitrine
+  const [hiddenPhotoIds, setHiddenPhotoIds] = useState<string[]>(() => {
+    return Array.isArray(profile?.features_config?.hidden_photo_ids)
+      ? (profile.features_config.hidden_photo_ids as string[])
+      : [];
+  });
+
+  const [hiddenPhotoFolders, setHiddenPhotoFolders] = useState<string[]>(() => {
+    return Array.isArray(profile?.features_config?.hidden_photo_folders)
+      ? (profile.features_config.hidden_photo_folders as string[])
+      : [];
+  });
+
+  const [curatingSection, setCuratingSection] = useState<PortfolioSectionId>('photos');
+  const [curatingAlbum, setCuratingAlbum] = useState<string>('all');
+
+  const togglePhotoHidden = (id: string) => {
+    setHiddenPhotoIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleFolderHidden = (folder: string) => {
+    setHiddenPhotoFolders((prev) =>
+      prev.includes(folder) ? prev.filter((f) => f !== folder) : [...prev, folder]
+    );
+  };
+
+  const saveSectionsLayout = async () => {
+    setIsSaving(true);
+    try {
+      const updatedFeaturesConfig = {
+        ...(profile?.features_config || {}),
+        portfolio_sections: sectionsConfig,
+        hidden_photo_ids: hiddenPhotoIds,
+        hidden_photo_folders: hiddenPhotoFolders,
+        press_clippings: pressClippings,
+        instagram_embeds: instagramEmbeds,
+      };
+      await saveUserProfileData({
+        portfolio: projects,
+        features_config: updatedFeaturesConfig,
+      });
+      setProfile({
+        ...profile,
+        portfolio: projects,
+        features_config: updatedFeaturesConfig,
+      });
+      setIsCustomizingSections(false);
+      router.refresh();
+    } catch (e) {
+      alert('Erro ao salvar estrutura: ' + String(e));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const [pressClippings, setPressClippings] = useState<PressClippingItem[]>(() =>
+    Array.isArray(profile?.features_config?.press_clippings)
+      ? (profile.features_config.press_clippings as PressClippingItem[])
+      : []
+  );
+  const [instagramEmbeds, setInstagramEmbeds] = useState<InstagramMentionEmbed[]>(() =>
+    Array.isArray(profile?.features_config?.instagram_embeds)
+      ? (profile.features_config.instagram_embeds as InstagramMentionEmbed[])
+      : []
+  );
+
+  const handleSavePressClippings = async (next: PressClippingItem[]) => {
+    const updatedFeaturesConfig = {
+      ...(profile?.features_config || {}),
+      press_clippings: next,
+    };
+    await saveUserProfileData({ features_config: updatedFeaturesConfig });
+    setPressClippings(next);
+    setProfile({ ...profile, features_config: updatedFeaturesConfig });
+    router.refresh();
+  };
+
+  const handleSaveInstagramEmbeds = async (next: InstagramMentionEmbed[]) => {
+    const updatedFeaturesConfig = {
+      ...(profile?.features_config || {}),
+      instagram_embeds: next,
+    };
+    await saveUserProfileData({ features_config: updatedFeaturesConfig });
+    setInstagramEmbeds(next);
+    setProfile({ ...profile, features_config: updatedFeaturesConfig });
+    router.refresh();
+  };
 
   // Garante que o tour guiado do Coach Marks encontre a galeria ativa
   useEffect(() => {
@@ -53,6 +212,7 @@ export default function PortfolioClient({
   // Acervo de Fotografias
   const [photos, setPhotos] = useState<PhotoInspectItem[]>(portfolioPhotos);
   const [isPhotoPickerOpen, setIsPhotoPickerOpen] = useState(false);
+  const [isEditingPhotos, setIsEditingPhotos] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const { vaultTicket, activeTicket } = useAurtisticMedia();
 
@@ -211,6 +371,40 @@ export default function PortfolioClient({
             {copiedLink ? 'Link Copiado!' : 'Copiar Link Público'}
           </button>
 
+          {!isReadOnly && (
+            <button
+              type="button"
+              onClick={() => setIsCustomizingSections((prev) => !prev)}
+              className={`flex items-center gap-1.5 px-3.5 py-2 border rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                isCustomizingSections
+                  ? 'bg-[#FFCC00] text-[#121212] border-[#FFCC00] shadow-md shadow-[#FFCC00]/15'
+                  : 'bg-surface hover:bg-surface-hover border-border-subtle hover:border-[#FFCC00] text-fg'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px] text-[#FFCC00]">
+                {isCustomizingSections ? 'close' : 'tune'}
+              </span>
+              {isCustomizingSections ? 'Fechar Personalização' : 'Personalizar Portfólio'}
+            </button>
+          )}
+
+          {!isReadOnly && activeSubTab === 'photos' && (
+            <button
+              type="button"
+              onClick={() => setIsEditingPhotos((prev) => !prev)}
+              className={`flex items-center gap-2 px-3.5 py-2 border rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                isEditingPhotos
+                  ? 'bg-[#FFCC00] text-[#121212] border-[#FFCC00] shadow-md shadow-[#FFCC00]/15 font-black'
+                  : 'bg-surface hover:bg-surface-hover border-border-subtle hover:border-[#FFCC00] text-fg'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px]">
+                {isEditingPhotos ? 'done' : 'edit'}
+              </span>
+              {isEditingPhotos ? 'Concluir Edição do Portfólio' : 'Editar Portfólio'}
+            </button>
+          )}
+
           {!isReadOnly && activeSubTab === 'projects' && (
             <>
               {isEditing && (
@@ -247,33 +441,388 @@ export default function PortfolioClient({
         </div>
       </div>
 
-      {/* Seletor de Sub-Abas: Fotografia vs Projetos de Software */}
-      <div className="flex items-center gap-3 mb-8 border-b border-border-subtle pb-2" data-tour="portfolio-subtabs">
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('photos')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-            activeSubTab === 'photos'
-              ? 'bg-[#FFCC00] text-[#121212] shadow-lg shadow-[#FFCC00]/10'
-              : 'text-fg-secondary hover:text-fg bg-surface border border-border-subtle'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[20px]">photo_camera</span>
-          Fotografia Autoral & Acervo ({photos.length})
-        </button>
+      {/* Painel de Personalização Modular de Seções */}
+      {isCustomizingSections && !isReadOnly && (
+        <div className="mb-6 p-5 bg-surface border border-[#FFCC00]/30 rounded-2xl shadow-xl shadow-black/20 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-subtle pb-3">
+            <div>
+              <h3 className="text-sm font-bold text-fg flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#FFCC00] text-[18px]">tune</span>
+                Estrutura & Ordem das Seções da Vitrine
+              </h3>
+              <p className="text-xs text-fg-muted mt-0.5">
+                Monte o seu espaço escolhendo quais seções exibir e organizando a ordem das abas na vitrine pública.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSectionsConfig(DEFAULT_PORTFOLIO_SECTIONS)}
+                className="px-3 py-1.5 rounded-lg border border-border-subtle text-xs font-bold text-fg-secondary hover:text-fg transition-colors"
+              >
+                Restaurar Padrão
+              </button>
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={saveSectionsLayout}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-[#FFCC00] text-[#121212] text-xs font-bold hover:bg-[#FFCC00]/90 transition-all cursor-pointer disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-[16px]">check</span>
+                {isSaving ? 'Salvando...' : 'Salvar Estrutura'}
+              </button>
+            </div>
+          </div>
 
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('projects')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-            activeSubTab === 'projects'
-              ? 'bg-[#FFCC00] text-[#121212] shadow-lg shadow-[#FFCC00]/10'
-              : 'text-fg-secondary hover:text-fg bg-surface border border-border-subtle'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[20px]">terminal</span>
-          Projetos de Software & Design ({projects.length})
-        </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {sectionsConfig.map((sec, idx) => (
+              <div
+                key={sec.id}
+                className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 transition-colors ${
+                  sec.enabled ? 'bg-app border-border-subtle' : 'bg-surface/50 border-border-subtle/50 opacity-60'
+                }`}
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="flex flex-col items-center justify-center shrink-0">
+                    <button
+                      type="button"
+                      disabled={idx === 0}
+                      onClick={() => moveSection(idx, 'up')}
+                      className="text-fg-secondary hover:text-[#FFCC00] disabled:opacity-20 cursor-pointer"
+                      title="Mover para cima"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">arrow_drop_up</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={idx === sectionsConfig.length - 1}
+                      onClick={() => moveSection(idx, 'down')}
+                      className="text-fg-secondary hover:text-[#FFCC00] disabled:opacity-20 cursor-pointer"
+                      title="Mover para baixo"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">arrow_drop_down</span>
+                    </button>
+                  </div>
+
+                  <span className="material-symbols-outlined text-[20px] text-[#FFCC00] shrink-0">
+                    {sec.id === 'photos'
+                      ? 'photo_camera'
+                      : sec.id === 'press'
+                      ? 'newspaper'
+                      : sec.id === 'instagram'
+                      ? 'photo_library'
+                      : 'terminal'}
+                  </span>
+
+                  <input
+                    type="text"
+                    value={sec.title}
+                    onChange={(e) => updateSectionTitle(sec.id, e.target.value)}
+                    className="flex-1 bg-surface border border-border-subtle rounded-lg px-2.5 py-1 text-xs text-fg focus:outline-none focus:border-[#FFCC00]"
+                  />
+                </div>
+
+                <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={sec.enabled}
+                    onChange={() => toggleSectionEnabled(sec.id)}
+                    className="accent-[#FFCC00]"
+                  />
+                  <span className="text-[11px] font-bold text-fg-secondary">
+                    {sec.enabled ? 'Ativa' : 'Oculta'}
+                  </span>
+                </label>
+              </div>
+            ))}
+          </div>
+
+          {/* Nível 2: Curadoria Centralizada de Itens por Seção */}
+          <div className="border-t border-border-subtle pt-4 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-fg flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[#FFCC00] text-[16px]">visibility</span>
+                  Curadoria de Itens Individuais
+                </h4>
+                <p className="text-[11px] text-fg-muted">
+                  Selecione uma seção para definir quais itens específicos ou pastas ficam visíveis para o público.
+                </p>
+              </div>
+
+              {/* Sub-abas de Curadoria */}
+              <div className="flex items-center gap-1 bg-app p-1 rounded-xl border border-border-subtle shrink-0">
+                {(['photos', 'press', 'instagram', 'projects'] as PortfolioSectionId[]).map((secKey) => (
+                  <button
+                    key={secKey}
+                    type="button"
+                    onClick={() => setCuratingSection(secKey)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                      curatingSection === secKey
+                        ? 'bg-[#FFCC00] text-black shadow-sm font-black'
+                        : 'text-fg-secondary hover:text-fg'
+                    }`}
+                  >
+                    {secKey === 'photos'
+                      ? 'Fotos'
+                      : secKey === 'press'
+                      ? 'Imprensa'
+                      : secKey === 'instagram'
+                      ? 'Instagram'
+                      : 'Projetos'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Curadoria 1: Fotografia Autoral */}
+            {curatingSection === 'photos' && (
+              <div className="p-3 bg-app rounded-xl border border-border-subtle space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-[11px] font-bold text-fg-secondary">
+                    Controle de Pastas / Álbuns de Fotos:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Array.from(new Set(photos.map((p) => p.album || 'Geral'))).map((albumName) => {
+                      const isFolderHidden = hiddenPhotoFolders.includes(albumName);
+                      return (
+                        <button
+                          key={albumName}
+                          type="button"
+                          onClick={() => toggleFolderHidden(albumName)}
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
+                            isFolderHidden
+                              ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                              : 'bg-surface border-border-subtle text-fg hover:border-[#FFCC00]'
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[13px]">
+                            {isFolderHidden ? 'visibility_off' : 'folder'}
+                          </span>
+                          <span>{albumName}</span>
+                          <span className="text-[9px] opacity-70">
+                            {isFolderHidden ? '(Oculto)' : '(Ativo)'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Grade de Fotos Individuais */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-fg-muted">
+                      Fotos Individuais ({photos.length}):
+                    </span>
+                    <span className="text-[10px] text-fg-muted">
+                      {hiddenPhotoIds.length} foto(s) ocultada(s)
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-48 overflow-y-auto no-scrollbar p-1">
+                    {photos.slice(0, 48).map((photo) => {
+                      const isHidden =
+                        hiddenPhotoIds.includes(photo.id) ||
+                        hiddenPhotoIds.includes(photo.relative_path) ||
+                        Boolean(photo.album && hiddenPhotoFolders.includes(photo.album));
+                      return (
+                        <button
+                          key={photo.id || photo.relative_path}
+                          type="button"
+                          onClick={() => togglePhotoHidden(photo.id || photo.relative_path)}
+                          title={`${photo.filename} • ${isHidden ? 'Clique para Exibir' : 'Clique para Ocultar'}`}
+                          className={`relative aspect-square rounded-lg overflow-hidden border transition-all cursor-pointer group ${
+                            isHidden
+                              ? 'border-amber-500/60 opacity-50'
+                              : 'border-border-subtle hover:border-[#FFCC00]'
+                          }`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={photo.signedThumbUrl || photo.signedStreamUrl}
+                            alt={photo.filename}
+                            className="w-full h-full object-cover"
+                          />
+                          <span
+                            className={`absolute inset-0 flex items-center justify-center bg-black/60 text-xs font-bold transition-opacity ${
+                              isHidden ? 'opacity-100 text-amber-300' : 'opacity-0 group-hover:opacity-100 text-white'
+                            }`}
+                          >
+                            <span className="material-symbols-outlined text-[18px]">
+                              {isHidden ? 'visibility_off' : 'visibility'}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Curadoria 2: Na Mídia / Imprensa */}
+            {curatingSection === 'press' && (
+              <div className="p-3 bg-app rounded-xl border border-border-subtle space-y-2">
+                <span className="text-[11px] font-bold text-fg-secondary block mb-1">
+                  Recortes de Imprensa Cadastrados:
+                </span>
+                {pressClippings.length === 0 ? (
+                  <p className="text-xs text-fg-muted">Nenhum recorte cadastrado.</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-44 overflow-y-auto">
+                    {pressClippings.map((clip, cIdx) => (
+                      <div
+                        key={clip.id}
+                        className="flex items-center justify-between p-2 rounded-lg bg-surface border border-border-subtle text-xs"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-fg truncate">{clip.title}</p>
+                          <p className="text-[10px] text-fg-muted">{clip.newspaperName} • {clip.publicationDate}</p>
+                        </div>
+                        <label className="flex items-center gap-1.5 cursor-pointer ml-3 shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={!clip.hidden}
+                            onChange={(e) => {
+                              const next = [...pressClippings];
+                              next[cIdx] = { ...next[cIdx], hidden: !e.target.checked };
+                              setPressClippings(next);
+                            }}
+                            className="accent-[#FFCC00]"
+                          />
+                          <span className="text-[10px] font-bold text-fg-secondary">
+                            {!clip.hidden ? 'Visível' : 'Oculto'}
+                          </span>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Curadoria 3: Mural do Instagram */}
+            {curatingSection === 'instagram' && (
+              <div className="p-3 bg-app rounded-xl border border-border-subtle space-y-2">
+                <span className="text-[11px] font-bold text-fg-secondary block mb-1">
+                  Publicações do Instagram no Mural:
+                </span>
+                {instagramEmbeds.length === 0 ? (
+                  <p className="text-xs text-fg-muted">Nenhum post incorporado.</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-44 overflow-y-auto">
+                    {instagramEmbeds.map((emb, eIdx) => (
+                      <div
+                        key={emb.id}
+                        className="flex items-center justify-between p-2 rounded-lg bg-surface border border-border-subtle text-xs"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-fg truncate">{emb.accountHandle}</p>
+                          <p className="text-[10px] text-fg-muted">{emb.photoCreditNote}</p>
+                        </div>
+                        <label className="flex items-center gap-1.5 cursor-pointer ml-3 shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={!emb.hidden}
+                            onChange={(e) => {
+                              const next = [...instagramEmbeds];
+                              next[eIdx] = { ...next[eIdx], hidden: !e.target.checked };
+                              setInstagramEmbeds(next);
+                            }}
+                            className="accent-[#FFCC00]"
+                          />
+                          <span className="text-[10px] font-bold text-fg-secondary">
+                            {!emb.hidden ? 'Visível' : 'Oculto'}
+                          </span>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Curadoria 4: Projetos de Software */}
+            {curatingSection === 'projects' && (
+              <div className="p-3 bg-app rounded-xl border border-border-subtle space-y-2">
+                <span className="text-[11px] font-bold text-fg-secondary block mb-1">
+                  Projetos de Software & Design:
+                </span>
+                {projects.length === 0 ? (
+                  <p className="text-xs text-fg-muted">Nenhum projeto cadastrado.</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-44 overflow-y-auto">
+                    {projects.map((proj, pIdx) => (
+                      <div
+                        key={pIdx}
+                        className="flex items-center justify-between p-2 rounded-lg bg-surface border border-border-subtle text-xs"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-fg truncate">{proj.title}</p>
+                          <p className="text-[10px] text-fg-muted truncate">{proj.description}</p>
+                        </div>
+                        <label className="flex items-center gap-1.5 cursor-pointer ml-3 shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={!proj.hidden}
+                            onChange={(e) => {
+                              const next = [...projects];
+                              next[pIdx] = { ...next[pIdx], hidden: !e.target.checked };
+                              setProjects(next);
+                            }}
+                            className="accent-[#FFCC00]"
+                          />
+                          <span className="text-[10px] font-bold text-fg-secondary">
+                            {!proj.hidden ? 'Visível' : 'Oculto'}
+                          </span>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Seletor de Sub-Abas Dinâmico baseado em sectionsConfig */}
+      <div className="flex flex-wrap items-center gap-3 mb-8 border-b border-border-subtle pb-2" data-tour="portfolio-subtabs">
+        {visibleSections.map((sec: PortfolioSectionConfig) => {
+          const count =
+            sec.id === 'photos'
+              ? photos.length
+              : sec.id === 'press'
+              ? pressClippings.length
+              : sec.id === 'instagram'
+              ? instagramEmbeds.length
+              : projects.length;
+
+          const icon =
+            sec.id === 'photos'
+              ? 'photo_camera'
+              : sec.id === 'press'
+              ? 'newspaper'
+              : sec.id === 'instagram'
+              ? 'photo_library'
+              : 'terminal';
+
+          return (
+            <button
+              key={sec.id}
+              type="button"
+              onClick={() => setActiveSubTab(sec.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+                activeSubTab === sec.id
+                  ? 'bg-[#FFCC00] text-[#121212] shadow-lg shadow-[#FFCC00]/10'
+                  : 'text-fg-secondary hover:text-fg bg-surface border border-border-subtle'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[20px]">{icon}</span>
+              {sec.title} ({count})
+            </button>
+          );
+        })}
       </div>
 
       {/* CONTEÚDO DA SUB-ABA 1: GALERIA PASSE-PARTOUT DE FOTOGRAFIA */}
@@ -285,10 +834,14 @@ export default function PortfolioClient({
             isOwner={!isReadOnly}
             username={publicSlug || profile?.username}
             ticket={vaultTicket || activeTicket || ''}
+            hiddenPhotoIds={hiddenPhotoIds}
+            hiddenPhotoFolders={hiddenPhotoFolders}
             onOpenUploadModal={() => setIsPhotoPickerOpen(true)}
             onItemUpdated={handleItemUpdated}
             onSyncPortfolio={handleSyncPortfolio}
             isSyncing={isSyncing}
+            isEditingPortfolio={isEditingPhotos}
+            onToggleEditPortfolio={() => setIsEditingPhotos((prev) => !prev)}
           />
 
           {/* Modal de Anexar / Subir Fotos do Servidor para o Portfólio */}
@@ -312,7 +865,29 @@ export default function PortfolioClient({
         </div>
       )}
 
-      {/* CONTEÚDO DA SUB-ABA 2: PROJETOS DE SOFTWARE & DESIGN */}
+      {/* CONTEÚDO DA SUB-ABA 2: NA MÍDIA & JORNAL IMPRESSO */}
+      {activeSubTab === 'press' && (
+        <PressClippingsSection
+          clippings={pressClippings}
+          portfolioPhotos={photos}
+          serverUrl={serverUrl}
+          ticket={vaultTicket || activeTicket || ''}
+          isOwner={!isReadOnly}
+          onSaveClippings={handleSavePressClippings}
+        />
+      )}
+
+      {/* CONTEÚDO DA SUB-ABA 3: MURAL DO INSTAGRAM */}
+      {activeSubTab === 'instagram' && (
+        <InstagramMuralSection
+          embeds={instagramEmbeds}
+          portfolioPhotos={photos}
+          isOwner={!isReadOnly}
+          onSaveEmbeds={handleSaveInstagramEmbeds}
+        />
+      )}
+
+      {/* CONTEÚDO DA SUB-ABA 4: PROJETOS DE SOFTWARE & DESIGN */}
       {activeSubTab === 'projects' && (
         <div>
           {isEditing ? (
@@ -354,7 +929,7 @@ export default function PortfolioClient({
                           type="text"
                           value={proj.title}
                           onChange={(e) => updateProject(idx, 'title', e.target.value)}
-                          className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-[#9D4EDD]"
+                          className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-accent-primary"
                         />
                       </div>
                       <div>
@@ -365,7 +940,7 @@ export default function PortfolioClient({
                           type="text"
                           value={proj.link}
                           onChange={(e) => updateProject(idx, 'link', e.target.value)}
-                          className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-[#9D4EDD]"
+                          className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-accent-primary"
                         />
                       </div>
                       <div>
@@ -377,7 +952,7 @@ export default function PortfolioClient({
                           value={proj.image_url}
                           onChange={(e) => updateProject(idx, 'image_url', e.target.value)}
                           placeholder="Ex: /aurtistic-icon.png"
-                          className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-[#9D4EDD]"
+                          className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-accent-primary"
                         />
                       </div>
                       <div>
@@ -394,7 +969,7 @@ export default function PortfolioClient({
                               e.target.value.split(',').map((s) => s.trim())
                             )
                           }
-                          className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-[#9D4EDD]"
+                          className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-accent-primary"
                         />
                       </div>
                     </div>
@@ -404,9 +979,18 @@ export default function PortfolioClient({
                         value={proj.description}
                         onChange={(e) => updateProject(idx, 'description', e.target.value)}
                         rows={3}
-                        className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-[#9D4EDD] resize-y"
+                        className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-accent-primary resize-y"
                       />
                     </div>
+                    <label className="flex items-center gap-2 text-xs text-fg-secondary cursor-pointer pt-1">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(proj.hidden)}
+                        onChange={(e) => updateProject(idx, 'hidden', e.target.checked)}
+                        className="accent-[#FFCC00]"
+                      />
+                      <span>Ocultar este projeto do portfólio público</span>
+                    </label>
                   </div>
                 ))}
               </div>
@@ -427,7 +1011,7 @@ export default function PortfolioClient({
                       value={iframeUrl}
                       onChange={(e) => setIframeUrl(e.target.value)}
                       placeholder="https://exemplo.com/galeria"
-                      className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-[#9D4EDD]"
+                      className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-accent-primary"
                     />
                   </div>
                   <div>
@@ -436,7 +1020,7 @@ export default function PortfolioClient({
                       type="text"
                       value={iframeTitle}
                       onChange={(e) => setIframeTitle(e.target.value)}
-                      className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-[#9D4EDD]"
+                      className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-xs text-fg focus:outline-none focus:border-accent-primary"
                     />
                   </div>
                 </div>
@@ -445,7 +1029,7 @@ export default function PortfolioClient({
           ) : (
             /* VIEW MODE DE PROJETOS */
             <main className="max-w-5xl mx-auto space-y-12">
-              {projects.length === 0 ? (
+              {projects.filter((p) => !isReadOnly || !p.hidden).length === 0 ? (
                 <div className="text-center p-12 bg-surface border border-border-subtle rounded-2xl">
                   <span className="material-symbols-outlined text-[64px] text-[#FFCC00] mb-3">
                     terminal
@@ -463,12 +1047,20 @@ export default function PortfolioClient({
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-6">
-                  {projects.map((proj, idx) => (
+                  {projects
+                    .filter((p) => !isReadOnly || !p.hidden)
+                    .map((proj, idx) => (
                     <div
                       key={idx}
-                      className="rounded-2xl p-[1px] bg-gradient-brand-soft hover:bg-gradient-brand transition-all"
+                      className={`rounded-2xl p-[1px] transition-all ${
+                        proj.hidden
+                          ? 'bg-amber-500/30 opacity-75'
+                          : 'bg-gradient-brand-soft hover:bg-gradient-brand'
+                      }`}
                     >
-                      <div className="bg-surface rounded-[15px] border border-border-subtle flex flex-col md:flex-row items-center justify-between p-6 sm:p-8 hover:bg-surface-hover transition-colors gap-6 group">
+                      <div className={`bg-surface rounded-[15px] border flex flex-col md:flex-row items-center justify-between p-6 sm:p-8 hover:bg-surface-hover transition-colors gap-6 group ${
+                        proj.hidden ? 'border-dashed border-amber-500/40' : 'border-border-subtle'
+                      }`}>
                         {proj.image_url && (
                           <div className="w-20 h-20 rounded-2xl bg-app border border-border-subtle p-2 flex items-center justify-center shrink-0">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -488,9 +1080,17 @@ export default function PortfolioClient({
                         )}
 
                         <div className="space-y-3 text-center md:text-left flex-1">
-                          <h3 className="text-xl font-['Bukra'] font-bold text-fg">
-                            {proj.title}
-                          </h3>
+                          <div className="flex items-center gap-2 flex-wrap justify-center md:justify-start">
+                            {proj.hidden && (
+                              <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[13px]">visibility_off</span>
+                                Oculto
+                              </span>
+                            )}
+                            <h3 className="text-xl font-['Bukra'] font-bold text-fg">
+                              {proj.title}
+                            </h3>
+                          </div>
                           <p className="text-fg-secondary text-sm max-w-3xl leading-relaxed">
                             {proj.description}
                           </p>

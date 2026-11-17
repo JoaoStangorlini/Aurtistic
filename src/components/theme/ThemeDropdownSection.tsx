@@ -1,12 +1,32 @@
 // Este programa é um software livre (Licença AGPLv3)
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTheme } from './ThemeProvider';
-import { PALETTE_LIST, type ThemeMode } from '@/lib/theme-config';
+import { PALETTE_LIST, ORG_PALETTE_LIST, type ThemeMode } from '@/lib/theme-config';
+import { getUserOrganizationsAction } from '@/app/(dashboard)/organizacoes/actions';
 
 export function ThemeDropdownSection() {
   const { mode, palette, resolvedMode, setThemeMode, setThemePalette, paletteDef } = useTheme();
+  const [memberSlugs, setMemberSlugs] = useState<string[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    void getUserOrganizationsAction()
+      .then((res) => {
+        if (!active || !res?.ok || !Array.isArray(res.organizations)) return;
+        const slugs = res.organizations
+          .map((o: { slug?: string }) => String(o.slug || '').toLowerCase())
+          .filter(Boolean);
+        setMemberSlugs(slugs);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const availableOrgPalettes = ORG_PALETTE_LIST.filter((p) => memberSlugs.includes(p.id));
 
   const modeButtons: Array<{ id: ThemeMode; label: string; icon: string }> = [
     { id: 'light', label: 'Claro', icon: 'light_mode' },
@@ -91,6 +111,47 @@ export function ThemeDropdownSection() {
             );
           })}
         </div>
+
+        {availableOrgPalettes.length > 0 && (
+          <div className="pt-2 border-t border-border-subtle/60 space-y-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-fg-muted block">
+              Temas de Organizações
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {availableOrgPalettes.map((p) => {
+                const isSelected = palette === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setThemePalette(p.id)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-surface border-[var(--accent-primary)] text-fg shadow-sm'
+                        : 'bg-app border-border-subtle text-fg-secondary hover:text-fg'
+                    }`}
+                  >
+                    <span
+                      className="w-3.5 h-3.5 rounded-full shrink-0 border border-white/20"
+                      style={{
+                        background: `linear-gradient(135deg, ${p.preview.primary} 50%, ${p.preview.secondary} 50%)`,
+                      }}
+                    />
+                    <span>
+                      {p.id === 'labdiv'
+                        ? 'LabDiv'
+                        : p.id === 'show-da-fisica'
+                          ? 'Show de Física'
+                          : p.id === 'hs'
+                            ? 'Hackerspace'
+                            : 'Pró-Física'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

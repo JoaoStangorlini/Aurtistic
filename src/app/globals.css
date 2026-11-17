@@ -228,6 +228,102 @@
     --on-accent-secondary: #FFFFFF;
   }
 
+  /* 6. LabDiv (IFUSP - Membros) */
+  html[data-theme-palette="labdiv"] {
+    --accent-primary: #1F9FCF;
+    --accent-primary-hover: #0F4780;
+    --accent-primary-text: #1F9FCF;
+    --on-accent-primary: #041222;
+
+    --accent-secondary: #FFCC00;
+    --accent-secondary-hover: #F14343;
+    --accent-secondary-text: #FFCC00;
+    --on-accent-secondary: #121212;
+  }
+  html[data-theme-palette="labdiv"][data-theme-mode="light"] {
+    --accent-primary: #0F4780;
+    --accent-primary-hover: #0F6688;
+    --accent-primary-text: #0F4780;
+    --on-accent-primary: #FFFFFF;
+
+    --accent-secondary: #F14343;
+    --accent-secondary-hover: #D93838;
+    --accent-secondary-text: #B91C1C;
+    --on-accent-secondary: #FFFFFF;
+  }
+
+  /* 7. Show de Física (IFUSP - Membros) */
+  html[data-theme-palette="show-da-fisica"] {
+    --accent-primary: #0066FF;
+    --accent-primary-hover: #0052CC;
+    --accent-primary-text: #38BDF8;
+    --on-accent-primary: #FFFFFF;
+
+    --accent-secondary: #FF1E56;
+    --accent-secondary-hover: #E11D48;
+    --accent-secondary-text: #FF4D79;
+    --on-accent-secondary: #FFFFFF;
+  }
+  html[data-theme-palette="show-da-fisica"][data-theme-mode="light"] {
+    --accent-primary: #0052CC;
+    --accent-primary-hover: #003D99;
+    --accent-primary-text: #0052CC;
+    --on-accent-primary: #FFFFFF;
+
+    --accent-secondary: #E11D48;
+    --accent-secondary-hover: #BE123C;
+    --accent-secondary-text: #BE123C;
+    --on-accent-secondary: #FFFFFF;
+  }
+
+  /* 8. Hackerspace IFUSP (Membros) */
+  html[data-theme-palette="hs"] {
+    --accent-primary: #00FF66;
+    --accent-primary-hover: #00CC52;
+    --accent-primary-text: #00FF66;
+    --on-accent-primary: #041A0E;
+
+    --accent-secondary: #FFCC00;
+    --accent-secondary-hover: #E6B800;
+    --accent-secondary-text: #FFCC00;
+    --on-accent-secondary: #121212;
+  }
+  html[data-theme-palette="hs"][data-theme-mode="light"] {
+    --accent-primary: #059669;
+    --accent-primary-hover: #047857;
+    --accent-primary-text: #059669;
+    --on-accent-primary: #FFFFFF;
+
+    --accent-secondary: #D97706;
+    --accent-secondary-hover: #B45309;
+    --accent-secondary-text: #B45309;
+    --on-accent-secondary: #121212;
+  }
+
+  /* 9. Pró-Física (ProFis - Membros) */
+  html[data-theme-palette="profis"] {
+    --accent-primary: #F59E0B;
+    --accent-primary-hover: #D97706;
+    --accent-primary-text: #F59E0B;
+    --on-accent-primary: #121212;
+
+    --accent-secondary: #38BDF8;
+    --accent-secondary-hover: #0284C7;
+    --accent-secondary-text: #38BDF8;
+    --on-accent-secondary: #082F49;
+  }
+  html[data-theme-palette="profis"][data-theme-mode="light"] {
+    --accent-primary: #D97706;
+    --accent-primary-hover: #B45309;
+    --accent-primary-text: #B45309;
+    --on-accent-primary: #FFFFFF;
+
+    --accent-secondary: #0284C7;
+    --accent-secondary-hover: #0369A1;
+    --accent-secondary-text: #0369A1;
+    --on-accent-secondary: #FFFFFF;
+  }
+
   html {
     forced-color-adjust: none;
     transition: background-color 0.2s ease, color 0.2s ease;
@@ -455,4 +551,42 @@ html:not([data-theme-palette="purple-gold"]) .from-\[\#FFCC00\].to-\[\#9D4EDD\] 
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-thumb-hover, #A0A0A0);
+}
+
+/* Range Sliders de Alta Performance — HUB Studio */
+.studio-range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+}
+.studio-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 2px solid var(--org-primary, #049fff);
+  box-shadow: 0 0 10px rgba(4, 159, 255, 0.7), 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: ew-resize;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.studio-range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 14px rgba(4, 159, 255, 0.95);
+}
+.studio-range-slider::-webkit-slider-thumb:active {
+  transform: scale(1.15);
+}
+.studio-range-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 2px solid var(--org-primary, #049fff);
+  box-shadow: 0 0 10px rgba(4, 159, 255, 0.7), 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: ew-resize;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.studio-range-slider::-moz-range-thumb:hover {
+  transform: scale(1.25);
 }

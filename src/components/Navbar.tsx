@@ -22,7 +22,17 @@ export default function Navbar({
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
 
   const userRole = initialRole;
+  const [isInIframe, setIsInIframe] = useState(false);
 
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && window.self !== window.top) {
+        setIsInIframe(true);
+      }
+    } catch {
+      setIsInIframe(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -49,7 +59,12 @@ export default function Navbar({
     };
   }, [router]);
 
-  if (pathname === '/login') {
+  if (
+    pathname === '/login' ||
+    pathname.startsWith('/embed') ||
+    isInIframe ||
+    (typeof window !== 'undefined' && (window.self !== window.top || window.location.search.includes('embed=1')))
+  ) {
     return null;
   }
   return <AurtisticNavbar />;
@@ -99,8 +114,8 @@ export default function Navbar({
                 href={link.href}
                 className={`font-medium transition-colors ${
                   isActive 
-                    ? 'text-[#9D4EDD] font-bold border-b-[3px] border-[#FFCC00] pb-1' 
-                    : 'text-fg-secondary hover:text-[#9D4EDD]'
+                    ? 'text-accent-primary font-bold border-b-[3px] border-accent-secondary pb-1' 
+                    : 'text-fg-secondary hover:text-accent-primary'
                 }`}
                 onClick={(e) => handleNavClick(e, link.href)}
               >
@@ -118,7 +133,7 @@ export default function Navbar({
               type="text" 
               placeholder="Buscar na página..." 
               onChange={handleSearchChange}
-              className="w-full bg-surface border border-border-subtle rounded-full pl-9 pr-4 py-1 text-sm text-fg focus:outline-none focus:border-[#9D4EDD] transition-colors"
+              className="w-full bg-surface border border-border-subtle rounded-full pl-9 pr-4 py-1 text-sm text-fg focus:outline-none focus:border-accent-primary transition-colors"
             />
           </div>
           
@@ -134,18 +149,18 @@ export default function Navbar({
           
           <Link 
             href={targetHref}
-            className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border border-border-subtle bg-surface hover:border-[#9D4EDD] hover:bg-[#9D4EDD]/10 transition-colors group cursor-pointer shrink-0"
+            className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border border-border-subtle bg-surface hover:border-accent-primary hover:bg-accent-primary/10 transition-colors group cursor-pointer shrink-0"
           >
             {userRole === 'Convidado' ? (
-              <div className="w-7 h-7 rounded-full bg-surface border border-border-subtle flex items-center justify-center group-hover:border-[#9D4EDD] transition-colors">
+              <div className="w-7 h-7 rounded-full bg-surface border border-border-subtle flex items-center justify-center group-hover:border-accent-primary transition-colors">
                 <span className="material-symbols-outlined text-[16px] text-fg-muted">person</span>
               </div>
             ) : (
-              <img src={userRole === 'LabDiv' ? "/labdiv-logo.png" : "/perfil.jpeg"} alt="Perfil" className="w-7 h-7 rounded-full object-cover border border-border-subtle group-hover:border-[#9D4EDD] transition-colors" />
+              <img src={userRole === 'LabDiv' ? "/labdiv-logo.png" : "/perfil.jpeg"} alt="Perfil" className="w-7 h-7 rounded-full object-cover border border-border-subtle group-hover:border-accent-primary transition-colors" />
             )}
 
             <div className="flex items-center gap-1.5">
-              <div className={`w-1.5 h-1.5 rounded-full ${userRole === 'Convidado' ? 'bg-[#8E8E8E]' : userRole === 'ADM' ? 'bg-[#FFCC00]' : 'bg-[#9D4EDD]'}`}></div>
+              <div className={`w-1.5 h-1.5 rounded-full ${userRole === 'Convidado' ? 'bg-[#8E8E8E]' : userRole === 'ADM' ? 'bg-accent-secondary' : 'bg-accent-primary'}`}></div>
               <span className="text-[10px] md:text-[11px] font-bold text-fg-secondary group-hover:text-fg uppercase tracking-wider truncate max-w-[80px] md:max-w-none">
                 {userRole}
               </span>
@@ -165,7 +180,7 @@ export default function Navbar({
               placeholder="Buscar na página..." 
               onChange={handleSearchChange}
               autoFocus
-              className="w-full bg-surface border border-border-subtle rounded-full pl-10 pr-4 py-2 text-fg focus:outline-none focus:border-[#9D4EDD] transition-colors"
+              className="w-full bg-surface border border-border-subtle rounded-full pl-10 pr-4 py-2 text-fg focus:outline-none focus:border-accent-primary transition-colors"
             />
           </div>
         </div>
@@ -190,7 +205,7 @@ export default function Navbar({
               href={link.href}
               className={`flex items-center justify-center rounded-full transition-all duration-300 ease-out ${
                 isActive 
-                  ? 'bg-[#9D4EDD]/20 text-[#9D4EDD] px-5 py-2.5 gap-2' 
+                  ? 'bg-accent-primary/20 text-accent-primary px-5 py-2.5 gap-2' 
                   : 'text-fg-muted hover:text-fg px-3 py-2.5'
               }`}
               onClick={(e) => handleNavClick(e, link.href)}

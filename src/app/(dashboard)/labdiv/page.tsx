@@ -4,6 +4,10 @@ import { redirect } from 'next/navigation';
 import { getTaskColumns, getUserProfile } from '@/app/(dashboard)/actions';
 import { getUserOrganizationsAction } from '@/app/(dashboard)/organizacoes/actions';
 import { LabDivWorkspaceClient } from '@/components/organizacoes/LabDivWorkspaceClient';
+import { OrganizationBrandProvider } from '@/components/organizacoes/OrganizationBrandProvider';
+import { OrgRestrictedAccessView } from '@/components/organizacoes/OrgRestrictedAccessView';
+import { normalizeOrgBrandSlug } from '@/lib/org-brand-tokens';
+import { isUuid } from '@/lib/validators';
 import type {
   Organization,
   OrganizationMember,
@@ -13,37 +17,144 @@ import type {
 
 export const dynamic = 'force-dynamic';
 
-export default async function LabDivPage() {
+interface LabDivPageProps {
+  searchParams?: Promise<{ org?: string; view?: string }>;
+}
+
+export default async function LabDivPage({ searchParams }: LabDivPageProps) {
+  const params = await searchParams;
+  const rawOrgParam = (params?.org || 'labdiv').toLowerCase().trim();
+  const targetOrgParam =
+    rawOrgParam === 'hackerspace'
+      ? 'hs'
+      : rawOrgParam === 'show' || rawOrgParam === 'show_da_fisica' || rawOrgParam === 'showdefisica'
+        ? 'show-da-fisica'
+        : rawOrgParam === 'pro-fis' || rawOrgParam === 'pro_fis'
+          ? 'profis'
+          : rawOrgParam;
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/login?next=/labdiv');
+    redirect(`/login?next=/labdiv${targetOrgParam ? `?org=${targetOrgParam}` : ''}`);
   }
 
-  // 1. Busca organização LabDiv pelo slug ou UUID
-  const { data: orgData } = await supabase
-    .from('organizations')
-    .select('*')
-    .or("slug.eq.labdiv,id.eq.1ab41410-0000-4000-8000-000000000001")
-    .maybeSingle();
+  // 1. Busca organização pelo slug ou UUID
+  let query = supabase.from('organizations').select('*');
+  if (isUuid(targetOrgParam)) {
+    query = query.eq('id', targetOrgParam);
+  } else {
+    query = query.eq('slug', targetOrgParam);
+  }
+  const { data: orgData } = await query.maybeSingle();
 
-  const organization: Organization = orgData || {
-    id: '1ab41410-0000-4000-8000-000000000001',
-    name: 'LabDiv',
-    slug: 'labdiv',
-    description: 'Laboratório de Divulgação Científica (LabDiv - IFUSP)',
-    created_by: 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e',
-    vault_quota_bytes: 26843545600,
-    vault_used_bytes: 0,
-    event_boost_active: false,
-    event_boost_expires_at: null,
-    event_boost_reason: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+  const defaultOrgsMap: Record<string, Organization> = {
+    'labdiv': {
+      id: '1ab41410-0000-4000-8000-000000000001',
+      name: 'LabDiv',
+      slug: 'labdiv',
+      description: 'Laboratório de Comunicação e Divulgação Científica do IFUSP',
+      avatar_url: '/labdiv-logo.png',
+      primary_color: '#1F9FCF',
+      secondary_color: '#FFCC00',
+      storage_quota_bytes: 53687091200,
+      storage_used_bytes: 0,
+      storage_policy: 'admin_or_permitted',
+      brand_config: {
+        themeId: 'labdiv',
+        bgApp: '#070c16',
+        bgSurface: '#0d1524',
+        textPrimary: '#f8fafc',
+        accents: ['#1F9FCF', '#F14343', '#FFCC00', '#0F4780'],
+        fontDisplay: 'Space Grotesk',
+        fontBody: 'Inter',
+        uppercaseTitles: false,
+        glowIntensity: 0.75,
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    'show-da-fisica': {
+      id: '1ab41410-0000-4000-8000-000000000002',
+      name: 'Show da Física',
+      slug: 'show-da-fisica',
+      description: 'Demonstrações teatrais e lúdicas de fenômenos físicos — IFUSP',
+      avatar_url: null,
+      primary_color: '#0066ff',
+      secondary_color: '#ff1e1e',
+      storage_quota_bytes: 53687091200,
+      storage_used_bytes: 0,
+      storage_policy: 'admin_or_permitted',
+      brand_config: {
+        themeId: 'show-da-fisica',
+        bgApp: '#07090e',
+        bgSurface: '#0d111a',
+        textPrimary: '#e2e8f0',
+        accents: ['#ff1e1e', '#0066ff', '#00ff44', '#ffcc00'],
+        fontDisplay: 'Orbitron',
+        fontBody: 'Inter',
+        uppercaseTitles: true,
+        glowIntensity: 1.0,
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    'hs': {
+      id: '1ab41410-0000-4000-8000-000000000003',
+      name: 'Hackerspace IFUSP',
+      slug: 'hs',
+      description: 'Laboratório comunitário de cultura maker, eletrônica e hardware livre',
+      avatar_url: null,
+      primary_color: '#00ff66',
+      secondary_color: '#ffcc00',
+      storage_quota_bytes: 53687091200,
+      storage_used_bytes: 0,
+      storage_policy: 'admin_or_permitted',
+      brand_config: {
+        themeId: 'hs',
+        bgApp: '#080808',
+        bgSurface: '#101412',
+        textPrimary: '#e2f1e8',
+        accents: ['#00ff66', '#ffcc00', '#06b6d4'],
+        fontDisplay: 'JetBrains Mono',
+        fontBody: 'Open Sans',
+        uppercaseTitles: true,
+        glowIntensity: 0.75,
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    profis: {
+      id: '1ab41410-0000-4000-8000-000000000004',
+      name: 'Pró-Física (ProFis)',
+      slug: 'profis',
+      description: 'Incentivo à formação acadêmica, nivelamento e pesquisa científica no IFUSP',
+      avatar_url: null,
+      primary_color: '#F59E0B',
+      secondary_color: '#FFCC00',
+      storage_quota_bytes: 53687091200,
+      storage_used_bytes: 0,
+      storage_policy: 'admin_or_permitted',
+      brand_config: {
+        themeId: 'profis',
+        bgApp: '#080c16',
+        bgSurface: '#0f172a',
+        textPrimary: '#f8fafc',
+        accents: ['#F59E0B', '#FFCC00', '#F97316', '#38BDF8'],
+        fontDisplay: 'Space Grotesk',
+        fontBody: 'Inter',
+        uppercaseTitles: false,
+        glowIntensity: 0.9,
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
   };
+
+  const defaultByUuid = Object.values(defaultOrgsMap).find((d) => d.id === targetOrgParam);
+  const organization: Organization = orgData || defaultByUuid || defaultOrgsMap[targetOrgParam] || defaultOrgsMap['labdiv'];
 
   // 2. Busca subequipes (com fallback estruturado)
   const { data: subteamsData } = await supabase
@@ -194,7 +305,17 @@ export default async function LabDivPage() {
           },
         ];
 
-  // 4. Verifica permissão de acesso
+  // 4. Verifica permissão de acesso (sem bypass cego por @usp.br ou hub_user_id)
+  const [profile, orgsRes] = await Promise.all([
+    getUserProfile(),
+    getUserOrganizationsAction(),
+  ]);
+  const userOrganizations = orgsRes.ok && Array.isArray(orgsRes.organizations) ? orgsRes.organizations : [];
+  const normalizedCurrentSlug = normalizeOrgBrandSlug(organization.slug);
+  const isOrgInHub = userOrganizations.some(
+    (o) => o.id === organization.id || normalizeOrgBrandSlug(o.slug) === normalizedCurrentSlug
+  );
+
   let myMember =
     members.find(
       (m) =>
@@ -202,24 +323,51 @@ export default async function LabDivPage() {
         (m.email && user.email && m.email.toLowerCase() === user.email.toLowerCase())
     ) || null;
 
-  const isPrimaryAdmin = user.id === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e';
-  const isHubLabDivAdmin =
+  const normalizedEmail = (user.email || '').toLowerCase().trim();
+  const normalizedUsername = (profile?.username || user.user_metadata?.username || '').toLowerCase().trim();
+  const isPrimaryAdmin =
+    user.id === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e' ||
+    user.id === '48b2fb73-c5d3-4eff-b727-54e4b91bf21b' ||
+    user.id === '8a3e4272-010d-4479-94cb-26178d544ea2' ||
+    normalizedUsername === 'joaostangorlini' ||
+    normalizedUsername === 'joao';
+  const isProfileAdmin = profile?.role === 'admin';
+  const isConfirmedAdmin =
+    isPrimaryAdmin ||
+    isProfileAdmin ||
     user.id === '7dcfe172-1cf0-4389-9abd-f340b1408386' ||
     user.id === 'fb12ee7b-da8f-4b80-ac5c-3b8d478047d2' ||
-    Boolean(user.email?.includes('hublabdiv')) ||
-    Boolean(user.email?.endsWith('@usp.br')) ||
-    Boolean(user.user_metadata?.hub_user_id);
+    normalizedEmail === 'joaopaulostangorlini@usp.br' ||
+    normalizedEmail === 'joaostangorlini@usp.br' ||
+    normalizedEmail === 'joao@aurtistic.com' ||
+    normalizedEmail === 'hublabdiv@gmail.com' ||
+    normalizedUsername === 'hublabdiv' ||
+    normalizedUsername === 'hublabdiv_institucional' ||
+    user.app_metadata?.role === 'admin' ||
+    user.user_metadata?.role === 'admin';
 
-  if (!myMember && !isPrimaryAdmin && !isHubLabDivAdmin) {
-    redirect('/');
+  if (!myMember && !isConfirmedAdmin && !isOrgInHub) {
+    return (
+      <OrganizationBrandProvider
+        orgSlug={normalizedCurrentSlug}
+        brandConfig={(organization.brand_config as Record<string, unknown> | null) || null}
+      >
+        <OrgRestrictedAccessView organization={organization} orgSlug={normalizedCurrentSlug} />
+      </OrganizationBrandProvider>
+    );
   }
 
-  if (!myMember && (isPrimaryAdmin || isHubLabDivAdmin)) {
+  if (!myMember && (isConfirmedAdmin || isOrgInHub)) {
     const isLeadAdmin =
       isPrimaryAdmin ||
+      isProfileAdmin ||
       user.id === '7dcfe172-1cf0-4389-9abd-f340b1408386' ||
-      user.email === 'joaopaulostangorlini@usp.br' ||
-      user.email === 'andyraposo@usp.br';
+      user.id === '48b2fb73-c5d3-4eff-b727-54e4b91bf21b' ||
+      normalizedEmail === 'joaopaulostangorlini@usp.br' ||
+      normalizedEmail === 'joaostangorlini@usp.br' ||
+      normalizedEmail === 'hublabdiv@gmail.com' ||
+      user.app_metadata?.role === 'admin' ||
+      user.user_metadata?.role === 'admin';
 
     myMember = {
       id: user.id,
@@ -228,6 +376,7 @@ export default async function LabDivPage() {
       full_name:
         user.user_metadata?.full_name ||
         user.user_metadata?.username ||
+        profile?.username ||
         (isPrimaryAdmin ? 'João Stangorlini' : 'Membro HUB LabDiv'),
       email: user.email || '',
       org_role: isLeadAdmin ? 'admin' : 'member',
@@ -237,6 +386,7 @@ export default async function LabDivPage() {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
+    members.unshift(myMember);
   }
 
   // 5. Busca reuniões da organização
@@ -248,14 +398,30 @@ export default async function LabDivPage() {
 
   const meetings: OrganizationMeeting[] = meetingsData || [];
 
-  // 6. Busca tarefas vinculadas ao LabDiv (organization_id OU dimensão legada HUB / LabDiv)
+  // 6. Busca tarefas vinculadas à Organização (organization_id OU dimensão correspondente)
   let tasksData: any[] = [];
   let isDbMigrationPending = false;
+
+  const isShow = organization.slug === 'show-da-fisica';
+  const isHs = organization.slug === 'hs';
+  const isProfis = organization.slug === 'profis';
+  const isLabDiv = !isShow && !isHs && !isProfis;
+  const dimFilter = isShow
+    ? 'Show da Física'
+    : isHs
+      ? 'Hackerspace'
+      : isProfis
+        ? 'Pró-Física'
+        : 'LabDiv';
+
+  const orFilter = isLabDiv
+    ? `organization_id.eq.${organization.id},dimensao.eq.LabDiv,dimensao.eq.HUB`
+    : `organization_id.eq.${organization.id},dimensao.eq.${dimFilter}`;
 
   const { data: rawTasks, error: tErr } = await supabase
     .from('tasks')
     .select('*')
-    .or(`organization_id.eq.${organization.id},dimensao.eq.HUB,dimensao.eq.LabDiv`)
+    .or(orFilter)
     .or('is_personal.is.null,is_personal.eq.false')
     .order('created_at', { ascending: false });
 
@@ -263,10 +429,13 @@ export default async function LabDivPage() {
     // Se a coluna organization_id ainda não foi criada no banco (migração 06 pendente)
     if (tErr.message?.includes('organization_id') || (tErr as any).code === '42703') {
       isDbMigrationPending = true;
+      const fallbackOr = isLabDiv
+        ? 'dimensao.eq.HUB,dimensao.eq.LabDiv'
+        : `dimensao.eq.${dimFilter}`;
       const { data: fallbackTasks, error: fErr } = await supabase
         .from('tasks')
         .select('*')
-        .or('dimensao.eq.HUB,dimensao.eq.LabDiv')
+        .or(fallbackOr)
         .order('created_at', { ascending: false });
 
       if (!fErr && fallbackTasks) {
@@ -292,9 +461,7 @@ export default async function LabDivPage() {
     .eq('user_id', user.id);
 
   const columns = await getTaskColumns();
-  const profile = await getUserProfile();
-  const orgsRes = await getUserOrganizationsAction();
-  const userOrganizations = orgsRes.ok && Array.isArray(orgsRes.organizations) ? orgsRes.organizations : [organization];
+  const finalUserOrganizations = userOrganizations.length > 0 ? userOrganizations : [organization];
 
   return (
     <LabDivWorkspaceClient
@@ -311,7 +478,8 @@ export default async function LabDivPage() {
       advancedSettings={profile?.features_config?.advanced_settings || {}}
       userEvents={userEventsData || []}
       isDbMigrationPending={isDbMigrationPending}
-      userOrganizations={userOrganizations}
+      userOrganizations={finalUserOrganizations}
+      initialView={params?.view === 'studio' ? 'studio' : 'organizacoes'}
     />
   );
 }

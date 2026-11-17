@@ -69,6 +69,7 @@ export interface VaultContextMenuProps {
   onBatchMoveToPortfolio?: () => void;
   onToggleCurriculum?: (entry: EdgeVaultEntry) => void;
   onShareWithClient?: (path: string, name?: string) => void;
+  onCreateShortcut?: (folderRelPath: string, folderName: string) => void;
   onTagFolderDevice?: (
     folderPath: string,
     category: 'camera' | 'mobile' | 'drone' | 'other',
@@ -113,6 +114,7 @@ export function VaultContextMenu({
   onBatchMoveToPortfolio,
   onToggleCurriculum,
   onShareWithClient,
+  onCreateShortcut,
   onTagFolderDevice,
   onLinkTask,
   onCreateFolder,
@@ -450,10 +452,26 @@ export function VaultContextMenu({
                 }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-fg hover:bg-surface-hover transition-colors text-left"
               >
-                <span className="material-symbols-outlined text-[17px] text-[#9D4EDD]">
+                <span className="material-symbols-outlined text-[17px] text-accent-primary">
                   {hasPin ? 'lock_open' : 'enhanced_encryption'}
                 </span>
                 <span>{hasPin ? 'Remover Proteção PIN' : 'Proteger com PIN'}</span>
+              </button>
+            )}
+
+            {onCreateShortcut && !entry.isShortcut && entry.mimeType !== 'inode/directory+shortcut' && (
+              <button
+                type="button"
+                onClick={() => {
+                  onCreateShortcut(entry.relativePath, entry.name);
+                  onClose();
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-fg hover:bg-surface-hover hover:text-amber-300 transition-colors text-left font-medium"
+              >
+                <span className="material-symbols-outlined text-[17px] text-amber-400">
+                  add_link
+                </span>
+                <span>Criar Atalho...</span>
               </button>
             )}
 
@@ -464,9 +482,9 @@ export function VaultContextMenu({
                   onShareWithClient(entry.relativePath, entry.name);
                   onClose();
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-fg hover:bg-surface-hover hover:text-[#9D4EDD] transition-colors text-left font-semibold"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-fg hover:bg-surface-hover hover:text-accent-primary transition-colors text-left font-semibold"
               >
-                <span className="material-symbols-outlined text-[17px] text-[#9D4EDD]">
+                <span className="material-symbols-outlined text-[17px] text-accent-primary">
                   share
                 </span>
                 <span>Compartilhar com o Cliente</span>
@@ -555,9 +573,9 @@ export function VaultContextMenu({
                   onShareWithClient(entry.relativePath, entry.name);
                   onClose();
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-fg hover:bg-surface-hover hover:text-[#9D4EDD] transition-colors text-left font-medium"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-fg hover:bg-surface-hover hover:text-accent-primary transition-colors text-left font-medium"
               >
-                <span className="material-symbols-outlined text-[17px] text-[#9D4EDD]">
+                <span className="material-symbols-outlined text-[17px] text-accent-primary">
                   share
                 </span>
                 <span>Compartilhar com o Cliente</span>
@@ -637,7 +655,7 @@ export function VaultContextMenu({
                 }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-fg hover:bg-surface-hover transition-colors text-left"
               >
-                <span className={`material-symbols-outlined text-[17px] ${inCurriculum ? 'text-[#9D4EDD]' : 'text-fg-muted'}`}>
+                <span className={`material-symbols-outlined text-[17px] ${inCurriculum ? 'text-accent-primary' : 'text-fg-muted'}`}>
                   verified
                 </span>
                 <span>{inCurriculum ? 'Desvincular do Currículo' : 'Vincular ao Currículo'}</span>
@@ -733,7 +751,7 @@ export function VaultContextMenu({
               }}
               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-fg hover:bg-surface-hover transition-colors text-left"
             >
-              <span className="material-symbols-outlined text-[17px] text-[#9D4EDD]">
+              <span className="material-symbols-outlined text-[17px] text-accent-primary">
                 note_add
               </span>
               <span>Nova Nota (.md)</span>

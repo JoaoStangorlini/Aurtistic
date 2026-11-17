@@ -22,7 +22,7 @@ export function getBadgeColorClass(type: BadgeType, value: string | null): strin
     else if (text === 'alta') colorClass = 'bg-[#db4437]/15 text-[#db4437] border-[#db4437]/30'; // Red
   }
   else if (type === 'categoria') {
-    if (text.includes('programar')) colorClass = 'bg-[#9D4EDD]/15 text-[#9D4EDD] border-[#9D4EDD]/30'; // Purple
+    if (text.includes('programar')) colorClass = 'bg-accent-primary/15 text-accent-primary border-accent-primary/30'; // Purple
     else if (text.includes('pesquisar')) colorClass = 'bg-[#4285f4]/15 text-[#4285f4] border-[#4285f4]/30'; // Blue
     else if (text.includes('touch')) colorClass = 'bg-[#0f9d58]/15 text-[#0f9d58] border-[#0f9d58]/30'; // Green
     else if (text.includes('reunir')) colorClass = 'bg-[#FF8C8C]/15 text-[#FF8C8C] border-[#FF8C8C]/30'; // Salmon/Pink
@@ -31,7 +31,7 @@ export function getBadgeColorClass(type: BadgeType, value: string | null): strin
   }
   else if (type === 'responsavel') {
     if (text.includes('andy')) colorClass = 'bg-[#db4437]/15 text-[#db4437] border-[#db4437]/30'; // Red
-    else if (text.includes('joão') || text.includes('joao')) colorClass = 'bg-[#9D4EDD]/15 text-[#9D4EDD] border-[#9D4EDD]/30'; // Purple
+    else if (text.includes('joão') || text.includes('joao')) colorClass = 'bg-accent-primary/15 text-accent-primary border-accent-primary/30'; // Purple
     else if (text.includes('leo')) colorClass = 'bg-[#0f9d58]/15 text-[#0f9d58] border-[#0f9d58]/30'; // Green
     else if (text.includes('dani')) colorClass = 'bg-[#4285f4]/15 text-[#4285f4] border-[#4285f4]/30'; // Blue
     else if (text.includes('lorenzo')) colorClass = 'bg-[#f4b400]/15 text-[#f4b400] border-[#f4b400]/30'; // Yellow
@@ -39,7 +39,7 @@ export function getBadgeColorClass(type: BadgeType, value: string | null): strin
   }
   else if (type === 'dimensao') {
     if (text.includes('usp')) colorClass = 'bg-[#0F4780]/20 text-[#4da8ff] border-[#0F4780]/50'; // Azul
-    else if (text.includes('hub')) colorClass = 'bg-[#9D4EDD]/15 text-[#9D4EDD] border-[#9D4EDD]/30'; // Roxo vibrante
+    else if (text.includes('hub')) colorClass = 'bg-accent-primary/15 text-accent-primary border-accent-primary/30'; // Roxo vibrante
     else if (text.includes('urgente')) colorClass = 'bg-[#F14343]/15 text-[#F14343] border-[#F14343]/30'; // Vermelho LabDiv
     else if (text.includes('livros')) colorClass = 'bg-[#FFCC00]/15 text-[#FFCC00] border-[#FFCC00]/30'; // Amarelo LabDiv
     else if (text.includes('filmes') || text.includes('series') || text.includes('séries')) colorClass = 'bg-[#FFE066]/15 text-[#FFE066] border-[#FFE066]/30'; // Amarelo Claro

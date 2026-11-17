@@ -86,8 +86,8 @@ export function PinLockModal({
       <div className="w-full max-w-md bg-surface border border-border-subtle rounded-2xl p-6 shadow-2xl">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-[#9D4EDD]/15 border border-[#9D4EDD]/40 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[#9D4EDD] text-[22px]">
+            <div className="w-10 h-10 rounded-xl bg-accent-primary/15 border border-accent-primary/40 flex items-center justify-center">
+              <span className="material-symbols-outlined text-accent-primary text-[22px]">
                 {mode === 'unlock' ? 'lock_open' : mode === 'set' ? 'enhanced_encryption' : 'no_encryption'}
               </span>
             </div>
@@ -114,7 +114,7 @@ export function PinLockModal({
 
         {mode === 'unlock' && pinHint && (
           <div className="mb-4 p-3 rounded-lg bg-app border border-border-subtle text-xs text-fg-secondary">
-            <span className="font-bold text-[#FFCC00]">Dica do PIN:</span> {pinHint}
+            <span className="font-bold text-accent-secondary">Dica do PIN:</span> {pinHint}
           </div>
         )}
 
@@ -138,7 +138,7 @@ export function PinLockModal({
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
               placeholder="••••"
-              className="w-full bg-app border border-border-subtle focus:border-[#9D4EDD] rounded-lg px-4 py-2.5 text-center text-lg tracking-[0.4em] font-bold text-fg outline-none"
+              className="w-full bg-app border border-border-subtle focus:border-accent-primary rounded-lg px-4 py-2.5 text-center text-lg tracking-[0.4em] font-bold text-fg outline-none"
             />
           </div>
 
@@ -153,7 +153,7 @@ export function PinLockModal({
                 value={hint}
                 onChange={(e) => setHint(e.target.value)}
                 placeholder="Ex: Ano do primeiro ensaio"
-                className="w-full bg-app border border-border-subtle focus:border-[#9D4EDD] rounded-lg px-3.5 py-2 text-sm text-fg outline-none"
+                className="w-full bg-app border border-border-subtle focus:border-accent-primary rounded-lg px-3.5 py-2 text-sm text-fg outline-none"
               />
             </div>
           )}
@@ -169,7 +169,7 @@ export function PinLockModal({
             <button
               type="submit"
               disabled={loading || pin.length < 4}
-              className="px-5 py-2 rounded-lg bg-[#9D4EDD] hover:bg-[#8B38CC] text-fg text-xs font-bold transition-colors disabled:opacity-50"
+              className="px-5 py-2 rounded-lg bg-accent-primary hover:bg-accent-primary-hover text-on-accent-primary text-xs font-bold transition-colors disabled:opacity-50"
             >
               {loading
                 ? 'Validando...'

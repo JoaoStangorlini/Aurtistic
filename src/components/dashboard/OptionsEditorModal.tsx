@@ -107,7 +107,7 @@ export function OptionsEditorModal({ column, onClose, onSave }: OptionsEditorMod
                 type="text" 
                 value={localColumn.name}
                 onChange={(e) => setLocalColumn({...localColumn, name: e.target.value})}
-                className="w-full bg-app border border-border-subtle rounded-md px-3 py-2 text-fg focus:outline-none focus:border-[#9D4EDD]"
+                className="w-full bg-app border border-border-subtle rounded-md px-3 py-2 text-fg focus:outline-none focus:border-accent-primary"
               />
             </div>
             
@@ -117,7 +117,7 @@ export function OptionsEditorModal({ column, onClose, onSave }: OptionsEditorMod
                 value={localColumn.type}
                 onChange={(e) => setLocalColumn({...localColumn, type: e.target.value as any})}
                 disabled={localColumn.is_native} // Nativas não podem mudar de tipo
-                className={`w-full bg-app border border-border-subtle rounded-md px-3 py-2 text-fg focus:outline-none focus:border-[#9D4EDD] ${localColumn.is_native ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`w-full bg-app border border-border-subtle rounded-md px-3 py-2 text-fg focus:outline-none focus:border-accent-primary ${localColumn.is_native ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <option value="select">Menu suspenso (Seleção)</option>
                 <option value="text">Texto livre</option>
@@ -183,7 +183,7 @@ export function OptionsEditorModal({ column, onClose, onSave }: OptionsEditorMod
                   onKeyDown={(e) => { if (e.key === 'Enter') handleAddOption() }}
                   className="flex-1 bg-transparent border-none text-sm text-fg focus:outline-none"
                 />
-                <button onClick={handleAddOption} className="text-[#9D4EDD] hover:text-[#b478ed] font-bold text-sm px-2">
+                <button onClick={handleAddOption} className="text-accent-primary hover:text-accent-primary-hover font-bold text-sm px-2">
                   Adicionar
                 </button>
               </div>

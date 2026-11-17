@@ -284,7 +284,7 @@ export function AdminQuotaGovernancePanel({
 
             <div className="bg-surface border border-border-subtle rounded-xl p-4">
               <div className="text-xs text-fg-secondary font-bold uppercase">Memória RAM</div>
-              <div className="text-lg font-bold text-[#9D4EDD] mt-1">
+              <div className="text-lg font-bold text-accent-primary mt-1">
                 {telemetry.ramUsedMb ?? 0} MB / {telemetry.ramTotalMb ?? 0} MB
               </div>
               <div className="text-xs text-fg-secondary mt-1">Concorrência máx de thumbs: 2</div>
@@ -324,7 +324,7 @@ export function AdminQuotaGovernancePanel({
             type="button"
             disabled={syncingLegacy}
             onClick={handleSyncLegacyCatalog}
-            className="px-4 py-2.5 rounded-xl bg-[#9D4EDD]/20 hover:bg-[#9D4EDD]/30 border border-[#9D4EDD]/50 text-xs font-bold text-[#E0AAFF] flex items-center gap-2 shrink-0 transition-colors disabled:opacity-50"
+            className="px-4 py-2.5 rounded-xl bg-accent-primary/20 hover:bg-accent-primary/30 border border-accent-primary/50 text-xs font-bold text-accent-primary flex items-center gap-2 shrink-0 transition-colors disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-[18px]">cloud_sync</span>
             {syncingLegacy
@@ -449,7 +449,7 @@ export function AdminQuotaGovernancePanel({
                           <span className="text-fg-muted">0 B (aguardando aprovação)</span>
                         ) : hasBoost ? (
                           <div>
-                            <span className="font-bold text-[#E0AAFF]">
+                            <span className="font-bold text-accent-primary">
                               ⚡ {formatStorageBytes(u.temp_quota_bytes || 0)}
                             </span>
                             {u.temp_quota_reason && (
@@ -487,7 +487,7 @@ export function AdminQuotaGovernancePanel({
                         <button
                           type="button"
                           onClick={() => openBoostModal(u)}
-                          className="px-3 py-1.5 rounded-lg bg-[#9D4EDD]/20 hover:bg-[#9D4EDD]/30 border border-[#9D4EDD]/40 text-[#E0AAFF] font-bold transition-colors"
+                          className="px-3 py-1.5 rounded-lg bg-accent-primary/20 hover:bg-accent-primary/30 border border-accent-primary/40 text-accent-primary font-bold transition-colors"
                         >
                           Ajustar / Evento ⚡
                         </button>
@@ -535,8 +535,8 @@ export function AdminQuotaGovernancePanel({
                 />
               </div>
 
-              <div className="p-3.5 rounded-xl bg-app border border-[#9D4EDD]/40 space-y-3">
-                <div className="text-xs font-bold text-[#E0AAFF] flex items-center gap-1.5">
+              <div className="p-3.5 rounded-xl bg-app border border-accent-primary/40 space-y-3">
+                <div className="text-xs font-bold text-accent-primary flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[16px]">bolt</span>
                   Boost Temporário para Cobertura de Evento
                 </div>

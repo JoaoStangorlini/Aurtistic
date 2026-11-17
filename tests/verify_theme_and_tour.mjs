@@ -189,6 +189,9 @@ console.log('\n--- 2. Verificação de Seletores data-tour nos Componentes ---')
 function walkFiles(dir, exts, out = []) {
   if (!fs.existsSync(dir)) return out;
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (e.name === 'node_modules' || e.name === '.next' || e.name === '.git' || e.name === 'dist') {
+      continue;
+    }
     const p = path.join(dir, e.name);
     if (e.isDirectory()) {
       walkFiles(p, exts, out);

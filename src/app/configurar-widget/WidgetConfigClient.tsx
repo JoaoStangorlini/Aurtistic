@@ -221,13 +221,13 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
   return (
     <>
       {isDirty && !savedSuccess && (
-        <div className="fixed top-24 right-4 md:right-8 z-50 bg-[var(--accent-primary)] text-white px-4 py-3 rounded shadow-2xl flex items-center gap-3 border border-[#9D4EDD]/50 animate-pulse">
+        <div className="fixed top-24 right-4 md:right-8 z-50 bg-accent-primary text-on-accent-primary px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-accent-primary/50 animate-pulse">
           <span className="material-symbols-outlined">save</span>
           <div className="flex flex-col">
             <span className="font-bold text-sm">Alterações não salvas</span>
             <span className="text-xs font-medium">Lembre-se de salvar!</span>
           </div>
-          <button onClick={handleSave} disabled={isSaving} className="ml-2 bg-app text-[#9D4EDD] px-3 py-1.5 rounded text-xs font-bold hover:bg-surface-hover transition-colors disabled:opacity-50">
+          <button onClick={handleSave} disabled={isSaving} className="ml-2 bg-app text-accent-primary px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-surface-hover transition-colors disabled:opacity-50">
             {isSaving ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
@@ -237,7 +237,7 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between md:items-center pb-6 border-b border-border-subtle mb-6 gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#FFCC00]/10 border border-[#FFCC00]/30 flex items-center justify-center text-[#FFCC00]">
+          <div className="w-10 h-10 rounded-xl bg-accent-secondary/10 border border-accent-secondary/30 flex items-center justify-center text-accent-secondary">
             <span className="material-symbols-outlined text-[24px]">widgets</span>
           </div>
           <div>
@@ -274,7 +274,7 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id ? 'border-[#9D4EDD] text-[#9D4EDD]' : 'border-transparent text-fg-muted hover:text-fg'}`}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id ? 'border-accent-primary text-accent-primary' : 'border-transparent text-fg-muted hover:text-fg'}`}
           >
             <span className="material-symbols-outlined text-[18px]">{tab.icon}</span>
             {tab.label}
@@ -307,8 +307,8 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
                 <div className="mt-4 p-3 bg-surface rounded-lg border border-border-subtle">
                   <h4 className="text-fg font-semibold text-xs mb-2">Como funcionam os botões no Widget:</h4>
                   <ul className="text-[11px] space-y-1.5">
-                    <li><strong className="text-[#FFCC00]">E</strong> = Clicar liga/desliga apenas os Eventos.</li>
-                    <li><strong className="text-[#9D4EDD]">T</strong> = Clicar liga/desliga apenas as Tarefas.</li>
+                    <li><strong className="text-accent-secondary">E</strong> = Clicar liga/desliga apenas os Eventos.</li>
+                    <li><strong className="text-accent-primary">T</strong> = Clicar liga/desliga apenas as Tarefas.</li>
                     <li>Deixe os dois ligados para ver ambos, ou os dois desligados para ver só os dias vazios.</li>
                   </ul>
                 </div>
@@ -324,7 +324,7 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
                   {uniqueStatuses.map(status => {
                     const isHidden = hiddenStatuses.includes(status);
                     return (
-                      <button key={status} onClick={() => toggleStatusVisibility(status)} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all border flex items-center gap-1 ${isHidden ? 'bg-surface-hover text-fg-muted border-border-strong' : 'bg-[#9D4EDD]/20 text-[#9D4EDD] border-[#9D4EDD]/30'}`}>
+                      <button key={status} onClick={() => toggleStatusVisibility(status)} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all border flex items-center gap-1 ${isHidden ? 'bg-surface-hover text-fg-muted border-border-strong' : 'bg-accent-primary/20 text-accent-primary border-accent-primary/30'}`}>
                         <span className="material-symbols-outlined text-[14px]">{isHidden ? 'visibility_off' : 'visibility'}</span>
                         {status}
                       </button>
@@ -350,7 +350,7 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
               {/* Filtro por Dimensão */}
               <div className="p-4 bg-app border border-border-subtle rounded-lg">
                 <h3 className="text-base font-bold text-fg mb-1 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#FFCC00] text-[20px]">category</span>
+                  <span className="material-symbols-outlined text-accent-secondary text-[20px]">category</span>
                   <label className="text-fg-secondary text-sm font-bold uppercase tracking-wider mb-2 block">Filtrar por Dimensão</label>
                 </h3>
                 <select value={selectedDimension} onChange={(e) => { setIsDirty(true); setSelectedDimension(e.target.value); }} className="w-full mt-2 bg-surface border border-border-subtle text-fg px-4 py-2.5 rounded-lg text-sm font-semibold">
@@ -364,7 +364,7 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
               <div className="p-4 bg-app border border-border-subtle rounded-lg">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[#9D4EDD] text-[20px]">person_check</span>
+                    <span className="material-symbols-outlined text-accent-primary text-[20px]">person_check</span>
                     <div>
                       <h3 className="text-sm font-bold text-fg">🎯 Exibir apenas minhas tarefas nos widgets</h3>
                       <p className="text-xs text-fg-muted">Oculta tarefas de outros membros da organização na tela inicial (Recomendado).</p>
@@ -374,7 +374,7 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
                     type="checkbox"
                     checked={onlyMyTasks}
                     onChange={(e) => { setIsDirty(true); setOnlyMyTasks(e.target.checked); }}
-                    className="w-5 h-5 accent-[#9D4EDD] rounded cursor-pointer"
+                    className="w-5 h-5 accent-[var(--accent-primary)] rounded cursor-pointer"
                   />
                 </div>
               </div>
@@ -401,8 +401,8 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
               <div className="mt-4 p-3 bg-surface rounded-lg border border-border-subtle">
                 <h4 className="text-fg font-semibold text-xs mb-2">Como funcionam os botões no Widget:</h4>
                 <ul className="text-[11px] space-y-1.5">
-                  <li><strong className="text-[#FFCC00]">E</strong> = Clicar liga/desliga apenas os Eventos.</li>
-                  <li><strong className="text-[#9D4EDD]">T</strong> = Clicar liga/desliga apenas as Tarefas.</li>
+                  <li><strong className="text-accent-secondary">E</strong> = Clicar liga/desliga apenas os Eventos.</li>
+                  <li><strong className="text-accent-primary">T</strong> = Clicar liga/desliga apenas as Tarefas.</li>
                   <li>Deixe os dois ligados para ver ambos, ou os dois desligados para ver só os dias vazios.</li>
                 </ul>
               </div>
@@ -429,33 +429,33 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
               <div className="mt-4 p-3 bg-surface rounded-lg border border-border-subtle">
                 <h4 className="text-fg font-semibold text-xs mb-2">Como funcionam os botões no Widget:</h4>
                 <ul className="text-[11px] space-y-1.5">
-                  <li><strong className="text-[#FFCC00]">E</strong> = Clicar liga/desliga apenas os Eventos.</li>
-                  <li><strong className="text-[#9D4EDD]">T</strong> = Clicar liga/desliga apenas as Tarefas.</li>
+                  <li><strong className="text-accent-secondary">E</strong> = Clicar liga/desliga apenas os Eventos.</li>
+                  <li><strong className="text-accent-primary">T</strong> = Clicar liga/desliga apenas as Tarefas.</li>
                   <li>Deixe os dois ligados para ver ambos, ou os dois desligados para ver só os dias vazios.</li>
                 </ul>
               </div>
 
               <div className="mt-4 p-4 bg-surface border border-border-subtle rounded-lg">
                 <h3 className="text-base font-bold text-fg mb-3 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#9D4EDD] text-[20px]">view_agenda</span>
+                  <span className="material-symbols-outlined text-accent-primary text-[20px]">view_agenda</span>
                   Divisão de Turnos
                 </h3>
                 <div className="flex flex-col gap-2">
-                  <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${weeklySplitType === 'none' ? 'border-[#9D4EDD] bg-[#9D4EDD]/10' : 'border-border-subtle bg-app hover:border-border-strong'}`}>
+                  <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${weeklySplitType === 'none' ? 'border-accent-primary bg-accent-primary/10' : 'border-border-subtle bg-app hover:border-border-strong'}`}>
                     <input type="radio" name="splitType" value="none" checked={weeklySplitType === 'none'} onChange={() => { setIsDirty(true); setWeeklySplitType('none'); }} className="hidden" />
                     <div className="flex-1">
                       <h4 className="text-fg font-semibold text-sm">Turno Único</h4>
                       <p className="text-fg-muted text-xs">Exibe as tarefas e eventos de forma contínua no dia.</p>
                     </div>
                   </label>
-                  <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${weeklySplitType === '12h' ? 'border-[#9D4EDD] bg-[#9D4EDD]/10' : 'border-border-subtle bg-app hover:border-border-strong'}`}>
+                  <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${weeklySplitType === '12h' ? 'border-accent-primary bg-accent-primary/10' : 'border-border-subtle bg-app hover:border-border-strong'}`}>
                     <input type="radio" name="splitType" value="12h" checked={weeklySplitType === '12h'} onChange={() => { setIsDirty(true); setWeeklySplitType('12h'); }} className="hidden" />
                     <div className="flex-1">
                       <h4 className="text-fg font-semibold text-sm">Dividir em 2 Turnos (12h-24h-12h)</h4>
                       <p className="text-fg-muted text-xs">Separa os itens em bloco da Manhã e Tarde/Noite.</p>
                     </div>
                   </label>
-                  <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${weeklySplitType === '8h' ? 'border-[#9D4EDD] bg-[#9D4EDD]/10' : 'border-border-subtle bg-app hover:border-border-strong'}`}>
+                  <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${weeklySplitType === '8h' ? 'border-accent-primary bg-accent-primary/10' : 'border-border-subtle bg-app hover:border-border-strong'}`}>
                     <input type="radio" name="splitType" value="8h" checked={weeklySplitType === '8h'} onChange={() => { setIsDirty(true); setWeeklySplitType('8h'); }} className="hidden" />
                     <div className="flex-1">
                       <h4 className="text-fg font-semibold text-sm">Dividir em 3 Turnos (8h-16h-24h-8h)</h4>
@@ -476,21 +476,21 @@ export default function WidgetConfigClient({ userId, tasks }: WidgetConfigClient
                 <h4 className="text-fg font-semibold text-xs mb-2">Estrutura do Widget Global:</h4>
                 <div className="text-[11px] space-y-3 text-fg-secondary">
                   <div>
-                    <strong className="text-[#9D4EDD] block mb-1">Seção Superior (Cabeçalho Global):</strong>
+                    <strong className="text-accent-primary block mb-1">Seção Superior (Cabeçalho Global):</strong>
                     <ul className="pl-2 space-y-1">
                       <li>• <strong>Esquerda:</strong> Filtro de Dimensões (Dimensões ▼).</li>
                       <li>• <strong>Direita:</strong> Botões de controle mestre E, T e +.</li>
                     </ul>
                   </div>
                   <div>
-                    <strong className="text-[#9D4EDD] block mb-1">Seção Central (Dividida em 50/50):</strong>
+                    <strong className="text-accent-primary block mb-1">Seção Central (Dividida em 50/50):</strong>
                     <ul className="pl-2 space-y-1">
                       <li>• <strong>Superior Esquerdo:</strong> Mini Calendário Mensal com cabeçalho de mês, dias da semana e grade de dias.</li>
                       <li>• <strong>Superior Direito:</strong> Lista de Tarefas e Eventos filtrados com barra de rolagem vertical.</li>
                     </ul>
                   </div>
                   <div>
-                    <strong className="text-[#9D4EDD] block mb-1">Seção Inferior (Base):</strong>
+                    <strong className="text-accent-primary block mb-1">Seção Inferior (Base):</strong>
                     <ul className="pl-2 space-y-1">
                       <li>• <strong>Inferior Horizontal:</strong> Visão Semanal completa com rolagem lateral por deslizamento e o divisor roxo (|) entre as semanas.</li>
                     </ul>

@@ -100,12 +100,22 @@ export async function saveTask(taskData: Partial<Task>) {
       .from('tasks')
       .upsert(dataToSave, { onConflict: 'id' });
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      if ((error as any).code === '23503' && dataToSave.organization_id) {
+        console.warn('saveTask upsert: foreign key constraint on organization_id failed, retrying with organization_id = null');
+        const fallbackData = { ...dataToSave, organization_id: null };
+        const { error: retryError } = await supabase.from('tasks').upsert(fallbackData, { onConflict: 'id' });
+        if (retryError) throw new Error(retryError.message);
+      } else {
+        throw new Error(error.message);
+      }
+    }
 
     // Propagate changes to child tasks
     if (originalTask) {
        const fieldsToPropagate: Partial<Task> = {};
-       const propagateKeys = ['dimensao', 'categoria', 'prazo', 'responsavel', 'prioridade', 'status'];
+       // 'status' e 'prazo' NÃO são propagados às subtarefas (preservam o checklist individual)
+       const propagateKeys = ['dimensao', 'categoria', 'prioridade'];
        propagateKeys.forEach(k => {
           const newVal = (dataToSave as any)[k];
           const oldVal = (originalTask as any)[k];
@@ -123,6 +133,26 @@ export async function saveTask(taskData: Partial<Task>) {
            fieldsToPropagate.custom_fields = dataToSave.custom_fields;
        }
 
+       // `responsavel` só é propagado para subtarefas SEM delegação própria
+       // (nunca sobrescreve responsavel/subteam_id/assigned_* de subtarefas já delegadas).
+       if (dataToSave.responsavel !== undefined && dataToSave.responsavel !== originalTask.responsavel) {
+           const { data: children } = await supabase
+             .from('tasks')
+             .select('id, subteam_id, assigned_subteam_ids, assigned_member_ids')
+             .eq('parent_id', dataToSave.id);
+           const undelegatedIds = (children || [])
+             .filter((c: any) => !c.subteam_id && !(c.assigned_subteam_ids?.length) && !(c.assigned_member_ids?.length))
+             .map((c: any) => c.id);
+           if (undelegatedIds.length > 0) {
+               await supabase.from('tasks').update({ responsavel: dataToSave.responsavel }).in('id', undelegatedIds);
+           }
+       }
+
+       // `prazo` só é propagado para subtarefas que ainda não têm prazo próprio
+       if (dataToSave.prazo !== undefined && dataToSave.prazo !== originalTask.prazo && dataToSave.prazo) {
+           await supabase.from('tasks').update({ prazo: dataToSave.prazo }).eq('parent_id', dataToSave.id).is('prazo', null);
+       }
+
        if (Object.keys(fieldsToPropagate).length > 0) {
            await supabase.from('tasks').update(fieldsToPropagate).eq('parent_id', dataToSave.id);
        }
@@ -133,11 +163,123 @@ export async function saveTask(taskData: Partial<Task>) {
       .from('tasks')
       .insert([dataToSave]);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      if ((error as any).code === '23503' && dataToSave.organization_id) {
+        console.warn('saveTask insert: foreign key constraint on organization_id failed, retrying with organization_id = null');
+        const fallbackData = { ...dataToSave, organization_id: null };
+        const { error: retryError } = await supabase.from('tasks').insert([fallbackData]);
+        if (retryError) throw new Error(retryError.message);
+      } else {
+        throw new Error(error.message);
+      }
+    }
   }
 
   revalidatePath('/labdiv');
   revalidatePath('/servidor');
+}
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function resolveSubteams(t: Partial<Task>): string[] {
+  const list = Array.isArray(t.assigned_subteam_ids)
+    ? t.assigned_subteam_ids
+    : (t.subteam_id ? [t.subteam_id] : []);
+  return list.filter((id): id is string => typeof id === 'string' && UUID_REGEX.test(id));
+}
+
+function resolveMembers(t: Partial<Task>): string[] {
+  return (Array.isArray(t.assigned_member_ids) ? t.assigned_member_ids : [])
+    .filter((id): id is string => typeof id === 'string' && UUID_REGEX.test(id));
+}
+
+export async function saveTaskWithSubtasksAction(parentTask: Partial<Task>, subtasks: Partial<Task>[]) {
+  const supabase = await createClient();
+  const { data: { user: actionUser } } = await supabase.auth.getUser();
+  if (!actionUser) throw new Error('Unauthorized');
+
+  const parentId = parentTask.id && UUID_REGEX.test(parentTask.id) ? parentTask.id : crypto.randomUUID();
+  const parentSubteams = resolveSubteams(parentTask);
+
+  // 1. Salva a tarefa-mãe (reaproveita regras de recorrência/conclusão do saveTask)
+  await saveTask({
+    ...parentTask,
+    id: parentId,
+    assigned_subteam_ids: parentSubteams,
+    subteam_id: parentSubteams[0] ?? null,
+    assigned_member_ids: resolveMembers(parentTask),
+  });
+
+  // 2. UUIDs definitivos + payload ordenado
+  const subtasksPayload = subtasks
+    .filter((st) => (st.nome || '').trim().length > 0)
+    .map((st, idx) => {
+      const resolvedSubteams = resolveSubteams(st);
+      return {
+        id: st.id && UUID_REGEX.test(st.id) ? st.id : crypto.randomUUID(),
+        parent_id: parentId,
+        user_id: parentTask.user_id || actionUser.id,
+        organization_id: parentTask.organization_id || null,
+        is_personal: parentTask.is_personal ?? false,
+        nome: (st.nome || '').trim(),
+        status: st.status || 'não iniciada',
+        ordem_manual: idx,
+        subteam_id: resolvedSubteams[0] ?? null,
+        assigned_subteam_ids: resolvedSubteams,
+        assigned_member_ids: resolveMembers(st),
+        responsavel: st.responsavel ?? null,
+        prazo: st.prazo || parentTask.prazo || null,
+        prioridade: st.prioridade || parentTask.prioridade || 'Baixa',
+        dimensao: parentTask.dimensao || 'HUB',
+        categoria: parentTask.categoria || null,
+      };
+    });
+
+  if (subtasksPayload.length > 0) {
+    const { error: upsertError } = await supabase.from('tasks').upsert(subtasksPayload, { onConflict: 'id' });
+    if (upsertError) {
+      if ((upsertError as any).code === '23503') {
+        console.warn('saveTaskWithSubtasksAction: foreign key constraint failed on subtasks, retrying with organization_id = null');
+        const fallbackSubtasks = subtasksPayload.map((s) => ({ ...s, organization_id: null }));
+        const { error: retryError } = await supabase.from('tasks').upsert(fallbackSubtasks, { onConflict: 'id' });
+        if (retryError) throw new Error(retryError.message);
+      } else {
+        throw new Error(upsertError.message);
+      }
+    }
+  }
+
+  // 3. Remove subtarefas órfãs (removidas no modal)
+  const keptIds = subtasksPayload.map((s) => s.id).filter((id) => UUID_REGEX.test(id));
+  let deleteQuery = supabase.from('tasks').delete().eq('parent_id', parentId);
+  if (keptIds.length > 0) {
+    deleteQuery = deleteQuery.not('id', 'in', `(${keptIds.join(',')})`);
+  }
+  const { error: deleteError } = await deleteQuery;
+  if (deleteError) throw new Error(deleteError.message);
+
+  revalidatePath('/labdiv');
+  revalidatePath('/servidor');
+  return { id: parentId };
+}
+
+export async function toggleSubtaskCompletionAction(subtaskId: string, completed: boolean) {
+  if (!UUID_REGEX.test(subtaskId)) throw new Error('ID de subtarefa inválido');
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Unauthorized');
+
+  const { error } = await supabase
+    .from('tasks')
+    .update({
+      status: completed ? 'completa' : 'não iniciada',
+      concluida_em: completed ? new Date().toISOString() : null,
+    })
+    .eq('id', subtaskId)
+    .not('parent_id', 'is', null);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/labdiv');
 }
 
 export async function deleteTask(id: string) {
@@ -769,8 +911,18 @@ export async function getPortfolioAlbumZipUrlAction(input: {
  */
 export async function syncPortfolioAction(options?: {
   forceReset?: boolean;
+  wifiOnly?: boolean;
+  isUnmeteredWifi?: boolean;
 }): Promise<{ ok: boolean; count: number; error?: string }> {
   try {
+    if (options?.wifiOnly && options?.isUnmeteredWifi === false) {
+      return {
+        ok: false,
+        count: 0,
+        error: 'Sincronização bloqueada: trava Somente Wi-Fi ativa.',
+      };
+    }
+
     const supabase = await createClient();
     const {
       data: { user },

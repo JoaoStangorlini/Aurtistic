@@ -209,7 +209,7 @@ export default function ResumoClient({
                 value={resumoData.tagline}
                 onChange={e => setResumoData({...resumoData, tagline: e.target.value})}
                 placeholder="Ex: FOTÓGRAFO & DEV & FÍSICO"
-                className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-[#9D4EDD]"
+                className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-accent-primary"
               />
             </div>
             <div>
@@ -219,7 +219,7 @@ export default function ResumoClient({
                 value={resumoData.title}
                 onChange={e => setResumoData({...resumoData, title: e.target.value})}
                 placeholder="Ex: JOÃO PAULO STANGORLINI"
-                className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-[#9D4EDD]"
+                className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-accent-primary"
               />
             </div>
           </div>
@@ -231,7 +231,7 @@ export default function ResumoClient({
               onChange={e => setResumoData({...resumoData, subtitle: e.target.value})}
               rows={3}
               placeholder="Descreva brevemente sua atuação..."
-              className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-[#9D4EDD] resize-y"
+              className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-accent-primary resize-y"
             />
           </div>
 
@@ -242,14 +242,14 @@ export default function ResumoClient({
                 type="text"
                 value={resumoData.button1_text}
                 onChange={e => setResumoData({...resumoData, button1_text: e.target.value})}
-                className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-[#9D4EDD]"
+                className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-accent-primary"
               />
               <label className="block text-xs font-bold text-[#FFCC00] uppercase tracking-wider mt-2 mb-1">URL do Botão 1</label>
               <input 
                 type="text"
                 value={resumoData.button1_url}
                 onChange={e => setResumoData({...resumoData, button1_url: e.target.value})}
-                className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-[#9D4EDD]"
+                className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-accent-primary"
               />
             </div>
             <div>
@@ -258,14 +258,14 @@ export default function ResumoClient({
                 type="text"
                 value={resumoData.button2_text}
                 onChange={e => setResumoData({...resumoData, button2_text: e.target.value})}
-                className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-[#9D4EDD]"
+                className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-accent-primary"
               />
               <label className="block text-xs font-bold text-[#FFCC00] uppercase tracking-wider mt-2 mb-1">URL do Botão 2</label>
               <input 
                 type="text"
                 value={resumoData.button2_url}
                 onChange={e => setResumoData({...resumoData, button2_url: e.target.value})}
-                className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-[#9D4EDD]"
+                className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-accent-primary"
               />
             </div>
           </div>
@@ -281,7 +281,7 @@ export default function ResumoClient({
                   value={resumoData.profile_image_url}
                   onChange={e => setResumoData({...resumoData, profile_image_url: e.target.value})}
                   placeholder="URL direta ou caminho relativo..."
-                  className="flex-1 bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-[#9D4EDD]"
+                  className="flex-1 bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-accent-primary"
                 />
                 <button
                   type="button"
@@ -302,15 +302,15 @@ export default function ResumoClient({
               onChange={e => setResumoData({...resumoData, description: e.target.value})}
               rows={6}
               placeholder="Escreva sua trajetória profissional e competências..."
-              className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-[#9D4EDD] resize-y"
+              className="w-full bg-app border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none focus:border-accent-primary resize-y"
             />
           </div>
 
-          <div className="mt-8 p-5 bg-[#3B1E43]/10 border border-[#3B1E43]/50 rounded-xl flex flex-col md:flex-row gap-4 items-start">
-            <span className="material-symbols-outlined text-[#9D4EDD] text-[24px]">info</span>
+          <div className="mt-8 p-5 bg-accent-primary/10 border border-accent-primary/30 rounded-xl flex flex-col md:flex-row gap-4 items-start">
+            <span className="material-symbols-outlined text-accent-primary text-[24px]">info</span>
             <div className="text-sm text-fg-secondary space-y-2">
               <p className="font-bold text-fg mb-2">Como editar as outras seções desta página?</p>
-              <ul className="list-disc list-inside space-y-1.5 marker:text-[#9D4EDD]">
+              <ul className="list-disc list-inside space-y-1.5 marker:text-accent-primary">
                 <li><strong>Projetos Destacados:</strong> São puxados automaticamente dos projetos que você cadastra na aba <Link href="/portfolio" className="text-[#FFCC00] hover:underline font-semibold">Portfólio</Link>.</li>
                 <li><strong>Currículo Resumido:</strong> É gerado automaticamente a partir do texto que você escreve no seu <Link href="/curriculo" className="text-[#FFCC00] hover:underline font-semibold">Currículo</Link>.</li>
                 <li><strong>Contato (WhatsApp e E-mail):</strong> Aparecem se você preencher seu Telefone e E-mail no <Link href="/curriculo" className="text-[#FFCC00] hover:underline font-semibold">Currículo</Link>.</li>
@@ -507,16 +507,16 @@ export default function ResumoClient({
 
               {/* Card de Currículo */}
               {profile?.curriculo && !Array.isArray(profile.curriculo) && profile.curriculo.summary && (
-                <div className="bg-surface p-8 md:p-10 rounded-2xl flex flex-col justify-between border border-[#FFCC00] hover:border-[#9D4EDD] transition-colors group">
+                <div className="bg-surface p-8 md:p-10 rounded-2xl flex flex-col justify-between border border-accent-secondary hover:border-accent-primary transition-colors group">
                   <div className="space-y-4">
-                    <div className="w-12 h-12 bg-[var(--accent-primary)] text-white rounded-full flex items-center justify-center mb-6">
+                    <div className="w-12 h-12 bg-accent-primary text-on-accent-primary rounded-full flex items-center justify-center mb-6">
                       <span className="font-bold text-xl">📄</span>
                     </div>
                     <h3 className="text-2xl font-['Bukra'] font-bold text-fg">Currículo Resumido</h3>
                     <p className="text-fg-secondary text-sm leading-relaxed">{profile.curriculo.summary}</p>
                   </div>
                   <div className="mt-8">
-                    <Link href="/curriculo" className="inline-flex px-8 py-3 bg-[var(--accent-primary)] text-white text-sm font-bold rounded-md hover:bg-[#7B2CBF] transition-colors items-center gap-2">
+                    <Link href="/curriculo" className="inline-flex px-8 py-3 bg-accent-primary text-on-accent-primary text-sm font-bold rounded-md hover:bg-accent-primary-hover transition-colors items-center gap-2">
                       Ver Currículo Completo
                       <span className="group-hover:translate-x-1 transition-transform">→</span>
                     </Link>

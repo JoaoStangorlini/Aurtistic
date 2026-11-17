@@ -19,6 +19,40 @@ import {
 
 export const PRIMARY_ADMIN_UUID = 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e';
 
+export const DEFAULT_ECOSYSTEM_ORGS_BY_ID: Record<
+  string,
+  { id: string; slug: string; name: string; storage_quota_bytes: number; storage_used_bytes: number }
+> = {
+  '1ab41410-0000-4000-8000-000000000001': {
+    id: '1ab41410-0000-4000-8000-000000000001',
+    slug: 'labdiv',
+    name: 'LabDiv',
+    storage_quota_bytes: 53687091200,
+    storage_used_bytes: 0,
+  },
+  '1ab41410-0000-4000-8000-000000000002': {
+    id: '1ab41410-0000-4000-8000-000000000002',
+    slug: 'show-da-fisica',
+    name: 'Show da Física',
+    storage_quota_bytes: 53687091200,
+    storage_used_bytes: 0,
+  },
+  '1ab41410-0000-4000-8000-000000000003': {
+    id: '1ab41410-0000-4000-8000-000000000003',
+    slug: 'hs',
+    name: 'Hackerspace IFUSP',
+    storage_quota_bytes: 53687091200,
+    storage_used_bytes: 0,
+  },
+  '1ab41410-0000-4000-8000-000000000004': {
+    id: '1ab41410-0000-4000-8000-000000000004',
+    slug: 'profis',
+    name: 'Pró-Física (ProFis)',
+    storage_quota_bytes: 53687091200,
+    storage_used_bytes: 0,
+  },
+};
+
 export interface IssuedUserStorageSession {
   profile: UserStorageProfile;
   isApprovedForStorage: boolean;
@@ -88,6 +122,53 @@ export async function issueUserStorageSession(
 
   const serverUrl = getEdgeStorageServerUrl();
 
+  // Resolve organizações permitidas ao usuário para atalhos cross-scope seguros no Edge Server
+  const allowedOrgSet = new Set<string>();
+  try {
+    const { data: memberships } = await supabase
+      .from('organization_members')
+      .select('organization_id, organization:organizations(slug)')
+      .eq('user_id', userId);
+    for (const m of memberships || []) {
+      const orgObj = m.organization as { slug?: string } | { slug?: string }[] | null;
+      const slug = Array.isArray(orgObj) ? orgObj[0]?.slug : orgObj?.slug;
+      const fallbackSlug = DEFAULT_ECOSYSTEM_ORGS_BY_ID[String(m.organization_id || '')]?.slug;
+      if (slug) allowedOrgSet.add(slug);
+      else if (fallbackSlug) allowedOrgSet.add(fallbackSlug);
+    }
+    if (profile.storage_role === 'admin' || isPrimaryAdmin) {
+      Object.values(DEFAULT_ECOSYSTEM_ORGS_BY_ID).forEach((o) => allowedOrgSet.add(o.slug));
+    } else if (options?.emailHint || allowedOrgSet.size === 0) {
+      const { data: authData } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+      const email = (options?.emailHint || authData?.user?.email || '').toLowerCase();
+      if (email) {
+        const hubBase = (
+          process.env.NEXT_PUBLIC_HUB_URL ||
+          process.env.HUB_URL ||
+          'http://localhost:3001'
+        ).replace(/\/+$/, '');
+        const secret =
+          process.env.HUB_SSO_SECRET ||
+          process.env.ADMIN_SECRET_KEY ||
+          process.env.EDGE_HMAC_SECRET ||
+          'hub-default-sso-secret';
+        const hubRes = await fetch(
+          `${hubBase}/api/iniciativas/org-member-sync?email=${encodeURIComponent(email)}`,
+          { headers: { Authorization: `Bearer ${secret}` }, signal: AbortSignal.timeout(1200) }
+        ).catch(() => null);
+        if (hubRes && hubRes.ok) {
+          const hubData = await hubRes.json().catch(() => null);
+          if (hubData && Array.isArray(hubData.organizations)) {
+            hubData.organizations.forEach((s: string) => {
+              if (typeof s === 'string' && s.trim()) allowedOrgSet.add(s.trim().toLowerCase());
+            });
+          }
+        }
+      }
+    }
+  } catch {}
+  const allowedOrgSlugs = Array.from(allowedOrgSet);
+
   const vaultTicket = signEdgeTenantTicket({
     userId,
     role: profile.storage_role,
@@ -95,6 +176,7 @@ export async function issueUserStorageSession(
     quotaLimitBytes: effectiveQuotaBytes,
     usedBytes: profile.used_bytes || 0,
     readOnly: !isApprovedForStorage,
+    allowedOrgSlugs,
     unlockedPins: options?.unlockedPins,
     ttlMs: VAULT_TICKET_TTL_MS,
   });
@@ -106,6 +188,7 @@ export async function issueUserStorageSession(
     quotaLimitBytes: effectiveQuotaBytes,
     usedBytes: profile.used_bytes || 0,
     readOnly: true,
+    allowedOrgSlugs,
     unlockedPins: options?.unlockedPins,
     ttlMs: MEDIA_READONLY_TICKET_TTL_MS,
   });
@@ -155,16 +238,82 @@ export async function issueOrganizationVaultSession(
   let canWrite = Boolean(isOrgAdmin || member?.can_upload_org_vault);
 
   if (!member || !member.organization) {
-    if (organizationId === '1ab41410-0000-4000-8000-000000000001' || userId === PRIMARY_ADMIN_UUID) {
-      org = {
-        id: '1ab41410-0000-4000-8000-000000000001',
-        slug: 'labdiv',
-        name: 'LabDiv',
-        storage_quota_bytes: 53687091200,
-        storage_used_bytes: 0,
-      };
-      isOrgAdmin = true;
-      canWrite = true;
+    const fallbackOrg = DEFAULT_ECOSYSTEM_ORGS_BY_ID[organizationId];
+    if (member && fallbackOrg) {
+      org = fallbackOrg;
+    } else if (fallbackOrg) {
+      let allowFallback = userId === PRIMARY_ADMIN_UUID;
+      let isAdminUser = userId === PRIMARY_ADMIN_UUID;
+
+      if (!allowFallback) {
+        let user: import('@supabase/supabase-js').User | null = null;
+        let isProfileAdmin = false;
+        try {
+          const [uRes, pRes] = await Promise.all([
+            supabase.auth.getUser(),
+            supabase.from('user_profiles').select('role').eq('id', userId).maybeSingle(),
+          ]);
+          user = uRes?.data?.user || null;
+          isProfileAdmin = pRes?.data?.role === 'admin';
+        } catch {}
+
+        const email = (user?.email || '').toLowerCase().trim();
+        const username = (user?.user_metadata?.username || '').toLowerCase().trim();
+        const isConfirmedGlobalAdmin =
+          isProfileAdmin ||
+          userId === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e' ||
+          userId === '48b2fb73-c5d3-4eff-b727-54e4b91bf21b' ||
+          userId === '8a3e4272-010d-4479-94cb-26178d544ea2' ||
+          email === 'joaopaulostangorlini@usp.br' ||
+          email === 'joaostangorlini@usp.br' ||
+          email === 'joao@aurtistic.com' ||
+          email === 'hublabdiv@gmail.com' ||
+          username === 'joaostangorlini' ||
+          username === 'joao' ||
+          username === 'hublabdiv' ||
+          user?.app_metadata?.role === 'admin' ||
+          user?.user_metadata?.role === 'admin';
+
+        if (isConfirmedGlobalAdmin) {
+          allowFallback = true;
+          isAdminUser = true;
+        } else if (email) {
+          try {
+            const hubBase = (
+              process.env.NEXT_PUBLIC_HUB_URL ||
+              process.env.HUB_URL ||
+              'http://localhost:3001'
+            ).replace(/\/+$/, '');
+            const secret =
+              process.env.HUB_SSO_SECRET ||
+              process.env.ADMIN_SECRET_KEY ||
+              process.env.EDGE_HMAC_SECRET ||
+              'hub-default-sso-secret';
+            const hubRes = await fetch(
+              `${hubBase}/api/iniciativas/org-member-sync?email=${encodeURIComponent(email)}`,
+              {
+                headers: { Authorization: `Bearer ${secret}` },
+                signal: AbortSignal.timeout(1500),
+              }
+            ).catch(() => null);
+            if (hubRes && hubRes.ok) {
+              const hubData = await hubRes.json().catch(() => null);
+              if (hubData && Array.isArray(hubData.organizations)) {
+                allowFallback = hubData.organizations.includes(fallbackOrg.slug);
+                isAdminUser = hubData.role === 'admin';
+              }
+            }
+          } catch {}
+        }
+      }
+
+      if (allowFallback) {
+        org = fallbackOrg;
+        isOrgAdmin = isAdminUser;
+        canWrite = true;
+      } else {
+        throw new Error('[OrgVault] Usuário não é membro desta organização.');
+      }
     } else {
       throw new Error('[OrgVault] Usuário não é membro desta organização.');
     }
@@ -286,6 +435,7 @@ export interface SignEdgeTicketOptions {
   scopeType?: 'user' | 'org';
   organizationId?: string;
   orgSlug?: string;
+  allowedOrgSlugs?: string[];
   allowedPrefix?: string;
   /** Lista explícita de caminhos relativos permitidos quando purpose === 'public_media' */
   allowedPaths?: string[];
@@ -339,6 +489,7 @@ export function signEdgeTenantTicket(options: SignEdgeTicketOptions): SignedEdge
     ...(options.scopeType ? { scopeType: options.scopeType } : {}),
     ...(options.organizationId ? { organizationId: options.organizationId } : {}),
     ...(options.orgSlug ? { orgSlug: options.orgSlug } : {}),
+    ...(options.allowedOrgSlugs?.length ? { allowedOrgSlugs: options.allowedOrgSlugs } : {}),
     ...(options.allowedPrefix ? { allowedPrefix: options.allowedPrefix } : {}),
     ...(normalizedAllowedPaths ? { allowedPaths: normalizedAllowedPaths } : {}),
     ...(isReadOnly ? { readOnly: true } : {}),
@@ -424,5 +575,64 @@ export function attachSignedPublicMediaUrls<T extends Pick<UserFileIndexRow, 'us
         : buildTenantStreamUrl(item.relative_path, ticketToUse, { serverUrl }),
     };
   });
+}
+
+function isRelativeEdgePath(urlOrPath?: string | null): urlOrPath is string {
+  if (!urlOrPath || typeof urlOrPath !== 'string') return false;
+  const trimmed = urlOrPath.trim();
+  if (!trimmed) return false;
+  return (
+    !trimmed.startsWith('http://') &&
+    !trimmed.startsWith('https://') &&
+    !trimmed.startsWith('data:') &&
+    !trimmed.startsWith('blob:')
+  );
+}
+
+/**
+ * Assina URLs de leitura pública (TTL 2h, purpose: 'share') para fotos de recortes de jornal
+ * (`physicalPagePhotoUrl` e `originalPhotoUrl`) armazenadas no Edge Server.
+ */
+export function signPressClippingsMediaUrls<T extends Record<string, any> | null>(
+  profile: T,
+  ownerId: string
+): T {
+  if (!profile || !ownerId) return profile;
+  const rawClippings = profile?.features_config?.press_clippings;
+  if (!Array.isArray(rawClippings) || rawClippings.length === 0) return profile;
+
+  const serverUrl = getEdgeStorageServerUrl();
+  const signRelPath = (rawPath: string): string => {
+    const cleanRelPath = rawPath.trim().replace(/^\/+/, '');
+    const { ticket } = signEdgeTenantTicket({
+      userId: ownerId,
+      role: 'member',
+      purpose: 'share',
+      allowedPaths: [cleanRelPath],
+      readOnly: true,
+      allowDownload: false,
+      ttlMs: MEDIA_READONLY_TICKET_TTL_MS,
+    });
+    return buildTenantStreamUrl(cleanRelPath, ticket, { serverUrl });
+  };
+
+  const signedClippings = rawClippings.map((item: Record<string, any>) => {
+    const nextItem = { ...item };
+    if (isRelativeEdgePath(item?.physicalPagePhotoUrl)) {
+      nextItem.signedPhysicalPageUrl = signRelPath(item.physicalPagePhotoUrl);
+    }
+    if (isRelativeEdgePath(item?.originalPhotoUrl)) {
+      nextItem.signedOriginalPhotoUrl = signRelPath(item.originalPhotoUrl);
+    }
+    return nextItem;
+  });
+
+  return {
+    ...profile,
+    features_config: {
+      ...(profile.features_config || {}),
+      press_clippings: signedClippings,
+    },
+  };
 }
 

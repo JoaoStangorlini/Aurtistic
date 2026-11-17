@@ -238,6 +238,64 @@ export async function createTenantFolderDirect(input: {
   return data as EdgeMutationResponse;
 }
 
+export async function createTenantFolderShortcutDirect(input: {
+  parentFolder: string;
+  shortcutName: string;
+  personalFolderRelPath: string;
+  targetOrgSlug?: string;
+  targetOrgId?: string;
+  ownerName?: string;
+  ticket: string;
+  serverUrl?: string;
+}): Promise<{ success: boolean; shortcut: EdgeVaultEntry }> {
+  const base = resolveClientEdgeServerUrl(input.serverUrl);
+  const res = await fetch(`${base}/api/tenant/shortcut`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-tenant-ticket': input.ticket,
+    },
+    body: JSON.stringify({
+      parentFolder: input.parentFolder,
+      name: input.shortcutName,
+      personalFolderRelPath: input.personalFolderRelPath,
+      targetOrgSlug: input.targetOrgSlug,
+      targetOrgId: input.targetOrgId,
+      ownerName: input.ownerName,
+    }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.success) {
+    throw new Error(data?.error || `Erro ao criar atalho (${res.status}).`);
+  }
+  return data;
+}
+
+export async function deleteTenantFolderShortcutDirect(input: {
+  shortcutPath: string;
+  ticket: string;
+  serverUrl?: string;
+}): Promise<{ success: boolean; removed: boolean }> {
+  const base = resolveClientEdgeServerUrl(input.serverUrl);
+  const res = await fetch(`${base}/api/tenant/shortcut`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-tenant-ticket': input.ticket,
+    },
+    body: JSON.stringify({
+      shortcutPath: input.shortcutPath,
+    }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.success) {
+    throw new Error(data?.error || `Erro ao remover atalho (${res.status}).`);
+  }
+  return data;
+}
+
 export async function renameOrMoveTenantEntryDirect(input: {
   oldPath: string;
   newPath: string;

@@ -1,7 +1,9 @@
 // Este programa é um software livre (Licença AGPLv3)
 import React from 'react';
 import { Task, AgendaEvent } from '@/types';
-import { Badge, getBadgeColorClass } from './Badge';
+import { getBadgeColorClass } from './Badge';
+
+type HoursFilterMode = 'all_day' | 'morning' | 'afternoon' | 'night' | 'only_items' | 'custom';
 
 interface TaskCalendarProps {
   tasks: Task[];
@@ -16,7 +18,7 @@ interface TaskCalendarProps {
 export default function TaskCalendar({ tasks, events = [], currentDate, format = 'monthly', onDateChange, onTaskClick, onEventClick }: TaskCalendarProps) {
   
   const [selectedDateStr, setSelectedDateStr] = React.useState<string | null>(null);
-  const [hoursFilterMode, setHoursFilterMode] = React.useState<'all_day'|'morning'|'afternoon'|'night'|'only_items'|'custom'>('all_day');
+  const [hoursFilterMode, setHoursFilterMode] = React.useState<HoursFilterMode>('all_day');
   const [customStartHour, setCustomStartHour] = React.useState<number>(7);
   const [customEndHour, setCustomEndHour] = React.useState<number>(23);
 
@@ -128,7 +130,7 @@ export default function TaskCalendar({ tasks, events = [], currentDate, format =
         const isBeforeEnd = !evtEnd || cellTime <= evtEnd.getTime();
         
         if (isAfterStart && isBeforeEnd) {
-          if ((e.horarios_semanais as any)[cellDayName]) return true;
+          if ((e.horarios_semanais as Record<string, unknown>)[cellDayName]) return true;
         }
       }
       return false;
@@ -138,9 +140,9 @@ export default function TaskCalendar({ tasks, events = [], currentDate, format =
       <div 
         key={`day-${cellDateStr}`} 
         onClick={() => setSelectedDateStr(isSelected ? null : cellDateStr)}
-        className={`min-h-[100px] border rounded-md p-1 sm:p-2 flex flex-col gap-1 transition-colors cursor-pointer ${isSelected ? 'border-[#FFCC00] bg-[#FFCC00]/5' : isToday ? 'border-[#9D4EDD] bg-[#9D4EDD]/5' : 'border-border-subtle bg-surface hover:border-[#8E8E8E]'}`}
+        className={`min-h-[100px] border rounded-md p-1 sm:p-2 flex flex-col gap-1 transition-colors cursor-pointer ${isSelected ? 'border-accent-secondary bg-accent-secondary/5' : isToday ? 'border-accent-primary bg-accent-primary/5' : 'border-border-subtle bg-surface hover:border-[#8E8E8E]'}`}
       >
-        <div className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full mb-1 ${isSelected ? 'bg-[#FFCC00] text-[#121212]' : isToday ? 'bg-[var(--accent-primary)] text-white' : 'text-fg-muted'}`}>
+        <div className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full mb-1 ${isSelected ? 'bg-accent-secondary text-on-accent-secondary' : isToday ? 'bg-accent-primary text-on-accent-primary' : 'text-fg-muted'}`}>
           {d}
         </div>
         <div className="flex flex-col gap-1 overflow-y-auto max-h-[150px] custom-scrollbar">
@@ -164,7 +166,7 @@ export default function TaskCalendar({ tasks, events = [], currentDate, format =
             <div 
               key={task.id} 
               onClick={(e) => { e.stopPropagation(); onTaskClick(task); }}
-              className="text-[10px] bg-surface-hover border border-border-subtle hover:border-[#9D4EDD] rounded p-1 cursor-pointer truncate transition-colors flex items-center gap-1"
+              className="text-[10px] bg-surface-hover border border-border-subtle hover:border-accent-primary rounded p-1 cursor-pointer truncate transition-colors flex items-center gap-1"
               title={task.nome}
             >
               <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: dotColor }}></div>
@@ -224,10 +226,10 @@ export default function TaskCalendar({ tasks, events = [], currentDate, format =
           {/* Menu Filtro de Horas */}
           <div className="flex flex-wrap gap-2 mb-4 items-center bg-surface p-2 rounded-md border border-border-subtle">
             <span className="text-fg-muted text-xs font-bold uppercase tracking-wider mr-2">Horários:</span>
-            {['all_day', 'morning', 'afternoon', 'night', 'only_items', 'custom'].map(mode => (
+            {(['all_day', 'morning', 'afternoon', 'night', 'only_items', 'custom'] as const).map(mode => (
               <button 
                 key={mode}
-                onClick={() => setHoursFilterMode(mode as any)}
+                onClick={() => setHoursFilterMode(mode)}
                 className={`px-3 py-1 rounded text-[11px] font-bold transition-colors ${hoursFilterMode === mode ? 'bg-[var(--accent-primary)] text-white' : 'bg-surface-hover text-fg-muted hover:text-fg'}`}
               >
                 {mode === 'all_day' && '7h às 23h'}
@@ -254,7 +256,7 @@ export default function TaskCalendar({ tasks, events = [], currentDate, format =
               {datesToRender.map((item, idx) => (
                 <div key={idx} className="flex-1 text-center p-2 border-r border-border-subtle last:border-r-0">
                   <div className="text-[10px] text-fg-muted uppercase">{dayNames[item.date.getDay()]}</div>
-                  <div className={`text-sm font-bold ${item.date.toISOString().split('T')[0] === new Date().toISOString().split('T')[0] ? 'text-[#9D4EDD]' : 'text-fg'}`}>
+                  <div className={`text-sm font-bold ${item.date.toISOString().split('T')[0] === new Date().toISOString().split('T')[0] ? 'text-accent-primary' : 'text-fg'}`}>
                     {item.date.getDate()}
                   </div>
                 </div>
@@ -298,7 +300,7 @@ export default function TaskCalendar({ tasks, events = [], currentDate, format =
                   // Para simplificar a POC vertical, no momento só renderizamos blocos básicos dentro da coluna
                   const dayEvts = events.filter(e => {
                     if (e.data_inicio && e.data_inicio.startsWith(cellDateStr)) return true;
-                    if (e.horarios_semanais && (e.horarios_semanais as any)[cellDayName]) return true;
+                    if (e.horarios_semanais && (e.horarios_semanais as Record<string, unknown>)[cellDayName]) return true;
                     return false;
                   });
 

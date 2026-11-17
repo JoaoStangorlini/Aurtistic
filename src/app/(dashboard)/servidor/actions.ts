@@ -9,18 +9,22 @@ import type {
   AdminStorageUserSummary,
   EdgeMutationResponse,
   EdgeVaultEntry,
+  GalleryTimelineCursor,
+  GalleryTimelineItem,
   ItemVisibility,
   ShareMode,
   SignedEdgeTicket,
   StorageGlobalSettings,
   TicketPurpose,
 } from '@/types';
+import { buildTenantStreamUrl, buildTenantThumbUrl } from '@/lib/edge-urls';
 import {
   issueUserStorageSession,
   issueOrganizationVaultSession,
   computeEffectiveQuotaBytes,
   getEdgeStorageServerUrl,
   signEdgeTenantTicket,
+  DEFAULT_ECOSYSTEM_ORGS_BY_ID,
   MEDIA_READONLY_TICKET_TTL_MS,
   VAULT_TICKET_TTL_MS,
 } from '@/lib/edge-ticket';
@@ -31,6 +35,10 @@ import {
   validateNumericPin,
   validatePublicSlug,
 } from '@/lib/validators';
+import {
+  createTenantFolderShortcutDirect,
+  deleteTenantFolderShortcutDirect,
+} from '@/lib/edge-client';
 
 export interface EcosystemLinksPatch {
   addTaskIds?: string[];
@@ -374,6 +382,9 @@ export async function adminUpdateGovernanceAction(input: {
   revalidatePath('/servidor');
   return { ok: true, data };
 }
+
+
+
 
 /**
  * [CORREÇÃO v4.1 #4]: Sincroniza em lote (chunks de 500) as 2.369 fotos existentes do catalog.json
@@ -871,9 +882,418 @@ export async function requestOrgVaultAccessAction(input: { organizationId: strin
   return { ok: true, data };
 }
 
-export async function approveOrgVaultAccessAction(input: {
-  organizationId: string;
-  targetUserId: string;
+/**
+ * Paginação por cursor (Keyset) para a Timeline Contínua Estilo Google Fotos.
+ * Seleciona apenas colunas leves (sem exif_data completo) para manter payload rápido.
+ */
+export async function getGalleryTimelinePageAction(input?: {
+  cursorCapturedAt?: string | null;
+  cursorId?: string | null;
+  filter?: 'all' | 'favorites' | 'camera' | 'mobile' | 'portfolio';
+  limit?: number;
+  organizationId?: string | null;
+  album?: string | null;
+}): Promise<{
+  ok: boolean;
+  items: GalleryTimelineItem[];
+  nextCursor: GalleryTimelineCursor | null;
+  error?: string;
+}> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, items: [], nextCursor: null, error: 'Não autenticado.' };
+
+  const limit = Math.min(200, Math.max(24, input?.limit ?? 120));
+  const filter = input?.filter || 'all';
+  const orgId = input?.organizationId && isUuid(input.organizationId) ? input.organizationId : null;
+  const targetAlbum = input?.album && input.album.trim() !== 'all' ? input.album.trim() : null;
+
+  try {
+    const runQuery = async (useFallbackExif = false) => {
+      const selectFields = useFallbackExif
+        ? 'id, relative_path, filename, mime_type, size_bytes, created_at, is_favorite, album, show_in_portfolio, exif_data'
+        : 'id, relative_path, filename, mime_type, size_bytes, captured_at, created_at, is_favorite, album, device_source, show_in_portfolio';
+
+      let query = supabase
+        .from('user_files_index')
+        .select(selectFields)
+        .eq('is_directory', false)
+        .or(
+          'mime_type.ilike.image/%,mime_type.ilike.video/%,filename.ilike.%.jpg,filename.ilike.%.jpeg,filename.ilike.%.png,filename.ilike.%.webp,filename.ilike.%.gif,filename.ilike.%.avif,filename.ilike.%.heic,filename.ilike.%.mp4,filename.ilike.%.mov'
+        );
+
+      if (orgId) {
+        query = query.eq('organization_id', orgId);
+      } else {
+        query = query.eq('user_id', user.id).is('organization_id', null);
+      }
+
+      if (targetAlbum) {
+        query = query.or(`album.ilike."%${targetAlbum}%",relative_path.ilike."%${targetAlbum}%"`);
+      }
+
+      if (filter === 'favorites') query = query.eq('is_favorite', true);
+      if (filter === 'portfolio') query = query.eq('show_in_portfolio', true);
+      if (!useFallbackExif) {
+        if (filter === 'mobile') query = query.ilike('device_source', '%mobile%');
+        if (filter === 'camera') query = query.not('device_source', 'ilike', '%mobile%');
+      }
+
+      if (useFallbackExif) {
+        query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
+        if (input?.cursorCapturedAt && input?.cursorId && isUuid(input.cursorId)) {
+          query = query.or(
+            `created_at.lt."${input.cursorCapturedAt}",and(created_at.eq."${input.cursorCapturedAt}",id.lt.${input.cursorId})`
+          );
+        }
+      } else {
+        query = query.order('captured_at', { ascending: false }).order('id', { ascending: false });
+        if (input?.cursorCapturedAt && input?.cursorId && isUuid(input.cursorId)) {
+          query = query.or(
+            `captured_at.lt."${input.cursorCapturedAt}",and(captured_at.eq."${input.cursorCapturedAt}",id.lt.${input.cursorId})`
+          );
+        }
+      }
+
+      return await query.limit(limit + 1);
+    };
+
+    let result = await runQuery(false);
+    if (result.error && (result.error.code === '42703' || result.error.message.includes('captured_at') || result.error.message.includes('device_source'))) {
+      result = await runQuery(true);
+    }
+
+    if (result.error) {
+      return { ok: false, items: [], nextCursor: null, error: result.error.message };
+    }
+
+    let rows = result.data || [];
+
+    // Se estiver vazio na 1ª página sem filtro e sem orgId, tenta carregar o catálogo de portfólio prévio
+    if (rows.length === 0 && !input?.cursorCapturedAt && !orgId && filter === 'all') {
+      try {
+        const { ensurePortfolioCatalogLoaded } = await import('@/lib/portfolio-catalog');
+        await ensurePortfolioCatalogLoaded(supabase, user.id, { allowSeedFallback: true }).catch(() => []);
+        const retryResult = await runQuery(false);
+        if (!retryResult.error && retryResult.data && retryResult.data.length > 0) {
+          rows = retryResult.data;
+        } else {
+          const retryFallback = await runQuery(true);
+          if (!retryFallback.error && retryFallback.data) {
+            rows = retryFallback.data;
+          }
+        }
+      } catch {}
+    }
+
+    // Fallback Direto no Edge Server caso user_files_index continue vazio na 1ª página
+    if (rows.length === 0 && !input?.cursorCapturedAt) {
+      try {
+        const serverUrl = getEdgeStorageServerUrl();
+        const fallbackTicket = signEdgeTenantTicket({
+          userId: user.id,
+          role: orgId ? 'member' : 'admin',
+          scopeType: orgId ? 'org' : 'user',
+          organizationId: orgId || undefined,
+          purpose: 'vault',
+          readOnly: true,
+          allowDownload: true,
+          ttlMs: MEDIA_READONLY_TICKET_TTL_MS,
+        });
+
+        const edgeRes = await fetch(`${serverUrl}/api/tenant/list?folder=`, {
+          headers: { 'x-tenant-ticket': fallbackTicket.ticket },
+          next: { revalidate: 0 },
+        }).catch(() => null);
+
+        if (edgeRes && edgeRes.ok) {
+          const edgeData = await edgeRes.json().catch(() => null);
+          const rawFiles = Array.isArray(edgeData?.files) ? edgeData.files : [];
+          let mediaFiles = rawFiles.filter(
+            (f: any) =>
+              !f.isDirectory &&
+              (f.mimeType?.startsWith('image/') ||
+                f.mimeType?.startsWith('video/') ||
+                /\.(jpg|jpeg|png|webp|gif|avif|heic|mp4|mov)$/i.test(f.name || ''))
+          );
+
+          if (targetAlbum) {
+            mediaFiles = mediaFiles.filter((f: any) => {
+              const rel = (f.entryRelPath || f.path || f.name || '').toLowerCase();
+              const alb = (f.album || '').toLowerCase();
+              const term = targetAlbum.toLowerCase();
+              return rel.includes(term) || alb.includes(term);
+            });
+          }
+
+          if (mediaFiles.length > 0) {
+            const edgeItems: GalleryTimelineItem[] = mediaFiles.map((f: any, idx: number) => {
+              const relPath = f.entryRelPath || f.path || f.name;
+              const signed = signEdgeTenantTicket({
+                userId: user.id,
+                role: 'member',
+                purpose: 'vault',
+                allowedPaths: [relPath],
+                readOnly: true,
+                allowDownload: true,
+                ttlMs: MEDIA_READONLY_TICKET_TTL_MS,
+              });
+
+              return {
+                id: `edge-${idx}-${Buffer.from(relPath).toString('base64url').slice(0, 16)}`,
+                relative_path: relPath,
+                filename: f.name || relPath.split('/').pop() || 'arquivo',
+                mime_type: f.mimeType || 'image/jpeg',
+                size_bytes: f.size || 0,
+                captured_at: f.modifiedAt || new Date().toISOString(),
+                is_favorite: false,
+                album: '',
+                device_source: 'edge',
+                show_in_portfolio: false,
+                signedThumbUrl: buildTenantThumbUrl(relPath, signed.ticket, { serverUrl }),
+                signedStreamUrl: buildTenantStreamUrl(relPath, signed.ticket, { serverUrl }),
+              };
+            });
+
+            return { ok: true, items: edgeItems, nextCursor: null };
+          }
+        }
+      } catch {}
+    }
+
+    const hasMore = rows.length > limit;
+    const pageRows = hasMore ? rows.slice(0, limit) : rows;
+    const serverUrl = getEdgeStorageServerUrl();
+
+    let resolvedOrgSlug: string | undefined;
+    if (orgId) {
+      const { data: orgRow } = await supabase
+        .from('organizations')
+        .select('slug')
+        .eq('id', orgId)
+        .maybeSingle();
+      resolvedOrgSlug = orgRow?.slug || DEFAULT_ECOSYSTEM_ORGS_BY_ID[orgId]?.slug;
+    }
+
+    const items: GalleryTimelineItem[] = pageRows.map((row: any) => {
+      const signed = signEdgeTenantTicket({
+        userId: user.id,
+        role: 'member',
+        purpose: 'vault',
+        scopeType: orgId ? 'org' : 'user',
+        organizationId: orgId || undefined,
+        orgSlug: resolvedOrgSlug,
+        allowedPaths: [row.relative_path],
+        readOnly: true,
+        allowDownload: true,
+        ttlMs: MEDIA_READONLY_TICKET_TTL_MS,
+      });
+
+      const derivedCapturedAt =
+        row.captured_at ||
+        row.exif_data?.DateTimeOriginal ||
+        row.exif_data?.createDate ||
+        row.created_at ||
+        new Date().toISOString();
+
+      const derivedDeviceSource =
+        row.device_source ||
+        (row.exif_data?.deviceCategory ? String(row.exif_data.deviceCategory) : null);
+
+      return {
+        id: row.id,
+        relative_path: row.relative_path,
+        filename: row.filename,
+        mime_type: row.mime_type,
+        size_bytes: row.size_bytes,
+        captured_at: derivedCapturedAt,
+        is_favorite: Boolean(row.is_favorite),
+        album: row.album || '',
+        device_source: derivedDeviceSource,
+        show_in_portfolio: Boolean(row.show_in_portfolio),
+        signedThumbUrl: buildTenantThumbUrl(row.relative_path, signed.ticket, { serverUrl }),
+        signedStreamUrl: buildTenantStreamUrl(row.relative_path, signed.ticket, { serverUrl }),
+      };
+    });
+
+    const last = items[items.length - 1];
+    const nextCursor: GalleryTimelineCursor | null =
+      hasMore && last
+        ? { capturedAt: last.captured_at, id: last.id }
+        : null;
+
+    return { ok: true, items, nextCursor };
+  } catch (err: unknown) {
+    return {
+      ok: false,
+      items: [],
+      nextCursor: null,
+      error: err instanceof Error ? err.message : 'Erro ao carregar timeline.',
+    };
+  }
+}
+
+export async function getGalleryAlbumsAction(input?: {
+  organizationId?: string | null;
+}): Promise<{
+  ok: boolean;
+  albums: { name: string; count: number }[];
+  error?: string;
+}> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, albums: [], error: 'Não autenticado.' };
+
+  const orgId = input?.organizationId && isUuid(input.organizationId) ? input.organizationId : null;
+
+  try {
+    let query = supabase
+      .from('user_files_index')
+      .select('album, relative_path')
+      .eq('is_directory', false)
+      .or(
+        'mime_type.ilike.image/%,mime_type.ilike.video/%,filename.ilike.%.jpg,filename.ilike.%.jpeg,filename.ilike.%.png,filename.ilike.%.webp,filename.ilike.%.gif,filename.ilike.%.avif,filename.ilike.%.heic,filename.ilike.%.mp4,filename.ilike.%.mov'
+      );
+
+    if (orgId) {
+      query = query.eq('organization_id', orgId);
+    } else {
+      query = query.eq('user_id', user.id).is('organization_id', null);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      return { ok: false, albums: [], error: error.message };
+    }
+
+    const counts = new Map<string, number>();
+
+    for (const row of data || []) {
+      let albumName = row.album?.trim();
+      if (!albumName) {
+        const parts = (row.relative_path || '').split('/');
+        if (parts.length > 1) {
+          albumName = parts[parts.length - 2];
+        }
+      }
+      if (!albumName || albumName === '.' || albumName === '/') {
+        albumName = 'Geral';
+      }
+      counts.set(albumName, (counts.get(albumName) || 0) + 1);
+    }
+
+    // Se a contagem no banco for vazia, tenta descobrir pastas de álbuns pelo Edge Server
+    if (counts.size === 0) {
+      try {
+        const serverUrl = getEdgeStorageServerUrl();
+        const fallbackTicket = signEdgeTenantTicket({
+          userId: user.id,
+          role: orgId ? 'member' : 'admin',
+          scopeType: orgId ? 'org' : 'user',
+          organizationId: orgId || undefined,
+          purpose: 'vault',
+          readOnly: true,
+          allowDownload: true,
+          ttlMs: MEDIA_READONLY_TICKET_TTL_MS,
+        });
+
+        const edgeRes = await fetch(`${serverUrl}/api/tenant/list?folder=`, {
+          headers: { 'x-tenant-ticket': fallbackTicket.ticket },
+          next: { revalidate: 0 },
+        }).catch(() => null);
+
+        if (edgeRes && edgeRes.ok) {
+          const edgeData = await edgeRes.json().catch(() => null);
+          const rawFolders = Array.isArray(edgeData?.folders) ? edgeData.folders : [];
+          for (const f of rawFolders) {
+            if (f.name && !f.name.startsWith('.')) {
+              counts.set(f.name, f.itemCount || 1);
+            }
+          }
+        }
+      } catch {}
+    }
+
+    const albums = Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+
+    return { ok: true, albums };
+  } catch (err) {
+    return {
+      ok: false,
+      albums: [],
+      error: err instanceof Error ? err.message : 'Erro ao buscar álbuns.',
+    };
+  }
+}
+
+export async function getPhotoExifDetailAction(fileId: string): Promise<{
+  ok: boolean;
+  exifData?: Record<string, any> | null;
+  error?: string;
+}> {
+  if (!isUuid(fileId)) return { ok: false, error: 'ID inválido.' };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Não autenticado.' };
+
+  const { data, error } = await supabase
+    .from('user_files_index')
+    .select('exif_data')
+    .eq('id', fileId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, exifData: (data?.exif_data as Record<string, any>) || null };
+}
+
+export async function checkBackupHashesAction(hashes: string[]): Promise<{
+  ok: boolean;
+  knownHashes: string[];
+}> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || hashes.length === 0) return { ok: false, knownHashes: [] };
+
+  const clean = hashes.filter((h) => /^[a-f0-9]{64}$/i.test(h)).slice(0, 200);
+  if (clean.length === 0) return { ok: true, knownHashes: [] };
+
+  const [origRes, proxyRes] = await Promise.all([
+    supabase
+      .from('user_files_index')
+      .select('content_hash')
+      .eq('user_id', user.id)
+      .in('content_hash', clean),
+    supabase
+      .from('user_files_index')
+      .select('compressed_proxy_hash')
+      .eq('user_id', user.id)
+      .in('compressed_proxy_hash', clean),
+  ]);
+
+  const set = new Set<string>();
+  for (const r of origRes.data || []) if (r.content_hash) set.add(r.content_hash);
+  for (const r of proxyRes.data || []) if (r.compressed_proxy_hash) set.add(r.compressed_proxy_hash);
+  return { ok: true, knownHashes: Array.from(set) };
+}
+
+export async function recordBackupProxyMetadataAction(input: {
+  relativePath: string;
+  contentHash: string;
+  originalSizeBytes: number;
+  compressedProxyHash?: string | null;
+  isLocalCompressedProxy?: boolean;
+  deviceSource?: string | null;
 }) {
   const supabase = await createClient();
   const {
@@ -881,17 +1301,274 @@ export async function approveOrgVaultAccessAction(input: {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: 'Não autenticado.' };
 
-  const { data, error } = await supabase.rpc('approve_org_vault_access', {
-    p_org_id: input.organizationId,
-    p_target_user_id: input.targetUserId,
-  });
+  const relRes = sanitizeRelativeTenantPath(input.relativePath, { allowEmpty: false });
+  if (!relRes.ok) return { ok: false, error: relRes.error };
 
-  if (error) {
-    return { ok: false, error: error.message };
-  }
+  const { error } = await supabase
+    .from('user_files_index')
+    .update({
+      content_hash: input.contentHash,
+      original_size_bytes: input.originalSizeBytes,
+      compressed_proxy_hash: input.compressedProxyHash || null,
+      is_local_compressed_proxy: Boolean(input.isLocalCompressedProxy),
+      device_source: input.deviceSource || null,
+    })
+    .eq('user_id', user.id)
+    .eq('relative_path', relRes.data);
 
-  revalidatePath('/servidor');
-  return { ok: true, data };
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
 
+/**
+ * Persiste um atalho de pasta (Org <-> Pessoal ou Pessoal <-> Pessoal) em user_files_index (Supabase)
+ */
+export async function syncShortcutInSupabaseAction(input: {
+  organizationId?: string | null;
+  parentFolder: string;
+  shortcutName: string;
+  targetRelPath: string;
+  targetOrgId?: string | null;
+  targetOrgSlug?: string | null;
+  ownerName?: string;
+}): Promise<{ ok: boolean; relativePath?: string; ownerUserId?: string; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Não autenticado.' };
+  if (input.organizationId && !isUuid(input.organizationId)) {
+    return { ok: false, error: 'ID de organização inválido.' };
+  }
+  if (input.targetOrgId && !isUuid(input.targetOrgId)) {
+    return { ok: false, error: 'ID da organização alvo inválido.' };
+  }
 
+  // Validação de permissão cross-scope no backend (Ponto 8)
+  if (input.organizationId) {
+    try {
+      await issueOrganizationVaultSession(supabase, user.id, input.organizationId);
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : 'Sem permissão no cofre desta organização.' };
+    }
+  }
+  if (input.targetOrgId) {
+    try {
+      await issueOrganizationVaultSession(supabase, user.id, input.targetOrgId);
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : 'Sem permissão para vincular pasta desta organização.' };
+    }
+  }
+
+  const cleanParent = String(input.parentFolder || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  const cleanName = String(input.shortcutName || '').replace(/[/\\]/g, '_').trim();
+  const rawRelPath = cleanParent ? `${cleanParent}/${cleanName}` : cleanName;
+  const relRes = sanitizeRelativeTenantPath(rawRelPath, { allowEmpty: false });
+  if (!relRes.ok) return { ok: false, error: relRes.error };
+
+  const cleanTargetRel = String(input.targetRelPath || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  const shortcutType = input.targetOrgId || input.targetOrgSlug ? 'org_folder' : 'personal_folder';
+
+  const { error } = await supabase.from('user_files_index').upsert(
+    {
+      user_id: user.id,
+      organization_id: input.organizationId || null,
+      relative_path: relRes.data,
+      filename: cleanName,
+      mime_type: 'inode/directory+shortcut',
+      size_bytes: 0,
+      is_directory: true,
+      has_pin: false,
+      visibility: 'private',
+      show_in_portfolio: false,
+      album: 'Atalhos',
+      category: 'Atalho',
+      exif_data: {
+        isShortcut: true,
+        shortcutType,
+        shortcutTarget: cleanTargetRel,
+        shortcutOwner: input.ownerName || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Membro',
+        ownerUserId: user.id,
+        targetOrgId: input.targetOrgId || null,
+        targetOrgSlug: input.targetOrgSlug || null,
+      },
+    },
+    { onConflict: 'vault_scope_key,relative_path' }
+  );
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/servidor');
+  return { ok: true, relativePath: relRes.data, ownerUserId: user.id };
+}
+
+/**
+ * Fallback Cross-Scope (Ponto 9): Busca registros em user_files_index pertencentes ao destino de um atalho
+ * quando o Edge Server está offline e o usuário abre um atalho de outro membro ou de uma organização.
+ */
+export async function getShortcutTargetFallbackEntriesAction(input: {
+  containerOrgId?: string | null;
+  targetOwnerId?: string | null;
+  targetOrgId?: string | null;
+  targetRelPath: string;
+}): Promise<{ ok: boolean; entries: import('@/types').UserFileIndexRow[]; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, entries: [], error: 'Não autenticado.' };
+
+  if (input.containerOrgId) {
+    if (!isUuid(input.containerOrgId)) return { ok: false, entries: [], error: 'Org container inválida.' };
+    try {
+      await issueOrganizationVaultSession(supabase, user.id, input.containerOrgId);
+    } catch {
+      return { ok: false, entries: [], error: 'Sem acesso ao cofre desta organização.' };
+    }
+  }
+  if (input.targetOrgId) {
+    if (!isUuid(input.targetOrgId)) return { ok: false, entries: [], error: 'Org alvo inválida.' };
+    try {
+      await issueOrganizationVaultSession(supabase, user.id, input.targetOrgId);
+    } catch {
+      return { ok: false, entries: [], error: 'Sem acesso à organização alvo do atalho.' };
+    }
+  }
+
+  const cleanRel = String(input.targetRelPath || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  let query = supabase.from('user_files_index').select('*').limit(300);
+
+  if (input.targetOrgId) {
+    query = query.eq('organization_id', input.targetOrgId);
+    if (cleanRel) {
+      query = query.ilike('relative_path', `${cleanRel}/%`);
+    }
+  } else {
+    const ownerId = input.targetOwnerId && isUuid(input.targetOwnerId) ? input.targetOwnerId : user.id;
+    query = query.eq('user_id', ownerId).is('organization_id', null);
+    if (cleanRel) {
+      if (cleanRel.toLowerCase().startsWith('portfolio')) {
+        query = query.or(`relative_path.ilike.${cleanRel}/%,show_in_portfolio.eq.true`);
+      } else {
+        query = query.ilike('relative_path', `${cleanRel}/%`);
+      }
+    }
+  }
+
+  const { data, error } = await query;
+  if (error) return { ok: false, entries: [], error: error.message };
+  return { ok: true, entries: (data || []) as import('@/types').UserFileIndexRow[] };
+}
+
+/**
+ * Remove o registro de atalho em user_files_index (Supabase)
+ */
+export async function removeShortcutFromSupabaseAction(input: {
+  organizationId?: string | null;
+  shortcutPath: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Não autenticado.' };
+
+  const relRes = sanitizeRelativeTenantPath(input.shortcutPath, { allowEmpty: false });
+  if (!relRes.ok) return { ok: false, error: relRes.error };
+
+  let delQuery = supabase.from('user_files_index').delete().eq('relative_path', relRes.data);
+  if (input.organizationId) {
+    if (!isUuid(input.organizationId)) return { ok: false, error: 'ID de organização inválido.' };
+    delQuery = delQuery.eq('organization_id', input.organizationId);
+  } else {
+    delQuery = delQuery.eq('user_id', user.id).is('organization_id', null);
+  }
+
+  const { error } = await delQuery;
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/servidor');
+  return { ok: true };
+}
+
+/**
+ * Cria um atalho no cofre de uma organização apontando para uma pasta pessoal do usuário
+ */
+export async function createOrgFolderShortcutAction(input: {
+  organizationId: string;
+  parentFolder: string;
+  shortcutName: string;
+  personalFolderRelPath: string;
+}): Promise<{ ok: boolean; shortcut?: any; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Não autenticado.' };
+  if (!isUuid(input.organizationId)) return { ok: false, error: 'ID de organização inválido.' };
+
+  const userProfile = await supabase.from('user_profiles').select('username').eq('id', user.id).maybeSingle();
+  const ownerName = user.user_metadata?.full_name || userProfile.data?.username || user.email?.split('@')[0] || 'Membro';
+
+  // Persiste no Supabase primeiro (garantia híbrida)
+  await syncShortcutInSupabaseAction({
+    organizationId: input.organizationId,
+    parentFolder: input.parentFolder,
+    shortcutName: input.shortcutName,
+    targetRelPath: input.personalFolderRelPath,
+    ownerName,
+  });
+
+  try {
+    const session = await issueOrganizationVaultSession(supabase, user.id, input.organizationId);
+
+    const res = await createTenantFolderShortcutDirect({
+      serverUrl: session.serverUrl,
+      ticket: session.vaultTicket.ticket,
+      parentFolder: input.parentFolder,
+      shortcutName: input.shortcutName,
+      personalFolderRelPath: input.personalFolderRelPath,
+      ownerName,
+    });
+
+    revalidatePath('/servidor');
+    return { ok: true, shortcut: res.shortcut };
+  } catch (err: unknown) {
+    // Se edge server estiver offline, o registro no Supabase já garante funcionalidade no fallback
+    revalidatePath('/servidor');
+    return { ok: true, error: err instanceof Error ? err.message : undefined };
+  }
+}
+
+/**
+ * Remove um atalho de pasta pessoal do cofre de uma organização
+ */
+export async function deleteOrgFolderShortcutAction(input: {
+  organizationId: string;
+  shortcutPath: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Não autenticado.' };
+  if (!isUuid(input.organizationId)) return { ok: false, error: 'ID de organização inválido.' };
+
+  await removeShortcutFromSupabaseAction({
+    organizationId: input.organizationId,
+    shortcutPath: input.shortcutPath,
+  });
+
+  try {
+    const session = await issueOrganizationVaultSession(supabase, user.id, input.organizationId);
+    await deleteTenantFolderShortcutDirect({
+      serverUrl: session.serverUrl,
+      ticket: session.vaultTicket.ticket,
+      shortcutPath: input.shortcutPath,
+    });
+
+    revalidatePath('/servidor');
+    return { ok: true };
+  } catch {
+    revalidatePath('/servidor');
+    return { ok: true };
+  }
+}

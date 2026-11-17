@@ -3,7 +3,11 @@
 import { createClient } from '@/utils/supabase/server';
 import { notFound } from 'next/navigation';
 import SharedWorkspaceClient from './SharedWorkspaceClient';
-import { attachSignedPublicMediaUrls, getEdgeStorageServerUrl } from '@/lib/edge-ticket';
+import {
+  attachSignedPublicMediaUrls,
+  getEdgeStorageServerUrl,
+  signPressClippingsMediaUrls,
+} from '@/lib/edge-ticket';
 import { ensurePortfolioCatalogLoaded } from '@/lib/portfolio-catalog';
 import type { UserFileIndexRow } from '@/types';
 
@@ -31,7 +35,7 @@ export default async function SharedProfilePage({ params }: PageProps) {
 
   const userId = resolved.userId as string;
   const publicSlug = (resolved.publicSlug as string) || username;
-  const userProfile = resolved.userProfile;
+  const userProfile = signPressClippingsMediaUrls(resolved.userProfile, userId);
   const creatorPalette = userProfile?.features_config?.theme?.palette;
 
   const {

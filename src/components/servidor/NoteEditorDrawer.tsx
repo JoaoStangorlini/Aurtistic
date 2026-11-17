@@ -163,7 +163,7 @@ export function NoteEditorDrawer({
               disabled={Boolean(initialRelativePath)}
               onChange={(e) => setFilename(e.target.value)}
               placeholder="ex: roteiro-video.md"
-              className="w-full bg-app border border-border-subtle focus:border-[#9D4EDD] rounded-lg px-3.5 py-2 text-sm text-fg outline-none disabled:opacity-60"
+              className="w-full bg-app border border-border-subtle focus:border-accent-primary rounded-lg px-3.5 py-2 text-sm text-fg outline-none disabled:opacity-60"
             />
           </div>
 
@@ -198,7 +198,7 @@ export function NoteEditorDrawer({
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="Escreva suas ideias, checklist ou documentação aqui..."
-                className="flex-1 w-full bg-app border border-border-subtle focus:border-[#9D4EDD] rounded-xl p-4 text-sm text-[#E5E2E1] font-mono leading-relaxed resize-none outline-none"
+                className="flex-1 w-full bg-app border border-border-subtle focus:border-accent-primary rounded-xl p-4 text-sm text-[#E5E2E1] font-mono leading-relaxed resize-none outline-none"
               />
             )}
           </div>

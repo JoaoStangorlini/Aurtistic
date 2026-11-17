@@ -105,7 +105,7 @@ export default async function VincularContaPage(props: {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-bold text-fg truncate">{displayName}</p>
-                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-[#0F4780]/80 text-blue-200 border border-blue-400/30">
+                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-[#0F4780]/80 text-white border border-[#1F9FCF]/50">
                   {isLabdivMember ? 'LabDiv' : 'HUB'}
                 </span>
               </div>
@@ -114,9 +114,9 @@ export default async function VincularContaPage(props: {
           </div>
 
           {/* OPÇÃO 1: Vincular a Conta Existente */}
-          <div className="p-5 rounded-2xl bg-black/30 border border-[#9D4EDD]/30 space-y-4">
+          <div className="p-5 rounded-2xl bg-black/30 border border-accent-primary/30 space-y-4">
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[20px] text-[#9D4EDD]">person_add</span>
+              <span className="material-symbols-outlined text-[20px] text-accent-primary">person_add</span>
               <h2 className="text-sm font-bold text-fg">Vincular a uma conta existente do Aurtistic</h2>
             </div>
             <p className="text-[11px] text-fg/60 leading-relaxed">
@@ -137,7 +137,7 @@ export default async function VincularContaPage(props: {
                   type="text"
                   required
                   placeholder="Ex: stangorlini ou seu@email.com"
-                  className="w-full bg-[#0E1522] border border-white/10 focus:border-[#9D4EDD] text-fg px-3.5 py-2.5 rounded-xl text-xs outline-none transition-colors"
+                  className="w-full bg-[#0E1522] border border-white/10 focus:border-accent-primary text-fg px-3.5 py-2.5 rounded-xl text-xs outline-none transition-colors"
                 />
               </div>
 
@@ -151,7 +151,7 @@ export default async function VincularContaPage(props: {
                   type="password"
                   required
                   placeholder="••••••••"
-                  className="w-full bg-[#0E1522] border border-white/10 focus:border-[#9D4EDD] text-fg px-3.5 py-2.5 rounded-xl text-xs outline-none transition-colors"
+                  className="w-full bg-[#0E1522] border border-white/10 focus:border-accent-primary text-fg px-3.5 py-2.5 rounded-xl text-xs outline-none transition-colors"
                 />
               </div>
 

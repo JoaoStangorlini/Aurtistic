@@ -20,6 +20,10 @@ export interface AurtisticGalleryGridProps {
   onItemUpdated?: (updated: UserFileIndexRow) => void;
   onSyncPortfolio?: (forceReset?: boolean) => Promise<void>;
   isSyncing?: boolean;
+  isEditingPortfolio?: boolean;
+  onToggleEditPortfolio?: () => void;
+  hiddenPhotoIds?: string[];
+  hiddenPhotoFolders?: string[];
 }
 
 const PREFERRED_ALBUM_ORDER = [
@@ -84,17 +88,24 @@ export function resolveItemDeviceInfo(item: PhotoInspectItem): {
     };
   }
 
-  const rawModel = String(exif.camera || exif.model || exif.make || '').trim();
-  const lower = rawModel.toLowerCase();
+  const make = String(exif.make || '').trim();
+  const model = String(exif.model || exif.camera || '').trim();
+  const rawModel = model || make;
+  // Classifica por fabricante + modelo (ex.: Xiaomi "M2101K6G" não traz a marca no modelo)
+  const haystack = `${make} ${model}`.toLowerCase();
 
-  if (/canon|nikon|sony|fujifilm|fuji|leica|hasselblad|panasonic|olympus|pentax/i.test(lower)) {
+  if (/canon|nikon|sony|fujifilm|fuji|leica|hasselblad|panasonic|olympus|pentax|\beos\b|rebel|lumix|ilce/i.test(haystack)) {
     return { category: 'camera', name: rawModel || 'Câmera Profissional' };
   }
-  if (/iphone|apple|samsung|galaxy|xiaomi|redmi|poco|motorola|moto|pixel|google|huawei|oppo|oneplus|realme|asus|lg/i.test(lower)) {
-    return { category: 'mobile', name: rawModel || 'Celular' };
-  }
-  if (/dji|mavic|phantom|mini \d|air \d|autel/i.test(lower)) {
+  if (/dji|mavic|phantom|autel/i.test(haystack)) {
     return { category: 'drone', name: rawModel || 'Drone' };
+  }
+  if (
+    /iphone|ipad|apple|samsung|galaxy|xiaomi|redmi|poco|motorola|moto|pixel|google|huawei|honor|oppo|oneplus|realme|vivo|asus|zenfone|nokia|\blg\b|sm-[a-z]\d/i.test(haystack) ||
+    /^m\d{4}[a-z0-9]+/i.test(model) ||
+    /^\d{7}[a-z]{1,2}\b/i.test(model)
+  ) {
+    return { category: 'mobile', name: rawModel || 'Celular' };
   }
 
   return { category: 'unknown', name: rawModel };
@@ -134,6 +145,10 @@ export function AurtisticGalleryGrid({
   onItemUpdated,
   onSyncPortfolio,
   isSyncing = false,
+  isEditingPortfolio = false,
+  onToggleEditPortfolio,
+  hiddenPhotoIds = [],
+  hiddenPhotoFolders = [],
 }: AurtisticGalleryGridProps) {
   // Contexto de Mídia para Ticket de Fallback
   const mediaCtx = useAurtisticMedia();
@@ -153,7 +168,7 @@ export function AurtisticGalleryGrid({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Filtros Avançados de Dispositivo e Ordenação Temporal
-  const [deviceCategoryFilter, setDeviceCategoryFilter] = useState<'all' | 'camera' | 'mobile' | 'mixed'>('all');
+  const [deviceCategoryFilter, setDeviceCategoryFilter] = useState<'all' | 'camera' | 'mobile'>('all');
   const [selectedDeviceName, setSelectedDeviceName] = useState<string>('all');
   const [selectedLensName, setSelectedLensName] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'name' | 'default'>('newest');
@@ -169,15 +184,25 @@ export function AurtisticGalleryGrid({
   });
   const [isReorderingAlbums, setIsReorderingAlbums] = useState(false);
 
-  // Álbuns Marcados como Equipamento Misto (Persistido em localStorage)
-  const [mixedAlbums, setMixedAlbums] = useState<Set<string>>(() => {
-    if (typeof window === 'undefined') return new Set();
+  // Ordem Customizada das Subpastas por Álbum (Persistida em localStorage)
+  const [customSubfolderOrder, setCustomSubfolderOrder] = useState<Record<string, string[]>>(() => {
+    if (typeof window === 'undefined') return {};
     try {
-      const stored = localStorage.getItem('aurtistic_portfolio_mixed_albums');
-      if (stored) return new Set(JSON.parse(stored));
+      const stored = localStorage.getItem('aurtistic_portfolio_subfolder_order');
+      if (stored) return JSON.parse(stored);
     } catch {}
-    return new Set();
+    return {};
   });
+
+  const editModeActive = Boolean(isEditingPortfolio || isReorderingAlbums);
+
+  const handleToggleEditMode = useCallback(() => {
+    if (onToggleEditPortfolio) {
+      onToggleEditPortfolio();
+    } else {
+      setIsReorderingAlbums((prev) => !prev);
+    }
+  }, [onToggleEditPortfolio]);
 
   // Modal de Inspeção Fotográfica
   const [inspectIndex, setInspectIndex] = useState<number | null>(null);
@@ -190,6 +215,37 @@ export function AurtisticGalleryGrid({
       setToastMessage((cur) => (cur === msg ? null : cur));
     }, 3000);
   }, []);
+
+  // Helper para extrair a subpasta de uma foto
+  const extractItemSubfolder = useCallback((item: PhotoInspectItem): string | undefined => {
+    const alb = item.album || 'Geral';
+    let sub: string | undefined = item.category;
+    if (!sub || sub === 'Fotografia' || sub === alb) {
+      const cleanRel = String(item.relative_path || '')
+        .replace(/\\/g, '/')
+        .replace(/^Portfolio\//, '');
+      const parts = cleanRel.split('/');
+      if (parts.length > 2) {
+        sub = parts[1];
+      } else {
+        sub = undefined;
+      }
+    }
+    if (sub && sub !== alb && sub !== 'Fotografia') {
+      return sub;
+    }
+    return undefined;
+  }, []);
+
+  // Dispositivo e lente: SOMENTE pelos metadados (EXIF) da foto
+  const getEffectiveItemDevice = useCallback(
+    (item: PhotoInspectItem) => resolveItemDeviceInfo(item),
+    []
+  );
+  const getEffectiveItemLens = useCallback(
+    (item: PhotoInspectItem) => resolveItemLensInfo(item),
+    []
+  );
 
   // Extrai e Ordena Álbuns respeitando a Ordem Personalizada ou a Padrão
   const sortedAlbums = useMemo(() => {
@@ -208,91 +264,35 @@ export function AurtisticGalleryGrid({
     return ordered;
   }, [items, customAlbumOrder]);
 
-  // Estatísticas de Equipamentos (Câmeras + Lentes) por Álbum
-  const albumEquipmentStats = useMemo(() => {
-    const stats: Record<string, { cameras: Set<string>; lenses: Set<string> }> = {};
-    for (const item of items) {
-      const alb = item.album || 'Geral';
-      if (!stats[alb]) {
-        stats[alb] = { cameras: new Set(), lenses: new Set() };
-      }
-      const dev = resolveItemDeviceInfo(item);
-      if (dev.name && dev.category !== 'unknown') {
-        stats[alb].cameras.add(dev.name);
-      }
-      const lens = resolveItemLensInfo(item);
-      if (lens) {
-        stats[alb].lenses.add(lens);
-      }
-    }
-    return stats;
-  }, [items]);
-
-  // Verifica se um Álbum é considerado Misto (automático ou marcado manualmente)
-  const isAlbumMixed = useCallback(
-    (alb: string) => {
-      if (mixedAlbums.has(alb)) return true;
-      const st = albumEquipmentStats[alb];
-      if (!st) return false;
-      return st.cameras.size > 1 || st.lenses.size > 1;
-    },
-    [mixedAlbums, albumEquipmentStats]
-  );
-
-  // Alterna Marcação de Álbum Misto
-  const handleToggleMixedAlbum = useCallback(
-    (alb: string) => {
-      setMixedAlbums((prev) => {
-        const next = new Set(prev);
-        if (next.has(alb)) {
-          next.delete(alb);
-          showToast(`Álbum "${alb}" desmarcado de Misto.`);
-        } else {
-          next.add(alb);
-          showToast(`Álbum "${alb}" marcado como Equipamento Misto!`);
-        }
-        try {
-          localStorage.setItem('aurtistic_portfolio_mixed_albums', JSON.stringify(Array.from(next)));
-        } catch {}
-        return next;
-      });
-    },
-    [showToast]
-  );
-
   // Move a Ordem de um Álbum
   const handleMoveAlbum = useCallback(
     (albumName: string, direction: -1 | 1) => {
-      setCustomAlbumOrder((prevOrder) => {
-        const baseList = prevOrder.length > 0 ? [...prevOrder] : [...sortedAlbums];
-        const fullList = Array.from(new Set([...baseList, ...sortedAlbums]));
-        const idx = fullList.indexOf(albumName);
-        const targetIdx = idx + direction;
-        if (idx === -1 || targetIdx < 0 || targetIdx >= fullList.length) return prevOrder;
+      const currentList = [...sortedAlbums];
+      const idx = currentList.indexOf(albumName);
+      const targetIdx = idx + direction;
+      if (idx === -1 || targetIdx < 0 || targetIdx >= currentList.length) return;
 
-        const tmp = fullList[idx];
-        fullList[idx] = fullList[targetIdx];
-        fullList[targetIdx] = tmp;
+      const tmp = currentList[idx];
+      currentList[idx] = currentList[targetIdx];
+      currentList[targetIdx] = tmp;
 
-        try {
-          localStorage.setItem('aurtistic_portfolio_album_order', JSON.stringify(fullList));
-        } catch {}
+      setCustomAlbumOrder(currentList);
+      try {
+        localStorage.setItem('aurtistic_portfolio_album_order', JSON.stringify(currentList));
+      } catch {}
 
-        // Sincronização assíncrona com o servidor Edge (PUT /api/portfolio/layout)
-        try {
-          const edgeBase = resolveClientEdgeServerUrl(serverUrl);
-          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-          if (effectiveTicket) headers['Authorization'] = `Bearer ${effectiveTicket}`;
-          fetch(`${edgeBase}/api/portfolio/layout`, {
-            method: 'PUT',
-            headers,
-            body: JSON.stringify({ albumOrder: fullList }),
-          }).catch(() => {});
-        } catch {}
+      try {
+        const edgeBase = resolveClientEdgeServerUrl(serverUrl);
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (effectiveTicket) headers['Authorization'] = `Bearer ${effectiveTicket}`;
+        fetch(`${edgeBase}/api/portfolio/layout`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({ albumOrder: currentList }),
+        }).catch(() => {});
+      } catch {}
 
-        showToast(`Ordem alterada: "${albumName}" movido.`);
-        return fullList;
-      });
+      showToast(`Ordem das pastas atualizada: "${albumName}" movida.`);
     },
     [sortedAlbums, showToast, serverUrl, effectiveTicket]
   );
@@ -313,31 +313,59 @@ export function AurtisticGalleryGrid({
     return sortedAlbums[0] || 'POLÍTICAS';
   }, [selectedAlbum, sortedAlbums]);
 
-  // Extrai Subpastas do Álbum Alvo
+  // Extrai e Ordena Subpastas do Álbum Alvo respeitando a Ordem Customizada
   const targetSubfolders = useMemo(() => {
     const subMap: Record<string, number> = {};
     for (const item of items) {
       if (item.album === targetAlbumForSubfolders) {
-        // Tenta extrair subpasta da categoria ou do relative_path
-        let sub: string | undefined = item.category;
-        if (!sub || sub === 'Fotografia' || sub === targetAlbumForSubfolders) {
-          const cleanRel = String(item.relative_path || '')
-            .replace(/\\/g, '/')
-            .replace(/^Portfolio\//, '');
-          const parts = cleanRel.split('/');
-          if (parts.length > 2) {
-            sub = parts[1];
-          } else {
-            sub = undefined;
-          }
-        }
-        if (sub && sub !== targetAlbumForSubfolders && sub !== 'Fotografia') {
+        const sub = extractItemSubfolder(item);
+        if (sub) {
           subMap[sub] = (subMap[sub] || 0) + 1;
         }
       }
     }
-    return Object.entries(subMap).sort((a, b) => b[1] - a[1]);
-  }, [items, targetAlbumForSubfolders]);
+    const entries = Object.entries(subMap).sort((a, b) => b[1] - a[1]);
+    const savedOrder = customSubfolderOrder[targetAlbumForSubfolders];
+    if (savedOrder && savedOrder.length > 0) {
+      const entryMap = new Map(entries);
+      const ordered: [string, number][] = [];
+      for (const name of savedOrder) {
+        if (entryMap.has(name)) {
+          ordered.push([name, entryMap.get(name)!]);
+          entryMap.delete(name);
+        }
+      }
+      for (const [name, count] of entryMap.entries()) {
+        ordered.push([name, count]);
+      }
+      return ordered;
+    }
+    return entries;
+  }, [items, targetAlbumForSubfolders, extractItemSubfolder, customSubfolderOrder]);
+
+  // Move a Ordem de uma Subpasta dentro do Álbum Alvo
+  const handleMoveSubfolder = useCallback(
+    (albumName: string, subfolderName: string, direction: -1 | 1) => {
+      const currentNames = targetSubfolders.map(([name]) => name);
+      const idx = currentNames.indexOf(subfolderName);
+      const targetIdx = idx + direction;
+      if (idx === -1 || targetIdx < 0 || targetIdx >= currentNames.length) return;
+
+      const tmp = currentNames[idx];
+      currentNames[idx] = currentNames[targetIdx];
+      currentNames[targetIdx] = tmp;
+
+      setCustomSubfolderOrder((prev) => {
+        const next = { ...prev, [albumName]: currentNames };
+        try {
+          localStorage.setItem('aurtistic_portfolio_subfolder_order', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+      showToast(`Subpasta "${subfolderName}" movida.`);
+    },
+    [targetSubfolders, showToast]
+  );
 
   // Total de Favoritas
   const totalFavorites = useMemo(
@@ -345,11 +373,11 @@ export function AurtisticGalleryGrid({
     [items]
   );
 
-  // Lista Dinâmica de Equipamentos Encontrados no Acervo
+  // Lista Dinâmica de Equipamentos Encontrados no Acervo (Incluindo Configurados nas Pastas)
   const discoveredDevices = useMemo(() => {
     const map = new Map<string, { category: string; count: number }>();
     for (const item of items) {
-      const dev = resolveItemDeviceInfo(item);
+      const dev = getEffectiveItemDevice(item);
       if (dev.name && dev.category !== 'unknown') {
         const existing = map.get(dev.name);
         map.set(dev.name, {
@@ -361,13 +389,13 @@ export function AurtisticGalleryGrid({
     return Array.from(map.entries())
       .map(([name, data]) => ({ name, ...data }))
       .sort((a, b) => b.count - a.count);
-  }, [items]);
+  }, [items, getEffectiveItemDevice]);
 
-  // Lista Dinâmica de Lentes Encontradas no Acervo
+  // Lista Dinâmica de Lentes Encontradas no Acervo (Incluindo Configuradas nas Pastas)
   const discoveredLenses = useMemo(() => {
     const map = new Map<string, number>();
     for (const item of items) {
-      const lens = resolveItemLensInfo(item);
+      const lens = getEffectiveItemLens(item);
       if (lens) {
         map.set(lens, (map.get(lens) || 0) + 1);
       }
@@ -375,49 +403,47 @@ export function AurtisticGalleryGrid({
     return Array.from(map.entries())
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count);
-  }, [items]);
+  }, [items, getEffectiveItemLens]);
 
   // Filtragem Geral de Itens
   const filteredItems = useMemo(() => {
     const list = items.filter((item) => {
+      // Se não for dono, fotos e álbuns ocultados na curadoria não aparecem
+      const isItemHidden =
+        hiddenPhotoIds.includes(item.id) ||
+        hiddenPhotoIds.includes(item.relative_path) ||
+        Boolean(item.album && hiddenPhotoFolders.includes(item.album));
+
+      if (!isOwner && isItemHidden) {
+        return false;
+      }
+
       if (onlyFavorites && !item.is_favorite) return false;
 
       // Filtro de Álbum
       if (selectedAlbum !== 'all' && item.album !== selectedAlbum) return false;
 
       // Filtro de Subpasta
-      if (selectedSubfolder !== 'all') {
-        let itemSub = item.category;
-        if (!itemSub || itemSub === 'Fotografia' || itemSub === item.album) {
-          const cleanRel = String(item.relative_path || '')
-            .replace(/\\/g, '/')
-            .replace(/^Portfolio\//, '');
-          const parts = cleanRel.split('/');
-          if (parts.length > 2) {
-            itemSub = parts[1];
-          }
-        }
-        if (itemSub !== selectedSubfolder) return false;
+      const itemSub = extractItemSubfolder(item);
+      if (selectedSubfolder !== 'all' && itemSub !== selectedSubfolder) {
+        return false;
       }
 
-      // Filtro de Dispositivo (Câmera / Celular / Álbum Misto)
-      if (deviceCategoryFilter === 'mixed') {
-        const isMixed = isAlbumMixed(item.album || 'Geral');
-        if (!isMixed) return false;
-      } else if (deviceCategoryFilter !== 'all') {
-        const dev = resolveItemDeviceInfo(item);
+      // Filtro de Dispositivo (Câmera / Celular) pelos metadados
+      if (deviceCategoryFilter !== 'all') {
+        const dev = getEffectiveItemDevice(item);
         if (dev.category !== deviceCategoryFilter) return false;
       }
 
       // Filtro de Equipamento Específico (Câmera / Celular)
       if (selectedDeviceName !== 'all') {
-        const dev = resolveItemDeviceInfo(item);
+        const dev = getEffectiveItemDevice(item);
         if (dev.name !== selectedDeviceName) return false;
       }
 
       // Filtro de Lente Específica
       if (selectedLensName !== 'all') {
-        const lens = resolveItemLensInfo(item);
+        const lens = getEffectiveItemLens(item);
         if (lens !== selectedLensName) return false;
       }
 
@@ -428,11 +454,12 @@ export function AurtisticGalleryGrid({
         const nameMatch = item.filename?.toLowerCase().includes(q);
         const albumMatch = item.album?.toLowerCase().includes(q);
         const tagMatch = item.tags?.some((t) => t.toLowerCase().includes(q));
-        const dev = resolveItemDeviceInfo(item);
+        const dev = getEffectiveItemDevice(item);
+        const lens = getEffectiveItemLens(item);
         const cameraMatch = String(
           item.exif_data?.camera || item.exif_data?.model || dev.name || ''
         ).toLowerCase().includes(q);
-        const lensMatch = String(item.exif_data?.lens || '').toLowerCase().includes(q);
+        const lensMatch = String(lens || item.exif_data?.lens || '').toLowerCase().includes(q);
         if (!titleMatch && !nameMatch && !albumMatch && !tagMatch && !cameraMatch && !lensMatch) {
           return false;
         }
@@ -456,12 +483,17 @@ export function AurtisticGalleryGrid({
     onlyFavorites,
     selectedAlbum,
     selectedSubfolder,
+    extractItemSubfolder,
     deviceCategoryFilter,
     selectedDeviceName,
     selectedLensName,
-    isAlbumMixed,
+    getEffectiveItemDevice,
+    getEffectiveItemLens,
     sortOrder,
     searchQuery,
+    hiddenPhotoIds,
+    hiddenPhotoFolders,
+    isOwner,
   ]);
 
   // Agrupamento por Seção/Subpasta quando no modo 'subfolders'
@@ -682,7 +714,7 @@ export function AurtisticGalleryGrid({
               type="button"
               onClick={() => onSyncPortfolio(false)}
               disabled={isSyncing}
-              className="px-3 py-2 bg-surface hover:bg-surface-hover text-fg border border-border-subtle rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+              className="px-3 py-2 bg-surface hover:bg-surface-hover text-fg border border-border-subtle rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
               title="Sincronizar acervo com o disco físico do servidor"
             >
               <span className={`material-symbols-outlined text-[18px] text-[var(--accent-secondary)] ${isSyncing ? 'animate-spin' : ''}`}>
@@ -691,11 +723,172 @@ export function AurtisticGalleryGrid({
               <span className="hidden sm:inline">{isSyncing ? 'Sincronizando...' : 'Sincronizar'}</span>
             </button>
           )}
+
+          {/* Botão de Editar Portfólio (Pastas, Ordem e Equipamentos) */}
+          {isOwner && (
+            <button
+              type="button"
+              onClick={handleToggleEditMode}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
+                editModeActive
+                  ? 'bg-accent-primary text-on-accent-primary border-accent-primary shadow-md shadow-accent-primary/20 font-black'
+                  : 'bg-surface hover:bg-surface-hover text-fg border-border-subtle hover:border-[#FFCC00]'
+              }`}
+              title="Editar ordem das pastas e marcar qual equipamento foi usado em cada pasta"
+            >
+              <span className="material-symbols-outlined text-[18px] text-[#FFCC00]">
+                {editModeActive ? 'done' : 'edit_square'}
+              </span>
+              <span>{editModeActive ? 'Concluir Edição' : 'Editar Portfólio'}</span>
+            </button>
+          )}
         </div>
       </div>
 
+      {/* PAINEL DE EDIÇÃO DO PORTFÓLIO (ORDEM DAS PASTAS & EQUIPAMENTOS POR PASTA) */}
+      {isOwner && editModeActive && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-surface border-2 border-accent-primary/60 shadow-xl space-y-4 animate-in fade-in duration-200">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-subtle pb-3">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#FFCC00] text-[22px]">tune</span>
+              <div>
+                <h3 className="text-sm font-black text-fg uppercase tracking-wider font-['Bukra']">
+                  Editor do Portfólio • Ordem das Pastas
+                </h3>
+                <p className="text-xs text-fg-secondary">
+                  Mude a ordem de exibição das pastas e subpastas. Câmera/celular são identificados automaticamente pelos metadados das fotos.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleToggleEditMode}
+              className="px-3 py-1.5 rounded-xl bg-accent-primary text-on-accent-primary text-xs font-bold hover:brightness-110 transition-all cursor-pointer"
+            >
+              Concluir Edição ✓
+            </button>
+          </div>
+
+          {/* 1. Reordenação Visual e Equipamento de Cada Pasta Principal */}
+          <div className="space-y-2">
+            <span className="text-[11px] font-bold text-[#FFCC00] uppercase tracking-wider block">
+              1. Ordem das Pastas Principais ({sortedAlbums.length})
+            </span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-80 overflow-y-auto pr-1">
+              {sortedAlbums.map((alb, idx) => {
+                return (
+                  <div
+                    key={alb}
+                    className="p-3 rounded-xl bg-app border border-border-subtle flex flex-col gap-2.5 text-xs"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="px-2 py-0.5 rounded bg-surface border border-border-subtle font-mono text-[10px] text-fg-muted">
+                          #{idx + 1}
+                        </span>
+                        <span className="font-bold text-fg truncate">{alb}</span>
+                        <span className="text-[10px] font-mono text-fg-muted">
+                          ({albumCounts[alb] || 0})
+                        </span>
+                      </div>
+
+                      {/* Botões de Mover Ordem da Pasta */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => handleMoveAlbum(alb, -1)}
+                          className="px-2 py-1 rounded bg-surface hover:bg-surface-hover border border-border-subtle text-fg disabled:opacity-25 font-bold cursor-pointer"
+                          title="Mover pasta para antes"
+                        >
+                          ◀ Subir
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === sortedAlbums.length - 1}
+                          onClick={() => handleMoveAlbum(alb, 1)}
+                          className="px-2 py-1 rounded bg-surface hover:bg-surface-hover border border-border-subtle text-fg disabled:opacity-25 font-bold cursor-pointer"
+                          title="Mover pasta para depois"
+                        >
+                          Descer ▶
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 2. Subpastas do Álbum Selecionado (Ordem e Equipamento por Subpasta) */}
+          {targetSubfolders.length > 0 && (
+            <div className="space-y-2 pt-2 border-t border-border-subtle">
+              <span className="text-[11px] font-bold text-[#C77DFF] uppercase tracking-wider block">
+                2. Subpastas de &quot;{targetAlbumForSubfolders}&quot; ({targetSubfolders.length}) — Ordem
+              </span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
+                {targetSubfolders.map(([subName, subCount], sIdx) => {
+                  return (
+                    <div
+                      key={`${targetAlbumForSubfolders}/${subName}`}
+                      className="p-2.5 rounded-xl bg-app border border-border-subtle flex flex-col gap-2 text-xs"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-fg truncate">
+                          📂 {subName} <span className="text-fg-muted font-mono">({subCount})</span>
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            disabled={sIdx === 0}
+                            onClick={() => handleMoveSubfolder(targetAlbumForSubfolders, subName, -1)}
+                            className="px-2 py-0.5 rounded bg-surface border border-border-subtle text-fg disabled:opacity-25 cursor-pointer"
+                          >
+                            ◀
+                          </button>
+                          <button
+                            type="button"
+                            disabled={sIdx === targetSubfolders.length - 1}
+                            onClick={() => handleMoveSubfolder(targetAlbumForSubfolders, subName, 1)}
+                            className="px-2 py-0.5 rounded bg-surface border border-border-subtle text-fg disabled:opacity-25 cursor-pointer"
+                          >
+                            ▶
+                          </button>
+                        </div>
+                      </div>
+
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+
       {/* 2. PÍLULAS DOS ÁLBUNS PRINCIPAIS (COM ROLAGEM HORIZONTAL E ÍCONES TEMÁTICOS) */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-thin" data-tour="portfolio-albums">
+        {/* Botão Fixo no Início para Ativar/Desativar Reordenação e Edição de Pastas */}
+        {isOwner && (
+          <button
+            type="button"
+            onClick={handleToggleEditMode}
+            className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all border shrink-0 cursor-pointer ${
+              editModeActive
+                ? 'bg-accent-primary text-on-accent-primary border-accent-primary shadow-sm font-black'
+                : 'bg-surface hover:bg-surface-hover text-[#FFCC00] border-[#FFCC00]/40 hover:border-[#FFCC00]'
+            }`}
+            title="Mudar a ordem das pastas/álbuns e definir equipamentos"
+          >
+            <span className="material-symbols-outlined text-[16px]">
+              {editModeActive ? 'done' : 'swap_horiz'}
+            </span>
+            <span>{editModeActive ? 'Concluir' : 'Mover / Editar'}</span>
+          </button>
+        )}
+
         {/* Chip 'Todas as Obras' */}
         <button
           type="button"
@@ -703,7 +896,7 @@ export function AurtisticGalleryGrid({
             setSelectedAlbum('all');
             setSelectedSubfolder('all');
           }}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap flex items-center gap-2 transition-all border ${
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap flex items-center gap-2 transition-all border cursor-pointer ${
             selectedAlbum === 'all'
               ? 'bg-[#FFCC00] text-[#121212] border-[#FFCC00] shadow-lg shadow-[#FFCC00]/10 font-black'
               : 'bg-surface hover:bg-surface-hover text-fg-secondary hover:text-fg border-border-subtle'
@@ -719,7 +912,6 @@ export function AurtisticGalleryGrid({
           const count = albumCounts[alb] || 0;
           const isSelected = selectedAlbum === alb;
           const icon = ALBUM_ICONS[alb] || 'folder';
-          const mixed = isAlbumMixed(alb);
 
           return (
             <div
@@ -736,33 +928,21 @@ export function AurtisticGalleryGrid({
                   setSelectedAlbum(alb);
                   setSelectedSubfolder('all');
                 }}
-                className="px-3.5 py-2 text-xs sm:text-sm font-bold whitespace-nowrap flex items-center gap-2"
+                className="px-3.5 py-2 text-xs sm:text-sm font-bold whitespace-nowrap flex items-center gap-2 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[18px]">{icon}</span>
                 <span>{alb}</span>
                 <span className="font-mono text-xs opacity-80">({count})</span>
-                {mixed && (
-                  <span
-                    className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-black border ${
-                      isSelected
-                        ? 'bg-black/20 text-[#121212] border-black/30'
-                        : 'bg-[#9D4EDD]/15 text-[#C77DFF] border-[#9D4EDD]/40'
-                    }`}
-                    title="Álbum com múltiplos equipamentos (sessão mista)"
-                  >
-                    🔀 Misto
-                  </span>
-                )}
               </button>
 
-              {/* Botões de Mover Ordem (Quando modo reordenar ativo) */}
-              {isReorderingAlbums && (
-                <div className="flex items-center gap-0.5 pr-2 pl-0.5 border-l border-current/20" onClick={(e) => e.stopPropagation()}>
+              {/* Botões de Mover Ordem (Quando modo editar/reordenar ativo) */}
+              {editModeActive && (
+                <div className="flex items-center gap-0.5 pr-2 pl-1 border-l border-current/20" onClick={(e) => e.stopPropagation()}>
                   <button
                     type="button"
                     disabled={albIdx === 0}
                     onClick={() => handleMoveAlbum(alb, -1)}
-                    className="p-1 rounded hover:bg-black/20 text-current disabled:opacity-20 transition-transform active:scale-90"
+                    className="p-1 rounded hover:bg-black/20 text-current disabled:opacity-20 transition-transform active:scale-90 cursor-pointer"
                     title={`Mover "${alb}" para a esquerda`}
                   >
                     ◀
@@ -771,7 +951,7 @@ export function AurtisticGalleryGrid({
                     type="button"
                     disabled={albIdx === sortedAlbums.length - 1}
                     onClick={() => handleMoveAlbum(alb, 1)}
-                    className="p-1 rounded hover:bg-black/20 text-current disabled:opacity-20 transition-transform active:scale-90"
+                    className="p-1 rounded hover:bg-black/20 text-current disabled:opacity-20 transition-transform active:scale-90 cursor-pointer"
                     title={`Mover "${alb}" para a direita`}
                   >
                     ▶
@@ -781,39 +961,20 @@ export function AurtisticGalleryGrid({
             </div>
           );
         })}
-
-        {/* Botão de Ativar/Desativar Reordenação */}
-        {isOwner && (
-          <button
-            type="button"
-            onClick={() => setIsReorderingAlbums((prev) => !prev)}
-            className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all border shrink-0 ${
-              isReorderingAlbums
-                ? 'bg-[#9D4EDD] text-white border-[#9D4EDD] shadow-sm'
-                : 'bg-surface hover:bg-surface-hover text-fg-muted hover:text-fg border-border-subtle'
-            }`}
-            title="Mudar a ordem das pastas/álbuns do portfólio"
-          >
-            <span className="material-symbols-outlined text-[16px]">
-              {isReorderingAlbums ? 'done' : 'swap_horiz'}
-            </span>
-            <span>{isReorderingAlbums ? 'Concluir' : 'Mover Ordem'}</span>
-          </button>
-        )}
       </div>
 
-      {/* 3. BARRA DE SUBPASTAS, MODO DE EXIBIÇÃO, COLUNAS E DOWNLOAD .ZIP */}
+      {/* 3. BARRA DE SUBPASTAS, EQUIPAMENTO DA PASTA, MODO DE EXIBIÇÃO, COLUNAS E DOWNLOAD .ZIP */}
       <div className="bg-surface border border-border-subtle p-2.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-sm" data-tour="portfolio-view-controls">
-        {/* Esquerda: Segmented Control ('▤ Ver Álbum Completo' vs '📂 Por Subpastas') + Chips */}
+        {/* Esquerda: Segmented Control ('▤ Ver Álbum Completo' vs '📂 Por Subpastas') + Seletor de Equipamento da Pasta + Chips */}
         <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
           {/* Controle Segmentado */}
           <div className="inline-flex rounded-xl bg-app p-1 border border-border-subtle shrink-0">
             <button
               type="button"
               onClick={() => setSubfolderMode('full')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 subfolderMode === 'full'
-                  ? 'bg-[#9D4EDD] text-white shadow-sm'
+                  ? 'bg-accent-primary text-on-accent-primary shadow-sm'
                   : 'text-fg-secondary hover:text-fg'
               }`}
             >
@@ -823,9 +984,9 @@ export function AurtisticGalleryGrid({
             <button
               type="button"
               onClick={() => setSubfolderMode('subfolders')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 subfolderMode === 'subfolders'
-                  ? 'bg-[#9D4EDD] text-white shadow-sm'
+                  ? 'bg-accent-primary text-on-accent-primary shadow-sm'
                   : 'text-fg-secondary hover:text-fg'
               }`}
             >
@@ -833,23 +994,6 @@ export function AurtisticGalleryGrid({
               <span>Por Subpastas</span>
             </button>
           </div>
-
-          {/* Botão de Marcar Álbum como Misto (Múltiplos Equipamentos) */}
-          {selectedAlbum !== 'all' && isOwner && (
-            <button
-              type="button"
-              onClick={() => handleToggleMixedAlbum(selectedAlbum)}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all shrink-0 ${
-                isAlbumMixed(selectedAlbum)
-                  ? 'bg-[#9D4EDD]/20 border-[#9D4EDD] text-[#C77DFF] font-black'
-                  : 'bg-app hover:bg-surface border-border-subtle text-fg-muted hover:text-fg'
-              }`}
-              title="Marcar ou desmarcar este álbum como sessão fotográfica mista (múltiplos equipamentos/câmeras/lentes)"
-            >
-              <span>🔀</span>
-              <span>{isAlbumMixed(selectedAlbum) ? 'Álbum Misto (Ativo)' : 'Marcar como Misto'}</span>
-            </button>
-          )}
 
           {/* Prefixo Dinâmico de Subpastas */}
           <span className="text-xs font-mono text-[#FFCC00] font-bold hidden sm:inline shrink-0">
@@ -869,7 +1013,7 @@ export function AurtisticGalleryGrid({
                 <button
                   type="button"
                   onClick={() => setSelectedSubfolder('all')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold whitespace-nowrap transition-colors border ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold whitespace-nowrap transition-colors border cursor-pointer ${
                     selectedSubfolder === 'all'
                       ? 'bg-[#FFCC00] text-[#121212] border-[#FFCC00]'
                       : 'bg-surface text-fg-secondary hover:text-fg hover:bg-surface-hover border-border-subtle'
@@ -877,21 +1021,47 @@ export function AurtisticGalleryGrid({
                 >
                   Todas ({albumCounts[targetAlbumForSubfolders] || 0})
                 </button>
-                {targetSubfolders.map(([subName, count]) => {
+                {targetSubfolders.map(([subName, count], sIdx) => {
                   const isSelected = selectedSubfolder === subName;
                   return (
-                    <button
+                    <div
                       key={subName}
-                      type="button"
-                      onClick={() => setSelectedSubfolder(subName)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold whitespace-nowrap transition-colors border ${
+                      className={`inline-flex items-center rounded-lg border transition-colors shrink-0 ${
                         isSelected
                           ? 'bg-[#FFCC00] text-[#121212] border-[#FFCC00]'
                           : 'bg-surface text-fg-secondary hover:text-fg hover:bg-surface-hover border-border-subtle'
                       }`}
                     >
-                      {subName} ({count})
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSubfolder(subName)}
+                        className="px-2.5 py-1 text-xs font-mono font-bold whitespace-nowrap flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>{subName} ({count})</span>
+                      </button>
+                      {editModeActive && (
+                        <div className="flex items-center pr-1 border-l border-current/20">
+                          <button
+                            type="button"
+                            disabled={sIdx === 0}
+                            onClick={() => handleMoveSubfolder(targetAlbumForSubfolders, subName, -1)}
+                            className="px-1 text-[10px] disabled:opacity-20 cursor-pointer"
+                            title="Mover subpasta para a esquerda"
+                          >
+                            ◀
+                          </button>
+                          <button
+                            type="button"
+                            disabled={sIdx === targetSubfolders.length - 1}
+                            onClick={() => handleMoveSubfolder(targetAlbumForSubfolders, subName, 1)}
+                            className="px-1 text-[10px] disabled:opacity-20 cursor-pointer"
+                            title="Mover subpasta para a direita"
+                          >
+                            ▶
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </>
@@ -988,23 +1158,6 @@ export function AurtisticGalleryGrid({
             >
               <span className="material-symbols-outlined text-[15px]">smartphone</span>
               <span>Celulares</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setDeviceCategoryFilter((prev) => (prev === 'mixed' ? 'all' : 'mixed'));
-                setSelectedDeviceName('all');
-                setSelectedLensName('all');
-              }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-                deviceCategoryFilter === 'mixed'
-                  ? 'bg-[#9D4EDD] text-white font-bold shadow-sm'
-                  : 'text-fg-secondary hover:text-fg'
-              }`}
-              title="Filtrar por sessões/álbuns onde foram usados múltiplos equipamentos"
-            >
-              <span>🔀</span>
-              <span>Mistos</span>
             </button>
           </div>
 
@@ -1271,20 +1424,41 @@ export function AurtisticGalleryGrid({
       });
 
     const exif = item.exif_data || {};
-    const lensInfo = exif.lens ? String(exif.lens) : null;
+    const effectiveDev = getEffectiveItemDevice(item);
+    const effectiveLens = getEffectiveItemLens(item);
+    const lensInfo = effectiveLens || (exif.lens ? String(exif.lens) : null);
     const focalAperture =
       exif.focalLength && (exif.fNumber || exif.aperture)
         ? `${exif.focalLength} ${exif.fNumber || exif.aperture}`
         : null;
+    const displayEquipmentText =
+      focalAperture || lensInfo || effectiveDev.name || String(exif.camera || exif.model || '');
+
+    const isItemHidden =
+      hiddenPhotoIds.includes(item.id) ||
+      hiddenPhotoIds.includes(item.relative_path) ||
+      Boolean(item.album && hiddenPhotoFolders.includes(item.album));
 
     return (
       <div
         key={item.relative_path}
         onClick={() => setInspectIndex(index)}
-        className="group cursor-pointer bg-surface border border-border-subtle hover:border-[#FFCC00] rounded-2xl overflow-hidden transition-all duration-300 flex flex-col justify-between hover:shadow-xl hover:shadow-[#FFCC00]/5"
+        className={`group cursor-pointer bg-surface border rounded-2xl overflow-hidden transition-all duration-300 flex flex-col justify-between hover:shadow-xl hover:shadow-[#FFCC00]/5 ${
+          isItemHidden
+            ? 'opacity-70 border-dashed border-amber-500/50'
+            : 'border-border-subtle hover:border-[#FFCC00]'
+        }`}
       >
         {/* Moldura Passe-Partout Respirável (object-contain sem cortes forçados) */}
         <div className="w-full aspect-[4/3] bg-app/80 dark:bg-[#101010] p-3 flex items-center justify-center relative overflow-hidden">
+          {/* Badge de Oculto (apenas visível para o dono) */}
+          {isItemHidden && (
+            <div className="absolute top-2 left-2 z-10 bg-amber-500/80 backdrop-blur-sm px-2 py-0.5 rounded-md text-[10px] font-bold text-black flex items-center gap-1 shadow-md">
+              <span className="material-symbols-outlined text-[13px]">visibility_off</span>
+              Oculta
+            </div>
+          )}
+
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={thumb}
@@ -1330,13 +1504,13 @@ export function AurtisticGalleryGrid({
           </div>
 
           {/* Câmera / Lente / Abertura */}
-          {(focalAperture || lensInfo || exif.camera || exif.model) && (
+          {displayEquipmentText && (
             <div className="text-[10px] text-fg-muted truncate flex items-center gap-1">
               <span className="material-symbols-outlined text-[12px] text-[#FFCC00]">
-                photo_camera
+                {effectiveDev.category === 'mobile' ? 'smartphone' : 'photo_camera'}
               </span>
               <span className="truncate">
-                {focalAperture || lensInfo || String(exif.camera || exif.model)}
+                {displayEquipmentText}
               </span>
             </div>
           )}

@@ -78,7 +78,7 @@ export function ImportICSModal({ isOpen, onClose, onSuccess }: ImportICSModalPro
         {/* Header */}
         <div className="flex justify-between items-center p-5 border-b border-border-subtle bg-surface">
           <h2 className="text-lg font-bold text-fg flex items-center gap-2">
-            <span className="material-symbols-outlined text-[#9D4EDD]">download</span>
+            <span className="material-symbols-outlined text-accent-primary">download</span>
             Importar Google Agenda / .ICS
           </h2>
           <button onClick={onClose} className="text-fg-muted hover:text-fg transition-colors">
@@ -90,14 +90,14 @@ export function ImportICSModal({ isOpen, onClose, onSuccess }: ImportICSModalPro
         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar flex flex-col gap-4">
           
           {/* File Picker */}
-          <div className="border-2 border-dashed border-border-subtle hover:border-[#9D4EDD] transition-colors rounded-lg p-6 text-center bg-surface cursor-pointer relative">
+          <div className="border-2 border-dashed border-border-subtle hover:border-accent-primary transition-colors rounded-lg p-6 text-center bg-surface cursor-pointer relative">
             <input 
               type="file" 
               accept=".ics,.ical" 
               onChange={handleFileUpload}
               className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
             />
-            <span className="material-symbols-outlined text-4xl text-[#9D4EDD] mb-2">upload_file</span>
+            <span className="material-symbols-outlined text-4xl text-accent-primary mb-2">upload_file</span>
             <p className="text-sm font-medium text-fg">
               {fileName ? fileName : 'Clique ou arraste um arquivo .ics do Google Agenda'}
             </p>
@@ -115,7 +115,7 @@ export function ImportICSModal({ isOpen, onClose, onSuccess }: ImportICSModalPro
                 </span>
                 <button 
                   onClick={toggleSelectAll}
-                  className="text-xs text-[#9D4EDD] hover:underline font-medium"
+                  className="text-xs text-accent-primary hover:underline font-medium"
                 >
                   {selectedIndices.size === parsedEvents.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
                 </button>
@@ -131,7 +131,7 @@ export function ImportICSModal({ isOpen, onClose, onSuccess }: ImportICSModalPro
                       type="checkbox"
                       checked={selectedIndices.has(idx)}
                       onChange={() => toggleSelectIndex(idx)}
-                      className="w-4 h-4 rounded border-border-subtle text-[#9D4EDD] focus:ring-[#9D4EDD] bg-surface"
+                      className="w-4 h-4 rounded border-border-subtle text-accent-primary focus:ring-accent-primary bg-surface accent-[var(--accent-primary)]"
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-fg truncate">{ev.nome}</p>
@@ -160,7 +160,7 @@ export function ImportICSModal({ isOpen, onClose, onSuccess }: ImportICSModalPro
           <button
             onClick={handleImport}
             disabled={isSubmitting || selectedIndices.size === 0}
-            className="px-5 py-2 text-sm font-bold bg-[#9D4EDD] hover:bg-[#8338EC] text-fg rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+            className="px-5 py-2 text-sm font-bold bg-accent-primary hover:bg-accent-primary-hover text-on-accent-primary rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
           >
             {isSubmitting ? (
               <span>Importando...</span>

@@ -461,13 +461,13 @@ export function VaultPreviewPanel({
                 onClick={handleToggleCurriculum}
                 className={`px-2.5 py-2 rounded-lg text-xs font-semibold border flex items-center justify-between gap-1.5 transition-colors ${
                   inCurriculum
-                    ? 'bg-blue-500/15 border-blue-500/40 text-blue-700 dark:text-blue-300'
+                    ? 'bg-accent-secondary/15 border-accent-secondary/40 text-accent-secondary'
                     : 'bg-elevated hover:bg-surface-hover text-fg border-border-subtle'
                 }`}
                 title="Alternar presença no Currículo Técnico"
               >
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="material-symbols-outlined text-[16px] text-blue-500">
+                  <span className="material-symbols-outlined text-[16px] text-accent-secondary">
                     badge
                   </span>
                   <span className="truncate">Currículo</span>
@@ -484,13 +484,13 @@ export function VaultPreviewPanel({
                 onClick={handleToggleResumoFavorite}
                 className={`px-2.5 py-2 rounded-lg text-xs font-semibold border flex items-center justify-between gap-1.5 transition-colors ${
                   isFavorite
-                    ? 'bg-purple-500/15 border-purple-500/40 text-purple-700 dark:text-purple-300'
+                    ? 'bg-accent-primary/15 border-accent-primary/40 text-accent-primary'
                     : 'bg-elevated hover:bg-surface-hover text-fg border-border-subtle'
                 }`}
                 title="Destacar nas Obras Favoritas do Resumo (/resumo)"
               >
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="material-symbols-outlined text-[16px] text-purple-500">
+                  <span className="material-symbols-outlined text-[16px] text-accent-primary">
                     star
                   </span>
                   <span className="truncate">Resumo</span>

@@ -171,7 +171,7 @@ export default function SharedWorkspaceClient({
                     onClick={() => setActiveTab(key)}
                     className={`px-4 py-2 text-xs font-bold rounded-lg border transition-all ${
                       isSelected
-                        ? 'bg-[var(--accent-primary)] text-white border-[#9D4EDD] shadow-md shadow-[#9D4EDD]/10'
+                        ? 'bg-accent-primary text-on-accent-primary border-accent-primary shadow-md shadow-accent-primary/10'
                         : 'bg-surface-hover text-fg-secondary border-border-subtle hover:text-fg hover:bg-surface-hover'
                     }`}
                   >
@@ -228,7 +228,7 @@ export default function SharedWorkspaceClient({
                   onClick={() => setActiveTab(key)}
                   className={`flex items-center justify-center rounded-full transition-all duration-300 ease-out ${
                     isSelected 
-                      ? 'bg-[#9D4EDD]/20 text-[#9D4EDD] px-5 py-2.5 gap-2' 
+                      ? 'bg-accent-primary/20 text-accent-primary px-5 py-2.5 gap-2' 
                       : 'text-fg-muted hover:text-fg px-3 py-2.5'
                   }`}
                 >

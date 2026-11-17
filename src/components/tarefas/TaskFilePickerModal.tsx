@@ -323,7 +323,7 @@ export function TaskFilePickerModal({
             onClick={() => setActiveTab('upload')}
             className={`py-3 px-4 text-xs font-bold transition-colors flex items-center gap-2 border-b-2 ${
               activeTab === 'upload'
-                ? 'border-[#9D4EDD] text-[#9D4EDD]'
+                ? 'border-accent-primary text-accent-primary'
                 : 'border-transparent text-fg-muted hover:text-fg'
             }`}
           >
@@ -334,7 +334,7 @@ export function TaskFilePickerModal({
 
         {/* Feedback / Erros */}
         {feedback && (
-          <div className="mx-4 mt-3 p-3 bg-[#9D4EDD]/20 border border-[#9D4EDD]/40 text-[#d8b4fe] rounded-xl text-xs flex items-center gap-2">
+          <div className="mx-4 mt-3 p-3 bg-accent-primary/20 border border-accent-primary/40 text-accent-primary rounded-xl text-xs flex items-center gap-2">
             <span className="material-symbols-outlined text-[16px]">check_circle</span>
             {feedback}
           </div>
@@ -443,7 +443,7 @@ export function TaskFilePickerModal({
                     ent.mimeType.includes('pdf');
 
                   const iconName = isAudio ? 'audiotrack' : isImage ? 'image' : isDoc ? 'description' : 'draft';
-                  const iconColor = isAudio ? 'text-[#9D4EDD]' : isImage ? 'text-[#00C49F]' : 'text-[#FFCC00]';
+                  const iconColor = isAudio ? 'text-accent-primary' : isImage ? 'text-[#00C49F]' : 'text-accent-secondary';
 
                   return (
                     <div
@@ -451,7 +451,7 @@ export function TaskFilePickerModal({
                       onClick={() => !isLinked && toggleSelectPath(ent.relativePath)}
                       className={`flex items-center justify-between p-2.5 rounded-lg transition-colors cursor-pointer ${
                         isSelected
-                          ? 'bg-[#9D4EDD]/20 border border-[#9D4EDD]/40'
+                          ? 'bg-accent-primary/20 border border-accent-primary/40'
                           : isLinked
                             ? 'opacity-60 bg-surface cursor-not-allowed'
                             : 'hover:bg-surface'
@@ -472,7 +472,7 @@ export function TaskFilePickerModal({
                       <div className="flex items-center gap-2 shrink-0">
                         {isLinked ? (
                           <div className="flex items-center gap-1.5">
-                            <span className="px-2 py-0.5 rounded bg-[#9D4EDD]/20 text-[10px] font-bold text-[#9D4EDD]">
+                            <span className="px-2 py-0.5 rounded bg-accent-primary/20 text-[10px] font-bold text-accent-primary">
                               Vinculado
                             </span>
                             <button
@@ -494,7 +494,7 @@ export function TaskFilePickerModal({
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => toggleSelectPath(ent.relativePath)}
-                            className="accent-[#9D4EDD] w-4 h-4 rounded cursor-pointer"
+                            className="accent-[var(--accent-primary)] w-4 h-4 rounded cursor-pointer"
                           />
                         )}
                       </div>
@@ -552,7 +552,7 @@ export function TaskFilePickerModal({
               <select
                 value={uploadTargetFolder}
                 onChange={(e) => setUploadTargetFolder(e.target.value)}
-                className="w-full bg-app border border-border-subtle rounded-xl px-3.5 py-2.5 text-xs text-fg focus:outline-none focus:border-[#9D4EDD]"
+                className="w-full bg-app border border-border-subtle rounded-xl px-3.5 py-2.5 text-xs text-fg focus:outline-none focus:border-accent-primary"
               >
                 <option value="">Raiz do Cofre (Padrão)</option>
                 <option value="Arquivos">Arquivos (Geral)</option>
@@ -638,13 +638,13 @@ export function TaskFilePickerModal({
                 }}
                 className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all ${
                   isDraggingOver
-                    ? 'border-[#9D4EDD] bg-[#9D4EDD]/15 scale-[1.01] shadow-lg shadow-[#9D4EDD]/20'
-                    : 'border-border-subtle bg-app hover:border-[#9D4EDD]'
+                    ? 'border-accent-primary bg-accent-primary/15 scale-[1.01] shadow-lg shadow-accent-primary/20'
+                    : 'border-border-subtle bg-app hover:border-accent-primary'
                 }`}
               >
                 <span
                   className={`material-symbols-outlined text-[40px] mb-2 block ${
-                    isDraggingOver ? 'text-[#FFCC00] animate-bounce' : 'text-[#9D4EDD]'
+                    isDraggingOver ? 'text-accent-secondary animate-bounce' : 'text-accent-primary'
                   }`}
                 >
                   {isDraggingOver ? 'drive_folder_upload' : 'cloud_upload'}
@@ -665,7 +665,7 @@ export function TaskFilePickerModal({
                     onClick={() => fileInputRef.current?.click()}
                     className="px-3.5 py-2 bg-surface hover:bg-surface-hover text-fg border border-border-subtle rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
                   >
-                    <span className="material-symbols-outlined text-[16px] text-[#9D4EDD]">attach_file</span>
+                    <span className="material-symbols-outlined text-[16px] text-accent-primary">attach_file</span>
                     <span>Selecionar Arquivos</span>
                   </button>
 
@@ -746,7 +746,7 @@ export function TaskFilePickerModal({
                 </div>
                 <div className="w-full bg-app h-2 rounded-full overflow-hidden border border-border-subtle">
                   <div
-                    className="bg-[#9D4EDD] h-full transition-all duration-300"
+                    className="bg-accent-primary h-full transition-all duration-300"
                     style={{ width: `${uploadProgress}%` }}
                   />
                 </div>
@@ -765,7 +765,7 @@ export function TaskFilePickerModal({
               <button
                 type="submit"
                 disabled={uploadItems.length === 0 || uploading}
-                className="px-5 py-2 bg-[#9D4EDD] hover:bg-[#8338ec] disabled:opacity-50 text-fg rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shadow-md"
+                className="px-5 py-2 bg-accent-primary hover:bg-accent-primary-hover disabled:opacity-50 text-on-accent-primary rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shadow-md"
               >
                 {uploading ? (
                   <>

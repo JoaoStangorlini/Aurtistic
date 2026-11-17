@@ -194,8 +194,8 @@ export function FileEcosystemMenu({
               onClick={handleToggleFavorite}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold border transition-colors ${
                 isFavorite
-                  ? 'bg-[#9D4EDD]/20 text-[#E0AAFF] border-[#9D4EDD]/40'
-                  : 'bg-app text-fg-secondary border-border-subtle hover:border-[#9D4EDD]/40'
+                  ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/40'
+                  : 'bg-app text-fg-secondary border-border-subtle hover:border-accent-primary/40'
               }`}
             >
               <span className="flex items-center gap-2">
@@ -211,7 +211,7 @@ export function FileEcosystemMenu({
             <div className="p-2.5 rounded-lg bg-app border border-border-subtle space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-fg flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[16px] text-[#9D4EDD]">
+                  <span className="material-symbols-outlined text-[16px] text-accent-primary">
                     verified
                   </span>
                   Currículo Verificado
@@ -223,7 +223,7 @@ export function FileEcosystemMenu({
                   className={`px-2 py-0.5 rounded text-[11px] font-bold ${
                     inCurriculum
                       ? 'bg-emerald-500/20 text-emerald-300'
-                      : 'bg-surface-hover text-fg-secondary hover:bg-[#9D4EDD] hover:text-fg'
+                      : 'bg-surface-hover text-fg-secondary hover:bg-accent-primary hover:text-on-accent-primary'
                   }`}
                 >
                   {inCurriculum ? 'Ativo ✓' : 'Vincular'}

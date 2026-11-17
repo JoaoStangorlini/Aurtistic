@@ -4,6 +4,8 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useSwipeTabs } from '@/hooks/useSwipeTabs';
 import type {
   EdgeTrashItem,
   EdgeVaultEntry,
@@ -15,6 +17,8 @@ import type {
 import {
   computeUnindexedDiskEntries,
   createTenantFolderDirect,
+  createTenantFolderShortcutDirect,
+  deleteTenantFolderShortcutDirect,
   deleteTenantEntryDirect,
   emptyTenantTrashDirect,
   fetchTenantDirectory,
@@ -40,6 +44,9 @@ import {
   cascadeFolderUpdateAction,
   updateFileEcosystemLinksAction,
   tagFolderDevicesAction,
+  syncShortcutInSupabaseAction,
+  removeShortcutFromSupabaseAction,
+  getShortcutTargetFallbackEntriesAction,
 } from '@/app/(dashboard)/servidor/actions';
 import { useVaultUpload } from '@/contexts/VaultUploadContext';
 import {
@@ -55,8 +62,12 @@ import { FileEcosystemMenu } from './FileEcosystemMenu';
 import { AdminQuotaGovernancePanel } from './AdminQuotaGovernancePanel';
 import { VaultIdeTreeSidebar } from './VaultIdeTreeSidebar';
 import { VaultIdeWorkbench } from './VaultIdeWorkbench';
+import { GooglePhotosTimelineView } from '@/components/galeria/GooglePhotosTimelineView';
+import type { GalleryTimelineItem } from '@/types/storage';
+import { OrganizationMaterialSelector } from '@/components/organizacoes/OrganizationMaterialSelector';
+import { OrganizationBrandProvider } from '@/components/organizacoes/OrganizationBrandProvider';
+import { syncHubOrganizationsAction } from '@/app/(dashboard)/organizacoes/actions';
 import { VaultPreviewPanel } from './VaultPreviewPanel';
-import { VaultUploadManagerModal } from './VaultUploadManagerModal';
 import {
   VaultContextMenu,
   type FolderCustomMeta,
@@ -88,17 +99,21 @@ export interface UserVaultWorkspaceProps {
   userTasks: Task[];
   userOrganizations?: UserOrganizationVaultOption[];
   userName?: string;
+  userAvatarUrl?: string | null;
+  initialOrgId?: string | null;
+  isEmbed?: boolean;
+  isInline?: boolean;
 }
 
 type ActiveTab = 'vault' | 'shares' | 'trash' | 'admin_quotas' | 'admin_telemetry';
 
-type VaultLayoutMode = 'grid' | 'list' | 'ide';
+type VaultLayoutMode = 'grid' | 'list' | 'ide' | 'timeline';
 
 function getInitialVaultLayout(): VaultLayoutMode {
   if (typeof window === 'undefined') return 'grid';
   try {
     const saved = localStorage.getItem('aurtistic_vault_layout_mode');
-    if (saved === 'grid' || saved === 'list' || saved === 'ide') return saved;
+    if (saved === 'grid' || saved === 'list' || saved === 'ide' || saved === 'timeline') return saved;
   } catch {}
   return 'grid';
 }
@@ -126,9 +141,48 @@ export function UserVaultWorkspace({
   userTasks,
   userOrganizations = [],
   userName,
+  userAvatarUrl = null,
+  initialOrgId = null,
+  isEmbed = false,
+  isInline = false,
 }: UserVaultWorkspaceProps) {
-  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
-  const [orgVaultTicket, setOrgVaultTicket] = useState<string | null>(null);
+  const [isUrlInline] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const sp = new URLSearchParams(window.location.search);
+    return sp.get('inline') === '1' || sp.get('embed') === '1';
+  });
+  const isEffectiveInline = isEmbed || isInline || isUrlInline;
+  const [syncedOrgs, setSyncedOrgs] = useState<UserOrganizationVaultOption[] | null>(null);
+  const localOrgs = syncedOrgs || userOrganizations;
+
+  // Sincronização automática silenciosa com o HUB LabDiv (sem botão manual)
+  useEffect(() => {
+    let active = true;
+    syncHubOrganizationsAction()
+      .then((res) => {
+        if (!active || !res.ok || !Array.isArray(res.organizations)) return;
+        const formatted: UserOrganizationVaultOption[] = res.organizations.map((o: any) => ({
+          id: o.id,
+          name: o.name || 'Organização',
+          slug: o.slug || 'labdiv',
+          role: o.myRole || o.role || 'membro',
+          can_upload_vault: o.canUploadOrgVault !== false,
+          quotaBytes: o.storage_quota_bytes || 53687091200,
+          usedBytes: o.storage_used_bytes || 0,
+          boostActive: false,
+          boostExpiresAt: null,
+          boostReason: null,
+        }));
+        setSyncedOrgs(formatted);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(initialOrgId);
+  const [orgVaultTicket, setOrgVaultTicket] = useState<{ orgId: string; ticket: string } | null>(null);
   // Guard to prevent race-condition when switching between personal/org scopes
   const [switchingScope, setSwitchingScope] = useState(false);
 
@@ -142,8 +196,29 @@ export function UserVaultWorkspace({
   const [boostFeedback, setBoostFeedback] = useState<string | null>(null);
 
   const selectedOrg = useMemo(() => {
-    return userOrganizations.find((o) => o.id === selectedOrgId) || null;
-  }, [userOrganizations, selectedOrgId]);
+    return localOrgs.find((o) => o.id === selectedOrgId) || null;
+  }, [localOrgs, selectedOrgId]);
+
+  // Modal de Criação de Atalho Bidirecional (Org <-> Pessoal ou Pessoal <-> Pessoal)
+  const [isShortcutModalOpen, setIsShortcutModalOpen] = useState(false);
+  const [shortcutViewMode, setShortcutViewMode] = useState<'breadcrumbs' | 'tree'>('breadcrumbs');
+  const [shortcutSourceScope, setShortcutSourceScope] = useState<'personal' | string>('personal');
+  const [shortcutTargetScope, setShortcutTargetScope] = useState<'current' | 'personal' | string>('current');
+  const [shortcutTargetFolder, setShortcutTargetFolder] = useState('');
+  const [shortcutAllowTargetPick, setShortcutAllowTargetPick] = useState(false);
+  const [shortcutBrowserPath, setShortcutBrowserPath] = useState('');
+  const [shortcutBrowserFolders, setShortcutBrowserFolders] = useState<{ name: string; relativePath: string }[]>([]);
+  const [loadingPersonalFolders, setLoadingPersonalFolders] = useState(false);
+  const [selectedPersonalFolder, setSelectedPersonalFolder] = useState('');
+  const [shortcutDisplayName, setShortcutDisplayName] = useState('');
+  const [isCreatingShortcut, setIsCreatingShortcut] = useState(false);
+  const [shortcutError, setShortcutError] = useState<string | null>(null);
+  const [shortcutTreeChildren, setShortcutTreeChildren] = useState<
+    Record<string, { name: string; relativePath: string }[]>
+  >({});
+  const [expandedShortcutTreePaths, setExpandedShortcutTreePaths] = useState<string[]>([]);
+  const [loadingTreePath, setLoadingTreePath] = useState<string | null>(null);
+  const scopeTicketCacheRef = useRef<Record<string, string>>({});
 
   // Solicitação de Acesso ao Cofre de Organização
   const [requestingOrgAccess, setRequestingOrgAccess] = useState(false);
@@ -207,10 +282,14 @@ export function UserVaultWorkspace({
     readOnly: !isApprovedForStorage,
   });
 
-  const activeTicket = selectedOrgId && orgVaultTicket ? orgVaultTicket : ticket;
+  const activeTicket = selectedOrgId
+    ? orgVaultTicket?.orgId === selectedOrgId
+      ? orgVaultTicket.ticket
+      : ''
+    : ticket;
 
   // Índice local dos 4 Pilares
-  const [indexedFiles] = useState<UserFileIndexRow[]>(initialIndexedFiles);
+  const [indexedFiles, setIndexedFiles] = useState<UserFileIndexRow[]>(initialIndexedFiles);
   const indexedMap = useMemo(() => {
     const map = new Map<string, UserFileIndexRow>();
     for (const row of indexedFiles) {
@@ -218,6 +297,100 @@ export function UserVaultWorkspace({
     }
     return map;
   }, [indexedFiles]);
+
+  // Fallback para o Modo Fotos (Timeline) estritamente isolado por escopo (+ fotos via atalhos)
+  const fallbackTimelineItems = useMemo(() => {
+    const list: GalleryTimelineItem[] = [];
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif', '.heic', '.mp4', '.mov'];
+    const currentScopeOrgId = selectedOrgId || null;
+
+    // Extrai regras de atalho pertencentes ao escopo ativo
+    const activeShortcuts = indexedFiles
+      .filter((row) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rowOrgId = (row as any).organization_id || null;
+        if (rowOrgId !== currentScopeOrgId) return false;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const exif = ((row as any).exif_data || {}) as Record<string, unknown>;
+        return row.mime_type === 'inode/directory+shortcut' || Boolean(exif.isShortcut);
+      })
+      .map((row) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const exif = ((row as any).exif_data || {}) as Record<string, unknown>;
+        return {
+          targetPath: String(exif.shortcutTarget || '')
+            .replace(/\\/g, '/')
+            .replace(/^\/+|\/+$/g, '')
+            .toLowerCase(),
+          targetOrgId: exif.targetOrgId ? String(exif.targetOrgId) : null,
+          ownerUserId: exif.ownerUserId ? String(exif.ownerUserId) : null,
+        };
+      })
+      .filter((s) => Boolean(s.targetPath));
+
+    for (const row of indexedFiles) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rowOrgId = (row as any).organization_id || null;
+      const cleanRel = String(row.relative_path || '')
+        .replace(/\\/g, '/')
+        .replace(/^\/+|\/+$/g, '')
+        .toLowerCase();
+
+      let belongsToActiveScope = rowOrgId === currentScopeOrgId;
+      if (!belongsToActiveScope && activeShortcuts.length > 0) {
+        belongsToActiveScope = activeShortcuts.some((sc) => {
+          if (sc.targetOrgId !== rowOrgId) return false;
+          if (sc.ownerUserId && row.user_id && row.user_id !== sc.ownerUserId) return false;
+          if (cleanRel === sc.targetPath || cleanRel.startsWith(`${sc.targetPath}/`)) return true;
+          if (!sc.targetOrgId && sc.targetPath === 'portfolio' && row.show_in_portfolio) return true;
+          return false;
+        });
+      }
+      if (!belongsToActiveScope) continue;
+
+      const isMedia =
+        row.mime_type?.startsWith('image/') ||
+        row.mime_type?.startsWith('video/') ||
+        imageExtensions.some((ext) => row.filename.toLowerCase().endsWith(ext));
+      if (!isMedia) continue;
+      list.push({
+        id: row.id,
+        relative_path: row.relative_path,
+        filename: row.filename,
+        mime_type: row.mime_type || 'image/jpeg',
+        size_bytes: row.size_bytes || 0,
+        captured_at: (row as any).captured_at || row.created_at || new Date().toISOString(),
+        is_favorite: Boolean(row.is_favorite),
+        album: row.album || '',
+        device_source: (row as any).device_source || null,
+        show_in_portfolio: Boolean(row.show_in_portfolio),
+        signedThumbUrl: buildTenantThumbUrl(row.relative_path, activeTicket, { serverUrl }),
+        signedStreamUrl: buildTenantStreamUrl(row.relative_path, activeTicket, { serverUrl }),
+      });
+    }
+
+    if (list.length === 0) {
+      for (const f of files) {
+        const isMedia = imageExtensions.some((ext) => f.name.toLowerCase().endsWith(ext));
+        if (!isMedia) continue;
+        list.push({
+          id: f.relativePath,
+          relative_path: f.relativePath,
+          filename: f.name,
+          mime_type: f.name.toLowerCase().endsWith('.mp4') ? 'video/mp4' : 'image/jpeg',
+          size_bytes: f.sizeBytes || 0,
+          captured_at: f.modifiedAt || new Date().toISOString(),
+          is_favorite: false,
+          album: '',
+          device_source: null,
+          show_in_portfolio: false,
+          signedThumbUrl: buildTenantThumbUrl(f.relativePath, activeTicket, { serverUrl }),
+          signedStreamUrl: buildTenantStreamUrl(f.relativePath, activeTicket, { serverUrl }),
+        });
+      }
+    }
+    return list;
+  }, [indexedFiles, files, activeTicket, serverUrl, selectedOrgId]);
 
   // Upload e criação de pastas/notas
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -593,43 +766,91 @@ export function UserVaultWorkspace({
   };
 
   const resolveFallbackFolderListing = useCallback(
-    (targetFolder: string) => {
+    (targetFolder: string, overrideRows?: UserFileIndexRow[]) => {
       const cleanTarget = String(targetFolder || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-      const isPort =
-        cleanTarget.toLowerCase() === 'portfolio' ||
-        cleanTarget.toLowerCase().startsWith('portfolio/') ||
-        cleanTarget.toLowerCase() === 'portifolio' ||
-        cleanTarget.toLowerCase().startsWith('portifolio/');
+      const sourceRows = overrideRows || indexedFiles;
 
-      const targetPrefix = cleanTarget ? `${cleanTarget}/` : '';
+      // Verifica se cleanTarget entra em algum atalho indexado no escopo atual
+      let effectiveTargetFolder = cleanTarget;
+      let effectiveScopeOrgId: string | null = selectedOrgId || null;
+
+      if (cleanTarget) {
+        for (const row of sourceRows) {
+          const relPath = row.relative_path;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const rOrg = (row as any).organization_id || null;
+          if ((selectedOrgId || null) !== rOrg) continue;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const exif = ((row as any).exif_data || {}) as Record<string, unknown>;
+          const isSc = row.mime_type === 'inode/directory+shortcut' || Boolean(exif.isShortcut);
+          if (!isSc) continue;
+
+          const cleanScRel = String(relPath || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+          if (
+            cleanTarget.toLowerCase() === cleanScRel.toLowerCase() ||
+            cleanTarget.toLowerCase().startsWith(`${cleanScRel.toLowerCase()}/`)
+          ) {
+            const remainder = cleanTarget.slice(cleanScRel.length).replace(/^\/+/, '');
+            const baseTarget = String(exif.shortcutTarget || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+            effectiveTargetFolder = [baseTarget, remainder].filter(Boolean).join('/');
+            effectiveScopeOrgId = exif.targetOrgId ? String(exif.targetOrgId) : null;
+            break;
+          }
+        }
+      }
+
+      const isPort =
+        effectiveTargetFolder.toLowerCase() === 'portfolio' ||
+        effectiveTargetFolder.toLowerCase().startsWith('portfolio/') ||
+        effectiveTargetFolder.toLowerCase() === 'portifolio' ||
+        effectiveTargetFolder.toLowerCase().startsWith('portifolio/');
+
+      const targetPrefix = effectiveTargetFolder ? `${effectiveTargetFolder}/` : '';
       const matchingFiles: EdgeVaultEntry[] = [];
       const subfolderNames = new Set<string>();
+      const shortcutEntriesMap = new Map<string, EdgeVaultEntry>();
 
-      indexedMap.forEach((row, relPath) => {
+      sourceRows.forEach((row) => {
+        const relPath = row.relative_path;
+        // Separação estrita de escopo (respeita escopo alvo se dentro de um atalho)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rowOrgId = (row as any).organization_id || null;
+        if (effectiveScopeOrgId) {
+          if (rowOrgId !== effectiveScopeOrgId) return;
+        } else {
+          if (rowOrgId) return;
+        }
+
         const cleanRel = String(relPath || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const exif = ((row as any).exif_data || {}) as Record<string, unknown>;
+        const isScRow = row.mime_type === 'inode/directory+shortcut' || Boolean(exif.isShortcut);
 
-        if (!cleanTarget) {
+        if (!effectiveTargetFolder) {
           // Raiz
           const parts = cleanRel.split('/');
           if (parts.length === 1) {
-            matchingFiles.push({
-              name: row.filename || parts[0],
-              relativePath: cleanRel,
-              isDirectory: false,
-              sizeBytes: row.size_bytes || 0,
-              mimeType: row.mime_type || 'application/octet-stream',
-              kind: (row.mime_type?.startsWith('image/') ? 'image' : 'other') as EdgeVaultEntry['kind'],
-              modifiedAt: row.updated_at || new Date().toISOString(),
-            });
-          } else if (parts.length > 1) {
-            subfolderNames.add(parts[0]);
-          }
-        } else {
-          // Subpasta (ex.: Portfolio ou Portfolio/Sub)
-          if (cleanRel.toLowerCase().startsWith(targetPrefix.toLowerCase())) {
-            const rest = cleanRel.slice(targetPrefix.length);
-            const parts = rest.split('/');
-            if (parts.length === 1) {
+            if (isScRow || row.is_directory) {
+              if (isScRow) {
+                shortcutEntriesMap.set(parts[0], {
+                  name: row.filename || parts[0],
+                  relativePath: cleanTarget ? `${cleanTarget}/${parts[0]}` : parts[0],
+                  isDirectory: true,
+                  sizeBytes: 0,
+                  mimeType: 'inode/directory+shortcut',
+                  kind: 'folder',
+                  modifiedAt: row.updated_at || new Date().toISOString(),
+                  isShortcut: true,
+                  shortcutType: exif.targetOrgId ? 'org_folder' : 'personal_folder',
+                  shortcutTarget: String(exif.shortcutTarget || ''),
+                  shortcutOwner: String(exif.shortcutOwner || 'Membro'),
+                  targetOrgId: exif.targetOrgId ? String(exif.targetOrgId) : undefined,
+                  targetOrgSlug: exif.targetOrgSlug ? String(exif.targetOrgSlug) : undefined,
+                });
+              } else {
+                subfolderNames.add(parts[0]);
+              }
+            } else {
               matchingFiles.push({
                 name: row.filename || parts[0],
                 relativePath: cleanRel,
@@ -639,10 +860,51 @@ export function UserVaultWorkspace({
                 kind: (row.mime_type?.startsWith('image/') ? 'image' : 'other') as EdgeVaultEntry['kind'],
                 modifiedAt: row.updated_at || new Date().toISOString(),
               });
+            }
+          } else if (parts.length > 1) {
+            subfolderNames.add(parts[0]);
+          }
+        } else {
+          // Subpasta (ex.: Portfolio ou Portfolio/Sub ou dentro de atalho)
+          if (cleanRel.toLowerCase().startsWith(targetPrefix.toLowerCase())) {
+            const rest = cleanRel.slice(targetPrefix.length);
+            const parts = rest.split('/').filter(Boolean);
+            if (parts.length === 1) {
+              if (isScRow || row.is_directory) {
+                if (isScRow) {
+                  shortcutEntriesMap.set(parts[0], {
+                    name: row.filename || parts[0],
+                    relativePath: cleanTarget ? `${cleanTarget}/${parts[0]}` : parts[0],
+                    isDirectory: true,
+                    sizeBytes: 0,
+                    mimeType: 'inode/directory+shortcut',
+                    kind: 'folder',
+                    modifiedAt: row.updated_at || new Date().toISOString(),
+                    isShortcut: true,
+                    shortcutType: exif.targetOrgId ? 'org_folder' : 'personal_folder',
+                    shortcutTarget: String(exif.shortcutTarget || ''),
+                    shortcutOwner: String(exif.shortcutOwner || 'Membro'),
+                    targetOrgId: exif.targetOrgId ? String(exif.targetOrgId) : undefined,
+                    targetOrgSlug: exif.targetOrgSlug ? String(exif.targetOrgSlug) : undefined,
+                  });
+                } else {
+                  subfolderNames.add(parts[0]);
+                }
+              } else {
+                matchingFiles.push({
+                  name: row.filename || parts[0],
+                  relativePath: cleanRel,
+                  isDirectory: false,
+                  sizeBytes: row.size_bytes || 0,
+                  mimeType: row.mime_type || 'application/octet-stream',
+                  kind: (row.mime_type?.startsWith('image/') ? 'image' : 'other') as EdgeVaultEntry['kind'],
+                  modifiedAt: row.updated_at || new Date().toISOString(),
+                });
+              }
             } else if (parts.length > 1) {
               subfolderNames.add(parts[0]);
             }
-          } else if (isPort && row.show_in_portfolio && !cleanRel.includes('/')) {
+          } else if (!effectiveScopeOrgId && isPort && row.show_in_portfolio && !cleanRel.includes('/')) {
             matchingFiles.push({
               name: row.filename || cleanRel,
               relativePath: cleanRel,
@@ -656,8 +918,8 @@ export function UserVaultWorkspace({
         }
       });
 
-      // Na raiz, assegura que a pasta virtual Portfolio esteja presente
-      if (!cleanTarget) {
+      // Na raiz PESSOAL (apenas se não houver organização selecionada e fora de atalho org), assegura pasta virtual Portfolio
+      if (!cleanTarget && !selectedOrgId) {
         subfolderNames.add('Portfolio');
       }
 
@@ -670,10 +932,11 @@ export function UserVaultWorkspace({
         })),
       ];
 
-      return {
-        currentFolder: cleanTarget,
-        breadcrumbs,
-        folders: Array.from(subfolderNames).map((sub) => ({
+      const mergedFolders: EdgeVaultEntry[] = [];
+      shortcutEntriesMap.forEach((scEntry) => mergedFolders.push(scEntry));
+      Array.from(subfolderNames).forEach((sub) => {
+        if (shortcutEntriesMap.has(sub)) return;
+        mergedFolders.push({
           name: sub === 'Portfolio' || sub === 'portfolio' ? 'Portfólio' : sub,
           relativePath: cleanTarget ? `${cleanTarget}/${sub}` : sub,
           isDirectory: true,
@@ -681,16 +944,73 @@ export function UserVaultWorkspace({
           mimeType: 'inode/directory',
           kind: 'folder' as const,
           modifiedAt: new Date().toISOString(),
-        })),
+        });
+      });
+
+      return {
+        currentFolder: cleanTarget,
+        breadcrumbs,
+        folders: mergedFolders,
         files: matchingFiles,
       };
     },
-    [indexedMap, selectedOrg]
+    [indexedFiles, selectedOrg, selectedOrgId, defaultPersonalLabel]
+  );
+
+  const mergeIndexedShortcuts = useCallback(
+    (diskFolders: EdgeVaultEntry[], targetFolder: string, scopeOrgId: string | null): EdgeVaultEntry[] => {
+      const cleanTarget = String(targetFolder || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+      const existingNames = new Set(diskFolders.map((f) => f.name.toLowerCase()));
+      const extraShortcuts: EdgeVaultEntry[] = [];
+
+      for (const row of indexedFiles) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rOrg = (row as any).organization_id || null;
+        if ((scopeOrgId || null) !== rOrg) continue;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const exif = ((row as any).exif_data || {}) as Record<string, unknown>;
+        const isSc = row.mime_type === 'inode/directory+shortcut' || Boolean(exif.isShortcut);
+        if (!isSc) continue;
+
+        const cleanRel = String(row.relative_path || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+        if (!cleanRel) continue;
+        if (scopeOrgId && (cleanRel.toLowerCase() === 'portfolio' || cleanRel.toLowerCase().startsWith('portfolio/'))) {
+          continue;
+        }
+        const slashIdx = cleanRel.lastIndexOf('/');
+        const parentDir = slashIdx === -1 ? '' : cleanRel.slice(0, slashIdx);
+        if (parentDir.toLowerCase() !== cleanTarget.toLowerCase()) continue;
+
+        const scName = row.filename || (slashIdx === -1 ? cleanRel : cleanRel.slice(slashIdx + 1));
+        if (existingNames.has(scName.toLowerCase())) continue;
+        existingNames.add(scName.toLowerCase());
+
+        extraShortcuts.push({
+          name: scName,
+          relativePath: cleanRel,
+          isDirectory: true,
+          sizeBytes: 0,
+          mimeType: 'inode/directory+shortcut',
+          kind: 'folder',
+          modifiedAt: row.updated_at || row.created_at || new Date().toISOString(),
+          isShortcut: true,
+          shortcutType: exif.targetOrgId ? 'org_folder' : 'personal_folder',
+          shortcutTarget: String(exif.shortcutTarget || ''),
+          shortcutOwner: String(exif.shortcutOwner || 'Membro'),
+          targetOrgId: exif.targetOrgId ? String(exif.targetOrgId) : undefined,
+          targetOrgSlug: exif.targetOrgSlug ? String(exif.targetOrgSlug) : undefined,
+        });
+      }
+
+      return extraShortcuts.length > 0 ? [...extraShortcuts, ...diskFolders] : diskFolders;
+    },
+    [indexedFiles]
   );
 
   const loadDirectory = useCallback(
     async (targetFolder: string, activeTicketToUse = activeTicket, quiet = false) => {
       if (!isApprovedForStorage && profile.storage_role !== 'admin') return;
+      if (!activeTicketToUse) return;
       if (!quiet) setLoadingDir(true);
       setDirError(null);
       try {
@@ -721,7 +1041,7 @@ export function UserVaultWorkspace({
             },
           ]
         );
-        setFolders(res.folders || []);
+        setFolders(mergeIndexedShortcuts(res.folders || [], targetFolder, selectedOrgId));
         setFiles(res.files || []);
         if (typeof res.total_used_bytes === 'number') {
           setUsedBytes(res.total_used_bytes);
@@ -738,8 +1058,50 @@ export function UserVaultWorkspace({
         }
       } catch (err: unknown) {
         setIsEdgeOnline(false);
-        // Fallback Resiliente via Cache Indexado do Supabase
-        const fallback = resolveFallbackFolderListing(targetFolder);
+        // Fallback Resiliente via Cache Indexado do Supabase (+ busca remota de itens de atalho cross-owner)
+        let fallback = resolveFallbackFolderListing(targetFolder);
+        const cleanTarget = String(targetFolder || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+
+        if (fallback.files.length === 0 && fallback.folders.length === 0 && cleanTarget) {
+          const matchedShortcutRow = indexedFiles.find((row) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const rOrg = (row as any).organization_id || null;
+            if ((selectedOrgId || null) !== rOrg) return false;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const exif = ((row as any).exif_data || {}) as Record<string, unknown>;
+            const isSc = row.mime_type === 'inode/directory+shortcut' || Boolean(exif.isShortcut);
+            if (!isSc) return false;
+            const scRel = String(row.relative_path || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').toLowerCase();
+            return cleanTarget.toLowerCase() === scRel || cleanTarget.toLowerCase().startsWith(`${scRel}/`);
+          });
+
+          if (matchedShortcutRow) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const exif = ((matchedShortcutRow as any).exif_data || {}) as Record<string, unknown>;
+            const scRel = String(matchedShortcutRow.relative_path || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+            const remainder = cleanTarget.slice(scRel.length).replace(/^\/+/, '');
+            const baseTarget = String(exif.shortcutTarget || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+            const resolvedTargetRel = [baseTarget, remainder].filter(Boolean).join('/');
+            try {
+              const scRes = await getShortcutTargetFallbackEntriesAction({
+                containerOrgId: selectedOrgId || null,
+                targetOwnerId: exif.ownerUserId ? String(exif.ownerUserId) : null,
+                targetOrgId: exif.targetOrgId ? String(exif.targetOrgId) : null,
+                targetRelPath: resolvedTargetRel,
+              });
+              if (scRes.ok && scRes.entries.length > 0) {
+                const existingIds = new Set(indexedFiles.map((r) => r.id));
+                const nextMerged = [
+                  ...indexedFiles,
+                  ...scRes.entries.filter((r) => !existingIds.has(r.id)),
+                ];
+                setIndexedFiles(nextMerged);
+                fallback = resolveFallbackFolderListing(targetFolder, nextMerged);
+              }
+            } catch {}
+          }
+        }
+
         if (fallback.files.length > 0 || fallback.folders.length > 0 || Boolean(targetFolder)) {
           setCurrentFolder(fallback.currentFolder);
           setSelectedPaths(new Set());
@@ -754,7 +1116,7 @@ export function UserVaultWorkspace({
         if (!quiet) setLoadingDir(false);
       }
     },
-    [isApprovedForStorage, profile.storage_role, activeTicket, serverUrl, indexedMap, selectedOrg, selectedOrgId, resolveFallbackFolderListing]
+    [isApprovedForStorage, profile.storage_role, activeTicket, serverUrl, indexedMap, indexedFiles, selectedOrg, selectedOrgId, resolveFallbackFolderListing]
   );
 
   useEffect(() => {
@@ -768,10 +1130,13 @@ export function UserVaultWorkspace({
     }
   }, [uploadCtx.lastCompletedUploadTime, uploadCtx.lastUploadResults, currentFolder, loadDirectory]);
 
-  const handleSwitchScope = async (orgId: string | null) => {
-    if (orgId === selectedOrgId) return;
+  const handleSwitchScope = async (orgId: string | null, force = false) => {
+    if (!force && orgId === selectedOrgId && (!orgId || orgVaultTicket?.orgId === orgId)) return;
     setSwitchingScope(true);
     setSelectedOrgId(orgId);
+    setOrgVaultTicket(null);
+    setFolders([]);
+    setFiles([]);
     setCurrentFolder('');
     setSelectedPaths(new Set());
 
@@ -791,7 +1156,7 @@ export function UserVaultWorkspace({
         setBreadcrumbs([{ name: userName ? `Cofre ${userName}` : 'Meus Arquivos', path: '' }]);
         await loadDirectory('', ticket);
       } else {
-        const org = userOrganizations.find((o) => o.id === orgId);
+        const org = localOrgs.find((o) => o.id === orgId);
         if (org) {
           setUsedBytes(org.usedBytes);
           setBreadcrumbs([{ name: org.name, path: '' }]);
@@ -802,8 +1167,9 @@ export function UserVaultWorkspace({
           unlockedPins,
         });
         if (res.ok && res.session?.vaultTicket?.ticket) {
-          setOrgVaultTicket(res.session.vaultTicket.ticket);
-          await loadDirectory('', res.session.vaultTicket.ticket);
+          const nextOrgTicket = res.session.vaultTicket.ticket;
+          setOrgVaultTicket({ orgId, ticket: nextOrgTicket });
+          await loadDirectory('', nextOrgTicket);
         } else {
           setDirError(res.error || 'Falha ao acessar o cofre da organização.');
           setLoadingDir(false);
@@ -847,6 +1213,13 @@ export function UserVaultWorkspace({
     [folderMetaMap, saveFolderMeta, selectedOrgId, currentFolder, loadDirectory]
   );
 
+  useEffect(() => {
+    if (initialOrgId) {
+      void handleSwitchScope(initialOrgId, true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialOrgId]);
+
 
   useEffect(() => {
     const handleEnsurePreview = () => {
@@ -860,6 +1233,7 @@ export function UserVaultWorkspace({
     let ignore = false;
     // Abort auto-reload while switching between personal/org scope to avoid race condition
     if (switchingScope) return;
+    if (selectedOrgId && !activeTicket) return;
     if (activeTab === 'vault' && (isApprovedForStorage || profile.storage_role === 'admin')) {
       fetchTenantDirectory(currentFolder, activeTicket, { serverUrl })
         .then((res) => {
@@ -891,7 +1265,7 @@ export function UserVaultWorkspace({
               },
             ]
           );
-          setFolders(res.folders || []);
+          setFolders(mergeIndexedShortcuts(res.folders || [], currentFolder, selectedOrgId));
           setFiles(res.files || []);
           if (typeof res.total_used_bytes === 'number') {
             setUsedBytes(res.total_used_bytes);
@@ -1065,6 +1439,359 @@ export function UserVaultWorkspace({
     }
   };
 
+  const resolveTicketForScope = useCallback(
+    async (scopeId: string): Promise<string> => {
+      if (scopeId === 'personal') return ticket;
+      if (scopeId === selectedOrgId && orgVaultTicket?.orgId === scopeId) return orgVaultTicket.ticket;
+      if (scopeTicketCacheRef.current[scopeId]) return scopeTicketCacheRef.current[scopeId];
+      try {
+        const res = await refreshOrganizationTicketAction({ organizationId: scopeId });
+        const issued = res.ok ? res.session?.vaultTicket?.ticket : '';
+        if (issued) {
+          scopeTicketCacheRef.current[scopeId] = issued;
+          return issued;
+        }
+      } catch {}
+      return '';
+    },
+    [ticket, selectedOrgId, orgVaultTicket]
+  );
+
+  const fetchFoldersForScopeAndPath = useCallback(
+    async (scopeId: string, folderPath: string): Promise<{ name: string; relativePath: string }[]> => {
+      const cleanPath = String(folderPath || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+      const prefix = cleanPath ? `${cleanPath}/` : '';
+      const folderMap = new Map<string, { name: string; relativePath: string }>();
+
+      // 1. Coleta pastas indexadas no Supabase (inclui subpastas profundas e Portfólio)
+      if (scopeId === 'personal' && !cleanPath) {
+        folderMap.set('Portfolio', { name: 'Portfólio', relativePath: 'Portfolio' });
+      }
+
+      indexedMap.forEach((row, relPath) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rowOrgId = (row as any).organization_id || null;
+        if (scopeId === 'personal') {
+          if (rowOrgId) return;
+        } else {
+          if (rowOrgId !== scopeId) return;
+        }
+
+        const cleanRel = String(relPath || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+        if (!cleanPath) {
+          const segs = cleanRel.split('/').filter(Boolean);
+          if (segs.length > 1 || (segs.length === 1 && row.is_directory)) {
+            const first = segs[0];
+            if (!folderMap.has(first)) {
+              folderMap.set(first, {
+                name: first.toLowerCase() === 'portfolio' ? 'Portfólio' : first,
+                relativePath: first,
+              });
+            }
+          }
+          if (scopeId === 'personal' && row.show_in_portfolio && row.album && row.album !== 'Geral') {
+            // Albums em raiz ficam dentro de Portfolio
+          }
+        } else if (cleanRel.toLowerCase().startsWith(prefix.toLowerCase())) {
+          const rest = cleanRel.slice(prefix.length);
+          const segs = rest.split('/').filter(Boolean);
+          if (segs.length > 1 || (segs.length === 1 && row.is_directory)) {
+            const seg = segs[0];
+            const childRel = `${cleanPath}/${seg}`;
+            if (!folderMap.has(childRel)) {
+              folderMap.set(childRel, { name: seg, relativePath: childRel });
+            }
+          }
+        }
+
+        if (
+          scopeId === 'personal' &&
+          cleanPath.toLowerCase() === 'portfolio' &&
+          row.show_in_portfolio &&
+          row.album &&
+          row.album !== 'Geral' &&
+          row.album !== 'Atalhos'
+        ) {
+          const albRel = `Portfolio/${row.album}`;
+          if (!folderMap.has(albRel)) {
+            folderMap.set(albRel, { name: row.album, relativePath: albRel });
+          }
+        }
+      });
+
+      // 2. Consulta Edge Server online para trazer pastas físicas em tempo real
+      try {
+        const scopeTicket = await resolveTicketForScope(scopeId);
+        if (scopeTicket) {
+          const res = await fetchTenantDirectory(cleanPath, scopeTicket, { serverUrl });
+          for (const f of res.folders || []) {
+            if (f.isShortcut) continue;
+            const fRel = String(f.relativePath || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+            if (!fRel) continue;
+            folderMap.set(fRel, {
+              name: f.name || fRel.split('/').pop() || fRel,
+              relativePath: fRel,
+            });
+          }
+        }
+      } catch {
+        // Fallback resiliente mantendo o que veio de indexedMap
+      }
+
+      return Array.from(folderMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    },
+    [indexedMap, resolveTicketForScope, serverUrl]
+  );
+
+  const loadShortcutBrowserLevel = useCallback(
+    async (scopeId: string, folderPath: string) => {
+      setLoadingPersonalFolders(true);
+      setShortcutBrowserPath(folderPath);
+      try {
+        const items = await fetchFoldersForScopeAndPath(scopeId, folderPath);
+        setShortcutBrowserFolders(items);
+        setShortcutTreeChildren((prev) => ({ ...prev, [folderPath]: items }));
+      } catch (err: unknown) {
+        setShortcutError(err instanceof Error ? err.message : 'Falha ao buscar pastas.');
+      } finally {
+        setLoadingPersonalFolders(false);
+      }
+    },
+    [fetchFoldersForScopeAndPath]
+  );
+
+  const activeModalBrowseScope = shortcutAllowTargetPick
+    ? shortcutTargetScope === 'current'
+      ? selectedOrgId || 'personal'
+      : shortcutTargetScope
+    : shortcutSourceScope;
+
+  const handleToggleShortcutTreeNode = async (nodeRelPath: string) => {
+    const isExpanded = expandedShortcutTreePaths.includes(nodeRelPath);
+    if (isExpanded) {
+      setExpandedShortcutTreePaths((prev) => prev.filter((p) => p !== nodeRelPath));
+      return;
+    }
+    setExpandedShortcutTreePaths((prev) => [...prev, nodeRelPath]);
+    if (!(nodeRelPath in shortcutTreeChildren)) {
+      setLoadingTreePath(nodeRelPath);
+      try {
+        const children = await fetchFoldersForScopeAndPath(activeModalBrowseScope, nodeRelPath);
+        setShortcutTreeChildren((prev) => ({ ...prev, [nodeRelPath]: children }));
+      } finally {
+        setLoadingTreePath(null);
+      }
+    }
+  };
+
+  const handleSwitchShortcutSourceScope = (newScope: string) => {
+    setShortcutSourceScope(newScope);
+    setShortcutTreeChildren({});
+    setExpandedShortcutTreePaths([]);
+    setSelectedPersonalFolder('');
+    void loadShortcutBrowserLevel(newScope, '');
+  };
+
+  const handleSwitchShortcutTargetScope = (newDestScope: string) => {
+    setShortcutTargetScope(newDestScope);
+    setShortcutTargetFolder('');
+    setShortcutTreeChildren({});
+    setExpandedShortcutTreePaths([]);
+    void loadShortcutBrowserLevel(newDestScope, '');
+  };
+
+  const handleOpenCreateShortcutModal = async (opts?: {
+    preselectedSourcePath?: string;
+    preselectedSourceName?: string;
+  }) => {
+    setIsShortcutModalOpen(true);
+    setShortcutError(null);
+    setShortcutTreeChildren({});
+    setExpandedShortcutTreePaths([]);
+    setShortcutTargetFolder('');
+
+    const currentScope = selectedOrgId || 'personal';
+    if (opts?.preselectedSourcePath) {
+      // Modo B: aberto pelo menu de contexto ("Criar Atalho...") — origem fixa, escolhe destino
+      const cleanSrc = opts.preselectedSourcePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+      const baseLabel = opts.preselectedSourceName || cleanSrc.split('/').pop() || 'Pasta';
+      const defaultDest =
+        currentScope === 'personal' ? localOrgs[0]?.id || 'personal' : 'personal';
+
+      setShortcutAllowTargetPick(true);
+      setShortcutSourceScope(currentScope);
+      setShortcutTargetScope(defaultDest);
+      setSelectedPersonalFolder(cleanSrc);
+      setShortcutDisplayName(`Atalho - ${baseLabel}`);
+
+      await loadShortcutBrowserLevel(defaultDest, '');
+    } else {
+      // Modo A: aberto via "+ Novo Atalho" — destino é a pasta aberta, escolhe origem
+      const defaultSource =
+        currentScope === 'personal' ? localOrgs[0]?.id || 'personal' : 'personal';
+      setShortcutAllowTargetPick(false);
+      setShortcutTargetScope('current');
+      setShortcutSourceScope(defaultSource);
+      setSelectedPersonalFolder('');
+      setShortcutDisplayName('');
+      await loadShortcutBrowserLevel(defaultSource, '');
+    }
+  };
+
+  const handleConfirmCreateShortcut = async () => {
+    if (!selectedPersonalFolder) {
+      setShortcutError('Selecione uma pasta de origem para criar o atalho.');
+      return;
+    }
+    const baseSrcName = selectedPersonalFolder.split('/').pop() || 'Pasta';
+    const cleanName = shortcutDisplayName.trim() || `Atalho - ${baseSrcName}`;
+    setShortcutError(null);
+
+    const resolvedTargetScope =
+      shortcutTargetScope === 'current' ? selectedOrgId || 'personal' : shortcutTargetScope;
+    const targetParentFolder = shortcutAllowTargetPick
+      ? shortcutTargetFolder
+      : resolvedTargetScope === (selectedOrgId || 'personal')
+        ? currentFolder
+        : '';
+
+    // Proteção contra loop circular (mesma pasta ou ancestral/descendente direto no mesmo cofre)
+    if (resolvedTargetScope === shortcutSourceScope) {
+      const normSrc = selectedPersonalFolder.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').toLowerCase();
+      const normDst = targetParentFolder.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').toLowerCase();
+      if (normSrc && (normDst === normSrc || normDst.startsWith(`${normSrc}/`))) {
+        setShortcutError(
+          'Referência circular bloqueada: não é possível criar um atalho dentro da própria pasta de origem ou de suas subpastas.'
+        );
+        return;
+      }
+    }
+
+    setIsCreatingShortcut(true);
+
+    const srcOrg =
+      shortcutSourceScope !== 'personal'
+        ? localOrgs.find((o) => o.id === shortcutSourceScope)
+        : null;
+
+    try {
+      const containerTicket = await resolveTicketForScope(resolvedTargetScope);
+      if (containerTicket) {
+        try {
+          await createTenantFolderShortcutDirect({
+            parentFolder: targetParentFolder,
+            shortcutName: cleanName,
+            personalFolderRelPath: selectedPersonalFolder,
+            targetOrgSlug: srcOrg?.slug,
+            targetOrgId: srcOrg?.id,
+            ownerName: userName || 'Membro',
+            ticket: containerTicket,
+            serverUrl,
+          });
+        } catch {
+          // Segue com persistência garantida em Supabase
+        }
+      }
+
+      const syncRes = await syncShortcutInSupabaseAction({
+        organizationId: resolvedTargetScope === 'personal' ? null : resolvedTargetScope,
+        parentFolder: targetParentFolder,
+        shortcutName: cleanName,
+        targetRelPath: selectedPersonalFolder,
+        targetOrgId: srcOrg?.id || null,
+        targetOrgSlug: srcOrg?.slug || null,
+        ownerName: userName || 'Membro',
+      });
+
+      const createdRelPath =
+        syncRes.relativePath ||
+        (targetParentFolder ? `${targetParentFolder}/${cleanName}` : cleanName);
+
+      // Atualiza estado local indexado para resposta imediata mesmo offline
+      const syntheticRow = {
+        id: `sc-${Date.now()}`,
+        user_id: profile.user_id,
+        organization_id: resolvedTargetScope === 'personal' ? null : resolvedTargetScope,
+        relative_path: createdRelPath,
+        filename: cleanName,
+        mime_type: 'inode/directory+shortcut',
+        size_bytes: 0,
+        is_directory: true,
+        has_pin: false,
+        visibility: 'private',
+        show_in_portfolio: false,
+        show_in_curriculum: false,
+        album: 'Atalhos',
+        category: 'Atalho',
+        tags: [],
+        is_favorite: false,
+        linked_task_ids: [],
+        exif_data: {
+          isShortcut: true,
+          shortcutType: srcOrg ? 'org_folder' : 'personal_folder',
+          shortcutTarget: selectedPersonalFolder,
+          shortcutOwner: userName || 'Membro',
+          ownerUserId: profile.user_id,
+          targetOrgId: srcOrg?.id || null,
+          targetOrgSlug: srcOrg?.slug || null,
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as unknown as UserFileIndexRow;
+
+      setIndexedFiles((prev) => [
+        ...prev.filter(
+          (r) =>
+            !(
+              r.relative_path === createdRelPath &&
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ((r as any).organization_id || null) ===
+                (resolvedTargetScope === 'personal' ? null : resolvedTargetScope)
+            )
+        ),
+        syntheticRow,
+      ]);
+
+      setIsShortcutModalOpen(false);
+      if (resolvedTargetScope === (selectedOrgId || 'personal')) {
+        await loadDirectory(currentFolder, activeTicket, true);
+      }
+    } catch (err: unknown) {
+      setShortcutError(err instanceof Error ? err.message : 'Erro ao criar atalho.');
+    } finally {
+      setIsCreatingShortcut(false);
+    }
+  };
+
+  const handleDeleteShortcut = async (folderPath: string, shortcutFile?: string) => {
+    try {
+      await removeShortcutFromSupabaseAction({
+        organizationId: selectedOrgId || null,
+        shortcutPath: folderPath,
+      });
+      setIndexedFiles((prev) =>
+        prev.filter(
+          (r) =>
+            !(
+              r.relative_path === folderPath &&
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ((r as any).organization_id || null) === (selectedOrgId || null)
+            )
+        )
+      );
+      try {
+        await deleteTenantFolderShortcutDirect({
+          shortcutPath: shortcutFile || folderPath,
+          ticket: activeTicket,
+          serverUrl,
+        });
+      } catch {}
+      await loadDirectory(currentFolder, activeTicket, true);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Erro ao remover atalho.');
+    }
+  };
+
   const handleRenameEntry = (entry: EdgeVaultEntry) => {
     setActionDialog({
       isOpen: true,
@@ -1126,6 +1853,21 @@ export function UserVaultWorkspace({
   };
 
   const handleDeleteEntry = (entry: EdgeVaultEntry) => {
+    if (entry.isShortcut) {
+      setActionDialog({
+        isOpen: true,
+        mode: 'danger',
+        icon: 'link_off',
+        title: 'Remover Atalho?',
+        description: `Deseja remover apenas o atalho "${entry.name}"? A pasta original e todos os arquivos originais permanecerão intactos.`,
+        confirmLabel: 'Remover Atalho',
+        onConfirm: () => {
+          setActionDialog((prev) => ({ ...prev, isOpen: false }));
+          void executeDeleteEntry(entry);
+        },
+      });
+      return;
+    }
     setActionDialog({
       isOpen: true,
       mode: 'danger',
@@ -1141,6 +1883,14 @@ export function UserVaultWorkspace({
   };
 
   const executeDeleteEntry = async (entry: EdgeVaultEntry) => {
+    if (entry.isShortcut) {
+      const explicitFile =
+        (entry as any).shortcutFileRelativePath ||
+        (entry as any).shortcutFileName ||
+        entry.relativePath;
+      await handleDeleteShortcut(entry.relativePath, explicitFile);
+      return;
+    }
     const targetPath = entry.relativePath;
     // OTIMISTA IMEDIATO (0ms): some da tela no mesmo frame do clique!
     const prevFolders = [...folders];
@@ -1440,14 +2190,50 @@ export function UserVaultWorkspace({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
+      const activeEl = document.activeElement as HTMLElement | null;
       if (
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable ||
-          target.closest('input, textarea, [contenteditable="true"]'))
+        (target &&
+          (target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.tagName === 'SELECT' ||
+            target.isContentEditable ||
+            target.closest('input, textarea, select, [contenteditable="true"]'))) ||
+        (activeEl &&
+          (activeEl.tagName === 'INPUT' ||
+            activeEl.tagName === 'TEXTAREA' ||
+            activeEl.tagName === 'SELECT' ||
+            activeEl.isContentEditable))
       ) {
         return;
+      }
+
+      // Atalhos de Layout Alt+1..4, Alt+B e Alt+P (Frente 2.2, 5.2, 6.4)
+      if (e.altKey && !e.ctrlKey && !e.metaKey) {
+        if (e.key === '1') {
+          e.preventDefault();
+          handleSetLayoutMode('grid');
+          return;
+        } else if (e.key === '2') {
+          e.preventDefault();
+          handleSetLayoutMode('list');
+          return;
+        } else if (e.key === '3') {
+          e.preventDefault();
+          handleSetLayoutMode('ide');
+          return;
+        } else if (e.key === '4') {
+          e.preventDefault();
+          handleSetLayoutMode('timeline');
+          return;
+        } else if (e.key === 'b' || e.key === 'B') {
+          e.preventDefault();
+          handleTogglePreview();
+          return;
+        } else if (e.key === 'p' || e.key === 'P') {
+          e.preventDefault();
+          handleTogglePreview();
+          return;
+        }
       }
 
       if (e.key === 'Escape') {
@@ -1566,8 +2352,16 @@ export function UserVaultWorkspace({
     }
   };
 
-  return (
+  const vaultRouter = useRouter();
+  const swipeHandlers = useSwipeTabs({
+    enabled: !isEffectiveInline,
+    onNext: () =>
+      vaultRouter.push(selectedOrg ? `/labdiv?org=${encodeURIComponent(selectedOrg.slug)}` : '/labdiv'),
+  });
+
+  const vaultContent = (
     <div
+      {...swipeHandlers}
       onDragOver={(e) => {
         e.preventDefault();
         if (e.dataTransfer) {
@@ -1583,78 +2377,84 @@ export function UserVaultWorkspace({
           }
         }
       }}
-      className="min-h-full flex flex-col p-4 md:p-8 bg-app space-y-6 pb-28 text-fg"
+      className={`relative z-10 min-h-full flex flex-col p-4 md:p-8 ${selectedOrg ? 'bg-transparent' : 'bg-app'} space-y-6 pb-28 text-fg`}
     >
-      {/* Alternador Macro Unificado: Organizações & Arquivos */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-surface border border-border-subtle rounded-2xl px-4 py-2.5 shadow-md">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-fg-muted">
-            Aba Gestão:
-          </span>
-          <div className="flex items-center gap-1 bg-app p-1 rounded-xl border border-border-subtle">
+      {/* Faixa 1: Switch Macro [ Cofre | Organizações | Studio ] acima de tudo */}
+      {!isEffectiveInline && (
+        <div className="flex justify-center shrink-0">
+          <div className="inline-flex items-center p-1 bg-surface rounded-2xl border border-border-subtle shadow-md gap-1">
+            <span className="flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-black bg-[#FFCC00] text-[#121212] shadow-sm">
+              <span className="material-symbols-outlined text-[16px]">folder_special</span>
+              <span>Cofre</span>
+            </span>
             <Link
-              href="/labdiv"
-              className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-fg-secondary hover:text-fg transition-colors"
+              href={selectedOrg ? `/labdiv?org=${encodeURIComponent(selectedOrg.slug)}` : '/labdiv'}
+              prefetch={true}
+              className="flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold text-fg-secondary hover:text-fg transition-colors"
+              title="Alternar para Organizações & Bastidores"
             >
               <span className="material-symbols-outlined text-[16px]">domain</span>
-              <span>Equipe & Projetos</span>
+              <span>Organizações</span>
             </Link>
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-[#FFCC00] text-[#121212] shadow-sm">
-              <span className="material-symbols-outlined text-[16px]">folder_special</span>
-              <span>Cofre de Arquivos</span>
-            </div>
+            <Link
+              href={selectedOrg ? `/labdiv?org=${encodeURIComponent(selectedOrg.slug)}&view=studio` : '/labdiv?view=studio'}
+              prefetch={true}
+              className="flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold text-fg-secondary hover:text-fg transition-colors"
+              title="Abrir HUB Studio (Criador Visual)"
+            >
+              <span className="material-symbols-outlined text-[16px]">palette</span>
+              <span>Studio</span>
+            </Link>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Seletor de Escopo: Cofre Pessoal vs Org Vault */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-surface border border-border-subtle rounded-xl p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold text-fg-muted uppercase tracking-wider mr-1">
-            Escopo do Cofre:
-          </span>
-          <button
-            type="button"
-            onClick={() => handleSwitchScope(null)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
-              selectedOrgId === null
-                ? 'bg-[#FFCC00] text-[#121212] shadow-sm font-black'
-                : 'bg-surface text-fg-secondary hover:text-fg hover:bg-surface-hover border border-border-subtle'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[16px]">person</span>
-            <span>{userName ? `Cofre ${userName}` : 'Meu Cofre Pessoal'}</span>
-          </button>
-
-          {userOrganizations.map((org) => (
-            <button
-              key={org.id}
-              type="button"
-              onClick={() => handleSwitchScope(org.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
-                selectedOrgId === org.id
-                  ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 font-black shadow-md'
-                  : 'bg-surface text-fg-secondary hover:text-fg hover:bg-surface-hover border border-border-subtle'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[16px]">domain</span>
-              <span>Cofre {org.name}</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-black/20 text-current font-mono">
-                Compartilhado
+      {/* Faixa 2: Seção só com a Logo e o Switch de Conta (Pessoal / Organização) */}
+      <div className="relative shrink-0 flex flex-wrap items-center justify-between gap-4 bg-surface border border-border-subtle rounded-2xl p-4 shadow-lg z-20">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/30 overflow-hidden p-1.5 shadow-inner">
+            {!selectedOrg ? (
+              userAvatarUrl ? (
+                <img
+                  src={userAvatarUrl}
+                  alt={userName || 'Perfil Pessoal'}
+                  className="w-full h-full object-cover rounded-xl"
+                />
+              ) : (
+                <span className="material-symbols-outlined text-[24px] text-[var(--accent-secondary)]">person</span>
+              )
+            ) : selectedOrg.slug === 'labdiv' || selectedOrg.name?.toLowerCase().includes('labdiv') ? (
+              <img src="/labdiv-logo.png" alt="LabDiv" className="w-full h-full object-contain" />
+            ) : selectedOrg.slug === 'show-da-fisica' ? (
+              <div className="w-full h-full flex flex-col items-center justify-center font-black text-center leading-none">
+                <span className="text-[9px] text-[#ff1e1e]">SHOW</span>
+                <span className="text-[8px] text-[#0066ff]">FÍSICA</span>
+              </div>
+            ) : selectedOrg.slug === 'hs' ? (
+              <div className="w-full h-full flex items-center justify-center font-mono font-bold text-[#00ff66] text-[11px]">
+                &gt;_HS
+              </div>
+            ) : selectedOrg.slug === 'profis' ? (
+              <div className="w-full h-full flex flex-col items-center justify-center font-black text-center leading-none">
+                <span className="text-[10px] text-[#F59E0B]">PRÓ</span>
+                <span className="text-[8px] text-[#FFCC00]">FÍSICA</span>
+              </div>
+            ) : (
+              <span className="text-lg font-black text-[var(--accent-primary)]">
+                {selectedOrg.name.slice(0, 2).toUpperCase()}
               </span>
-            </button>
-          ))}
+            )}
+          </div>
 
-          {userOrganizations.length === 0 && (
-            <Link
-              href="/labdiv"
-              className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 border border-dashed border-border-subtle hover:border-[var(--accent-secondary,#FFCC00)] text-fg-muted hover:text-fg transition-colors"
-              title="Conectar ou criar organização para habilitar o cofre compartilhado"
-            >
-              <span className="material-symbols-outlined text-[16px] text-[var(--accent-secondary,#FFCC00)]">domain_add</span>
-              <span>+ Conectar Organização</span>
-            </Link>
-          )}
+          <OrganizationMaterialSelector
+            organizations={localOrgs}
+            selectedOrgId={selectedOrgId}
+            onSelectOrg={(id) => handleSwitchScope(id)}
+            allowPersonal={true}
+            personalLabel={userName ? `Perfil ${userName}` : 'Pessoal'}
+            personalAvatarUrl={userAvatarUrl}
+            hideTriggerLogo={true}
+          />
         </div>
 
         <button
@@ -1663,10 +2463,10 @@ export function UserVaultWorkspace({
             setBoostTargetScope(selectedOrgId ? 'org' : 'personal');
             setIsBoostModalOpen(true);
           }}
-          className="flex items-center gap-1.5 rounded-lg border border-[#9D4EDD]/40 bg-[#9D4EDD]/10 px-3 py-1.5 text-xs font-bold text-[#E0AAFF] hover:bg-[#9D4EDD]/20 transition-colors"
+          className="flex items-center gap-1.5 rounded-xl border border-accent-primary/40 bg-accent-primary/10 px-3.5 py-2 text-xs font-bold text-accent-primary hover:bg-accent-primary/20 transition-colors cursor-pointer shadow-sm"
         >
           <span className="material-symbols-outlined text-[16px]">bolt</span>
-          Pedir Boost de Evento
+          <span>Pedir Boost</span>
         </button>
       </div>
 
@@ -1758,8 +2558,8 @@ export function UserVaultWorkspace({
                 onClick={() => setActiveTab('admin_quotas')}
                 className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors ${
                   activeTab === 'admin_quotas'
-                    ? 'bg-[var(--accent-primary)] text-white'
-                    : 'bg-surface text-[#E0AAFF] hover:bg-[#9D4EDD]/20 border border-[#9D4EDD]/40'
+                    ? 'bg-accent-primary text-on-accent-primary'
+                    : 'bg-surface text-accent-primary hover:bg-accent-primary/20 border border-accent-primary/40'
                 }`}
               >
                 <span className="material-symbols-outlined text-[18px]">group</span>
@@ -1771,8 +2571,8 @@ export function UserVaultWorkspace({
                 onClick={() => setActiveTab('admin_telemetry')}
                 className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors ${
                   activeTab === 'admin_telemetry'
-                    ? 'bg-[var(--accent-primary)] text-white'
-                    : 'bg-surface text-[#E0AAFF] hover:bg-[#9D4EDD]/20 border border-[#9D4EDD]/40'
+                    ? 'bg-accent-primary text-on-accent-primary'
+                    : 'bg-surface text-accent-primary hover:bg-accent-primary/20 border border-accent-primary/40'
                 }`}
               >
                 <span className="material-symbols-outlined text-[18px]">monitoring</span>
@@ -1841,20 +2641,20 @@ export function UserVaultWorkspace({
           )}
 
           {/* Barra de Ferramentas e Caminho do Arquivo */}
-          <div className="bg-surface border border-border-subtle rounded-2xl p-3.5 sm:p-4 space-y-3">
+          <div className="relative z-30 bg-surface border border-border-subtle rounded-2xl p-3.5 sm:p-4 space-y-3">
             {/* Linha 1: Controles de Exibição e Ações Principais */}
             <div className="flex flex-wrap items-center justify-between gap-3" data-tour="vault-actions">
-              {/* Seletor de Layout (Grade / Lista / IDE) + Toggle do Painel de Inspeção */}
+              {/* Seletor de Layout (Grade / Lista / IDE / Fotos) + Toggle do Painel de Inspeção (Frente 2.2 e 5.2) */}
               <div className="flex items-center gap-1 bg-app p-1 rounded-xl border border-border-subtle" data-tour="vault-layout-switcher">
                 <button
                   type="button"
                   onClick={() => handleSetLayoutMode('grid')}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     layoutMode === 'grid'
                       ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
                   }`}
-                  title="Visualização em Grade com Miniaturas"
+                  title="Grade de Miniaturas (Alt+1)"
                 >
                   <span className="material-symbols-outlined text-[16px]">grid_view</span>
                   <span className="hidden sm:inline">Grade</span>
@@ -1862,12 +2662,12 @@ export function UserVaultWorkspace({
                 <button
                   type="button"
                   onClick={() => handleSetLayoutMode('list')}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     layoutMode === 'list'
                       ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
                   }`}
-                  title="Visualização em Lista Detalhada"
+                  title="Lista Detalhada (Alt+2)"
                 >
                   <span className="material-symbols-outlined text-[16px]">view_list</span>
                   <span className="hidden sm:inline">Lista</span>
@@ -1875,15 +2675,28 @@ export function UserVaultWorkspace({
                 <button
                   type="button"
                   onClick={() => handleSetLayoutMode('ide')}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     layoutMode === 'ide'
+                      ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm ring-1 ring-[#FFCC00]/50'
+                      : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
+                  }`}
+                  title="Visualização IDE com Árvore Lateral e Abas (Alt+3)"
+                >
+                  <span className="material-symbols-outlined text-[16px]">terminal</span>
+                  <span className="font-bold">IDE</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetLayoutMode('timeline')}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    layoutMode === 'timeline'
                       ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
                   }`}
-                  title="Visualização Estilo IDE com Árvore Lateral e Abas"
+                  title="Fotos e Mídia em Linha do Tempo (Alt+4)"
                 >
-                  <span className="material-symbols-outlined text-[16px]">terminal</span>
-                  <span className="hidden sm:inline">IDE</span>
+                  <span className="material-symbols-outlined text-[16px]">photo_library</span>
+                  <span className="hidden sm:inline">Fotos</span>
                 </button>
 
                 <div className="w-[1px] h-4 bg-border-subtle mx-0.5" />
@@ -1891,12 +2704,12 @@ export function UserVaultWorkspace({
                 <button
                   type="button"
                   onClick={handleTogglePreview}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     isPreviewOpen
                       ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
                   }`}
-                  title={isPreviewOpen ? 'Ocultar Painel Lateral (Alt+P)' : 'Abrir Painel Lateral (Alt+P)'}
+                  title={isPreviewOpen ? 'Ocultar Painel Lateral (Alt+P / Alt+B)' : 'Abrir Painel Lateral (Alt+P / Alt+B)'}
                 >
                   <span className="material-symbols-outlined text-[18px]">view_sidebar</span>
                   <span className="hidden sm:inline">Painel</span>
@@ -1914,7 +2727,7 @@ export function UserVaultWorkspace({
                         setShareTitle(currentFolder.split('/').pop() || 'Álbum');
                         setShareModalOpen(true);
                       }}
-                      className="px-3 py-2 rounded-xl bg-[#9D4EDD]/15 hover:bg-[#9D4EDD]/25 text-[#9D4EDD] dark:text-[#E0AAFF] border border-[#9D4EDD]/30 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                      className="px-3 py-2 rounded-xl bg-accent-primary/15 hover:bg-accent-primary/25 text-accent-primary border border-accent-primary/30 text-xs font-bold flex items-center gap-1.5 transition-colors"
                     >
                       <span className="material-symbols-outlined text-[18px]">share</span>
                       <span className="hidden md:inline">Compartilhar c/ Cliente</span>
@@ -2131,11 +2944,11 @@ export function UserVaultWorkspace({
                         }}
                         className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-fg hover:bg-surface-hover flex items-center gap-2.5 transition-colors group"
                       >
-                        <div className="w-8 h-8 rounded-lg bg-[#9D4EDD]/15 flex items-center justify-center text-[#9D4EDD] group-hover:scale-110 transition-transform">
+                        <div className="w-8 h-8 rounded-lg bg-accent-primary/15 flex items-center justify-center text-accent-primary group-hover:scale-110 transition-transform">
                           <span className="material-symbols-outlined text-[18px]">note_add</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-bold text-fg group-hover:text-[#9D4EDD] transition-colors">
+                          <p className="font-bold text-fg group-hover:text-accent-primary transition-colors">
                             Subir uma nota (.md)
                           </p>
                           <p className="text-[10px] text-fg-muted truncate">
@@ -2156,11 +2969,11 @@ export function UserVaultWorkspace({
                         }}
                         className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-fg hover:bg-surface-hover flex items-center gap-2.5 transition-colors group"
                       >
-                        <div className="w-8 h-8 rounded-lg bg-[#9D4EDD]/15 flex items-center justify-center text-[#9D4EDD] group-hover:scale-110 transition-transform">
+                        <div className="w-8 h-8 rounded-lg bg-accent-primary/15 flex items-center justify-center text-accent-primary group-hover:scale-110 transition-transform">
                           <span className="material-symbols-outlined text-[18px]">edit_note</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-bold text-fg group-hover:text-[#9D4EDD] transition-colors">
+                          <p className="font-bold text-fg group-hover:text-accent-primary transition-colors">
                             Criar nova nota (.md)
                           </p>
                           <p className="text-[10px] text-fg-muted truncate">
@@ -2191,6 +3004,32 @@ export function UserVaultWorkspace({
                           </p>
                           <p className="text-[10px] text-fg-muted truncate">
                             Criar novo diretório no caminho atual
+                          </p>
+                        </div>
+                      </button>
+
+                      {/* 6. Atalho para Pasta (Bidirecional: Cofre da Organização <-> Cofre Pessoal) */}
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={uploading}
+                        onClick={() => {
+                          setIsAddMenuOpen(false);
+                          void handleOpenCreateShortcutModal();
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-fg hover:bg-surface-hover flex items-center gap-2.5 transition-colors group"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-300 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <span className="material-symbols-outlined text-[18px]">add_link</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-amber-300 group-hover:text-amber-200 transition-colors">
+                            {selectedOrgId ? 'Atalho para Pasta Pessoal' : 'Criar Atalho de Pasta'}
+                          </p>
+                          <p className="text-[10px] text-fg-muted truncate">
+                            {selectedOrgId
+                              ? 'Vincular pasta do espaço pessoal ou de outra org'
+                              : 'Vincular pasta de organização ou pasta pessoal'}
                           </p>
                         </div>
                       </button>
@@ -2235,7 +3074,7 @@ export function UserVaultWorkspace({
           </div>
 
           {uploadStatus && (
-            <div className="p-3 rounded-xl bg-[#9D4EDD]/15 border border-[#9D4EDD]/40 text-xs text-[#E0AAFF] font-bold flex items-center gap-2">
+            <div className="p-3 rounded-xl bg-accent-primary/15 border border-accent-primary/40 text-xs text-accent-primary font-bold flex items-center gap-2">
               <span className="material-symbols-outlined text-[18px] animate-spin">sync</span>
               {uploadStatus}
             </div>
@@ -2311,7 +3150,7 @@ export function UserVaultWorkspace({
                 folders={folders}
                 files={files}
                 unlockedPins={unlockedPins}
-                ticket={ticket}
+                ticket={activeTicket}
                 serverUrl={serverUrl}
                 onSelectFolder={(folderPath, folderEntry) => {
                   const resolvedPath = folderPath || (folderEntry as unknown as { path?: string })?.path || folderEntry?.name || '';
@@ -2395,8 +3234,14 @@ export function UserVaultWorkspace({
                 </div>
               )}
 
-              {/* Conteúdo: No modo IDE usa VaultIdeWorkbench; no modo Grade/Lista usa Pastas e Arquivos */}
-              {layoutMode === 'ide' ? (
+              {/* Conteúdo: Timeline Google Fotos, IDE ou Pastas */}
+              {layoutMode === 'timeline' ? (
+                <GooglePhotosTimelineView
+                  organizationId={selectedOrgId}
+                  fallbackItems={fallbackTimelineItems}
+                  hideScopeSelector={true}
+                />
+              ) : layoutMode === 'ide' ? (
                 <VaultIdeWorkbench
                   activeEntry={openIdeTabs.find((t) => t.relativePath === activeIdeTabPath) || null}
                   ticket={activeTicket}
@@ -2455,16 +3300,18 @@ export function UserVaultWorkspace({
                         const folderPath = folder.relativePath || (folder as unknown as { path?: string })?.path || folder.name;
                         const isSelected = selectedPaths.has(folderPath);
                         const meta = folderMetaMap[folderPath];
-                        const customColor = meta?.color;
-                        const customIcon = meta?.icon || (
-                          folder.name === 'Portfolio' || folder.name === 'Portfólio'
-                            ? 'photo_library'
-                            : folder.name === 'Curriculo'
-                              ? 'verified'
-                              : folder.name === 'Projetos'
-                                ? 'workspaces'
-                                : 'folder'
-                        );
+                        const customColor = folder.isShortcut ? '#f59e0b' : meta?.color;
+                        const customIcon = folder.isShortcut
+                          ? 'folder_shared'
+                          : meta?.icon || (
+                            folder.name === 'Portfolio' || folder.name === 'Portfólio'
+                              ? 'photo_library'
+                              : folder.name === 'Curriculo'
+                                ? 'verified'
+                                : folder.name === 'Projetos'
+                                  ? 'workspaces'
+                                  : 'folder'
+                          );
                         const isFavorite = Boolean(meta?.isFavorite);
 
                         return (
@@ -2568,8 +3415,17 @@ export function UserVaultWorkspace({
                                     </span>
                                   )}
                                 </div>
-                                <div className="text-[11px] text-fg-muted">
-                                  {folder.hasPin ? 'Protegida por PIN' : 'Pasta'}
+                                <div className="text-[11px] text-fg-muted flex items-center gap-1.5 flex-wrap">
+                                  {folder.isShortcut ? (
+                                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1 font-bold">
+                                      <span className="material-symbols-outlined text-[12px]">link</span>
+                                      {folder.shortcutType === 'org_folder' ? 'Atalho Org' : 'Atalho Pessoal'} {folder.shortcutTarget ? `(${folder.shortcutTarget})` : ''}
+                                    </span>
+                                  ) : folder.hasPin ? (
+                                    'Protegida por PIN'
+                                  ) : (
+                                    'Pasta'
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -2579,6 +3435,16 @@ export function UserVaultWorkspace({
                               className="flex items-center gap-0.5 opacity-80 group-hover:opacity-100 shrink-0"
                               onClick={(e) => e.stopPropagation()}
                             >
+                              {folder.isShortcut && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteShortcut(folderPath)}
+                                  title="Remover Atalho Pessoal do Cofre"
+                                  className="p-1.5 rounded-lg text-amber-400 hover:text-red-400 hover:bg-surface-hover transition-colors"
+                                >
+                                  <span className="material-symbols-outlined text-[17px]">link_off</span>
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => handleToggleFolderFavorite(folder)}
@@ -2720,10 +3586,10 @@ export function UserVaultWorkspace({
                             setEditingNotePath(null);
                             setNoteDrawerOpen(true);
                           }}
-                          className="px-3.5 py-2 rounded-xl bg-surface hover:bg-surface-hover text-fg border border-border-subtle text-xs font-bold transition-all flex items-center gap-2 shadow-sm hover:border-[#9D4EDD]"
+                          className="px-3.5 py-2 rounded-xl bg-surface hover:bg-surface-hover text-fg border border-border-subtle text-xs font-bold transition-all flex items-center gap-2 shadow-sm hover:border-accent-primary"
                           title="Criar uma nova nota Markdown rápida"
                         >
-                          <span className="material-symbols-outlined text-[18px] text-[#9D4EDD]">
+                          <span className="material-symbols-outlined text-[18px] text-accent-primary">
                             edit_note
                           </span>
                           <span>Nova Nota (.md)</span>
@@ -3152,7 +4018,7 @@ export function UserVaultWorkspace({
                         className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
                           sl.is_submitted
                             ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-[#9D4EDD]/15 text-[#E0AAFF] border border-[#9D4EDD]/30'
+                            : 'bg-accent-primary/15 text-accent-primary border border-accent-primary/30'
                         }`}
                       >
                         {sl.is_submitted
@@ -3419,7 +4285,7 @@ export function UserVaultWorkspace({
           <div className="w-full max-w-md rounded-2xl border border-border-subtle bg-surface p-6 shadow-2xl text-slate-100">
             <div className="flex items-center justify-between pb-3 border-b border-border-subtle mb-4">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#9D4EDD] text-[22px]">bolt</span>
+                <span className="material-symbols-outlined text-accent-primary text-[22px]">bolt</span>
                 <h3 className="text-base font-bold text-fg">Solicitar Boost para Evento</h3>
               </div>
               <button
@@ -3500,7 +4366,7 @@ export function UserVaultWorkspace({
                   placeholder="Ex: Semana de Arte USP / Gravação de Vídeo"
                   value={boostEventName}
                   onChange={(e) => setBoostEventName(e.target.value)}
-                  className="w-full rounded-lg border border-border-subtle bg-app p-2.5 text-xs text-fg placeholder-slate-600 focus:border-[#9D4EDD] focus:outline-none"
+                  className="w-full rounded-lg border border-border-subtle bg-app p-2.5 text-xs text-fg placeholder-slate-600 focus:border-accent-primary focus:outline-none"
                 />
               </div>
 
@@ -3510,7 +4376,7 @@ export function UserVaultWorkspace({
                   <select
                     value={boostGb}
                     onChange={(e) => setBoostGb(Number(e.target.value))}
-                    className="w-full rounded-lg border border-border-subtle bg-app p-2.5 text-xs text-fg focus:border-[#9D4EDD] focus:outline-none"
+                    className="w-full rounded-lg border border-border-subtle bg-app p-2.5 text-xs text-fg focus:border-accent-primary focus:outline-none"
                   >
                     <option value={25}>+25 GB</option>
                     <option value={50}>+50 GB (Padrão)</option>
@@ -3523,7 +4389,7 @@ export function UserVaultWorkspace({
                   <select
                     value={boostDays}
                     onChange={(e) => setBoostDays(Number(e.target.value))}
-                    className="w-full rounded-lg border border-border-subtle bg-app p-2.5 text-xs text-fg focus:border-[#9D4EDD] focus:outline-none"
+                    className="w-full rounded-lg border border-border-subtle bg-app p-2.5 text-xs text-fg focus:border-accent-primary focus:outline-none"
                   >
                     <option value={7}>7 dias</option>
                     <option value={14}>14 dias (Recomendado)</option>
@@ -3555,7 +4421,7 @@ export function UserVaultWorkspace({
                 <button
                   type="submit"
                   disabled={isSubmittingBoost || !boostEventName.trim()}
-                  className="rounded-lg bg-[#9D4EDD] px-4 py-1.5 font-bold text-fg hover:bg-[#8338EC] disabled:opacity-50 transition-colors"
+                  className="rounded-lg bg-accent-primary px-4 py-1.5 font-bold text-on-accent-primary hover:bg-accent-primary-hover disabled:opacity-50 transition-colors"
                 >
                   {isSubmittingBoost ? 'Ativando...' : 'Ativar Boost'}
                 </button>
@@ -3663,6 +4529,12 @@ export function UserVaultWorkspace({
             setShareTitle(name || targetPath.split('/').pop() || 'Álbum');
             setShareModalOpen(true);
           }}
+          onCreateShortcut={(folderPath, folderName) => {
+            void handleOpenCreateShortcutModal({
+              preselectedSourcePath: folderPath,
+              preselectedSourceName: folderName,
+            });
+          }}
           onRename={(entry) => void handleRenameEntry(entry)}
           onDelete={(entry) => void handleDeleteEntry(entry)}
           onBatchDelete={() => void handleBatchDelete()}
@@ -3734,6 +4606,535 @@ export function UserVaultWorkspace({
         />
       )}
 
+      {/* Modal de Criação de Atalho Bidirecional com Switch Navegador / Árvore */}
+      {isShortcutModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => !isCreatingShortcut && setIsShortcutModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg bg-surface border border-border-subtle rounded-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-border-subtle">
+              <div className="flex items-center gap-2 text-amber-400">
+                <span className="material-symbols-outlined text-[22px]">add_link</span>
+                <h3 className="text-sm font-bold text-fg">
+                  {shortcutAllowTargetPick
+                    ? 'Enviar Atalho de Pasta'
+                    : selectedOrgId
+                      ? 'Atalho para Pasta Pessoal / Org'
+                      : 'Criar Atalho no Cofre Pessoal'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsShortcutModalOpen(false)}
+                disabled={isCreatingShortcut}
+                className="p-1 rounded-lg text-fg-muted hover:text-fg hover:bg-surface-hover cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <p className="text-xs text-fg-muted">
+              Navegue pelas pastas para vincular um diretório sem duplicar arquivos no armazenamento.
+            </p>
+
+            {shortcutError && (
+              <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
+                <span className="material-symbols-outlined text-[16px]">error</span>
+                <span>{shortcutError}</span>
+              </div>
+            )}
+
+            {/* Seletor de Destino (Modo B: aberto via Menu de Contexto "Criar Atalho...") */}
+            {shortcutAllowTargetPick ? (
+              <div className="space-y-3">
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="material-symbols-outlined text-[16px] text-amber-400 shrink-0">folder_zip</span>
+                    <span className="font-bold text-amber-300 truncate">
+                      Origem fixa: {selectedOrg ? selectedOrg.name : 'Espaço Pessoal'} / {selectedPersonalFolder}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-fg-muted">
+                    Cofre de Destino do Atalho:
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchShortcutTargetScope('personal')}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                        shortcutTargetScope === 'personal'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                          : 'bg-app border-border-subtle text-fg-muted hover:text-fg'
+                      }`}
+                    >
+                      Meu Cofre Pessoal
+                    </button>
+                    {localOrgs.map((org) => (
+                      <button
+                        key={org.id}
+                        type="button"
+                        onClick={() => handleSwitchShortcutTargetScope(org.id)}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                          shortcutTargetScope === org.id
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                            : 'bg-app border-border-subtle text-fg-muted hover:text-fg'
+                        }`}
+                      >
+                        {org.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Seletor de Espaço de Origem (Modo A: aberto via "+ Novo Atalho") */
+              <div className="space-y-2.5">
+                <div className="px-2.5 py-1.5 rounded-xl bg-surface border border-border-subtle text-[11px] text-fg-muted flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[15px] text-amber-400">save</span>
+                  <span>
+                    Será salvo em:{' '}
+                    <strong className="text-fg">
+                      {selectedOrg ? selectedOrg.name : 'Meu Cofre Pessoal'}
+                      {currentFolder ? ` / ${currentFolder}` : ' (Raiz)'}
+                    </strong>
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-fg-muted">
+                    Espaço de Origem:
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchShortcutSourceScope('personal')}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                        shortcutSourceScope === 'personal'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                          : 'bg-app border-border-subtle text-fg-muted hover:text-fg'
+                      }`}
+                    >
+                      Espaço Pessoal
+                    </button>
+                    {localOrgs.map((org) => (
+                      <button
+                        key={org.id}
+                        type="button"
+                        onClick={() => handleSwitchShortcutSourceScope(org.id)}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                          shortcutSourceScope === org.id
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                            : 'bg-app border-border-subtle text-fg-muted hover:text-fg'
+                        }`}
+                      >
+                        {org.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Header da Seleção de Pasta + Switch (Opção A: Navegador vs Opção B: Árvore) */}
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-fg-muted">
+                  {shortcutAllowTargetPick
+                    ? 'Subpasta de Destino (opcional):'
+                    : 'Pasta de Origem Selecionada:'}
+                </label>
+
+                <div className="inline-flex items-center gap-1 p-0.5 rounded-lg bg-app border border-border-subtle">
+                  <button
+                    type="button"
+                    onClick={() => setShortcutViewMode('breadcrumbs')}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors ${
+                      shortcutViewMode === 'breadcrumbs'
+                        ? 'bg-amber-500 text-slate-950 shadow-sm'
+                        : 'text-fg-muted hover:text-fg'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[14px]">folder_open</span>
+                    <span>Navegador</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShortcutViewMode('tree')}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors ${
+                      shortcutViewMode === 'tree'
+                        ? 'bg-amber-500 text-slate-950 shadow-sm'
+                        : 'text-fg-muted hover:text-fg'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[14px]">account_tree</span>
+                    <span>Árvore</span>
+                  </button>
+                </div>
+              </div>
+
+              {shortcutViewMode === 'breadcrumbs' ? (
+                <div className="space-y-2">
+                  {/* Barra de Breadcrumbs + Subir Nível */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-app border border-border-subtle text-xs">
+                    <div className="flex items-center gap-1 flex-wrap min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (shortcutAllowTargetPick) setShortcutTargetFolder('');
+                          void loadShortcutBrowserLevel(activeModalBrowseScope, '');
+                        }}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-surface-hover text-amber-300 font-bold cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">home</span>
+                        <span>Raiz</span>
+                      </button>
+                      {shortcutBrowserPath
+                        .split('/')
+                        .filter(Boolean)
+                        .map((seg, idx, arr) => {
+                          const segPath = arr.slice(0, idx + 1).join('/');
+                          return (
+                            <React.Fragment key={segPath}>
+                              <span className="text-fg-muted">/</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void loadShortcutBrowserLevel(activeModalBrowseScope, segPath)
+                                }
+                                className="px-1.5 py-0.5 rounded hover:bg-surface-hover text-fg font-medium truncate max-w-[120px] cursor-pointer"
+                              >
+                                {seg}
+                              </button>
+                            </React.Fragment>
+                          );
+                        })}
+                    </div>
+
+                    {shortcutBrowserPath && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const parent = shortcutBrowserPath.split('/').slice(0, -1).join('/');
+                          void loadShortcutBrowserLevel(activeModalBrowseScope, parent);
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-fg-muted hover:text-fg cursor-pointer shrink-0"
+                        title="Voltar para a pasta pai"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">arrow_upward</span>
+                        <span>..</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Ação rápida: selecionar Raiz no Modo B ou pasta aberta no Modo A/B */}
+                  {shortcutAllowTargetPick && !shortcutBrowserPath && (
+                    <button
+                      type="button"
+                      onClick={() => setShortcutTargetFolder('')}
+                      className={`w-full px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center justify-between cursor-pointer transition-colors ${
+                        shortcutTargetFolder === ''
+                          ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                          : 'bg-surface hover:bg-surface-hover border-border-subtle text-fg'
+                      }`}
+                    >
+                      <span className="truncate">Salvar na Raiz do Cofre de Destino</span>
+                      <span className="material-symbols-outlined text-[15px] text-amber-400">
+                        {shortcutTargetFolder === '' ? 'check_circle' : 'add_circle'}
+                      </span>
+                    </button>
+                  )}
+
+                  {shortcutBrowserPath && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (shortcutAllowTargetPick) {
+                          setShortcutTargetFolder(shortcutBrowserPath);
+                        } else {
+                          const base = shortcutBrowserPath.split('/').pop() || shortcutBrowserPath;
+                          setSelectedPersonalFolder(shortcutBrowserPath);
+                          if (!shortcutDisplayName || shortcutDisplayName.startsWith('Atalho - ')) {
+                            setShortcutDisplayName(`Atalho - ${base}`);
+                          }
+                        }
+                      }}
+                      className={`w-full px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center justify-between cursor-pointer transition-colors ${
+                        (shortcutAllowTargetPick ? shortcutTargetFolder : selectedPersonalFolder) ===
+                        shortcutBrowserPath
+                          ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                          : 'bg-surface hover:bg-surface-hover border-border-subtle text-fg'
+                      }`}
+                    >
+                      <span className="truncate">Usar pasta aberta: {shortcutBrowserPath}</span>
+                      <span className="material-symbols-outlined text-[15px] text-amber-400">
+                        {(shortcutAllowTargetPick ? shortcutTargetFolder : selectedPersonalFolder) ===
+                        shortcutBrowserPath
+                          ? 'check_circle'
+                          : 'add_circle'}
+                      </span>
+                    </button>
+                  )}
+
+                  {loadingPersonalFolders ? (
+                    <div className="py-6 text-center text-xs text-fg-muted flex flex-col items-center gap-2">
+                      <span className="material-symbols-outlined animate-spin text-[20px] text-amber-400">
+                        sync
+                      </span>
+                      Carregando pastas...
+                    </div>
+                  ) : shortcutBrowserFolders.length === 0 ? (
+                    <div className="p-3 rounded-xl bg-app border border-border-subtle text-xs text-fg-muted text-center">
+                      Nenhuma subpasta neste diretório.
+                    </div>
+                  ) : (
+                    <div className="max-h-52 overflow-y-auto space-y-1 p-1 bg-app border border-border-subtle rounded-xl">
+                      {shortcutBrowserFolders.map((folderItem) => {
+                        const activeSelectedPath = shortcutAllowTargetPick
+                          ? shortcutTargetFolder
+                          : selectedPersonalFolder;
+                        const isSelected = activeSelectedPath === folderItem.relativePath;
+                        return (
+                          <div
+                            key={folderItem.relativePath}
+                            className={`flex items-center justify-between gap-1 rounded-lg px-2 py-1.5 transition-colors ${
+                              isSelected
+                                ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40'
+                                : 'hover:bg-surface-hover text-fg border border-transparent'
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (shortcutAllowTargetPick) {
+                                  setShortcutTargetFolder(folderItem.relativePath);
+                                } else {
+                                  setSelectedPersonalFolder(folderItem.relativePath);
+                                  if (
+                                    !shortcutDisplayName ||
+                                    shortcutDisplayName.startsWith('Atalho - ')
+                                  ) {
+                                    setShortcutDisplayName(`Atalho - ${folderItem.name}`);
+                                  }
+                                }
+                              }}
+                              onDoubleClick={() =>
+                                void loadShortcutBrowserLevel(
+                                  activeModalBrowseScope,
+                                  folderItem.relativePath
+                                )
+                              }
+                              className="flex-1 text-left text-xs flex items-center gap-2 min-w-0 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[16px] text-amber-400 shrink-0">
+                                folder
+                              </span>
+                              <span className="truncate">{folderItem.name}</span>
+                              {isSelected && (
+                                <span className="material-symbols-outlined text-[15px] text-amber-400 shrink-0">
+                                  check
+                                </span>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void loadShortcutBrowserLevel(
+                                  activeModalBrowseScope,
+                                  folderItem.relativePath
+                                )
+                              }
+                              className="px-2 py-1 rounded-md bg-surface/80 hover:bg-surface border border-border-subtle text-[10px] font-bold text-fg-muted hover:text-fg flex items-center gap-0.5 cursor-pointer shrink-0"
+                              title="Abrir subpastas"
+                            >
+                              <span>Abrir</span>
+                              <span className="material-symbols-outlined text-[13px]">
+                                chevron_right
+                              </span>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Modo Opção B: Árvore Hierárquica Expansível */
+                <div className="max-h-56 overflow-y-auto p-1.5 bg-app border border-border-subtle rounded-xl space-y-0.5">
+                  {loadingPersonalFolders && !( '' in shortcutTreeChildren) ? (
+                    <div className="py-6 text-center text-xs text-fg-muted flex flex-col items-center gap-2">
+                      <span className="material-symbols-outlined animate-spin text-[20px] text-amber-400">
+                        sync
+                      </span>
+                      Carregando árvore de pastas...
+                    </div>
+                  ) : (
+                    (() => {
+                      const renderTreeNodes = (parentPath: string, depth: number): React.ReactNode => {
+                        if (depth > 10) return null;
+                        const nodes = shortcutTreeChildren[parentPath] || [];
+                        if (nodes.length === 0) {
+                          if (parentPath === '') {
+                            return (
+                              <div className="p-3 text-center text-xs text-fg-muted">
+                                Nenhuma pasta encontrada neste espaço.
+                              </div>
+                            );
+                          }
+                          return (
+                            <div
+                              style={{ paddingLeft: `${depth * 14 + 24}px` }}
+                              className="py-1 text-[10px] text-fg-muted italic"
+                            >
+                              (Sem subpastas)
+                            </div>
+                          );
+                        }
+                        return nodes.map((node) => {
+                          const isExpanded = expandedShortcutTreePaths.includes(node.relativePath);
+                          const activeSelectedPath = shortcutAllowTargetPick
+                            ? shortcutTargetFolder
+                            : selectedPersonalFolder;
+                          const isSelected = activeSelectedPath === node.relativePath;
+                          const isLoadingNode = loadingTreePath === node.relativePath;
+                          return (
+                            <div key={node.relativePath}>
+                              <div
+                                style={{ paddingLeft: `${depth * 14 + 4}px` }}
+                                className={`flex items-center gap-1 py-1 pr-2 rounded-lg text-xs transition-colors ${
+                                  isSelected
+                                    ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40'
+                                    : 'hover:bg-surface-hover text-fg border border-transparent'
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => void handleToggleShortcutTreeNode(node.relativePath)}
+                                  className="p-0.5 rounded hover:bg-white/10 text-fg-muted hover:text-fg cursor-pointer shrink-0"
+                                  title={isExpanded ? 'Recolher subpastas' : 'Expandir subpastas'}
+                                >
+                                  <span className="material-symbols-outlined text-[15px]">
+                                    {isLoadingNode
+                                      ? 'sync'
+                                      : isExpanded
+                                        ? 'expand_more'
+                                        : 'chevron_right'}
+                                  </span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (shortcutAllowTargetPick) {
+                                      setShortcutTargetFolder(node.relativePath);
+                                    } else {
+                                      setSelectedPersonalFolder(node.relativePath);
+                                      if (
+                                        !shortcutDisplayName ||
+                                        shortcutDisplayName.startsWith('Atalho - ')
+                                      ) {
+                                        setShortcutDisplayName(`Atalho - ${node.name}`);
+                                      }
+                                    }
+                                  }}
+                                  className="flex-1 text-left flex items-center gap-1.5 min-w-0 cursor-pointer"
+                                >
+                                  <span className="material-symbols-outlined text-[15px] text-amber-400 shrink-0">
+                                    {isExpanded ? 'folder_open' : 'folder'}
+                                  </span>
+                                  <span className="truncate">{node.name}</span>
+                                </button>
+                                {isSelected && (
+                                  <span className="material-symbols-outlined text-[15px] text-amber-400 shrink-0">
+                                    check
+                                  </span>
+                                )}
+                              </div>
+                              {isExpanded && renderTreeNodes(node.relativePath, depth + 1)}
+                            </div>
+                          );
+                        });
+                      };
+                      return (
+                        <>
+                          {shortcutAllowTargetPick && (
+                            <button
+                              type="button"
+                              onClick={() => setShortcutTargetFolder('')}
+                              className={`w-full mb-1 px-2 py-1 rounded-lg text-left text-xs flex items-center gap-1.5 cursor-pointer transition-colors ${
+                                shortcutTargetFolder === ''
+                                  ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40'
+                                  : 'hover:bg-surface-hover text-fg-muted border border-transparent'
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-[14px] text-amber-400">home</span>
+                              <span>Raiz do Cofre de Destino</span>
+                            </button>
+                          )}
+                          {renderTreeNodes('', 0)}
+                        </>
+                      );
+                    })()
+                  )}
+                </div>
+              )}
+
+              {(shortcutAllowTargetPick ? shortcutTargetFolder || '(Raiz)' : selectedPersonalFolder) && (
+                <p className="text-[11px] font-mono text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg px-2.5 py-1 truncate">
+                  {shortcutAllowTargetPick
+                    ? `Destino escolhido: ${shortcutTargetFolder || 'Raiz do cofre de destino'}`
+                    : `Selecionado: ${selectedPersonalFolder}`}
+                </p>
+              )}
+            </div>
+
+            {/* Nome do Atalho */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-fg-muted">
+                Nome do Atalho:
+              </label>
+              <input
+                type="text"
+                value={shortcutDisplayName}
+                onChange={(e) => setShortcutDisplayName(e.target.value)}
+                placeholder="Ex: Fotos - Show da Física"
+                className="w-full px-3 py-2 rounded-xl bg-app border border-border-subtle text-xs text-fg placeholder:text-fg-muted focus:outline-none focus:border-amber-400"
+              />
+            </div>
+
+            {/* Ações */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border-subtle">
+              <button
+                type="button"
+                onClick={() => setIsShortcutModalOpen(false)}
+                disabled={isCreatingShortcut}
+                className="px-3 py-1.5 rounded-xl border border-border-subtle hover:bg-surface-hover text-xs font-medium text-fg-muted hover:text-fg cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCreateShortcut}
+                disabled={isCreatingShortcut || !selectedPersonalFolder}
+                className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-all shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isCreatingShortcut && (
+                  <span className="material-symbols-outlined animate-spin text-[14px]">sync</span>
+                )}
+                <span>Criar Atalho</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Diálogo de Ação / Confirmação Interno da Plataforma */}
       <VaultActionDialog
         isOpen={actionDialog.isOpen}
@@ -3749,6 +5150,14 @@ export function UserVaultWorkspace({
         onCancel={() => setActionDialog((prev) => ({ ...prev, isOpen: false }))}
       />
     </div>
+  );
+
+  return selectedOrg ? (
+    <OrganizationBrandProvider orgSlug={selectedOrg.slug}>
+      {vaultContent}
+    </OrganizationBrandProvider>
+  ) : (
+    vaultContent
   );
 }
 

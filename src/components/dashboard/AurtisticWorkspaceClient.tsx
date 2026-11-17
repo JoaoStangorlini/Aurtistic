@@ -187,32 +187,29 @@ export default function AurtisticWorkspaceClient({
         </div>
       )}
 
-      {/* Workspace Header */}
-      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-black text-fg font-['Bukra'] tracking-tighter">
-              Aurtistic <span className="text-[var(--accent-secondary)] text-lg font-bold font-sans align-middle ml-2">creative manager</span>
-            </h1>
-          </div>
-          <p className="text-sm text-fg-muted mt-1.5">Seu espaço pessoal isolado e livre de distrações.</p>
+      {/* Workspace Header Compacto (Frente 2.7.1) */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl md:text-2xl font-black text-fg font-['Bukra'] tracking-tight">
+            Aurtistic <span className="text-[var(--accent-secondary)] text-xs md:text-sm font-bold font-sans align-middle ml-1.5 opacity-90">creative manager</span>
+          </h1>
         </div>
 
-        {/* Action buttons */}
-        <div className="flex gap-3" data-tour="workspace-actions">
+        {/* Action buttons compactos (M3 State Layers + 8px grid) */}
+        <div className="flex items-center gap-2" data-tour="workspace-actions">
           <button 
             onClick={handleShareSpace}
-            className="flex items-center gap-2 px-4 py-2 bg-surface border border-border-subtle hover:border-[var(--accent-primary)] text-fg rounded-lg text-sm font-bold transition-all cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 bg-surface border border-border-subtle hover:border-[var(--accent-primary)] hover:bg-surface-hover text-fg rounded-xl text-xs font-bold transition-all duration-200 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[18px] text-[var(--accent-primary)]">share</span>
-            Compartilhar Espaço
+            <span className="material-symbols-outlined text-[16px] text-[var(--accent-primary)]">share</span>
+            <span>Compartilhar</span>
           </button>
           <button 
             onClick={() => setShowConfig(!showConfig)}
-            className="flex items-center gap-2 px-4 py-2 bg-surface border border-border-subtle hover:border-[var(--accent-secondary)] text-fg rounded-lg text-sm font-bold transition-all cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 bg-surface border border-border-subtle hover:border-[var(--accent-secondary)] hover:bg-surface-hover text-fg rounded-xl text-xs font-bold transition-all duration-200 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[18px] text-[var(--accent-secondary)]">dashboard_customize</span>
-            {showConfig ? 'Fechar Editor' : 'Montar Espaço'}
+            <span className="material-symbols-outlined text-[16px] text-[var(--accent-secondary)]">dashboard_customize</span>
+            <span>{showConfig ? 'Fechar Editor' : 'Montar Espaço'}</span>
           </button>
         </div>
       </div>
@@ -333,66 +330,22 @@ export default function AurtisticWorkspaceClient({
         </div>
       )}
 
-      {/* Dynamic selector switcher (Tarefas / Eventos / Ambos) */}
-      {activeFeatures.includes('tasks') && (
-        <div className="flex justify-center mb-6 shrink-0" data-tour="workspace-mode-switcher">
-          <div className="inline-flex p-1 bg-surface border border-border-subtle rounded-full gap-1 shadow-sm">
-            <button 
-              onClick={() => setDisplayMode('tarefas')}
-              className={`px-5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
-                displayMode === 'tarefas' 
-                  ? 'bg-[var(--accent-primary)] text-[var(--on-accent-primary)] shadow-md' 
-                  : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[14px]">task_alt</span>
-              Tarefas
-            </button>
-            <button 
-              onClick={() => setDisplayMode('eventos')}
-              className={`px-5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
-                displayMode === 'eventos' 
-                  ? 'bg-[var(--accent-primary)] text-[var(--on-accent-primary)] shadow-md' 
-                  : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[14px]">event</span>
-              Eventos
-            </button>
-            <button 
-              onClick={() => setDisplayMode('ambos')}
-              className={`px-5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
-                displayMode === 'ambos' 
-                  ? 'bg-[var(--accent-primary)] text-[var(--on-accent-primary)] shadow-md' 
-                  : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[14px]">category</span>
-              Ambos
-            </button>
-          </div>
-        </div>
-      )}
-
-
       {/* Main Tasks Planner View */}
       {activeFeatures.includes('tasks') ? (
-        <div>
-          {/* Quick links block */}
-          {advancedSettings.show_quick_links !== false && (
-            <div className="mb-4">
+        <div className="space-y-4">
+          {/* Bento Grid M3 de Cuidados & Links Rápidos (8px grid) */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+            {advancedSettings.show_quick_links !== false && (
               <AurtisticQuickLinks initialLinks={profile?.quick_links || []} userId={userId} />
-            </div>
-          )}
+            )}
+            <SelfCareHub />
+          </div>
 
-          {/* Hub de Autocuidado Neurodivergente & Interocepção */}
-          <SelfCareHub />
-
-          
           <TasksView 
             initialTasks={getCurrentTasks()} 
             initialEvents={getCurrentEvents()}
             displayMode={displayMode}
+            onDisplayModeChange={setDisplayMode}
             initialColumns={columns} 
             isPersonalScope={false} 
             userId={userId}

@@ -142,7 +142,7 @@ export function OrganizationManagementView({
           <button
             type="button"
             onClick={() => setIsPlaybooksOpen(true)}
-            className="flex items-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-2 text-xs font-bold text-indigo-300 hover:bg-indigo-500/20 transition-colors shadow-sm"
+            className="flex items-center gap-1.5 rounded-xl border border-accent-primary/30 bg-accent-primary/10 px-3.5 py-2 text-xs font-bold text-accent-primary hover:bg-accent-primary/20 transition-colors shadow-sm"
           >
             <span className="material-symbols-outlined text-[16px]">menu_book</span>
             Roteiros

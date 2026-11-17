@@ -44,7 +44,7 @@ export function GlobalAudioDock() {
       aria-label="Reprodutor de Áudio Global Aurtistic"
       className="fixed bottom-20 md:bottom-4 left-1/2 -translate-x-1/2 z-[90] w-[95%] max-w-2xl transition-all duration-300 ease-out"
     >
-      <div className="bg-surface/95 backdrop-blur-xl border border-border-subtle hover:border-[#9D4EDD]/40 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.7)] p-3 md:p-4 text-fg">
+      <div className="bg-surface/95 backdrop-blur-xl border border-border-subtle hover:border-accent-primary/40 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.7)] p-3 md:p-4 text-fg">
         {/* Barra de Progresso Superior (Seekbar) */}
         <div className="relative w-full group mb-2">
           <input
@@ -160,7 +160,7 @@ export function GlobalAudioDock() {
                 value={isMuted ? 0 : volume}
                 onChange={(e) => setVolume(parseFloat(e.target.value))}
                 aria-label="Volume do áudio"
-                className="w-14 h-1 bg-surface-hover rounded-full appearance-none cursor-pointer accent-[#9D4EDD]"
+                className="w-14 h-1 bg-surface-hover rounded-full appearance-none cursor-pointer accent-[var(--accent-primary)]"
               />
             </div>
 
@@ -171,7 +171,7 @@ export function GlobalAudioDock() {
                 onClick={() => setDockExpanded(!isDockExpanded)}
                 className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
                   isDockExpanded
-                    ? 'text-[#9D4EDD] bg-[#9D4EDD]/10'
+                    ? 'text-accent-primary bg-accent-primary/10'
                     : 'text-fg-muted hover:text-fg hover:bg-surface-hover'
                 }`}
                 title="Ver lista de reprodução"
@@ -206,7 +206,7 @@ export function GlobalAudioDock() {
                   onClick={() => !isCurrent && playTrack(track)}
                   className={`flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer transition-colors ${
                     isCurrent
-                      ? 'bg-[#9D4EDD]/20 text-[#9D4EDD] font-bold'
+                      ? 'bg-accent-primary/20 text-accent-primary font-bold'
                       : 'hover:bg-surface-hover text-fg-secondary'
                   }`}
                 >

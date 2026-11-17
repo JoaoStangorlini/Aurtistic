@@ -199,7 +199,7 @@ export function OrganizationScopeToolbar({
         <button
           type="button"
           onClick={() => setIsCreateModalOpen(true)}
-          className="flex items-center gap-1.5 rounded-xl border border-indigo-500/40 bg-indigo-500/10 px-3 py-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors shadow-sm cursor-pointer"
+          className="flex items-center gap-1.5 rounded-xl border border-accent-primary/40 bg-accent-primary/10 px-3 py-1.5 text-xs font-bold text-accent-primary hover:bg-accent-primary/20 transition-colors shadow-sm cursor-pointer"
         >
           <span className="material-symbols-outlined text-[16px]">add_circle</span>
           Criar Organização

@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Organization, OrganizationSubteam } from '@/types/organizations';
+import { OrgLiveStageModerationPanel } from './OrgBastidoresModules';
 
 export type RequestItemType = 'pedido' | 'sugestao';
 export type RequestPriority = 'Baixa' | 'Média' | 'Alta' | 'Urgente';
@@ -45,8 +46,8 @@ export function OrganizationRequestsPanel({
   const [isLoaded, setIsLoaded] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
-  // Filtros
-  const [typeFilter, setTypeFilter] = useState<'all' | RequestItemType>('all');
+  // Filtros (M3 Chips: Ideias, Pedidos ou Converse com o Show)
+  const [activeHubMode, setActiveHubMode] = useState<'all' | 'sugestao' | 'pedido' | 'converse_show'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | RequestStatus>('all');
 
   // Formulário de Criação
@@ -155,43 +156,131 @@ export function OrganizationRequestsPanel({
 
   const filteredItems = useMemo(() => {
     return items.filter((it) => {
-      if (typeFilter !== 'all' && it.type !== typeFilter) return false;
+      if (activeHubMode === 'pedido' && it.type !== 'pedido') return false;
+      if (activeHubMode === 'sugestao' && it.type !== 'sugestao') return false;
       if (statusFilter !== 'all' && it.status !== statusFilter) return false;
       return true;
     });
-  }, [items, typeFilter, statusFilter]);
+  }, [items, activeHubMode, statusFilter]);
 
   if (!isLoaded) return null;
 
   return (
-    <div className="p-4 md:p-5 bg-surface border border-border-subtle rounded-2xl shadow-lg space-y-4">
-      {/* Cabeçalho */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-subtle pb-3">
-        <div className="flex items-center gap-2.5">
-          <span className="material-symbols-outlined text-[22px] text-amber-400">
-            forward_to_inbox
-          </span>
+    <div className="org-card p-4 md:p-6 bg-surface border border-border-subtle rounded-2xl shadow-lg space-y-5">
+      {/* Cabeçalho Unificado */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-subtle pb-4">
+        <div className="flex items-center gap-3">
+          <div
+            style={{
+              backgroundColor: 'color-mix(in srgb, var(--md-sys-color-tertiary) 15%, transparent)',
+              borderColor: 'color-mix(in srgb, var(--md-sys-color-tertiary) 35%, transparent)',
+            }}
+            className="w-10 h-10 rounded-xl border flex items-center justify-center shrink-0"
+          >
+            <span
+              style={{ color: 'var(--md-sys-color-tertiary)' }}
+              className="material-symbols-outlined text-[22px]"
+            >
+              forum
+            </span>
+          </div>
           <div>
-            <h3 className="text-sm font-bold text-fg uppercase tracking-wider font-['Bukra']">
-              Canal de Pedidos & Sugestões da Organização
+            <h3 className="text-sm font-bold text-fg uppercase tracking-wider">
+              Ideias, Pedidos & Converse com o Show
             </h3>
-            <p className="text-xs text-fg-secondary">
-              Espaço transparente para solicitar materiais, insumos, acessos e propor melhorias de processo.
+            <p className="text-xs text-fg-muted mt-0.5">
+              Compartilhe ideias, faça pedidos para a equipe e receba interações ao vivo do Converse com o Show.
             </p>
           </div>
         </div>
 
+        {activeHubMode !== 'converse_show' && (
+          <button
+            type="button"
+            onClick={() => setIsFormOpen((prev) => !prev)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--md-sys-color-secondary)] text-slate-950 font-black text-xs hover:brightness-110 active:scale-[0.98] transition-all shadow-sm self-start sm:self-auto cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[16px]">
+              {isFormOpen ? 'close' : 'add'}
+            </span>
+            <span>{isFormOpen ? 'Fechar' : 'Nova Ideia / Pedido'}</span>
+          </button>
+        )}
+      </div>
+
+      {/* Filter Chips M3 Unificados */}
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={() => setIsFormOpen((prev) => !prev)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs hover:bg-amber-400 transition-colors shadow-sm self-start sm:self-auto cursor-pointer"
+          onClick={() => setActiveHubMode('all')}
+          className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-[0.98] ${
+            activeHubMode === 'all'
+              ? 'bg-[var(--md-sys-color-primary)] text-slate-950 shadow-sm'
+              : 'bg-app border border-border-subtle text-fg-muted hover:text-fg'
+          }`}
         >
-          <span className="material-symbols-outlined text-[16px]">
-            {isFormOpen ? 'expand_less' : 'add'}
-          </span>
-          <span>{isFormOpen ? 'Fechar Formulário' : 'Novo Pedido ou Sugestão'}</span>
+          <span className="material-symbols-outlined text-[15px]">apps</span>
+          <span>Tudo ({items.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveHubMode('sugestao');
+            setDemandType('sugestao');
+          }}
+          className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-[0.98] ${
+            activeHubMode === 'sugestao'
+              ? 'bg-[var(--md-sys-color-primary)] text-slate-950 shadow-sm'
+              : 'bg-app border border-border-subtle text-fg-muted hover:text-fg'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[15px]">lightbulb</span>
+          <span>Ideias & Sugestões</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveHubMode('pedido');
+            setDemandType('pedido');
+          }}
+          className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-[0.98] ${
+            activeHubMode === 'pedido'
+              ? 'bg-[var(--md-sys-color-secondary)] text-slate-950 shadow-sm'
+              : 'bg-app border border-border-subtle text-fg-muted hover:text-fg'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[15px]">inventory_2</span>
+          <span>Pedidos & Oficina</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveHubMode('converse_show');
+            setIsFormOpen(false);
+          }}
+          style={
+            activeHubMode === 'converse_show'
+              ? { backgroundColor: 'var(--md-sys-color-tertiary)', color: '#ffffff' }
+              : { borderColor: 'color-mix(in srgb, var(--md-sys-color-tertiary) 45%, transparent)' }
+          }
+          className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer active:scale-[0.98] ${
+            activeHubMode === 'converse_show'
+              ? 'border-transparent shadow-sm'
+              : 'bg-app text-fg hover:brightness-110'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[15px]">sensors</span>
+          <span>Converse com o Show (Ao Vivo)</span>
         </button>
       </div>
+
+      {activeHubMode === 'converse_show' ? (
+        <OrgLiveStageModerationPanel orgSlug={organization.slug} />
+      ) : (
+        <>
 
       {/* Formulário de Envio */}
       {isFormOpen && (
@@ -214,13 +303,13 @@ export function OrganizationRequestsPanel({
             <button
               type="button"
               onClick={() => setDemandType('sugestao')}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+              className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
                 demandType === 'sugestao'
-                  ? 'bg-teal-500/20 border-teal-500/50 text-teal-300'
+                  ? 'bg-[var(--md-sys-color-primary)]/20 border-[var(--md-sys-color-primary)]/50 text-[var(--md-sys-color-primary)]'
                   : 'bg-surface border-border-subtle text-fg-muted'
               }`}
             >
-              💡 Sugestão (Melhoria de Processo, Ideias)
+              💡 Ideia / Sugestão
             </button>
           </div>
 
@@ -309,26 +398,8 @@ export function OrganizationRequestsPanel({
         </form>
       )}
 
-      {/* Filtros da Listagem */}
-      <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] font-bold text-fg-muted uppercase">Tipo:</span>
-          {(['all', 'pedido', 'sugestao'] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTypeFilter(t)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                typeFilter === t
-                  ? 'bg-surface text-white border border-border-subtle shadow-sm'
-                  : 'text-fg-muted hover:text-white'
-              }`}
-            >
-              {t === 'all' ? 'Todos' : t === 'pedido' ? '📦 Pedidos' : '💡 Sugestões'}
-            </button>
-          ))}
-        </div>
-
+      {/* Filtros de Status */}
+      <div className="flex items-center justify-end flex-wrap gap-2 pt-1">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] font-bold text-fg-muted uppercase">Status:</span>
           {(['all', 'Pendente', 'Em Análise', 'Aprovado / Atendido', 'Arquivado'] as const).map((st) => (
@@ -336,13 +407,13 @@ export function OrganizationRequestsPanel({
               key={st}
               type="button"
               onClick={() => setStatusFilter(st)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 statusFilter === st
-                  ? 'bg-surface text-white border border-border-subtle shadow-sm'
-                  : 'text-fg-muted hover:text-white'
+                  ? 'bg-surface text-fg border border-[var(--md-sys-color-primary)]/50 shadow-sm'
+                  : 'text-fg-muted hover:text-fg'
               }`}
             >
-              {st === 'all' ? 'Todos os Status' : st}
+              {st === 'all' ? 'Todos' : st}
             </button>
           ))}
         </div>
@@ -391,7 +462,7 @@ export function OrganizationRequestsPanel({
                       it.status === 'Aprovado / Atendido'
                         ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                         : it.status === 'Em Análise'
-                        ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                        ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/30'
                         : it.status === 'Arquivado'
                         ? 'bg-white/5 text-white/40 border border-white/10'
                         : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
@@ -480,6 +551,8 @@ export function OrganizationRequestsPanel({
           })
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }

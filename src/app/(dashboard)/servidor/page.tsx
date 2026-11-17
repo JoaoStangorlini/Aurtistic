@@ -8,11 +8,49 @@ import { UserVaultWorkspace } from '@/components/servidor/UserVaultWorkspace';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ServidorPage() {
+export default async function ServidorPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ org?: string; ticket?: string; embed?: string }>;
+}) {
+  const resolvedParams = searchParams ? await searchParams : {};
+  const queryOrg = resolvedParams?.org;
+  const queryTicket = resolvedParams?.ticket;
   const supabase = await createClient();
-  const {
+  let {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (!user && queryTicket) {
+    const secret = process.env.HUB_SSO_SECRET || process.env.EDGE_HMAC_SECRET;
+    if (secret) {
+      const { verifyHubSsoTicket } = await import('@/lib/hub-sso');
+      const verification = verifyHubSsoTicket(queryTicket, secret);
+      if (verification.valid && verification.payload) {
+        const sso = verification.payload;
+        const { data: foundUser } = await supabase
+          .from('user_profiles')
+          .select('id, username')
+          .eq('email', sso.email)
+          .maybeSingle();
+
+        const ssoUserId = foundUser?.id || sso.hubUserId || 'sso-guest';
+        user = {
+          id: ssoUserId,
+          email: sso.email,
+          user_metadata: {
+            full_name: sso.fullName,
+            username: sso.username,
+          },
+          app_metadata: {
+            role: sso.role === 'admin' ? 'admin' : 'member',
+          },
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
+        } as any;
+      }
+    }
+  }
 
   if (!user) {
     redirect('/login?next=/servidor');
@@ -91,12 +129,23 @@ export default async function ServidorPage() {
     };
   }
 
-  // Busca índice de arquivos do usuário
-  const { data: indexedFiles } = await supabase
-    .from('user_files_index')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false });
+  // Busca organizações das quais o usuário é membro para navegação no Cofre da Organização
+  const userOrgsRes = await getUserOrganizationsAction();
+  let rawOrgs = userOrgsRes.ok ? userOrgsRes.organizations || [] : [];
+
+  const memberOrgIds = (rawOrgs || [])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((o: any) => String(o?.id || ''))
+    .filter((id: string) => /^[0-9a-f-]{36}$/i.test(id));
+
+  // Busca índice de arquivos do usuário + itens/atalhos das organizações em que ele é membro (Ponto 9)
+  let filesQuery = supabase.from('user_files_index').select('*');
+  if (memberOrgIds.length > 0) {
+    filesQuery = filesQuery.or(`user_id.eq.${user.id},organization_id.in.(${memberOrgIds.join(',')})`);
+  } else {
+    filesQuery = filesQuery.eq('user_id', user.id);
+  }
+  const { data: indexedFiles } = await filesQuery.order('created_at', { ascending: false });
 
   // Busca links de compartilhamento do usuário
   const { data: shareLinks } = await supabase
@@ -112,16 +161,20 @@ export default async function ServidorPage() {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
-  // Busca organizações das quais o usuário é membro para navegação no Cofre da Organização
-  const userOrgsRes = await getUserOrganizationsAction();
-  let rawOrgs = userOrgsRes.ok ? userOrgsRes.organizations || [] : [];
-
-  // Busca perfil para obter nome/username amigável
+  // Busca perfil para obter nome/username amigável e avatar
   const { data: userProfileData } = await supabase
     .from('user_profiles')
-    .select('username')
+    .select('username, features_config')
     .eq('id', user.id)
     .maybeSingle();
+
+  const userAvatarUrl =
+    user.user_metadata?.avatar_url ||
+    user.user_metadata?.picture ||
+    (user.id === PRIMARY_ADMIN_UUID &&
+    userProfileData?.features_config?.advanced_settings?.sync_curriculum_photo !== false
+      ? '/perfil.jpeg'
+      : null);
 
   const userDisplayName =
     user.user_metadata?.full_name ||
@@ -165,8 +218,12 @@ export default async function ServidorPage() {
     boostReason: o.event_boost_reason || null,
   }));
 
+  const initialOrgId = queryOrg
+    ? (formattedOrgs.find((o: any) => o.id === queryOrg || o.slug === queryOrg)?.id || null)
+    : null;
+
   return (
-    <div className="min-h-full flex flex-col p-4 md:p-8 bg-app">
+    <div className="min-h-full flex flex-col bg-app">
       <UserVaultWorkspace
         profile={session.profile}
         isApprovedForStorage={session.isApprovedForStorage}
@@ -179,6 +236,8 @@ export default async function ServidorPage() {
         userTasks={userTasks || []}
         userOrganizations={formattedOrgs}
         userName={userDisplayName}
+        userAvatarUrl={userAvatarUrl}
+        initialOrgId={initialOrgId}
       />
     </div>
   );

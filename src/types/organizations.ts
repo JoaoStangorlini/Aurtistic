@@ -28,6 +28,7 @@ export interface Organization {
   storage_boost_bytes?: number | null;
   storage_boost_until?: string | null;
   storage_policy: 'admin_or_permitted' | 'open_to_members';
+  brand_config?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }

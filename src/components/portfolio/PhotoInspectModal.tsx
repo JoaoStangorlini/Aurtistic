@@ -204,7 +204,7 @@ export function PhotoInspectModal({
             title="Informações EXIF da Câmera (Tecla I)"
             className={`p-2 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold ${
               showExifPanel
-                ? 'bg-[#9D4EDD] text-white'
+                ? 'bg-accent-primary text-on-accent-primary'
                 : 'bg-surface text-fg-secondary hover:text-white'
             }`}
           >

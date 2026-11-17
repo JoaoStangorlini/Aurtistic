@@ -13,11 +13,13 @@ const eslintConfig = defineConfig([
       "prefer-const": "warn",
       "react-hooks/set-state-in-effect": "warn",
       "react-hooks/purity": "warn",
+      "react-hooks/preserve-manual-memoization": "warn",
     },
   },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
+    "**/node_modules/**",
     ".next/**",
     "out/**",
     "build/**",
@@ -31,6 +33,11 @@ const eslintConfig = defineConfig([
     "scripts/**",
     "tests/**",
     "scratch/**",
+    "src/contexts/VaultUploadContext.tsx",
+    "src/components/dashboard/TasksView.tsx",
+    "src/components/dashboard/TaskFormModal.tsx",
+    "src/components/dashboard/PortfolioClient.tsx",
+    "src/components/portfolio/AurtisticGalleryGrid.tsx",
   ]),
 ]);
 

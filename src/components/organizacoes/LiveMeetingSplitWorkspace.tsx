@@ -404,7 +404,7 @@ export function LiveMeetingSplitWorkspace({
           <div className="flex-1 flex flex-col p-4 overflow-hidden">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[18px] text-indigo-400">checklist</span>
+                <span className="material-symbols-outlined text-[18px] text-accent-primary">checklist</span>
                 Pauta da Reunião & Encaminhamentos
               </h2>
               <span className="text-xs text-slate-500">
@@ -472,12 +472,12 @@ export function LiveMeetingSplitWorkspace({
                 placeholder="Adicionar novo tópico à pauta..."
                 value={newAgendaTitle}
                 onChange={(e) => setNewAgendaTitle(e.target.value)}
-                className="flex-1 rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                className="flex-1 rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:border-accent-primary focus:outline-none"
               />
               <button
                 type="submit"
                 disabled={!newAgendaTitle.trim()}
-                className="flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 transition-colors disabled:opacity-50"
+                className="flex items-center gap-1 rounded-lg bg-accent-primary px-3 py-1.5 text-xs font-medium text-on-accent-primary hover:bg-accent-primary-hover transition-colors disabled:opacity-50"
               >
                 <span className="material-symbols-outlined text-[16px]">add</span>
                 Adicionar
@@ -510,13 +510,13 @@ export function LiveMeetingSplitWorkspace({
                 onClick={() => setActiveTab('process')}
                 className={`flex items-center gap-2 border-b-2 px-3 py-2 text-xs font-semibold transition-colors ${
                   activeTab === 'process'
-                    ? 'border-blue-500 text-blue-400 bg-blue-500/5'
+                    ? 'border-accent-primary text-accent-primary bg-accent-primary/5'
                     : 'border-transparent text-slate-400 hover:text-slate-200'
                 }`}
               >
                 <span className="material-symbols-outlined text-[16px]">group</span>
                 📋 Processo / Ata Coletiva
-                <span className="rounded-full bg-blue-500/10 px-1.5 py-0.2 text-[10px] text-blue-400">
+                <span className="rounded-full bg-accent-primary/10 px-1.5 py-0.2 text-[10px] text-accent-primary">
                   Equipe
                 </span>
               </button>
@@ -576,7 +576,7 @@ export function LiveMeetingSplitWorkspace({
               <div className="flex-1 flex flex-col">
                 <div className="mb-2 flex items-center justify-between text-xs text-slate-400">
                   <span className="flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[16px] text-blue-400">description</span>
+                    <span className="material-symbols-outlined text-[16px] text-accent-primary">description</span>
                     Decisões acordadas, prazos e notas oficiais para a Ata
                   </span>
                   <span className="text-[11px] text-slate-500">
@@ -587,7 +587,7 @@ export function LiveMeetingSplitWorkspace({
                   value={processNotes}
                   onChange={(e) => setProcessNotes(e.target.value)}
                   placeholder="Registre as deliberações oficiais, combinados e pontos acordados que devem constar na ata da equipe..."
-                  className="flex-1 resize-none rounded-lg border border-slate-800 bg-slate-950/80 p-3 text-xs leading-relaxed text-slate-200 placeholder-slate-600 focus:border-blue-500 focus:outline-none font-mono"
+                  className="flex-1 resize-none rounded-lg border border-slate-800 bg-slate-950/80 p-3 text-xs leading-relaxed text-slate-200 placeholder-slate-600 focus:border-accent-primary focus:outline-none font-mono"
                 />
               </div>
             )}

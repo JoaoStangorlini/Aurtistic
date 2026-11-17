@@ -129,9 +129,9 @@ export function CustomSelect({ name, value, options: initialOptions, onChange, t
                 }}
                 placeholder="Novo valor..."
                 autoFocus
-                className="flex-1 bg-app border border-border-subtle rounded px-3 py-1 text-sm text-fg focus:outline-none focus:border-[#9D4EDD]"
+                className="flex-1 bg-app border border-border-subtle rounded px-3 py-1 text-sm text-fg focus:outline-none focus:border-accent-primary"
               />
-              <button type="button" onClick={() => handleCustomSubmit()} className="bg-[var(--accent-primary)] text-white rounded px-3 py-1 text-sm font-bold hover:bg-[#8338C7]">
+              <button type="button" onClick={() => handleCustomSubmit()} className="bg-accent-primary text-on-accent-primary rounded px-3 py-1 text-sm font-bold hover:bg-accent-primary-hover">
                 OK
               </button>
             </div>

@@ -125,7 +125,7 @@ export function HubLinkCard({ hubConnection, userEmail }: HubLinkCardProps) {
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-bold text-white">{hubConnection.hub_full_name || hubConnection.hub_username}</p>
-                  <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-[#0F4780]/80 text-blue-200 border border-blue-400/30">
+                  <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-[#0F4780]/80 text-white border border-[#1F9FCF]/50">
                     {hubConnection.is_labdiv ? 'LabDiv' : 'HUB'}
                   </span>
                 </div>

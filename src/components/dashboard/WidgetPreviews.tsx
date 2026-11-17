@@ -16,8 +16,8 @@ export function WidgetTasksPreview({ tasks, config }: { tasks: any[], config: an
             <span className="material-symbols-outlined text-fg-secondary text-[18px]">expand_more</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className={`w-[24px] h-[24px] rounded-[4px] flex items-center justify-center text-[12px] font-bold text-[#121212] ${showEvents ? 'bg-[#FFCC00]' : 'bg-[#FFCC00]/20'} mr-1`}>E</div>
-            <div className={`w-[24px] h-[24px] rounded-[4px] flex items-center justify-center text-[12px] font-bold text-fg ${showTasks ? 'bg-[#9D4EDD]' : 'bg-[#9D4EDD]/20'} mr-2`}>T</div>
+            <div className={`w-[24px] h-[24px] rounded-[4px] flex items-center justify-center text-[12px] font-bold text-on-accent-secondary ${showEvents ? 'bg-accent-secondary' : 'bg-accent-secondary/20'} mr-1`}>E</div>
+            <div className={`w-[24px] h-[24px] rounded-[4px] flex items-center justify-center text-[12px] font-bold text-on-accent-primary ${showTasks ? 'bg-accent-primary' : 'bg-accent-primary/20'} mr-2`}>T</div>
             <button className="w-[32px] h-[32px] flex items-center justify-center text-fg hover:bg-white/10 rounded-full transition-colors">
               <span className="material-symbols-outlined text-[20px]">add</span>
             </button>
@@ -28,20 +28,20 @@ export function WidgetTasksPreview({ tasks, config }: { tasks: any[], config: an
         <div className="flex flex-col gap-2">
           <h4 className="text-fg font-bold text-[13px] mb-1">Sex., 7 de ago.</h4>
           {showTasks && (
-            <div className="bg-[#9D4EDD]/15 border border-[#9D4EDD]/30 rounded-[12px] px-3 py-2.5 flex items-center justify-between shadow-sm">
+            <div className="bg-accent-primary/15 border border-accent-primary/30 rounded-[12px] px-3 py-2.5 flex items-center justify-between shadow-sm">
                <span className="text-fg text-[13px] font-medium leading-tight truncate flex-1 mr-2">
                  Consulta no médico
                </span>
                <div className="flex items-center gap-2 flex-shrink-0">
-                 <span className="material-symbols-outlined text-[#FFCC00] text-[16px]">edit</span>
-                 <span className="bg-[#9D4EDD]/40 text-[#FFCC00] text-[10px] font-bold px-2 py-0.5 rounded">Hoje</span>
+                 <span className="material-symbols-outlined text-accent-secondary text-[16px]">edit</span>
+                 <span className="bg-accent-primary/40 text-accent-secondary text-[10px] font-bold px-2 py-0.5 rounded">Hoje</span>
                </div>
             </div>
           )}
           {showEvents && (
-            <div className="bg-[#FFCC00] rounded-[12px] px-3 py-2.5 flex flex-col shadow-sm">
-              <span className="text-[#121212] text-[13px] font-bold leading-tight mb-0.5">Aniversário do Jorge</span>
-              <span className="text-[#121212]/80 text-[11px] font-bold">19:30 - 23:00</span>
+            <div className="bg-accent-secondary rounded-[12px] px-3 py-2.5 flex flex-col shadow-sm">
+              <span className="text-on-accent-secondary text-[13px] font-bold leading-tight mb-0.5">Aniversário do Jorge</span>
+              <span className="text-on-accent-secondary/80 text-[11px] font-bold">19:30 - 23:00</span>
             </div>
           )}
         </div>
@@ -100,8 +100,8 @@ export function WidgetCalendarPreview({ config }: { config?: any }) {
 
         <div className="flex items-center gap-6">
           <div className={`w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] font-bold text-[#121212] cursor-pointer shadow ${showEvents ? 'bg-[#FFCC00]' : 'bg-[#FFCC00]/20'}`}>E</div>
-          <div className={`w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] font-bold text-fg cursor-pointer shadow ${showTasks ? 'bg-[#9D4EDD]' : 'bg-[#9D4EDD]/20'}`}>T</div>
-          <button className="w-7 h-7 rounded-full bg-[var(--accent-primary)] text-white flex items-center justify-center shadow shrink-0 cursor-pointer">
+          <div className={`w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] font-bold cursor-pointer shadow ${showTasks ? 'bg-accent-primary text-on-accent-primary' : 'bg-accent-primary/20 text-white'}`}>T</div>
+          <button className="w-7 h-7 rounded-full bg-accent-primary text-on-accent-primary flex items-center justify-center shadow shrink-0 cursor-pointer">
             <span className="material-symbols-outlined text-[18px]">add</span>
           </button>
         </div>
@@ -133,7 +133,7 @@ export function WidgetCalendarPreview({ config }: { config?: any }) {
               const isToday = d === currentDate.getDate();
               return (
                 <div key={d} className="bg-[#2A2A2C] rounded-[6px] flex flex-col items-center pt-1 pb-1 relative overflow-hidden h-[34px]">
-                  <span className={`text-[12px] font-bold ${isToday ? 'text-[#9D4EDD]' : 'text-fg-secondary'}`}>{d}</span>
+                  <span className={`text-[12px] font-bold ${isToday ? 'text-accent-primary' : 'text-fg-secondary'}`}>{d}</span>
                   <div className="flex flex-col gap-[2px] mt-auto w-[90%] items-center mb-[2px]">
                     {showEvents && hasEvent && (
                       <div className="bg-[#FFCC00] rounded-[3px] w-full h-[10px] flex items-center justify-center px-1">
@@ -141,7 +141,7 @@ export function WidgetCalendarPreview({ config }: { config?: any }) {
                       </div>
                     )}
                     {showTasks && hasTask && (
-                      <div className="bg-[#9D4EDD] rounded-[3px] w-full h-[10px] flex items-center justify-center px-1">
+                      <div className="bg-accent-primary rounded-[3px] w-full h-[10px] flex items-center justify-center px-1">
                         <span className="text-fg text-[7px] font-bold truncate leading-none">Tar...</span>
                       </div>
                     )}
@@ -184,7 +184,7 @@ export function WidgetCalendarPreview({ config }: { config?: any }) {
                       </div>
                     )}
                     {showTasks && hasTask && (
-                      <div className="bg-[#9D4EDD] rounded-[3px] w-full h-[10px] flex items-center justify-center px-1">
+                      <div className="bg-accent-primary rounded-[3px] w-full h-[10px] flex items-center justify-center px-1">
                         <span className="text-fg text-[7px] font-bold truncate leading-none">Tar...</span>
                       </div>
                     )}
@@ -227,7 +227,7 @@ export function WidgetCalendarPreview({ config }: { config?: any }) {
                       </div>
                     )}
                     {showTasks && hasTask && (
-                      <div className="bg-[#9D4EDD] rounded-[3px] w-full h-[10px] flex items-center justify-center px-1">
+                      <div className="bg-accent-primary rounded-[3px] w-full h-[10px] flex items-center justify-center px-1">
                         <span className="text-fg text-[7px] font-bold truncate leading-none">Tar...</span>
                       </div>
                     )}
@@ -256,8 +256,8 @@ export function WidgetWeeklyCalendarPreview({ config }: { config?: any }) {
         {/* Left side buttons: E (Top), T (Middle), + (Bottom) */}
         <div className="flex flex-col justify-between items-center mr-3 shrink-0 h-full py-1">
           <div className={`w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] font-bold text-[#121212] cursor-pointer shadow ${showEvents ? 'bg-[#FFCC00]' : 'bg-[#FFCC00]/20'}`}>E</div>
-          <div className={`w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] font-bold text-fg cursor-pointer shadow ${showTasks ? 'bg-[#9D4EDD]' : 'bg-[#9D4EDD]/20'}`}>T</div>
-          <button className="w-7 h-7 rounded-full flex items-center justify-center text-[#FFFFFF] bg-[#9D4EDD] shadow cursor-pointer">
+          <div className={`w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] font-bold cursor-pointer shadow ${showTasks ? 'bg-accent-primary text-on-accent-primary' : 'bg-accent-primary/20 text-white'}`}>T</div>
+          <button className="w-7 h-7 rounded-full flex items-center justify-center text-[#FFFFFF] bg-accent-primary shadow cursor-pointer">
             <span className="material-symbols-outlined text-[18px]">add</span>
           </button>
         </div>
@@ -284,7 +284,7 @@ export function WidgetWeeklyCalendarPreview({ config }: { config?: any }) {
                 return (
                   <div key={d} className="flex flex-col relative h-full w-full">
                     <span className="text-center text-fg-muted text-[10px] font-medium mb-0.5">{letter}</span>
-                    <span className={`text-[11px] text-center font-bold mb-1 ${d === 10 ? 'text-[#9D4EDD]' : 'text-fg-secondary'}`}>{d}</span>
+                    <span className={`text-[11px] text-center font-bold mb-1 ${d === 10 ? 'text-accent-primary' : 'text-fg-secondary'}`}>{d}</span>
                     
                     {splitType === '8h' ? (
                       <div className="flex-1 flex flex-col w-full h-full gap-[3px]">
@@ -297,7 +297,7 @@ export function WidgetWeeklyCalendarPreview({ config }: { config?: any }) {
                         </div>
                         <div className="bg-[#2A2A2C] rounded-[4px] flex-1 flex flex-col items-center justify-center w-full px-[1px]">
                           {showTasks && hasTaskAM && (
-                            <div className="bg-[#9D4EDD] rounded-[3px] w-full h-[11px] flex items-center justify-center px-[1px]">
+                            <div className="bg-accent-primary rounded-[3px] w-full h-[11px] flex items-center justify-center px-[1px]">
                               <span className="text-fg text-[6px] font-bold truncate leading-none">Tar...</span>
                             </div>
                           )}
@@ -319,7 +319,7 @@ export function WidgetWeeklyCalendarPreview({ config }: { config?: any }) {
                             </div>
                           )}
                           {showTasks && hasTaskAM && (
-                            <div className="bg-[#9D4EDD] rounded-[3px] w-full h-[11px] flex items-center justify-center px-[1px] mt-[1px]">
+                            <div className="bg-accent-primary rounded-[3px] w-full h-[11px] flex items-center justify-center px-[1px] mt-[1px]">
                               <span className="text-fg text-[6px] font-bold truncate leading-none">Tar...</span>
                             </div>
                           )}
@@ -331,7 +331,7 @@ export function WidgetWeeklyCalendarPreview({ config }: { config?: any }) {
                             </div>
                           )}
                           {showTasks && hasTaskPM && (
-                            <div className="bg-[#9D4EDD] rounded-[3px] w-full h-[11px] flex items-center justify-center px-[1px] mt-[1px]">
+                            <div className="bg-accent-primary rounded-[3px] w-full h-[11px] flex items-center justify-center px-[1px] mt-[1px]">
                               <span className="text-fg text-[6px] font-bold truncate leading-none">Tar...</span>
                             </div>
                           )}
@@ -346,7 +346,7 @@ export function WidgetWeeklyCalendarPreview({ config }: { config?: any }) {
                             </div>
                           )}
                           {showTasks && (hasTaskAM || hasTaskPM) && (
-                            <div className="bg-[#9D4EDD] rounded-[3px] w-full h-[11px] flex items-center justify-center px-[1px]">
+                            <div className="bg-accent-primary rounded-[3px] w-full h-[11px] flex items-center justify-center px-[1px]">
                               <span className="text-fg text-[6px] font-bold truncate leading-none">Tar...</span>
                             </div>
                           )}
@@ -359,7 +359,7 @@ export function WidgetWeeklyCalendarPreview({ config }: { config?: any }) {
             </div>
 
             {/* Divisor Roxo 1 */}
-            <div className="w-[2px] bg-[#9D4EDD] rounded-full my-1 mx-1.5 self-stretch shrink-0" />
+            <div className="w-[2px] bg-accent-primary rounded-full my-1 mx-1.5 self-stretch shrink-0" />
 
             {/* Semana 2 */}
             <div 
@@ -386,7 +386,7 @@ export function WidgetWeeklyCalendarPreview({ config }: { config?: any }) {
                       </div>
                       <div className="bg-[#2A2A2C] rounded-[4px] flex-1 flex flex-col items-center justify-center w-full px-[1px]">
                         {showTasks && hasTaskPM && (
-                          <div className="bg-[#9D4EDD] rounded-[3px] w-full h-[11px] flex items-center justify-center px-[1px]">
+                          <div className="bg-accent-primary rounded-[3px] w-full h-[11px] flex items-center justify-center px-[1px]">
                             <span className="text-fg text-[6px] font-bold truncate leading-none">Tar...</span>
                           </div>
                         )}
@@ -398,7 +398,7 @@ export function WidgetWeeklyCalendarPreview({ config }: { config?: any }) {
             </div>
 
             {/* Divisor Roxo 2 */}
-            <div className="w-[2px] bg-[#9D4EDD] rounded-full my-1 mx-1.5 self-stretch shrink-0" />
+            <div className="w-[2px] bg-accent-primary rounded-full my-1 mx-1.5 self-stretch shrink-0" />
 
             {/* Semana 3 */}
             <div 
@@ -425,7 +425,7 @@ export function WidgetWeeklyCalendarPreview({ config }: { config?: any }) {
                       </div>
                       <div className="bg-[#2A2A2C] rounded-[4px] flex-1 flex flex-col items-center justify-center w-full px-[1px]">
                         {showTasks && hasTaskPM && (
-                          <div className="bg-[#9D4EDD] rounded-[3px] w-full h-[11px] flex items-center justify-center px-[1px]">
+                          <div className="bg-accent-primary rounded-[3px] w-full h-[11px] flex items-center justify-center px-[1px]">
                             <span className="text-fg text-[6px] font-bold truncate leading-none">Tar...</span>
                           </div>
                         )}
@@ -469,8 +469,8 @@ export function WidgetGlobalPreview({ tasks, config }: { tasks?: any[]; config?:
 
         <div className="flex items-center gap-5">
           <div className={`w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] font-bold text-[#121212] cursor-pointer shadow ${showEvents ? 'bg-[#FFCC00]' : 'bg-[#FFCC00]/20'}`}>E</div>
-          <div className={`w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] font-bold text-fg cursor-pointer shadow ${showTasks ? 'bg-[#9D4EDD]' : 'bg-[#9D4EDD]/20'}`}>T</div>
-          <button className="w-7 h-7 rounded-full flex items-center justify-center text-[#FFFFFF] bg-[#9D4EDD] shadow cursor-pointer">
+          <div className={`w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] font-bold cursor-pointer shadow ${showTasks ? 'bg-accent-primary text-on-accent-primary' : 'bg-accent-primary/20 text-white'}`}>T</div>
+          <button className="w-7 h-7 rounded-full flex items-center justify-center text-[#FFFFFF] bg-accent-primary shadow cursor-pointer">
             <span className="material-symbols-outlined text-[18px]">add</span>
           </button>
         </div>
@@ -502,10 +502,10 @@ export function WidgetGlobalPreview({ tasks, config }: { tasks?: any[]; config?:
                   const hasT = d === 10 || d === 20 || d === 31;
                   return (
                     <div key={i} className="bg-[#2A2A2C] rounded flex flex-col items-center justify-between p-0.5 h-[18px]">
-                      <span className={`text-[8px] font-medium leading-none ${d === currentDate.getDate() ? 'text-[#9D4EDD] font-bold' : 'text-fg-secondary'}`}>{d}</span>
+                      <span className={`text-[8px] font-medium leading-none ${d === currentDate.getDate() ? 'text-accent-primary font-bold' : 'text-fg-secondary'}`}>{d}</span>
                       <div className="w-full flex gap-0.5">
                         {hasE && <div className="flex-1 bg-[#FFCC00] h-[2px] rounded-[1px]" />}
-                        {hasT && <div className="flex-1 bg-[#9D4EDD] h-[2px] rounded-[1px]" />}
+                        {hasT && <div className="flex-1 bg-accent-primary h-[2px] rounded-[1px]" />}
                       </div>
                     </div>
                   );
@@ -534,7 +534,7 @@ export function WidgetGlobalPreview({ tasks, config }: { tasks?: any[]; config?:
                       <span className="text-[8px] text-fg-secondary font-medium leading-none">{d}</span>
                       <div className="w-full flex gap-0.5">
                         {hasE && <div className="flex-1 bg-[#FFCC00] h-[2px] rounded-[1px]" />}
-                        {hasT && <div className="flex-1 bg-[#9D4EDD] h-[2px] rounded-[1px]" />}
+                        {hasT && <div className="flex-1 bg-accent-primary h-[2px] rounded-[1px]" />}
                       </div>
                     </div>
                   );
@@ -563,7 +563,7 @@ export function WidgetGlobalPreview({ tasks, config }: { tasks?: any[]; config?:
                       <span className="text-[8px] text-fg-secondary font-medium leading-none">{d}</span>
                       <div className="w-full flex gap-0.5">
                         {hasE && <div className="flex-1 bg-[#FFCC00] h-[2px] rounded-[1px]" />}
-                        {hasT && <div className="flex-1 bg-[#9D4EDD] h-[2px] rounded-[1px]" />}
+                        {hasT && <div className="flex-1 bg-accent-primary h-[2px] rounded-[1px]" />}
                       </div>
                     </div>
                   );
@@ -576,21 +576,21 @@ export function WidgetGlobalPreview({ tasks, config }: { tasks?: any[]; config?:
         {/* Top Right: Lista de Tarefas / Eventos com Rolagem Suave */}
         <div className="w-1/2 flex flex-col pl-1 overflow-hidden">
           <div className="flex flex-col gap-1.5 overflow-y-auto custom-scrollbar flex-1 pr-1">
-            <div className="bg-[#9D4EDD]/15 border border-[#9D4EDD]/30 rounded-lg p-1.5 flex items-center justify-between">
+            <div className="bg-accent-primary/15 border border-accent-primary/30 rounded-lg p-1.5 flex items-center justify-between">
               <span className="text-fg text-[10px] font-medium truncate flex-1 mr-1">Consulta médica</span>
-              <span className="bg-[#9D4EDD]/40 text-[#FFCC00] text-[8px] font-bold px-1 rounded">Hoje</span>
+              <span className="bg-accent-primary/40 text-accent-secondary text-[8px] font-bold px-1 rounded">Hoje</span>
             </div>
             <div className="bg-[#FFCC00] rounded-lg p-1.5 flex flex-col">
               <span className="text-[#121212] text-[10px] font-bold truncate">Aniversário Jorge</span>
               <span className="text-[#121212]/80 text-[8px] font-bold">19:30</span>
             </div>
-            <div className="bg-[#3B82F6]/15 border border-[#3B82F6]/30 rounded-lg p-1.5 flex items-center justify-between">
+            <div className="bg-accent-secondary/15 border border-accent-secondary/30 rounded-lg p-1.5 flex items-center justify-between">
               <span className="text-fg text-[10px] font-medium truncate flex-1 mr-1">Aula de math</span>
-              <span className="bg-[#3B82F6]/40 text-[#FFCC00] text-[8px] font-bold px-1 rounded">1d</span>
+              <span className="bg-accent-secondary/40 text-accent-secondary text-[8px] font-bold px-1 rounded">1d</span>
             </div>
-            <div className="bg-[#9D4EDD]/15 border border-[#9D4EDD]/30 rounded-lg p-1.5 flex items-center justify-between">
+            <div className="bg-accent-primary/15 border border-accent-primary/30 rounded-lg p-1.5 flex items-center justify-between">
               <span className="text-fg text-[10px] font-medium truncate flex-1 mr-1">Reunião de trabalho</span>
-              <span className="bg-[#9D4EDD]/40 text-[#FFCC00] text-[8px] font-bold px-1 rounded">2d</span>
+              <span className="bg-accent-primary/40 text-accent-secondary text-[8px] font-bold px-1 rounded">2d</span>
             </div>
           </div>
         </div>
@@ -616,7 +616,7 @@ export function WidgetGlobalPreview({ tasks, config }: { tasks?: any[]; config?:
               return (
                 <div key={d} className="flex flex-col items-center bg-[#2A2A2C] rounded-md p-1 flex-1 min-h-[90px]">
                   <span className="text-fg-muted text-[9px] font-medium mb-0.5">{letter}</span>
-                  <span className={`text-[11px] font-bold mb-1 ${d === 10 ? 'text-[#9D4EDD]' : 'text-fg-secondary'}`}>{d}</span>
+                  <span className={`text-[11px] font-bold mb-1 ${d === 10 ? 'text-accent-primary' : 'text-fg-secondary'}`}>{d}</span>
                   <div className="w-full flex-1 flex flex-col gap-1 justify-center">
                     <div className="bg-[#1C1C1E] rounded p-0.5 flex flex-col gap-0.5 min-h-[26px] justify-center">
                       {hasEvent && (
@@ -627,7 +627,7 @@ export function WidgetGlobalPreview({ tasks, config }: { tasks?: any[]; config?:
                     </div>
                     <div className="bg-[#1C1C1E] rounded p-0.5 flex flex-col gap-0.5 min-h-[26px] justify-center">
                       {hasTask && (
-                        <div className="bg-[#9D4EDD] rounded px-0.5 py-0.2">
+                        <div className="bg-accent-primary rounded px-0.5 py-0.2">
                           <span className="text-fg text-[6px] font-bold block truncate leading-none">Tar...</span>
                         </div>
                       )}
@@ -639,7 +639,7 @@ export function WidgetGlobalPreview({ tasks, config }: { tasks?: any[]; config?:
           </div>
 
           {/* Purple Divider 1 */}
-          <div className="w-[2px] bg-[#9D4EDD] rounded-full my-1 mx-1 self-stretch shrink-0" />
+          <div className="w-[2px] bg-accent-primary rounded-full my-1 mx-1 self-stretch shrink-0" />
 
           {/* Semana 2 */}
           <div 
@@ -666,7 +666,7 @@ export function WidgetGlobalPreview({ tasks, config }: { tasks?: any[]; config?:
                     </div>
                     <div className="bg-[#1C1C1E] rounded p-0.5 flex flex-col gap-0.5 min-h-[26px] justify-center">
                       {hasTask && (
-                        <div className="bg-[#9D4EDD] rounded px-0.5 py-0.2">
+                        <div className="bg-accent-primary rounded px-0.5 py-0.2">
                           <span className="text-fg text-[6px] font-bold block truncate leading-none">Tar...</span>
                         </div>
                       )}
@@ -678,7 +678,7 @@ export function WidgetGlobalPreview({ tasks, config }: { tasks?: any[]; config?:
           </div>
 
           {/* Purple Divider 2 */}
-          <div className="w-[2px] bg-[#9D4EDD] rounded-full my-1 mx-1 self-stretch shrink-0" />
+          <div className="w-[2px] bg-accent-primary rounded-full my-1 mx-1 self-stretch shrink-0" />
 
           {/* Semana 3 */}
           <div 
@@ -705,7 +705,7 @@ export function WidgetGlobalPreview({ tasks, config }: { tasks?: any[]; config?:
                     </div>
                     <div className="bg-[#1C1C1E] rounded p-0.5 flex flex-col gap-0.5 min-h-[26px] justify-center">
                       {hasTask && (
-                        <div className="bg-[#9D4EDD] rounded px-0.5 py-0.2">
+                        <div className="bg-accent-primary rounded px-0.5 py-0.2">
                           <span className="text-fg text-[6px] font-bold block truncate leading-none">Tar...</span>
                         </div>
                       )}

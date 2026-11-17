@@ -17,7 +17,14 @@ import { uploadTenantFileDirect } from '@/lib/edge-client';
 import {
   refreshTenantTicketAction,
   syncUserFileIndexAction,
+  checkBackupHashesAction,
+  recordBackupProxyMetadataAction,
 } from '@/app/(dashboard)/servidor/actions';
+import {
+  computeFileSha256,
+  hasProxySignatureMarker,
+} from '@/lib/proxy-signature';
+import { loadSmartBackupPreferences } from '@/components/galeria/SmartBackupSettingsModal';
 
 export interface QueuedUploadItem {
   id: string;
@@ -323,9 +330,34 @@ export function VaultUploadProvider({
     setQueue((prev) => prev.filter((it) => it.status !== 'success'));
   }, []);
 
-  // Loop de Upload Sequencial
+  // Loop de Upload Sequencial com Trava Wi-Fi e Proteção Anti-Loop
   const startUpload = useCallback(async () => {
     if (isUploading || queue.length === 0) return;
+
+    const backupPrefs = loadSmartBackupPreferences();
+    if (backupPrefs.wifiOnly && typeof navigator !== 'undefined') {
+      const capPlugin = (window as any).Capacitor?.Plugins?.SmartBackup;
+      if (capPlugin?.isUnmeteredWifi) {
+        try {
+          const wifiRes = await capPlugin.isUnmeteredWifi();
+          if (wifiRes && wifiRes.unmeteredWifi === false) {
+            alert('Sincronização pausada: conecte-se a uma rede Wi-Fi para enviar arquivos.');
+            return;
+          }
+        } catch {}
+      } else {
+        const conn = (navigator as any).connection;
+        if (
+          !navigator.onLine ||
+          conn?.saveData === true ||
+          (conn?.type && conn.type !== 'wifi' && conn.type !== 'ethernet')
+        ) {
+          alert('Sincronização pausada: trava "Somente Wi-Fi" ativa.');
+          return;
+        }
+      }
+    }
+
     setIsUploading(true);
     cancelRequestedRef.current = false;
     speedSampleRef.current = null;
@@ -349,6 +381,28 @@ export function VaultUploadProvider({
       const completedBytesBeforeThis = queue
         .slice(0, i)
         .reduce((acc, it) => acc + (it.status === 'success' ? it.file.size : 0), 0);
+
+      // Proteção Anti-Loop: ignora proxy comprimido local ou hash já conhecido
+      let itemSha256 = '';
+      try {
+        const isProxy = await hasProxySignatureMarker(currentItem.file);
+        if (isProxy) {
+          setQueue((prev) =>
+            prev.map((it, idx) => (idx === i ? { ...it, status: 'success', progressPercent: 100 } : it))
+          );
+          successCount++;
+          continue;
+        }
+        itemSha256 = await computeFileSha256(currentItem.file);
+        const hashRes = await checkBackupHashesAction([itemSha256]);
+        if (hashRes.ok && hashRes.knownHashes.includes(itemSha256)) {
+          setQueue((prev) =>
+            prev.map((it, idx) => (idx === i ? { ...it, status: 'success', progressPercent: 100 } : it))
+          );
+          successCount++;
+          continue;
+        }
+      } catch {}
 
       setQueue((prev) =>
         prev.map((it, idx) =>
@@ -458,6 +512,51 @@ export function VaultUploadProvider({
 
           if (typeof mutation.total_used_bytes === 'number') {
             lastUsedBytes = mutation.total_used_bytes;
+          }
+
+          // Registro de hash + execução da política pós-backup após ACK verificado
+          const verifiedSize = mutation.verifiedSizeBytes ?? currentItem.file.size;
+          const ackSha = mutation.sha256 || itemSha256;
+          if (mutation.item?.relativePath && ackSha && verifiedSize === currentItem.file.size) {
+            void recordBackupProxyMetadataAction({
+              relativePath: mutation.item.relativePath,
+              contentHash: ackSha,
+              originalSizeBytes: verifiedSize,
+              deviceSource: (window as any).Capacitor?.isNativePlatform?.() ? 'mobile_android' : 'web',
+            });
+
+            const capPlugin = (window as any).Capacitor?.Plugins?.SmartBackup;
+            const localUri = (currentItem as any).localUri as string | undefined;
+            if (capPlugin && localUri) {
+              if (backupPrefs.postBackupPolicy === 'delete_local' && capPlugin.deleteLocalFile) {
+                void capPlugin.deleteLocalFile({ uri: localUri });
+              } else if (
+                backupPrefs.postBackupPolicy === 'replace_compressed' &&
+                capPlugin.replaceWithCompressedProxy
+              ) {
+                void capPlugin
+                  .replaceWithCompressedProxy({
+                    uri: localUri,
+                    originalSha256: ackSha,
+                    originalSizeBytes: verifiedSize,
+                    maxEdgePx: backupPrefs.compressedMaxEdgePx,
+                    quality: Math.round(backupPrefs.compressedQuality * 100),
+                  })
+                  .then((proxyRes: any) => {
+                    if (proxyRes?.compressedProxyHash && mutation.item?.relativePath) {
+                      void recordBackupProxyMetadataAction({
+                        relativePath: mutation.item.relativePath,
+                        contentHash: ackSha,
+                        originalSizeBytes: verifiedSize,
+                        compressedProxyHash: proxyRes.compressedProxyHash,
+                        isLocalCompressedProxy: true,
+                        deviceSource: 'mobile_android',
+                      });
+                    }
+                  })
+                  .catch(() => {});
+              }
+            }
           }
 
           successCount++;

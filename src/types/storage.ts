@@ -48,6 +48,7 @@ export interface EdgeTenantTicketPayload {
   scopeType?: 'user' | 'org';
   organizationId?: string;
   orgSlug?: string;
+  allowedOrgSlugs?: string[];
   allowedPrefix?: string;
   allowedPaths?: string[];
   readOnly?: boolean;
@@ -103,14 +104,23 @@ export interface EdgeVaultEntry {
   streamUrl?: string;
   downloadUrl?: string;
   thumbUrl?: string | null;
+  isShortcut?: boolean;
+  shortcutType?: 'personal_folder' | 'org_folder' | 'virtual_file';
+  shortcutTarget?: string;
+  shortcutOwner?: string;
+  targetUserId?: string;
+  targetOrgId?: string;
+  targetOrgSlug?: string;
 }
 
 export interface EdgeMutationResponse {
   success: boolean;
-  action: 'upsert' | 'delete' | 'rename' | 'move';
+  action: 'upsert' | 'delete' | 'rename' | 'move' | 'dedup_skip' | 'protected_original_skip';
   item: EdgeVaultEntry;
   old_relative_path?: string;
   total_used_bytes?: number;
+  verifiedSizeBytes?: number;
+  sha256?: string;
 }
 
 export interface EdgeTrashItem {
@@ -164,9 +174,45 @@ export interface UserFileIndexRow {
   display_order: number;
   created_at: string;
   updated_at: string;
+  captured_at?: string | null;
+  content_hash?: string | null;
+  original_size_bytes?: number | null;
+  compressed_proxy_hash?: string | null;
+  is_local_compressed_proxy?: boolean;
+  device_source?: string | null;
   signedThumbUrl?: string;
   signedStreamUrl?: string;
   itemTicket?: string;
+}
+
+export type PostBackupStoragePolicy = 'keep_original' | 'delete_local' | 'replace_compressed';
+
+export interface SmartBackupPreferences {
+  wifiOnly: boolean;
+  backgroundSyncEnabled: boolean;
+  postBackupPolicy: PostBackupStoragePolicy;
+  compressedMaxEdgePx: number;
+  compressedQuality: number;
+}
+
+export interface GalleryTimelineCursor {
+  capturedAt: string;
+  id: string;
+}
+
+export interface GalleryTimelineItem {
+  id: string;
+  relative_path: string;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  captured_at: string;
+  is_favorite: boolean;
+  album: string;
+  device_source?: string | null;
+  show_in_portfolio: boolean;
+  signedThumbUrl: string;
+  signedStreamUrl: string;
 }
 
 export interface ShareLinkRow {

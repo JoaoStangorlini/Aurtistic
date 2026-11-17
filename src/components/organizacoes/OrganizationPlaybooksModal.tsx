@@ -159,7 +159,7 @@ export function OrganizationPlaybooksModal({
                   onChange={(e) => setNewSubteamId(e.target.value)}
                   className="w-full bg-app border border-border-subtle rounded-xl px-3.5 py-2 text-xs text-fg outline-none focus:border-[var(--accent-secondary)]"
                 >
-                  <option value="">Selecione a categoria (Programação, Comunicação, Pesquisa, Administração)...</option>
+                  <option value="">Selecione a equipe...</option>
                   {subteams.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}

@@ -54,7 +54,7 @@ const getIconColor = (kind: EdgeVaultEntry['kind']) => {
     case 'image':
       return 'text-amber-400';
     case 'audio':
-      return 'text-purple-400';
+      return 'text-accent-primary';
     case 'video':
       return 'text-red-400';
     case 'note':
@@ -284,6 +284,12 @@ export function VaultIdeTreeSidebar({
   const [isRootExpanded, setIsRootExpanded] = useState(true);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [treeData, setTreeData] = useState<Record<string, DirectoryNodeData>>({});
+
+  // Limpa cache da árvore quando o ticket/escopo muda (Pessoal ↔ Organização)
+  useEffect(() => {
+    setTreeData({});
+    setExpandedFolders(new Set());
+  }, [ticket]);
 
   // Sincroniza dados da raiz quando props mudam na raiz
   useEffect(() => {

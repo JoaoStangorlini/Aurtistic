@@ -5,7 +5,11 @@ import { getUserProfile } from '@/app/(dashboard)/actions';
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import PortfolioClient from '@/components/dashboard/PortfolioClient';
-import { attachSignedPublicMediaUrls, getEdgeStorageServerUrl } from '@/lib/edge-ticket';
+import {
+  attachSignedPublicMediaUrls,
+  getEdgeStorageServerUrl,
+  signPressClippingsMediaUrls,
+} from '@/lib/edge-ticket';
 import { ensurePortfolioCatalogLoaded } from '@/lib/portfolio-catalog';
 import type { UserFileIndexRow } from '@/types';
 
@@ -21,7 +25,8 @@ export default async function PortfolioPage() {
     redirect('/login');
   }
 
-  const profile = await getUserProfile();
+  const rawProfile = await getUserProfile();
+  const profile = signPressClippingsMediaUrls(rawProfile, user.id);
 
   // Busca acervo de fotos do usuário (auto-inicializa as 2.012 fotos se for o Admin e estiver vazio)
   const rawPhotos = await ensurePortfolioCatalogLoaded(supabase, user.id, {

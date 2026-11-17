@@ -26,7 +26,8 @@ import TaskCalendar from './TaskCalendar';
 import { useSearchParams, usePathname } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { updateTaskOrders, saveTaskColumn, updateEvent, createEvent } from '@/app/(dashboard)/actions';
-import { saveTask, deleteMultipleTasks, updateMultipleTasks } from '@/lib/offlineActions';
+import { saveTask, deleteMultipleTasks, updateMultipleTasks, toggleSubtaskCompletion } from '@/lib/offlineActions';
+import { TaskDelegationBadges } from './TaskDelegationBadges';
 import { Preferences } from '@capacitor/preferences';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -38,9 +39,14 @@ import { downloadCSV } from '@/utils/csv';
 export interface WidgetPluginPlugin {
   updateWidget(): Promise<void>;
 }
-export const WidgetPlugin = Capacitor.isPluginAvailable('WidgetPlugin')
-  ? ((Capacitor as any).Plugins.WidgetPlugin as WidgetPluginPlugin)
-  : registerPlugin<WidgetPluginPlugin>('WidgetPlugin');
+const globalForWidget = globalThis as unknown as {
+  __aurtisticWidgetPlugin?: WidgetPluginPlugin;
+};
+export const WidgetPlugin: WidgetPluginPlugin =
+  globalForWidget.__aurtisticWidgetPlugin ??
+  (globalForWidget.__aurtisticWidgetPlugin = Capacitor.isPluginAvailable('WidgetPlugin')
+    ? (Capacitor as unknown as { Plugins: { WidgetPlugin: WidgetPluginPlugin } }).Plugins.WidgetPlugin
+    : registerPlugin<WidgetPluginPlugin>('WidgetPlugin'));
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return '-';
@@ -85,13 +91,13 @@ function getPriorityWeight(p: string | null) {
 const HighlightedText = ({ text, highlight }: { text: string | null, highlight: string }) => {
   if (!text) return null;
   if (!highlight.trim()) return <>{text}</>;
-  
+
   const parts = text.split(new RegExp(`(${highlight})`, 'gi'));
   return (
     <>
-      {parts.map((part, index) => 
+      {parts.map((part, index) =>
         part.toLowerCase() === highlight.toLowerCase() ? (
-          <span key={index} className="bg-purple-500/50 text-white rounded-sm px-0.5">{part}</span>
+          <span key={index} className="bg-accent-primary/50 text-on-accent-primary rounded-sm px-0.5">{part}</span>
         ) : (
           part
         )
@@ -103,7 +109,8 @@ const HighlightedText = ({ text, highlight }: { text: string | null, highlight: 
 export function TasksView({
   initialTasks: rawInitialTasks,
   initialEvents = [],
-  displayMode = 'tarefas',
+  displayMode: propDisplayMode = 'tarefas',
+  onDisplayModeChange,
   initialColumns = [],
   isPersonalScope = false,
   userId,
@@ -117,6 +124,7 @@ export function TasksView({
   initialTasks: Task[];
   initialEvents?: AgendaEvent[];
   displayMode?: 'tarefas' | 'eventos' | 'ambos';
+  onDisplayModeChange?: (mode: 'tarefas' | 'eventos' | 'ambos') => void;
   initialColumns?: TaskColumn[];
   isPersonalScope?: boolean;
   userId?: string;
@@ -127,14 +135,21 @@ export function TasksView({
   initialOrganizations?: any[];
   showUnassignedBanner?: boolean;
 }) {
+  const [internalDisplayMode, setInternalDisplayMode] = useState<'tarefas' | 'eventos' | 'ambos'>(propDisplayMode);
+  const displayMode = onDisplayModeChange ? propDisplayMode : internalDisplayMode;
+  const setDisplayMode = (m: 'tarefas' | 'eventos' | 'ambos') => {
+    setInternalDisplayMode(m);
+    onDisplayModeChange?.(m);
+  };
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const enableSubtasks = advancedSettings.enable_subtasks !== false;
   const enableAdminFilters = advancedSettings.enable_admin_filters !== false;
 
   const searchParams = useSearchParams();
   const globalQuery = searchParams.get('q') || '';
-  
+
   const [columns, setColumns] = useState<TaskColumn[]>(initialColumns);
-  
+
   const getColColor = (key: string, val: string | null | undefined) => {
     const col = columns.find(c => c.key === key);
     if (!col || !col.options) return undefined;
@@ -153,7 +168,7 @@ export function TasksView({
       setViewMode(advancedSettings.default_view_mode || 'list');
     }
   }, [displayMode, advancedSettings.default_view_mode]);
-    const [calendarCurrentDate, setCalendarCurrentDate] = useState(new Date());
+  const [calendarCurrentDate, setCalendarCurrentDate] = useState(new Date());
 
   const [organizations, setOrganizations] = useState<any[]>(initialOrganizations || []);
   const [activeOrgId, setActiveOrgId] = useState<string | null>(
@@ -199,7 +214,7 @@ export function TasksView({
     if ((activeScope === 'organization' || activeScope === 'all') && activeOrgId) {
       getOrganizationDetailsAction(activeOrgId).then(res => {
         if (res.ok && res.organization) {
-          setActiveOrgDetails(res.organization);
+          setActiveOrgDetails(res);
         }
       });
       getOrganizationMeetingsAction(activeOrgId).then(res => {
@@ -209,26 +224,50 @@ export function TasksView({
       });
     }
   }, [activeScope, activeOrgId]);
-  
+
   // Normalizar os dados que vêm do banco (migração temporária na UI)
-  const initialTasks = useMemo(() => 
-    rawInitialTasks.map(t => 
-      t.dimensao && t.dimensao.toLowerCase() === 'pessoal' 
-        ? { ...t, dimensao: 'urgente' } 
+  const initialTasks = useMemo(() =>
+    rawInitialTasks.map(t =>
+      t.dimensao && t.dimensao.toLowerCase() === 'pessoal'
+        ? { ...t, dimensao: 'urgente' }
         : t
-    ), 
-  [rawInitialTasks]);
-  
+    ),
+    [rawInitialTasks]);
+
   const [localTasks, setLocalTasks] = useState(initialTasks);
+
+  const handleToggleSubtaskQuick = async (subtaskId: string, completed: boolean) => {
+    const prev = localTasks;
+    const primary = (advancedSettings?.completion_statuses?.[0] || 'completa') as string;
+    setLocalTasks(curr => curr.map(t => t.id === subtaskId
+      ? { ...t, status: completed ? primary : 'não iniciada', concluida_em: completed ? new Date().toISOString() : null }
+      : t));
+    try {
+      await toggleSubtaskCompletion(subtaskId, completed);
+    } catch (err) {
+      setLocalTasks(prev);
+      alert('Erro ao atualizar subtarefa: ' + String(err));
+    }
+  };
   const [localEvents, setLocalEvents] = useState(initialEvents);
   const [isDailyFollowup, setIsDailyFollowup] = useState(advancedSettings.start_in_daily_followup || false);
 
 
-  const [visibleExtraCols, setVisibleExtraCols] = useState<string[]>(userId === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e' ? ['responsavel', 'concluida_em', 'frequencia'] : []);
-  
+  const STORAGE_COLS_V7_KEY = 'aurtistic_visible_columns_v7';
+  const DEFAULT_ESSENTIAL_EXTRA_COLS = ['responsavel'];
+
+  const [visibleExtraCols, setVisibleExtraCols] = useState<string[]>(DEFAULT_ESSENTIAL_EXTRA_COLS);
+
   useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_COLS_V7_KEY);
+      if (stored) {
+        setVisibleExtraCols(JSON.parse(stored));
+        return;
+      }
+    } catch { }
     import('@capacitor/preferences').then(({ Preferences }) => {
-      Preferences.get({ key: 'visibleExtraCols' }).then(res => {
+      Preferences.get({ key: STORAGE_COLS_V7_KEY }).then(res => {
         if (res.value) setVisibleExtraCols(JSON.parse(res.value));
       });
     });
@@ -237,8 +276,21 @@ export function TasksView({
   const toggleExtraCol = (col: string) => {
     const newCols = visibleExtraCols.includes(col) ? visibleExtraCols.filter(c => c !== col) : [...visibleExtraCols, col];
     setVisibleExtraCols(newCols);
+    try {
+      localStorage.setItem(STORAGE_COLS_V7_KEY, JSON.stringify(newCols));
+    } catch { }
     import('@capacitor/preferences').then(({ Preferences }) => {
-      Preferences.set({ key: 'visibleExtraCols', value: JSON.stringify(newCols) });
+      Preferences.set({ key: STORAGE_COLS_V7_KEY, value: JSON.stringify(newCols) });
+    });
+  };
+
+  const resetToEssentialColumns = () => {
+    setVisibleExtraCols(DEFAULT_ESSENTIAL_EXTRA_COLS);
+    try {
+      localStorage.setItem(STORAGE_COLS_V7_KEY, JSON.stringify(DEFAULT_ESSENTIAL_EXTRA_COLS));
+    } catch { }
+    import('@capacitor/preferences').then(({ Preferences }) => {
+      Preferences.set({ key: STORAGE_COLS_V7_KEY, value: JSON.stringify(DEFAULT_ESSENTIAL_EXTRA_COLS) });
     });
   };
 
@@ -250,10 +302,10 @@ export function TasksView({
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const [expandedTasks, setExpandedTasks] = useState<string[]>([]);
-  
+
   const toggleTaskExpansion = (taskId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setExpandedTasks(prev => 
+    setExpandedTasks(prev =>
       prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
     );
   };
@@ -264,14 +316,14 @@ export function TasksView({
   };
   const [isBulkEditModalOpen, setIsBulkEditModalOpen] = useState(false);
   const [editingColumn, setEditingColumn] = useState<TaskColumn | null>(null);
-  
+
   useEffect(() => {
     const syncOffline = async () => {
       if (window.navigator.onLine) {
         // We are online. The initialTasks from server are fresh.
         setLocalTasks(initialTasks);
         await saveTasksToCache(initialTasks);
-        
+
         // Check if we have pending mutations
         const mutations = await getMutations();
         if (mutations.length > 0) {
@@ -321,7 +373,7 @@ export function TasksView({
           value: JSON.stringify(localEvents)
         });
         if (Capacitor.isNativePlatform()) {
-          try { await WidgetPlugin.updateWidget(); } catch (err) {}
+          try { await WidgetPlugin.updateWidget(); } catch (err) { }
         }
       } catch (e) {
         console.warn('Erro ao salvar eventos no widget:', e);
@@ -340,16 +392,16 @@ export function TasksView({
         let hiddenStatuses = ['completa', 'descartada', 'concluída'];
         let sortOrder = 'recentes';
         let hiddenTaskIds: string[] = [];
-        
+
         const safeParse = (str: string | null, fallback: any) => {
           if (!str) return fallback;
           try { return JSON.parse(str); } catch (e) { return fallback; }
         };
-        
+
         try {
           const { value: hiddenStatsVal } = await Preferences.get({ key: 'widget_hidden_statuses' });
           if (hiddenStatsVal) hiddenStatuses = safeParse(hiddenStatsVal, []);
-          
+
           const { value: sortOrderVal } = await Preferences.get({ key: 'widget_sort_order' });
           if (sortOrderVal) sortOrder = sortOrderVal;
 
@@ -357,8 +409,8 @@ export function TasksView({
           if (hiddenIdsVal) hiddenTaskIds = safeParse(hiddenIdsVal, []);
         } catch (e) { console.warn('Erro ao ler prefs do widget em TasksView', e); }
 
-        let filteredTasks = localTasks.filter(t => 
-          !hiddenStatuses.includes(t.status || 'não iniciada') && 
+        let filteredTasks = localTasks.filter(t =>
+          !hiddenStatuses.includes(t.status || 'não iniciada') &&
           !hiddenTaskIds.includes(t.id)
         );
 
@@ -390,7 +442,7 @@ export function TasksView({
           key: 'favorite_tasks',
           value: JSON.stringify(widgetTasks)
         });
-        
+
         // Extract and save unique dimensions for the widget filter
         const dims = Array.from(new Set(localTasks.map(t => t.dimensao).filter(Boolean)));
         await Preferences.set({
@@ -415,7 +467,7 @@ export function TasksView({
           key: 'status_colors',
           value: JSON.stringify(statusColors)
         });
-        
+
         if (Capacitor.isNativePlatform()) {
           try { await WidgetPlugin.updateWidget(); } catch (err) { console.warn('Widget update failed', err); }
         }
@@ -446,10 +498,10 @@ export function TasksView({
           if (updates.length > 0) {
             console.log("Processando fila do widget", updates);
             await Preferences.set({ key: 'pending_widget_updates', value: '[]' });
-            
+
             let newTasks = [...localTasks];
             let modified = false;
-            
+
             for (const update of updates) {
               if (update.action === 'create') {
                 const { taskId, taskName, taskDimension } = update;
@@ -524,7 +576,7 @@ export function TasksView({
 
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [isUpdatingOrder, setIsUpdatingOrder] = useState(false);
-  
+
   const [history, setHistory] = useState<Task[][]>([]);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [dropPosition, setDropPosition] = useState<'top' | 'bottom'>('top');
@@ -611,14 +663,14 @@ export function TasksView({
     if (!task) return;
 
     const newValue = !task.is_favorite;
-    
+
     // Find children to cascade the favorite status
     const children = localTasks.filter(t => t.parent_id === taskId);
     const taskIdsToUpdate = [taskId, ...children.map(c => c.id)];
 
     const updatedTasks = localTasks.map(t => taskIdsToUpdate.includes(t.id) ? { ...t, is_favorite: newValue } : t);
     setLocalTasks(updatedTasks);
-    
+
     try {
       for (const id of taskIdsToUpdate) {
         const t = localTasks.find(x => x.id === id);
@@ -709,7 +761,7 @@ export function TasksView({
     }
 
     setLocalTasks(updatedTasks);
-    
+
     try {
       if (isBulkEdit) {
         await updateMultipleTasks(taskIdsToUpdate, { [field]: newValue });
@@ -747,10 +799,10 @@ export function TasksView({
 
   // Filters State
   const [localSearchTerm, setLocalSearchTerm] = useState('');
-  
+
   // Se a Navbar global mandar ?q=... nós usamos ela. Senão a local.
   const searchTerm = globalQuery || localSearchTerm;
-  
+
   type SortOption = 'status' | 'status_inv' | 'prazo' | 'categoria' | 'prioridade_desc' | 'prioridade_asc' | 'manual' | string;
   const [sortBy, setSortBy] = useState<SortOption>('status');
 
@@ -820,26 +872,52 @@ export function TasksView({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Global Keybinds (Escape and Ctrl+Z)
+  // Global Keybinds (Escape, Delete, Ctrl+Z, e atalhos rápidos N / com guarda estrita)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Do not trigger if any modal is open
-      if (isModalOpen || isBulkEditModalOpen) return;
-      
+      // Guarda estrita: Ignora se qualquer modal estiver aberto
+      if (isModalOpen || isEventModalOpen || isBulkEditModalOpen || isImportModalOpen) return;
+
+      const target = e.target as HTMLElement | null;
+      const activeEl = document.activeElement as HTMLElement | null;
+      const isInputFocused =
+        (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) ||
+        (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT' || activeEl.isContentEditable));
+
       if (e.key === 'Escape') {
         setSelectedTasks(new Set());
         setLastSelectedTaskId(null);
+        return;
       }
+
+      // Atalhos N e / (Apenas quando não houver modificador ctrl/meta/alt e foco em campo de texto)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !isInputFocused) {
+        if (e.key === 'n' || e.key === 'N') {
+          e.preventDefault();
+          handleNew();
+          return;
+        }
+        if (e.key === '/') {
+          e.preventDefault();
+          if (searchInputRef.current) {
+            searchInputRef.current.focus();
+          } else {
+            const navSearch = document.querySelector('input[type="search"], input[placeholder*="Buscar"], input[placeholder*="buscar"]') as HTMLInputElement | null;
+            navSearch?.focus();
+          }
+          return;
+        }
+      }
+
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        const target = e.target as HTMLElement;
-        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+        if (isInputFocused) return;
         if (selectedTasks.size > 0) {
           const taskIds = Array.from(selectedTasks);
-          
+
           if (advancedSettings?.soft_delete_to_discarded) {
             const tasksToDelete = localTasks.filter(t => taskIds.includes(t.id));
             const allDiscarded = tasksToDelete.every(t => t.status?.toLowerCase() === 'descartada');
-            
+
             if (!allDiscarded) {
               updateMultipleTasks(taskIds, { status: 'descartada' }).then(() => {
                 setLocalTasks(prev => prev.map(t => taskIds.includes(t.id) ? { ...t, status: 'descartada' } : t));
@@ -863,22 +941,24 @@ export function TasksView({
           if (prev.length === 0) return prev;
           const prevTasks = prev[prev.length - 1];
           setLocalTasks(prevTasks);
-          
+
           // Sync with Supabase asynchronously using Server Action
           updateTaskOrders(prevTasks.map(t => ({ id: t.id, ordem_manual: t.ordem_manual || 0 })))
             .catch(err => alert("Erro ao desfazer ordem: " + err.message));
-          
+
           return prev.slice(0, -1);
         });
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isModalOpen, isBulkEditModalOpen, selectedTasks, localTasks, advancedSettings]);
+  }, [isModalOpen, isEventModalOpen, isBulkEditModalOpen, isImportModalOpen, selectedTasks, localTasks, advancedSettings]);
 
   const handleEdit = (task: Task) => {
     // Inject subtasks if this is a parent task
-    const subtasks = localTasks.filter(t => t.parent_id === task.id);
+    const subtasks = localTasks
+      .filter(t => t.parent_id === task.id)
+      .sort((a, b) => (a.ordem_manual || 0) - (b.ordem_manual || 0));
     setTaskToEdit({ ...task, subtasks } as any);
     setIsModalOpen(true);
   };
@@ -978,19 +1058,23 @@ export function TasksView({
 
   const handleNew = () => {
     let newTask: any = { id: crypto.randomUUID(), status: 'não iniciada', prioridade: 'Baixa', categoria: 'Programar' };
-    
+
     if (selectedDimensions.length === 1 && selectedDimensions[0] !== 'favoritas') {
       newTask.dimensao = selectedDimensions[0];
     }
     if (isPersonalScope) {
       newTask.is_personal = true;
     }
-    
+
     setTaskToEdit(newTask);
     setIsModalOpen(true);
   };
 
+  const isCreatingDraftRef = useRef(false);
+
   const handleNewDraftTask = async () => {
+    if (isCreatingDraftRef.current) return;
+    isCreatingDraftRef.current = true;
     const newTask: any = {
       id: crypto.randomUUID(),
       nome: 'Novo Rascunho de Tarefa',
@@ -1000,15 +1084,19 @@ export function TasksView({
       dimensao: selectedDimensions.length === 1 && selectedDimensions[0] !== 'favoritas' ? selectedDimensions[0] : 'Rascunho',
       is_personal: isPersonalScope
     };
-    setLocalTasks(prev => [newTask, ...prev]);
+    setLocalTasks(prev => (prev.some(t => t.id === newTask.id) ? prev : [newTask, ...prev]));
     try {
       await saveTask(newTask);
     } catch (e) {
       console.error("Erro ao salvar rascunho de tarefa", e);
+    } finally {
+      isCreatingDraftRef.current = false;
     }
   };
 
   const handleNewDraftEvent = async () => {
+    if (isCreatingDraftRef.current) return;
+    isCreatingDraftRef.current = true;
     const newEvent: Partial<AgendaEvent> = {
       id: crypto.randomUUID(),
       nome: 'Novo Rascunho de Evento',
@@ -1017,11 +1105,13 @@ export function TasksView({
       dimensao: selectedDimensions.length === 1 && selectedDimensions[0] !== 'favoritas' ? selectedDimensions[0] : 'Rascunho',
       is_labdiv: !isPersonalScope
     };
-    setLocalEvents(prev => [newEvent as AgendaEvent, ...prev]);
+    setLocalEvents(prev => (prev.some(ev => ev.id === newEvent.id) ? prev : [newEvent as AgendaEvent, ...prev]));
     try {
       await createEvent(newEvent);
     } catch (e) {
       console.error("Erro ao salvar rascunho de evento", e);
+    } finally {
+      isCreatingDraftRef.current = false;
     }
   };
 
@@ -1039,13 +1129,13 @@ export function TasksView({
     if (isShift && lastSelectedTaskId) {
       const startIdx = processedTasks.findIndex(t => t.id === lastSelectedTaskId);
       const endIdx = processedTasks.findIndex(t => t.id === taskId);
-      
+
       if (startIdx !== -1 && endIdx !== -1) {
         const minIdx = Math.min(startIdx, endIdx);
         const maxIdx = Math.max(startIdx, endIdx);
-        
+
         if (!isCtrl) newSet.clear();
-        
+
         for (let i = minIdx; i <= maxIdx; i++) {
           newSet.add(processedTasks[i].id);
         }
@@ -1067,17 +1157,17 @@ export function TasksView({
 
   const toggleCheckbox = (e: React.MouseEvent | React.ChangeEvent, taskId: string) => {
     const isShift = (e.nativeEvent as any)?.shiftKey;
-    
+
     let newSet = new Set(selectedTasks);
 
     if (isShift && lastSelectedTaskId) {
       const startIdx = processedTasks.findIndex(t => t.id === lastSelectedTaskId);
       const endIdx = processedTasks.findIndex(t => t.id === taskId);
-      
+
       if (startIdx !== -1 && endIdx !== -1) {
         const minIdx = Math.min(startIdx, endIdx);
         const maxIdx = Math.max(startIdx, endIdx);
-        
+
         for (let i = minIdx; i <= maxIdx; i++) {
           newSet.add(processedTasks[i].id);
         }
@@ -1124,7 +1214,7 @@ export function TasksView({
     const catCol = columns.find(c => c.key === 'categoria');
     let predefined = catCol ? catCol.options.map(o => o.value) : ['Programar', 'Design', 'Marketing', 'Geral'];
     if (!isJoao) predefined = ['Trabalho', 'Estudo', 'Casa', 'Geral'];
-    
+
     const fromTasks = localTasks.map(t => t.categoria).filter(Boolean) as string[];
     return Array.from(new Set([...predefined, ...fromTasks]));
   }, [localTasks, columns, userId]);
@@ -1143,7 +1233,7 @@ export function TasksView({
     const isJoao = userId === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e';
     const dimCol = columns.find(c => c.key === 'dimensao');
     let predefined = dimCol ? dimCol.options.map(o => o.value) : ['Pessoal', 'Trabalho', 'Estudos', 'Saúde'];
-    
+
     // For non-Stangorlini users, ignore the database options since they are polluted with Stangorlini's tags
     if (!isJoao) {
       predefined = ['Pessoal', 'Trabalho', 'Estudos', 'Saúde'];
@@ -1399,7 +1489,7 @@ export function TasksView({
         const isPast = taskDate < today;
         const completionStatuses = advancedSettings?.completion_statuses || ['completa', 'descartada'];
         const isPending = !completionStatuses.includes(t.status || '');
-        
+
         return isToday || (isPast && isPending);
       });
     }
@@ -1407,8 +1497,8 @@ export function TasksView({
     // 1. Filter Search
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
-      tasks = tasks.filter(t => 
-        t.parent_id || (t.nome && t.nome.toLowerCase().includes(term)) || 
+      tasks = tasks.filter(t =>
+        t.parent_id || (t.nome && t.nome.toLowerCase().includes(term)) ||
         (t.descricao && t.descricao.toLowerCase().includes(term))
       );
     }
@@ -1435,9 +1525,9 @@ export function TasksView({
     // 5. Filter Dimensions
     if (selectedDimensions.length > 0) {
       if (selectedDimensions.includes('favoritas')) {
-        tasks = tasks.filter(t => 
-           t.parent_id || (t.is_favorite && selectedDimensions.includes('favoritas')) ||
-           (t.dimensao && selectedDimensions.includes(t.dimensao))
+        tasks = tasks.filter(t =>
+          t.parent_id || (t.is_favorite && selectedDimensions.includes('favoritas')) ||
+          (t.dimensao && selectedDimensions.includes(t.dimensao))
         );
       } else {
         tasks = tasks.filter(t => t.parent_id || (t.dimensao && selectedDimensions.includes(t.dimensao)));
@@ -1461,8 +1551,8 @@ export function TasksView({
         if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1;
       }
       let primaryDiff = 0;
-      
-      switch(sortBy) {
+
+      switch (sortBy) {
         case 'status':
           primaryDiff = getColIndex('status', a.status) - getColIndex('status', b.status);
           break;
@@ -1512,7 +1602,7 @@ export function TasksView({
       }
 
       if (primaryDiff !== 0) return primaryDiff;
-      
+
       // Secundário: created_at DESC (mais novas no topo, mais antigas no fundo)
       const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
       const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
@@ -1521,7 +1611,7 @@ export function TasksView({
 
     const interleaved: Task[] = [];
     const parentTasks = tasks.filter(t => !t.parent_id);
-    
+
     // Group children by parent
     const childTasksByParent: Record<string, Task[]> = {};
     for (const t of tasks) {
@@ -1532,10 +1622,10 @@ export function TasksView({
     }
 
     for (const parent of parentTasks) {
-       interleaved.push(parent);
-       if (!collapsedTasks.has(parent.id) && childTasksByParent[parent.id]) {
-           interleaved.push(...childTasksByParent[parent.id]);
-       }
+      interleaved.push(parent);
+      if (!collapsedTasks.has(parent.id) && childTasksByParent[parent.id]) {
+        interleaved.push(...[...childTasksByParent[parent.id]].sort((a, b) => (a.ordem_manual || 0) - (b.ordem_manual || 0)));
+      }
     }
 
     return interleaved;
@@ -1545,17 +1635,17 @@ export function TasksView({
 
   return (
     <div className="w-full flex flex-col relative">
-      
+
       {/* ========================================================
           BARRA DE COMANDO UNIFICADA (Unified Command Toolbar)
           Substitui as 4 camadas horizontais anteriores por uma
           única faixa elegante de alta densidade (~48px)
           ======================================================== */}
       <div className="w-full flex flex-col gap-2.5 mb-4 shrink-0">
-        <div className="w-full bg-surface border border-border-subtle rounded-2xl p-2 md:p-2.5 shadow-lg flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-          
-          {/* Lado Esquerdo: Escopo (Tudo vs Individual vs Organização) integrado */}
-          <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+        <div className="org-card w-full bg-surface border border-border-subtle rounded-2xl p-2 md:p-2.5 shadow-lg flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+
+          {/* Lado Esquerdo: Escopo + Seletor de Modos (Tarefas / Eventos / Ambos) integrado (Frente 2.7.3) */}
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
             <span className="text-[10px] font-black text-fg-muted uppercase tracking-wider mr-1 hidden sm:inline">Escopo:</span>
             <div className="inline-flex p-1 bg-app rounded-xl border border-border-subtle">
               {organizations && organizations.length > 0 && (
@@ -1565,11 +1655,10 @@ export function TasksView({
                     setActiveScope('all');
                     if (viewMode === 'org_management') setViewMode('list');
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                    activeScope === 'all'
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${activeScope === 'all'
                       ? 'bg-gradient-brand text-[var(--on-accent-primary)] shadow-sm font-black'
                       : 'text-neutral-400 hover:text-white hover:bg-white/5'
-                  }`}
+                    }`}
                   title="Ver tarefas e eventos individuais e organizacionais juntos"
                 >
                   <span className="material-symbols-outlined text-[15px]">public</span>
@@ -1583,31 +1672,26 @@ export function TasksView({
                   setActiveScope('individual');
                   if (viewMode === 'org_management') setViewMode('list');
                 }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeScope === 'individual'
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${activeScope === 'individual'
                     ? 'bg-gradient-brand text-[var(--on-accent-primary)] shadow-sm font-black'
                     : 'text-neutral-400 hover:text-white hover:bg-white/5'
-                }`}
+                  }`}
               >
                 <span className="material-symbols-outlined text-[15px]">person</span>
                 Individual
               </button>
-              
+
               {organizations && organizations.length > 0 ? (
                 <button
                   type="button"
                   onClick={() => setActiveScope('organization')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                    activeScope === 'organization'
-                      ? 'bg-gradient-brand text-[var(--on-accent-primary)] shadow-sm font-black'
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${activeScope === 'organization'
+                      ? 'bg-surface text-fg border border-border-strong shadow-sm'
                       : 'text-neutral-400 hover:text-white hover:bg-white/5'
-                  }`}
+                    }`}
                 >
                   <span className="material-symbols-outlined text-[15px]">domain</span>
-                  {activeOrg?.name || 'Organização'}
-                  <span className="rounded-full bg-slate-900/60 px-1.5 py-0.2 text-[10px] text-teal-300 font-mono">
-                    {organizations.length}
-                  </span>
+                  <span>Organizações</span>
                 </button>
               ) : (
                 <button
@@ -1620,6 +1704,46 @@ export function TasksView({
                   <span>🏛️ + Entrar ou Criar Org</span>
                 </button>
               )}
+            </div>
+
+            {/* Seletor Tarefas / Eventos / Ambos integrado na toolbar (Frente 2.7.3) */}
+            <div className="inline-flex p-1 bg-app rounded-xl border border-border-subtle" data-tour="workspace-mode-switcher">
+              <button
+                type="button"
+                onClick={() => setDisplayMode('tarefas')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${displayMode === 'tarefas'
+                    ? 'bg-[var(--accent-primary)] text-[var(--on-accent-primary)] shadow-sm'
+                    : 'text-fg-secondary hover:text-fg hover:bg-white/5'
+                  }`}
+                title="Visualizar apenas Tarefas"
+              >
+                <span className="material-symbols-outlined text-[14px]">task_alt</span>
+                <span className="hidden sm:inline">Tarefas</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDisplayMode('eventos')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${displayMode === 'eventos'
+                    ? 'bg-[var(--accent-primary)] text-[var(--on-accent-primary)] shadow-sm'
+                    : 'text-fg-secondary hover:text-fg hover:bg-white/5'
+                  }`}
+                title="Visualizar apenas Eventos"
+              >
+                <span className="material-symbols-outlined text-[14px]">event</span>
+                <span className="hidden sm:inline">Eventos</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDisplayMode('ambos')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${displayMode === 'ambos'
+                    ? 'bg-[var(--accent-primary)] text-[var(--on-accent-primary)] shadow-sm'
+                    : 'text-fg-secondary hover:text-fg hover:bg-white/5'
+                  }`}
+                title="Visualizar Tarefas e Eventos integrados"
+              >
+                <span className="material-symbols-outlined text-[14px]">category</span>
+                <span className="hidden sm:inline">Ambos</span>
+              </button>
             </div>
 
             {/* Seletor se tiver mais de uma organização */}
@@ -1663,11 +1787,10 @@ export function TasksView({
             <button
               type="button"
               onClick={() => setViewMode('list')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                viewMode === 'list'
-                  ? 'bg-[#9D4EDD] text-white shadow-sm font-black'
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${viewMode === 'list'
+                  ? 'bg-accent-primary text-on-accent-primary shadow-sm font-black'
                   : 'text-neutral-400 hover:text-white hover:bg-white/5'
-              }`}
+                }`}
             >
               <span className="material-symbols-outlined text-[16px]">format_list_bulleted</span>
               <span>Lista</span>
@@ -1676,11 +1799,10 @@ export function TasksView({
             <button
               type="button"
               onClick={() => setViewMode('weekly')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                viewMode === 'weekly'
-                  ? 'bg-[#9D4EDD] text-white shadow-sm font-black'
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${viewMode === 'weekly'
+                  ? 'bg-accent-primary text-on-accent-primary shadow-sm font-black'
                   : 'text-neutral-400 hover:text-white hover:bg-white/5'
-              }`}
+                }`}
             >
               <span className="material-symbols-outlined text-[16px]">view_week</span>
               <span>Semanal</span>
@@ -1689,42 +1811,21 @@ export function TasksView({
             <button
               type="button"
               onClick={() => setViewMode('monthly')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                viewMode === 'monthly'
-                  ? 'bg-[#9D4EDD] text-white shadow-sm font-black'
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${viewMode === 'monthly'
+                  ? 'bg-accent-primary text-on-accent-primary shadow-sm font-black'
                   : 'text-neutral-400 hover:text-white hover:bg-white/5'
-              }`}
+                }`}
             >
               <span className="material-symbols-outlined text-[16px]">calendar_month</span>
               <span>Mensal</span>
             </button>
-
-            {activeScope === 'organization' && (
-              <button
-                type="button"
-                onClick={() => setViewMode('org_management')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                  viewMode === 'org_management'
-                    ? 'bg-teal-500 text-slate-950 font-black shadow-sm'
-                    : 'text-teal-400 hover:bg-teal-500/10'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[16px]">groups</span>
-                <span>Equipe</span>
-                {activeOrgDetails?.members?.length ? (
-                  <span className="px-1.5 py-0.2 rounded-full bg-black/40 text-[10px] font-mono">
-                    {activeOrgDetails.members.length}
-                  </span>
-                ) : null}
-              </button>
-            )}
           </div>
 
           {/* Lado Direito: Ações (Filtros, Colunas, Foco, Criação, Contadores) */}
           <div className="flex items-center gap-2 justify-end shrink-0 flex-wrap" data-tour="tasks-toolbar">
             {/* Contador de tarefas e Bulk Edit */}
             <div className="flex items-center text-fg-muted text-[11px] font-bold px-2.5 py-1 bg-app rounded-lg border border-border-subtle h-[34px] text-fg-muted">
-              <span className="text-[#FFCC00] text-xs mr-1">{processedTasks.length}</span>
+              <span className="text-accent-secondary text-xs mr-1">{processedTasks.length}</span>
               <span className="hidden xl:inline mr-1">/</span>
               <span className="text-white text-xs mr-1">{localTasks.length}</span>
               <span className="hidden xl:inline">visíveis</span>
@@ -1732,7 +1833,7 @@ export function TasksView({
                 <button
                   type="button"
                   onClick={() => setIsBulkEditModalOpen(true)}
-                  className="ml-2 bg-[#9D4EDD]/20 text-[#9D4EDD] hover:bg-[#9D4EDD] hover:text-white border border-[#9D4EDD]/50 px-2 py-0.5 rounded text-[10px] flex items-center gap-1 transition-colors cursor-pointer"
+                  className="ml-2 bg-accent-primary/20 text-accent-primary hover:bg-accent-primary hover:text-on-accent-primary border border-accent-primary/50 px-2 py-0.5 rounded text-[10px] flex items-center gap-1 transition-colors cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[12px]">edit</span>
                   Editar ({selectedTasks.size})
@@ -1746,11 +1847,10 @@ export function TasksView({
                 type="button"
                 data-tour="tasks-quick-filters"
                 onClick={toggleQuickFiltersExpanded}
-                className={`h-[34px] px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-                  isQuickFiltersExpanded || activeFilterPills.length > 0
+                className={`h-[34px] px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${isQuickFiltersExpanded || activeFilterPills.length > 0
                     ? 'bg-[var(--accent-secondary,#FFCC00)]/15 border-[var(--accent-secondary,#FFCC00)] text-[var(--accent-secondary,#FFCC00)]'
                     : 'bg-app border border-border-subtle text-fg-secondary hover:text-fg hover:border-border-strong hover:bg-surface-hover'
-                }`}
+                  }`}
                 title="Filtros e Ordenação"
               >
                 <span className="material-symbols-outlined text-[16px]">tune</span>
@@ -1766,14 +1866,14 @@ export function TasksView({
               </button>
             )}
 
-            {/* Editar Colunas */}
+            {/* Editar Colunas (Frente 2.7.5 e Trava Técnica 3) */}
             {displayMode !== 'eventos' && (
-              <div className="relative">
+              <div className="relative" ref={columnsMenuRef}>
                 <button
                   type="button"
                   onClick={() => setIsColumnsMenuOpen(!isColumnsMenuOpen)}
                   className="h-[34px] bg-app border border-border-subtle text-fg-secondary hover:text-fg hover:border-border-strong hover:bg-surface-hover px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-                  title="Editar Colunas Visíveis"
+                  title="Editar Colunas Visíveis (6 Essenciais por Padrão)"
                 >
                   <span className="material-symbols-outlined text-[16px]">view_column</span>
                   <span className="hidden sm:inline">Colunas</span>
@@ -1781,30 +1881,83 @@ export function TasksView({
                 </button>
 
                 {isColumnsMenuOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-[240px] bg-surface border border-border-subtle rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col">
-                    <div className="p-3 border-b border-border-subtle">
-                      <h3 className="text-xs font-bold text-fg-muted uppercase tracking-wider mb-2">Colunas</h3>
-                      <div className="flex flex-col gap-1 max-h-[250px] overflow-y-auto">
-                        {columns.map(col => (
-                          <div key={col.id} className="flex justify-between items-center group px-2 py-1.5 hover:bg-surface-hover rounded-md transition-colors">
-                            <span className="text-sm text-white truncate max-w-[150px]">{col.name}</span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setIsColumnsMenuOpen(false);
-                                setEditingColumn(col);
-                              }}
-                              className="text-fg-muted hover:text-[#FFCC00] transition-colors opacity-0 group-hover:opacity-100 flex items-center justify-center p-1"
-                              title="Editar Coluna"
-                            >
-                              <span className="material-symbols-outlined text-[16px]">edit</span>
-                            </button>
-                          </div>
-                        ))}
+                  <div className="absolute right-0 top-full mt-2 w-[270px] bg-surface border border-border-subtle rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col animate-in fade-in slide-in-from-top-1 duration-150">
+                    <div className="p-3 border-b border-border-subtle bg-app/50 flex items-center justify-between">
+                      <div>
+                        <h3 className="text-xs font-bold text-fg uppercase tracking-wider">Colunas da Tabela</h3>
+                        <p className="text-[10px] text-fg-muted">6 colunas essenciais ativas</p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={resetToEssentialColumns}
+                        className="text-[10px] text-[var(--accent-secondary)] hover:underline font-bold"
+                        title="Restaurar padrão de 6 colunas essenciais"
+                      >
+                        Restaurar padrão
+                      </button>
                     </div>
-                    
+
+                    <div className="p-2 space-y-1 max-h-[280px] overflow-y-auto">
+                      <div className="px-2 py-1 text-[10px] font-bold text-fg-muted uppercase tracking-wider">
+                        Colunas Opcionais
+                      </div>
+                      {[
+                        { key: 'responsavel', label: 'Responsável' },
+                        { key: 'categoria', label: 'Categoria' },
+                        { key: 'dimensao', label: 'Dimensão' },
+                        { key: 'criada_em', label: 'Criada em' },
+                        { key: 'inicio', label: 'Data de Início' },
+                        { key: 'dias_restantes', label: 'Dias Restantes' },
+                        { key: 'concluida_em', label: 'Concluída em' },
+                        { key: 'frequencia', label: 'Frequência' },
+                      ].map((col) => {
+                        const isChecked = visibleExtraCols.includes(col.key);
+                        return (
+                          <label
+                            key={col.key}
+                            className="flex items-center justify-between px-2.5 py-1.5 hover:bg-surface-hover rounded-lg cursor-pointer text-xs transition-colors"
+                          >
+                            <span className={isChecked ? 'text-white font-medium' : 'text-fg-secondary'}>
+                              {col.label}
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleExtraCol(col.key)}
+                              className="accent-[var(--accent-primary)] rounded cursor-pointer"
+                            />
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    {columns.length > 0 && (
+                      <div className="p-2 border-t border-border-subtle bg-app/30">
+                        <div className="px-2 py-1 text-[10px] font-bold text-fg-muted uppercase tracking-wider">
+                          Colunas Customizadas
+                        </div>
+                        <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto">
+                          {columns.map(col => (
+                            <div key={col.id} className="flex justify-between items-center group px-2 py-1 hover:bg-surface-hover rounded-md transition-colors">
+                              <span className="text-xs text-white truncate max-w-[150px]">{col.name}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIsColumnsMenuOpen(false);
+                                  setEditingColumn(col);
+                                }}
+                                className="text-fg-muted hover:text-[#FFCC00] transition-colors p-1"
+                                title="Editar Coluna"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">edit</span>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => {
@@ -1819,7 +1972,7 @@ export function TasksView({
                           order_num: 0
                         });
                       }}
-                      className="px-4 py-2.5 cursor-pointer transition-colors text-[#FFCC00] hover:bg-surface-hover font-bold text-xs flex items-center gap-2"
+                      className="px-4 py-2 cursor-pointer transition-colors text-[#FFCC00] hover:bg-surface-hover font-bold text-xs flex items-center gap-2 border-t border-border-subtle"
                     >
                       <span className="material-symbols-outlined text-[16px]">add</span>
                       Adicionar Nova Coluna
@@ -1829,16 +1982,31 @@ export function TasksView({
               </div>
             )}
 
+            {/* Só Minhas Tarefas (Frente 2.7.5) */}
+            {displayMode !== 'eventos' && (
+              <button
+                type="button"
+                onClick={() => setOnlyMyTasks(!onlyMyTasks)}
+                className={`h-[34px] px-2.5 py-1 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer border ${onlyMyTasks
+                    ? 'bg-accent-secondary/20 text-accent-secondary border-accent-secondary/50 shadow-sm'
+                    : 'bg-app border border-border-subtle text-fg-secondary hover:text-fg hover:border-border-strong hover:bg-surface-hover'
+                  }`}
+                title="Filtrar apenas tarefas atribuídas a mim"
+              >
+                <span className="material-symbols-outlined text-[16px]">person</span>
+                <span className="hidden sm:inline">Só Minhas</span>
+              </button>
+            )}
+
             {/* Foco Diário */}
             {displayMode !== 'eventos' && (
               <button
                 type="button"
                 onClick={() => setIsDailyFollowup(!isDailyFollowup)}
-                className={`h-[34px] px-2.5 py-1 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer border ${
-                  isDailyFollowup
-                    ? 'bg-[#9D4EDD] text-white border-[#9D4EDD]'
+                className={`h-[34px] px-2.5 py-1 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer border ${isDailyFollowup
+                    ? 'bg-accent-primary text-on-accent-primary border-accent-primary'
                     : 'bg-app border border-border-subtle text-fg-secondary hover:text-fg hover:border-border-strong hover:bg-surface-hover'
-                }`}
+                  }`}
                 title="Foco Diário (Hoje & Pendentes)"
               >
                 <span className="material-symbols-outlined text-[16px]">track_changes</span>
@@ -1879,17 +2047,17 @@ export function TasksView({
                   <button
                     type="button"
                     onClick={() => { setIsQuickCreateMenuOpen(false); handleNewDraftTask(); }}
-                    className="w-full text-left px-4 py-2.5 text-xs text-white hover:bg-[#9D4EDD]/20 hover:text-[#9D4EDD] transition-colors flex items-center gap-2.5 font-bold cursor-pointer"
+                    className="w-full text-left px-4 py-2.5 text-xs text-fg hover:bg-accent-primary/20 hover:text-accent-primary transition-colors flex items-center gap-2.5 font-bold cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-[16px] text-[#FFCC00]">edit_note</span>
+                    <span className="material-symbols-outlined text-[16px] text-accent-secondary">edit_note</span>
                     Rascunho de Tarefa
                   </button>
                   <button
                     type="button"
                     onClick={() => { setIsQuickCreateMenuOpen(false); handleNewDraftEvent(); }}
-                    className="w-full text-left px-4 py-2.5 text-xs text-white hover:bg-[#9D4EDD]/20 hover:text-[#9D4EDD] transition-colors flex items-center gap-2.5 font-bold cursor-pointer"
+                    className="w-full text-left px-4 py-2.5 text-xs text-fg hover:bg-accent-primary/20 hover:text-accent-primary transition-colors flex items-center gap-2.5 font-bold cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-[16px] text-[#9D4EDD]">event_note</span>
+                    <span className="material-symbols-outlined text-[16px] text-accent-primary">event_note</span>
                     Rascunho de Evento
                   </button>
 
@@ -1903,15 +2071,15 @@ export function TasksView({
                     onClick={() => { setIsQuickCreateMenuOpen(false); handleNew(); }}
                     className="w-full text-left px-4 py-2.5 text-xs text-fg-secondary hover:bg-surface-hover hover:text-white transition-colors flex items-center gap-2.5 font-medium cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-[16px] text-[#FFCC00]">add_task</span>
+                    <span className="material-symbols-outlined text-[16px] text-accent-secondary">add_task</span>
                     Nova Tarefa Completa
                   </button>
                   <button
                     type="button"
                     onClick={() => { setIsQuickCreateMenuOpen(false); handleNewEvent(); }}
-                    className="w-full text-left px-4 py-2.5 text-xs text-fg-secondary hover:bg-surface-hover hover:text-white transition-colors flex items-center gap-2.5 font-medium cursor-pointer"
+                    className="w-full text-left px-4 py-2.5 text-xs text-fg-secondary hover:bg-surface-hover hover:text-fg transition-colors flex items-center gap-2.5 font-medium cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-[16px] text-[#9D4EDD]">calendar_add_on</span>
+                    <span className="material-symbols-outlined text-[16px] text-accent-primary">calendar_add_on</span>
                     Novo Evento Completo
                   </button>
                 </div>
@@ -1954,7 +2122,7 @@ export function TasksView({
 
         {/* Painel Completo de Filtros quando Expandido */}
         {isQuickFiltersExpanded && (
-          <div className="w-full bg-surface border border-border-subtle rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col gap-3">
+          <div className="org-card w-full bg-surface border border-border-subtle rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col gap-3">
             {/* Header do Painel */}
             <div className="flex items-center justify-between pb-2 border-b border-border-subtle">
               <div className="flex items-center gap-2">
@@ -1980,7 +2148,7 @@ export function TasksView({
                 <button
                   type="button"
                   onClick={() => setIsQuickFiltersModalOpen(true)}
-                  className="p-1 text-fg-muted hover:text-[var(--accent-primary,#9D4EDD)] hover:bg-surface-hover rounded transition-colors cursor-pointer"
+                  className="p-1 text-fg-muted hover:text-accent-primary hover:bg-surface-hover rounded transition-colors cursor-pointer"
                   title="Configurar Filtros Rápidos"
                 >
                   <span className="material-symbols-outlined text-[16px]">settings</span>
@@ -1997,16 +2165,16 @@ export function TasksView({
                     if (sortKey === 'status') {
                       return (
                         <React.Fragment key="status">
-                          <button type="button" onClick={() => setSortBy('status')} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${sortBy === 'status' ? 'bg-[#9D4EDD]/20 border-[#9D4EDD] text-[#9D4EDD]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}>Padrão</button>
-                          <button type="button" onClick={() => setSortBy('status_inv')} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${sortBy === 'status_inv' ? 'bg-[#FFCC00]/15 border-[#FFCC00] text-[#FFCC00]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}>Padrão (inv)</button>
+                          <button type="button" onClick={() => setSortBy('status')} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${sortBy === 'status' ? 'bg-accent-primary/20 border-accent-primary text-accent-primary' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}>Padrão</button>
+                          <button type="button" onClick={() => setSortBy('status_inv')} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${sortBy === 'status_inv' ? 'bg-accent-secondary/15 border-accent-secondary text-accent-secondary' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}>Padrão (inv)</button>
                         </React.Fragment>
                       );
                     }
                     if (sortKey === 'manual') {
-                      return <button type="button" key="manual" onClick={() => setSortBy('manual')} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${sortBy === 'manual' ? 'bg-[#9D4EDD]/20 border-[#9D4EDD] text-[#9D4EDD]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}>Manual</button>;
+                      return <button type="button" key="manual" onClick={() => setSortBy('manual')} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${sortBy === 'manual' ? 'bg-accent-primary/20 border-accent-primary text-accent-primary' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}>Manual</button>;
                     }
                     if (sortKey === 'prazo') {
-                      return <button type="button" key="prazo" onClick={() => setSortBy('prazo')} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${sortBy === 'prazo' ? 'bg-[#9D4EDD]/20 border-[#9D4EDD] text-[#9D4EDD]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}>Prazo</button>;
+                      return <button type="button" key="prazo" onClick={() => setSortBy('prazo')} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${sortBy === 'prazo' ? 'bg-accent-primary/20 border-accent-primary text-accent-primary' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}>Prazo</button>;
                     }
                     if (sortKey === 'prioridade') {
                       return (
@@ -2017,12 +2185,12 @@ export function TasksView({
                       );
                     }
                     if (sortKey === 'categoria') {
-                      return <button type="button" key="categoria" onClick={() => setSortBy('categoria')} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${sortBy === 'categoria' ? 'bg-[#9D4EDD]/20 border-[#9D4EDD] text-[#9D4EDD]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}>Categoria</button>;
+                      return <button type="button" key="categoria" onClick={() => setSortBy('categoria')} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${sortBy === 'categoria' ? 'bg-accent-primary/20 border-accent-primary text-accent-primary' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}>Categoria</button>;
                     }
                     const col = columns.find(c => c.key === sortKey);
                     if (col) {
                       return (
-                        <button type="button" key={`custom_${sortKey}`} onClick={() => setSortBy(`custom_${sortKey}`)} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${sortBy === `custom_${sortKey}` ? 'bg-[#9D4EDD]/20 border-[#9D4EDD] text-[#9D4EDD]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}>{col.name}</button>
+                        <button type="button" key={`custom_${sortKey}`} onClick={() => setSortBy(`custom_${sortKey}`)} className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${sortBy === `custom_${sortKey}` ? 'bg-accent-primary/20 border-accent-primary text-accent-primary' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'}`}>{col.name}</button>
                       );
                     }
                     return null;
@@ -2038,9 +2206,8 @@ export function TasksView({
                 <button
                   type="button"
                   onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-                  className={`h-[26px] px-2 text-[11px] rounded-md border transition-colors font-bold shrink-0 flex items-center justify-center gap-1 cursor-pointer ${
-                    showFavoritesOnly ? 'bg-[#FFCC00]/20 border-[#FFCC00] text-[#FFCC00]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
-                  }`}
+                  className={`h-[26px] px-2 text-[11px] rounded-md border transition-colors font-bold shrink-0 flex items-center justify-center gap-1 cursor-pointer ${showFavoritesOnly ? 'bg-[#FFCC00]/20 border-[#FFCC00] text-[#FFCC00]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
+                    }`}
                   title="Apenas Favoritas"
                 >
                   <span className={`material-symbols-outlined text-[12px] ${showFavoritesOnly ? 'text-[#FFCC00]' : ''}`}>star</span>
@@ -2048,9 +2215,8 @@ export function TasksView({
                 <button
                   type="button"
                   onClick={() => setShowDraftsOnly(!showDraftsOnly)}
-                  className={`h-[26px] px-2.5 text-[11px] rounded-md border transition-colors font-bold shrink-0 flex items-center justify-center gap-1 cursor-pointer ${
-                    showDraftsOnly ? 'bg-[#8E8E8E]/20 border-[#8E8E8E] text-fg-muted' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
-                  }`}
+                  className={`h-[26px] px-2.5 text-[11px] rounded-md border transition-colors font-bold shrink-0 flex items-center justify-center gap-1 cursor-pointer ${showDraftsOnly ? 'bg-[#8E8E8E]/20 border-[#8E8E8E] text-fg-muted' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
+                    }`}
                 >
                   <span className={`material-symbols-outlined text-[12px] ${showDraftsOnly ? 'text-fg-muted' : ''}`}>draft</span> Rascunhos
                 </button>
@@ -2059,9 +2225,8 @@ export function TasksView({
                     type="button"
                     key={s}
                     onClick={() => toggleFilter(selectedStatuses, setSelectedStatuses, s)}
-                    className={`h-[26px] px-2.5 text-[11px] rounded-md border transition-colors font-bold shrink-0 flex items-center justify-center cursor-pointer ${
-                      selectedStatuses.includes(s) ? getBadgeColorClass('status', s) : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
-                    }`}
+                    className={`h-[26px] px-2.5 text-[11px] rounded-md border transition-colors font-bold shrink-0 flex items-center justify-center cursor-pointer ${selectedStatuses.includes(s) ? getBadgeColorClass('status', s) : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
+                      }`}
                   >
                     {s}
                   </button>
@@ -2074,8 +2239,8 @@ export function TasksView({
               const col = columns.find(c => c.key === filterKey);
               let options: string[] = [];
               let isSelected: (val: string) => boolean = () => false;
-              let onToggle: (val: string) => void = () => {};
-              let onClear: () => void = () => {};
+              let onToggle: (val: string) => void = () => { };
+              let onClear: () => void = () => { };
               let isAllSelected = false;
               let isHidden = false;
 
@@ -2124,9 +2289,8 @@ export function TasksView({
                     <button
                       type="button"
                       onClick={onClear}
-                      className={`h-[26px] px-2.5 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${
-                        isAllSelected ? 'bg-[#FFCC00]/20 border-[#FFCC00] text-[#FFCC00]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
-                      }`}
+                      className={`h-[26px] px-2.5 text-[11px] rounded-md border transition-colors font-bold shrink-0 cursor-pointer ${isAllSelected ? 'bg-[#FFCC00]/20 border-[#FFCC00] text-[#FFCC00]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
+                        }`}
                     >
                       Todas
                     </button>
@@ -2136,11 +2300,10 @@ export function TasksView({
                       type="button"
                       data-tour="filter-only-mine"
                       onClick={() => setOnlyMyTasks((prev) => !prev)}
-                      className={`h-[26px] px-2.5 text-[11px] rounded-md border transition-all font-bold shrink-0 flex items-center gap-1.5 cursor-pointer ${
-                        onlyMyTasks
-                          ? 'bg-[var(--accent-primary,#9D4EDD)] text-white border-[var(--accent-primary,#9D4EDD)] shadow-sm'
+                      className={`h-[26px] px-2.5 text-[11px] rounded-md border transition-all font-bold shrink-0 flex items-center gap-1.5 cursor-pointer ${onlyMyTasks
+                          ? 'bg-accent-primary text-on-accent-primary border-accent-primary shadow-sm'
                           : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
-                      }`}
+                        }`}
                     >
                       <span>🎯 Apenas Minhas</span>
                     </button>
@@ -2150,9 +2313,8 @@ export function TasksView({
                       type="button"
                       key={o}
                       onClick={() => onToggle(o)}
-                      className={`h-[26px] px-2.5 text-[11px] ${filterKey === 'responsavel' ? 'rounded-full' : 'rounded-md'} border transition-colors font-bold flex items-center justify-center gap-1 shrink-0 cursor-pointer ${
-                        isSelected(o) ? getBadgeColorClass(filterKey, o) : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
-                      }`}
+                      className={`h-[26px] px-2.5 text-[11px] ${filterKey === 'responsavel' ? 'rounded-full' : 'rounded-md'} border transition-colors font-bold flex items-center justify-center gap-1 shrink-0 cursor-pointer ${isSelected(o) ? getBadgeColorClass(filterKey, o) : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
+                        }`}
                     >
                       {filterKey === 'responsavel' && <span className="material-symbols-outlined text-[12px]">person</span>}
                       {o}
@@ -2171,9 +2333,8 @@ export function TasksView({
                 <button
                   type="button"
                   onClick={() => setIsDailyFollowup(!isDailyFollowup)}
-                  className={`h-[26px] px-3 text-[11px] rounded-md border transition-colors font-bold flex items-center justify-center gap-1 shrink-0 cursor-pointer ${
-                    isDailyFollowup ? 'bg-[#9D4EDD] text-white border-[#9D4EDD]' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
-                  }`}
+                  className={`h-[26px] px-3 text-[11px] rounded-md border transition-colors font-bold flex items-center justify-center gap-1 shrink-0 cursor-pointer ${isDailyFollowup ? 'bg-accent-primary text-on-accent-primary border-accent-primary' : 'bg-surface border border-border-subtle text-fg-muted hover:text-fg hover:bg-surface-hover'
+                    }`}
                 >
                   <span className="material-symbols-outlined text-[12px]">today</span>
                   Hoje & Pendentes
@@ -2200,7 +2361,7 @@ export function TasksView({
                   <button
                     type="button"
                     onClick={() => downloadICS(processedTasks, 'tarefas.ics')}
-                    className="flex items-center gap-1.5 px-2.5 py-1 border border-blue-500/40 text-blue-400 hover:bg-blue-500/10 rounded text-xs font-semibold transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 px-2.5 py-1 border border-accent-primary/40 text-accent-primary hover:bg-accent-primary/10 rounded text-xs font-semibold transition-colors cursor-pointer"
                     title="Baixar em formato de calendário ICS"
                   >
                     <span className="material-symbols-outlined text-[14px]">calendar_month</span>
@@ -2331,85 +2492,268 @@ export function TasksView({
         <div data-tour="tasks-main-view" className="flex flex-col gap-2 mt-4 custom-scrollbar overflow-x-auto w-full border border-border-subtle rounded-lg relative overflow-hidden" style={{ minHeight: '600px' }}>
           <div ref={desktopContainerRef} style={{ overflowAnchor: 'none' }} className="hidden md:block overflow-x-auto bg-surface border border-border-subtle rounded-lg relative">
             <table className="w-full text-left border-collapse min-w-[1400px]">
-          <thead className="bg-surface-hover border-b border-border-subtle sticky top-0 z-10">
-            <tr>
-              <th className="p-4 w-[100px] text-center">
-                <input type="checkbox" className="accent-[#9D4EDD] rounded-sm" onChange={(e) => {
-                  if (e.target.checked) {
-                    setSelectedTasks(new Set(processedTasks.map(t => t.id)));
-                  } else {
-                    setSelectedTasks(new Set());
-                  }
-                }} checked={selectedTasks.size === processedTasks.length && processedTasks.length > 0} />
-              </th>
-              <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider text-center w-[60px]">
-                <div className="flex items-center justify-center gap-1 relative group/tooltip cursor-help w-fit mx-auto">
-                  Ação <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal left-1/2 -translate-x-1/2">
-                    Botões de edição e sub-tarefas.
-                  </div>
-                </div>
-              </th>
-              <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider w-[220px]">
-                <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                  Nome <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-left font-normal normal-case tracking-normal left-0">
-                    O nome principal da sua tarefa.
-                  </div>
-                </div>
-              </th>
-              <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">
-                <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                  Status <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal left-1/2 -translate-x-1/2">
-                    O estágio atual da tarefa (Ex: Em progresso).
-                  </div>
-                </div>
-              </th>
-              <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">
-                <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                  Prioridade <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal left-1/2 -translate-x-1/2">
-                    Nível de urgência (Alta, Média, Baixa).
-                  </div>
-                </div>
-              </th>
-              <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">
-                <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                  Categoria <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal left-1/2 -translate-x-1/2">
-                    O tipo de ação (Ex: Programar, Estudar).
-                  </div>
-                </div>
-              </th>
-              {visibleExtraCols.includes("responsavel") && <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">Responsável</th>}
-              <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">Criada em</th>
-              <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">Início</th>
-              <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">Prazo</th>
-              {hasAnyPrazo && <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">Dias Restantes</th>}
-              {visibleExtraCols.includes("concluida_em") && <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">Concluída em</th>}
-              {visibleExtraCols.includes("frequencia") && <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">Freq.</th>}
-              <th className="p-4 text-xs font-semibold text-fg-muted uppercase tracking-wider">
-                <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                  Dimensão <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
-                    A grande área da sua vida (Pessoal, Saúde, etc).
-                  </div>
-                </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {localTasks.length === 0 && (
-              <tr>
-                <td colSpan={14} className="p-8 text-center text-fg-muted">
-                  Nenhuma tarefa encontrada. Clique em <span className="text-[#FFCC00] font-bold">+ Nova Tarefa</span> para começar.
-                </td>
-              </tr>
-            )}
+              <thead className="bg-surface-hover border-b border-border-subtle sticky top-0 z-10">
+                <tr>
+                  {/* Check + Ação unificados em 64px (Frente 2.7.5) */}
+                  <th className="py-2.5 px-2 w-[64px] text-center shrink-0">
+                    <div className="flex items-center justify-center gap-1">
+                      <input
+                        type="checkbox"
+                        className="accent-[var(--accent-primary)] rounded-sm cursor-pointer"
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedTasks(new Set(processedTasks.map(t => t.id)));
+                          } else {
+                            setSelectedTasks(new Set());
+                          }
+                        }}
+                        checked={selectedTasks.size === processedTasks.length && processedTasks.length > 0}
+                      />
+                    </div>
+                  </th>
+                  {/* 6 Colunas Essenciais: Título / Descrição */}
+                  <th className="py-2.5 px-3 text-xs font-semibold text-fg-muted uppercase tracking-wider min-w-[260px]">
+                    <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
+                      Tarefa <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                      <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-left font-normal normal-case tracking-normal left-0">
+                        O nome principal da sua tarefa.
+                      </div>
+                    </div>
+                  </th>
+                  {/* 6 Colunas Essenciais: Status */}
+                  <th className="py-2.5 px-3 text-xs font-semibold text-fg-muted uppercase tracking-wider w-[120px]">
+                    <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
+                      Status <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                      <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal left-1/2 -translate-x-1/2">
+                        O estágio atual da tarefa.
+                      </div>
+                    </div>
+                  </th>
+                  {/* 6 Colunas Essenciais: Prioridade */}
+                  <th className="py-2.5 px-3 text-xs font-semibold text-fg-muted uppercase tracking-wider w-[110px]">
+                    <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
+                      Prioridade <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                      <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal left-1/2 -translate-x-1/2">
+                        Nível de urgência (Alta, Média, Baixa).
+                      </div>
+                    </div>
+                  </th>
+                  {/* 6 Colunas Essenciais: Prazo */}
+                  <th className="py-2.5 px-3 text-xs font-semibold text-fg-muted uppercase tracking-wider w-[110px]">Prazo</th>
+                  {/* 6 Colunas Essenciais: Responsável (quando ativo e não é escopo pessoal) */}
+                  {!isPersonalScope && visibleExtraCols.includes("responsavel") && (
+                    <th className="py-2.5 px-3 text-xs font-semibold text-fg-muted uppercase tracking-wider w-[120px]">Responsável</th>
+                  )}
+
+                  {/* Colunas Opcionais (Configuradas em [ Colunas ]) */}
+                  {visibleExtraCols.includes("categoria") && (
+                    <th className="py-2.5 px-3 text-xs font-semibold text-fg-muted uppercase tracking-wider">Categoria</th>
+                  )}
+                  {visibleExtraCols.includes("criada_em") && (
+                    <th className="py-2.5 px-3 text-xs font-semibold text-fg-muted uppercase tracking-wider">Criada em</th>
+                  )}
+                  {visibleExtraCols.includes("inicio") && (
+                    <th className="py-2.5 px-3 text-xs font-semibold text-fg-muted uppercase tracking-wider">Início</th>
+                  )}
+                  {hasAnyPrazo && visibleExtraCols.includes("dias_restantes") && (
+                    <th className="py-2.5 px-3 text-xs font-semibold text-fg-muted uppercase tracking-wider">Dias Restantes</th>
+                  )}
+                  {visibleExtraCols.includes("concluida_em") && (
+                    <th className="py-2.5 px-3 text-xs font-semibold text-fg-muted uppercase tracking-wider">Concluída em</th>
+                  )}
+                  {visibleExtraCols.includes("frequencia") && (
+                    <th className="py-2.5 px-3 text-xs font-semibold text-fg-muted uppercase tracking-wider">Freq.</th>
+                  )}
+                  {visibleExtraCols.includes("dimensao") && (
+                    <th className="py-2.5 px-3 text-xs font-semibold text-fg-muted uppercase tracking-wider">Dimensão</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {localTasks.length === 0 && (
+                  <tr>
+                    <td colSpan={10} className="p-8 text-center text-fg-muted text-sm">
+                      Nenhuma tarefa encontrada. Clique em <span className="text-[#FFCC00] font-bold">+ Nova Tarefa</span> para começar.
+                    </td>
+                  </tr>
+                )}
+                {processedTasks.map(task => (
+                  <React.Fragment key={task.id}>
+                    <tr
+                      draggable={sortBy === 'manual' ? true : undefined}
+                      onDragStart={sortBy === 'manual' ? (e) => handleDragStart(e, task.id) : undefined}
+                      onDragOver={sortBy === 'manual' ? (e) => handleDragOver(e, task.id) : undefined}
+                      onDragLeave={sortBy === 'manual' ? handleDragLeave : undefined}
+                      onDrop={sortBy === 'manual' ? (e) => handleDrop(e, task.id) : undefined}
+                      onDragEnd={sortBy === 'manual' ? () => setDropTargetId(null) : undefined}
+                      onClick={(e) => handleRowClick(e, task.id)}
+                      className={`transition-colors group ${selectedTasks.has(task.id) ? 'bg-accent-primary/10' : 'hover:bg-surface-hover'} ${draggedTaskId === task.id ? 'opacity-50' : ''} ${dropTargetId === task.id ? (dropPosition === 'top' ? 'border-t-2 border-accent-primary' : 'border-b-2 border-accent-primary') : 'border-b border-border-subtle hover:border-accent-primary'}`}
+                    >
+                      {/* Check + Ação unificados em 64px (Frente 2.7.5) */}
+                      <td className="py-2.5 px-2 w-[64px] text-center shrink-0">
+                        <div className="flex items-center justify-center gap-1">
+                          <input
+                            type="checkbox"
+                            className="accent-[var(--accent-primary)] rounded-sm cursor-pointer"
+                            checked={selectedTasks.has(task.id)}
+                            onChange={(e) => toggleCheckbox(e, task.id)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleEdit(task)}
+                            className="text-fg-muted hover:text-accent-primary opacity-40 group-hover:opacity-100 transition-opacity p-0.5"
+                            title="Editar tarefa"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleFavoriteToggle(e, task.id)}
+                            className={`transition-colors p-0.5 ${task.is_favorite ? 'text-[#FFCC00]' : 'text-fg-muted hover:text-[#FFCC00] opacity-30 group-hover:opacity-100'}`}
+                            title="Favoritar"
+                          >
+                            <span className={`material-symbols-outlined text-[16px] ${task.is_favorite ? 'filled' : ''}`} style={task.is_favorite ? { fontVariationSettings: "'FILL' 1" } : {}}>star</span>
+                          </button>
+                        </div>
+                      </td>
+
+                      {/* Título / Descrição */}
+                      <td className="py-2.5 px-3 text-sm font-medium text-white break-words" title={task.descricao || ''}>
+                        <div className={`flex items-center gap-2 ${task.parent_id ? 'pl-3 border-l-2 border-[#FFCC00] ml-4 scale-[0.97] origin-left' : ''}`}>
+                          {!task.parent_id && localTasks.some(t => t.parent_id === task.id) && (
+                            <button onClick={(e) => toggleExpand(e, task.id)} className="text-fg-muted hover:text-white transition-colors flex items-center justify-center shrink-0">
+                              <span className="material-symbols-outlined text-[20px]">{!collapsedTasks.has(task.id) ? 'expand_more' : 'chevron_right'}</span>
+                            </button>
+                          )}
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-center gap-2">
+                              <HighlightedText text={task.nome} highlight={searchTerm} />
+                              {(task as any).custom_fields?.foto_url && (
+                                <a href={(task as any).custom_fields.foto_url} target="_blank" rel="noopener noreferrer" className="text-fg-muted hover:text-accent-primary flex items-center transition-colors" title="Ver foto">
+                                  <span className="material-symbols-outlined text-[16px]">image</span>
+                                </a>
+                              )}
+                            </div>
+                            <TaskDelegationBadges
+                              task={task}
+                              allTasks={localTasks}
+                              subteams={activeOrgDetails?.subteams || []}
+                              members={activeOrgDetails?.members || []}
+                              completionStatuses={advancedSettings?.completion_statuses}
+                              onToggleSubtask={handleToggleSubtaskQuick}
+                            />
+                            {task.descricao && (
+                              <div className="mt-0.5 flex flex-col items-start w-full pr-2">
+                                <div className={`text-xs text-fg-secondary transition-all ${(expandedTasks.includes(task.id) || advancedSettings?.auto_expand_descriptions) ? 'whitespace-pre-wrap' : 'line-clamp-1'}`}>
+                                  <HighlightedText text={task.descricao} highlight={searchTerm} />
+                                </div>
+                                {(!advancedSettings?.auto_expand_descriptions && (task.descricao.length > 80 || task.descricao.includes('\n'))) && (
+                                  <button
+                                    onClick={(e) => toggleTaskExpansion(task.id, e)}
+                                    className="text-accent-primary text-[10px] font-bold mt-0.5 flex items-center hover:underline"
+                                  >
+                                    {expandedTasks.includes(task.id) ? (
+                                      <>Ver menos <span className="material-symbols-outlined text-[14px]">expand_less</span></>
+                                    ) : (
+                                      <>Ver mais <span className="material-symbols-outlined text-[14px]">expand_more</span></>
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Status com Dropdown Rápido */}
+                      <td className="py-2.5 px-3" onClick={(e) => handleBadgeClick(e, task, 'status')}>
+                        <div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar status">
+                          <Badge type="status" value={task.status} customColor={getColColor('status', task.status)} />
+                        </div>
+                      </td>
+
+                      {/* Prioridade com Dropdown Rápido */}
+                      <td className="py-2.5 px-3" onClick={(e) => handleBadgeClick(e, task, 'prioridade')}>
+                        <div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar prioridade">
+                          <Badge type="prioridade" value={task.prioridade} customColor={getColColor('prioridade', task.prioridade)} />
+                        </div>
+                      </td>
+
+                      {/* Prazo */}
+                      <td className="py-2.5 px-3 text-xs text-fg-secondary">{formatDate(task.prazo)}</td>
+
+                      {/* Responsável (6 Colunas Essenciais) */}
+                      {!isPersonalScope && visibleExtraCols.includes("responsavel") && (
+                        <td className="py-2.5 px-3" onClick={(e) => handleBadgeClick(e, task, 'responsavel')}>
+                          <div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar responsável">
+                            <Badge type="responsavel" value={task.responsavel} customColor={getColColor('responsavel', task.responsavel)} />
+                          </div>
+                        </td>
+                      )}
+
+                      {/* Colunas Opcionais */}
+                      {visibleExtraCols.includes("categoria") && (
+                        <td className="py-2.5 px-3" onClick={(e) => handleBadgeClick(e, task, 'categoria')}>
+                          <div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar categoria">
+                            <Badge type="categoria" value={task.categoria} customColor={getColColor('categoria', task.categoria)} />
+                          </div>
+                        </td>
+                      )}
+                      {visibleExtraCols.includes("criada_em") && (
+                        <td className="py-2.5 px-3 text-xs text-fg-secondary">{formatDate(task.created_at)}</td>
+                      )}
+                      {visibleExtraCols.includes("inicio") && (
+                        <td className="py-2.5 px-3 text-xs text-fg-secondary">{formatDate(task.inicio)}</td>
+                      )}
+                      {hasAnyPrazo && visibleExtraCols.includes("dias_restantes") && (
+                        <td className="py-2.5 px-3 text-xs">
+                          {task.prazo ? (
+                            (() => {
+                              if (task.status === 'completa') {
+                                const days = getDaysUntil(task.prazo, task.concluida_em);
+                                if (days === null) return <span className="text-accent-primary font-bold">Concluída</span>;
+                                return <span className="text-accent-primary font-bold">Concluída ({days > 0 ? `+${days}d` : `${days}d`})</span>;
+                              }
+                              if (task.status === 'descartada') return <span className="text-fg-muted font-bold">-</span>;
+                              const days = getDaysUntil(task.prazo);
+                              if (days === null) return '-';
+                              if (days < 0) return <span className="text-[#db4437] font-bold">Atrasada ({-days}d)</span>;
+                              if (days === 0) return <span className="text-[#db4437] font-bold">Hoje!</span>;
+                              return <span className="text-[#FFCC00] font-bold">{days} dias</span>;
+                            })()
+                          ) : '-'}
+                        </td>
+                      )}
+                      {visibleExtraCols.includes("concluida_em") && (
+                        <td className="py-2.5 px-3 text-xs text-fg-secondary">{formatDate(task.concluida_em)}</td>
+                      )}
+                      {visibleExtraCols.includes("frequencia") && (
+                        <td className="py-2.5 px-3 text-xs text-fg-secondary">{task.frequencia || '-'}</td>
+                      )}
+                      {visibleExtraCols.includes("dimensao") && (
+                        <td className="py-2.5 px-3" onClick={(e) => handleBadgeClick(e, task, 'dimensao')}>
+                          <div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar dimensão">
+                            <Badge type="dimensao" value={task.dimensao} customColor={getColColor('dimensao', task.dimensao)} />
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  </React.Fragment>
+                ))}
+                {processedTasks.length === 0 && (
+                  <tr>
+                    <td colSpan={10} className="p-8 text-center text-fg-muted text-sm">Nenhuma tarefa encontrada.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile View (Cards) */}
+          <div ref={mobileContainerRef} style={{ overflowAnchor: 'none' }} className="md:hidden space-y-4 pb-20 mt-4">
             {processedTasks.map(task => (
-              <React.Fragment key={task.id}>
-              <tr 
+              <div
+                key={task.id}
                 draggable={sortBy === 'manual' ? true : undefined}
                 onDragStart={sortBy === 'manual' ? (e) => handleDragStart(e, task.id) : undefined}
                 onDragOver={sortBy === 'manual' ? (e) => handleDragOver(e, task.id) : undefined}
@@ -2417,414 +2761,280 @@ export function TasksView({
                 onDrop={sortBy === 'manual' ? (e) => handleDrop(e, task.id) : undefined}
                 onDragEnd={sortBy === 'manual' ? () => setDropTargetId(null) : undefined}
                 onClick={(e) => handleRowClick(e, task.id)}
-                className={`transition-colors group ${selectedTasks.has(task.id) ? 'bg-[#9D4EDD]/10' : 'hover:bg-surface-hover'} ${draggedTaskId === task.id ? 'opacity-50' : ''} ${dropTargetId === task.id ? (dropPosition === 'top' ? 'border-t-2 border-[#9D4EDD]' : 'border-b-2 border-[#9D4EDD]') : 'border-b border-[#FFCC00]/30 hover:border-[#9D4EDD]'}`}
+                className={`border rounded-lg p-4 flex flex-col gap-3 relative transition-colors ${selectedTasks.has(task.id) ? 'bg-accent-primary/10 border-accent-primary/30' : 'bg-surface border border-border-subtle hover:border-accent-primary'} ${draggedTaskId === task.id ? 'opacity-50' : ''} ${dropTargetId === task.id ? (dropPosition === 'top' ? 'border-t-2 border-accent-primary' : 'border-b-2 border-accent-primary') : ''} ${task.parent_id ? 'border-l-2 border-l-accent-secondary ml-4 scale-[0.97] origin-left' : ''}`}
               >
-                <td className="p-4">
-                  <div className="flex items-center justify-center gap-2">
-                    <span className={`material-symbols-outlined text-fg-muted hover:text-white opacity-0 group-hover:opacity-100 transition-opacity ${sortBy === 'manual' ? 'cursor-grab' : 'cursor-not-allowed'}`} title={sortBy !== 'manual' ? 'Mude para ordenação Manual para arrastar' : 'Arrastar'}>drag_indicator</span>
-                    <input type="checkbox" className="accent-[#9D4EDD] rounded-sm" checked={selectedTasks.has(task.id)} onChange={(e) => toggleCheckbox(e, task.id)} />
-                    <button onClick={(e) => handleFavoriteToggle(e, task.id)} className={`transition-colors flex items-center justify-center ${task.is_favorite ? 'text-[#FFCC00]' : 'text-fg-muted hover:text-[#FFCC00]'}`}>
-                      <span className={`material-symbols-outlined text-[18px] ${task.is_favorite ? 'filled' : ''}`} style={task.is_favorite ? { fontVariationSettings: "'FILL' 1" } : {}}>star</span>
-                    </button>
-                  </div>
-                </td>
-                <td className="p-4 text-center">
-                  <button 
+                <div className="absolute top-4 right-4 flex items-center gap-3">
+                  <button onClick={(e) => handleFavoriteToggle(e, task.id)} className={`transition-colors flex items-center justify-center ${task.is_favorite ? 'text-accent-secondary' : 'text-fg-muted hover:text-accent-secondary'}`}>
+                    <span className={`material-symbols-outlined text-[18px] ${task.is_favorite ? 'filled' : ''}`} style={task.is_favorite ? { fontVariationSettings: "'FILL' 1" } : {}}>star</span>
+                  </button>
+                  <input type="checkbox" className="accent-[var(--accent-primary)] rounded-sm w-4 h-4" checked={selectedTasks.has(task.id)} onChange={(e) => toggleCheckbox(e, task.id)} />
+                  <button
                     onClick={() => handleEdit(task)}
-                    className="text-fg-muted hover:text-[#9D4EDD] opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-fg-muted hover:text-accent-primary"
                   >
                     <span className="material-symbols-outlined text-[18px]">edit</span>
                   </button>
-                </td>
-                <td className="p-4 text-sm font-medium text-white break-words" title={task.descricao || ''}>
-                  <div className={`flex items-center gap-2 ${task.parent_id ? 'pl-3 border-l-2 border-[#FFCC00] ml-4 scale-[0.97] origin-left' : ''}`}>
-                    {!task.parent_id && localTasks.some(t => t.parent_id === task.id) && (
-                      <button onClick={(e) => toggleExpand(e, task.id)} className="text-fg-muted hover:text-white transition-colors flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-[20px]">{!collapsedTasks.has(task.id) ? 'expand_more' : 'chevron_right'}</span>
-                      </button>
-                    )}
-                    <div className="flex flex-col">
+                </div>
+
+                <div className={`pr-16 flex items-start gap-2`}>
+                  {!task.parent_id && localTasks.some(t => t.parent_id === task.id) && (
+                    <button onClick={(e) => toggleExpand(e, task.id)} className="text-fg-muted hover:text-white transition-colors flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="material-symbols-outlined text-[20px]">{!collapsedTasks.has(task.id) ? 'expand_more' : 'chevron_right'}</span>
+                    </button>
+                  )}
+                  {(!task.parent_id || !localTasks.some(t => t.parent_id === task.id)) && (
+                    <span className={`material-symbols-outlined text-fg-muted text-[18px] mt-0.5 ${sortBy === 'manual' ? 'cursor-grab' : 'cursor-not-allowed'}`} title={sortBy !== 'manual' ? 'Mude para ordenação Manual para arrastar' : 'Arrastar'}>drag_indicator</span>
+                  )}
+                  <div>
+                    <h3 className="text-sm font-bold text-white mb-1">
                       <div className="flex items-center gap-2">
                         <HighlightedText text={task.nome} highlight={searchTerm} />
                         {(task as any).custom_fields?.foto_url && (
-                          <a href={(task as any).custom_fields.foto_url} target="_blank" rel="noopener noreferrer" className="text-fg-muted hover:text-[#9D4EDD] flex items-center transition-colors" title="Ver foto">
+                          <a href={(task as any).custom_fields.foto_url} target="_blank" rel="noopener noreferrer" className="text-fg-muted hover:text-accent-primary flex items-center transition-colors" title="Ver foto">
                             <span className="material-symbols-outlined text-[16px]">image</span>
                           </a>
                         )}
                       </div>
-                      {task.descricao && (
-                        <div className="mt-1 flex flex-col items-start w-full pr-2">
-                          <div className={`text-xs text-fg-secondary transition-all ${(expandedTasks.includes(task.id) || advancedSettings?.auto_expand_descriptions) ? 'whitespace-pre-wrap' : 'line-clamp-1'}`}>
-                            <HighlightedText text={task.descricao} highlight={searchTerm} />
-                          </div>
-                          {(!advancedSettings?.auto_expand_descriptions && (task.descricao.length > 80 || task.descricao.includes('\n'))) && (
-                            <button 
-                              onClick={(e) => toggleTaskExpansion(task.id, e)}
-                              className="text-[#9D4EDD] text-[10px] font-bold mt-1 flex items-center hover:underline"
-                            >
-                              {expandedTasks.includes(task.id) ? (
-                                <>Ver menos <span className="material-symbols-outlined text-[14px]">expand_less</span></>
-                              ) : (
-                                <>Ver mais <span className="material-symbols-outlined text-[14px]">expand_more</span></>
-                              )}
-                            </button>
-                          )}
-                        </div>
-                      )}
+                    </h3>
+                    <TaskDelegationBadges
+                      task={task}
+                      allTasks={localTasks}
+                      subteams={activeOrgDetails?.subteams || []}
+                      members={activeOrgDetails?.members || []}
+                      completionStatuses={advancedSettings?.completion_statuses}
+                      onToggleSubtask={handleToggleSubtaskQuick}
+                    />
+                    {task.descricao && (
+                      <div className="mt-1 flex flex-col items-start w-full">
+                        <p className={`text-[11px] text-fg-secondary transition-all ${(expandedTasks.includes(task.id) || advancedSettings?.auto_expand_descriptions) ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}>
+                          <HighlightedText text={task.descricao} highlight={searchTerm} />
+                        </p>
+                        {(!advancedSettings?.auto_expand_descriptions && (task.descricao.length > 100 || task.descricao.includes('\n'))) && (
+                          <button
+                            onClick={(e) => toggleTaskExpansion(task.id, e)}
+                            className="text-accent-primary text-[10px] font-bold mt-1 flex items-center hover:underline"
+                          >
+                            {expandedTasks.includes(task.id) ? (
+                              <>Ver menos <span className="material-symbols-outlined text-[14px]">expand_less</span></>
+                            ) : (
+                              <>Ver mais <span className="material-symbols-outlined text-[14px]">expand_more</span></>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-1 pl-6 pr-2">
+                  <div className="flex justify-between items-center text-center mb-1 gap-1">
+                    <div className="flex-1 flex justify-center items-center gap-1">
+                      <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Status</span>
+                      <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Estágio atual.")}><span className="material-symbols-outlined text-[6px] text-fg-muted">help</span></div>
+                    </div>
+                    <div className="flex-1 flex justify-center items-center gap-1">
+                      <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Prio</span>
+                      <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Nível de urgência.")}><span className="material-symbols-outlined text-[6px] text-fg-muted">help</span></div>
+                    </div>
+                    <div className="flex-1 flex justify-center items-center gap-1">
+                      <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Categ</span>
+                      <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Tipo de ação.")}><span className="material-symbols-outlined text-[6px] text-fg-muted">help</span></div>
+                    </div>
+                    {visibleExtraCols.includes("responsavel") && <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider flex-1 truncate">Resp</span>}
+                    <div className="flex-1 flex justify-center items-center gap-1">
+                      <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Dim</span>
+                      <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Área da vida.")}><span className="material-symbols-outlined text-[6px] text-fg-muted">help</span></div>
                     </div>
                   </div>
-                </td>
-                <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'status')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar status"><Badge type="status" value={task.status} customColor={getColColor('status', task.status)} /></div></td>
-                <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'prioridade')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar prioridade"><Badge type="prioridade" value={task.prioridade} customColor={getColColor('prioridade', task.prioridade)} /></div></td>
-                <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'categoria')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar categoria"><Badge type="categoria" value={task.categoria} customColor={getColColor('categoria', task.categoria)} /></div></td>
-                {!isPersonalScope && <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'responsavel')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar responsável"><Badge type="responsavel" value={task.responsavel} customColor={getColColor('responsavel', task.responsavel)} /></div></td>}
-                <td className="p-4 text-xs text-fg-secondary">{formatDate(task.created_at)}</td>
-                <td className="p-4 text-xs text-fg-secondary">{formatDate(task.inicio)}</td>
-                <td className="p-4 text-xs text-fg-secondary">{formatDate(task.prazo)}</td>
-                {hasAnyPrazo && (
-                  <td className="p-4 text-xs">
-                    {task.prazo ? (
+                  <div className="flex justify-between items-center text-center gap-1">
+                    <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'status')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="status" value={task.status} customColor={getColColor('status', task.status)} /></div></div>
+                    <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'prioridade')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="prioridade" value={task.prioridade} customColor={getColColor('prioridade', task.prioridade)} /></div></div>
+                    <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'categoria')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="categoria" value={task.categoria} customColor={getColColor('categoria', task.categoria)} /></div></div>
+                    <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'responsavel')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="responsavel" value={task.responsavel} customColor={getColColor('responsavel', task.responsavel)} /></div></div>
+                    <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'dimensao')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="dimensao" value={task.dimensao} customColor={getColColor('dimensao', task.dimensao)} /></div></div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between mt-2 border-t border-border-subtle pt-2 pb-1 text-[9px] text-fg-secondary pl-6 pr-2">
+                  <span className="truncate">Cria: {formatDate(task.created_at)}</span>
+                  <span className="truncate">Ini: {formatDate(task.inicio)}</span>
+                  <span className="truncate flex items-center gap-1">
+                    Fim: {formatDate(task.prazo)}
+                    {task.prazo && (
                       (() => {
                         if (task.status === 'completa') {
                           const days = getDaysUntil(task.prazo, task.concluida_em);
-                          if (days === null) return <span className="text-[#9D4EDD] font-bold">Concluída</span>;
-                          return <span className="text-[#9D4EDD] font-bold">Concluída ({days > 0 ? `+${days}d` : `${days}d`})</span>;
+                          if (days === null) return <span className="text-accent-primary font-bold">Concluída</span>;
+                          return <span className="text-accent-primary font-bold">Concluída ({days > 0 ? `+${days}d` : `${days}d`})</span>;
                         }
                         if (task.status === 'descartada') return <span className="text-fg-muted font-bold">-</span>;
                         const days = getDaysUntil(task.prazo);
-                        if (days === null) return '-';
-                        if (days < 0) return <span className="text-[#db4437] font-bold">Atrasada ({-days}d)</span>;
+                        if (days === null) return null;
+                        if (days < 0) return <span className="text-[#db4437] font-bold">({-days}d)</span>;
                         if (days === 0) return <span className="text-[#db4437] font-bold">Hoje!</span>;
-                        return <span className="text-[#FFCC00] font-bold">{days} dias</span>;
+                        return <span className="text-[#FFCC00] font-bold">{days}d</span>;
                       })()
-                    ) : '-'}
-                  </td>
-                )}
-                <td className="p-4 text-xs text-fg-secondary">{formatDate(task.concluida_em)}</td>
-                <td className="p-4 text-xs text-fg-secondary">{task.frequencia || '-'}</td>
-                <td className="p-4" onClick={(e) => handleBadgeClick(e, task, 'dimensao')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar dimensão"><Badge type="dimensao" value={task.dimensao} customColor={getColColor('dimensao', task.dimensao)} /></div></td>
-              </tr>
-              </React.Fragment>
-            ))}
-            {processedTasks.length === 0 && (
-              <tr>
-                <td colSpan={13} className="p-8 text-center text-fg-muted text-sm">Nenhuma tarefa encontrada.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile View (Cards) */}
-      <div ref={mobileContainerRef} style={{ overflowAnchor: 'none' }} className="md:hidden space-y-4 pb-20 mt-4">
-        {processedTasks.map(task => (
-          <div 
-            key={task.id} 
-            draggable={sortBy === 'manual' ? true : undefined}
-            onDragStart={sortBy === 'manual' ? (e) => handleDragStart(e, task.id) : undefined}
-            onDragOver={sortBy === 'manual' ? (e) => handleDragOver(e, task.id) : undefined}
-            onDragLeave={sortBy === 'manual' ? handleDragLeave : undefined}
-            onDrop={sortBy === 'manual' ? (e) => handleDrop(e, task.id) : undefined}
-            onDragEnd={sortBy === 'manual' ? () => setDropTargetId(null) : undefined}
-            onClick={(e) => handleRowClick(e, task.id)}
-            className={`border rounded-lg p-4 flex flex-col gap-3 relative transition-colors ${selectedTasks.has(task.id) ? 'bg-[#9D4EDD]/10 border-[#9D4EDD]/30' : 'bg-surface border border-border-subtle hover:border-[var(--accent-primary)]'} ${draggedTaskId === task.id ? 'opacity-50' : ''} ${dropTargetId === task.id ? (dropPosition === 'top' ? 'border-t-2 border-[#9D4EDD]' : 'border-b-2 border-[#9D4EDD]') : ''} ${task.parent_id ? 'border-l-2 border-l-[#FFCC00] ml-4 scale-[0.97] origin-left' : ''}`}
-          >
-            <div className="absolute top-4 right-4 flex items-center gap-3">
-              <button onClick={(e) => handleFavoriteToggle(e, task.id)} className={`transition-colors flex items-center justify-center ${task.is_favorite ? 'text-[#FFCC00]' : 'text-fg-muted hover:text-[#FFCC00]'}`}>
-                <span className={`material-symbols-outlined text-[18px] ${task.is_favorite ? 'filled' : ''}`} style={task.is_favorite ? { fontVariationSettings: "'FILL' 1" } : {}}>star</span>
-              </button>
-              <input type="checkbox" className="accent-[#9D4EDD] rounded-sm w-4 h-4" checked={selectedTasks.has(task.id)} onChange={(e) => toggleCheckbox(e, task.id)} />
-              <button 
-                onClick={() => handleEdit(task)}
-                className="text-fg-muted hover:text-[#9D4EDD]"
-              >
-                <span className="material-symbols-outlined text-[18px]">edit</span>
-              </button>
-            </div>
-            
-            <div className={`pr-16 flex items-start gap-2`}>
-              {!task.parent_id && localTasks.some(t => t.parent_id === task.id) && (
-                <button onClick={(e) => toggleExpand(e, task.id)} className="text-fg-muted hover:text-white transition-colors flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="material-symbols-outlined text-[20px]">{!collapsedTasks.has(task.id) ? 'expand_more' : 'chevron_right'}</span>
-                </button>
-              )}
-              {(!task.parent_id || !localTasks.some(t => t.parent_id === task.id)) && (
-                <span className={`material-symbols-outlined text-fg-muted text-[18px] mt-0.5 ${sortBy === 'manual' ? 'cursor-grab' : 'cursor-not-allowed'}`} title={sortBy !== 'manual' ? 'Mude para ordenação Manual para arrastar' : 'Arrastar'}>drag_indicator</span>
-              )}
-              <div>
-                <h3 className="text-sm font-bold text-white mb-1">
-                  <div className="flex items-center gap-2">
-                    <HighlightedText text={task.nome} highlight={searchTerm} />
-                    {(task as any).custom_fields?.foto_url && (
-                      <a href={(task as any).custom_fields.foto_url} target="_blank" rel="noopener noreferrer" className="text-fg-muted hover:text-[#9D4EDD] flex items-center transition-colors" title="Ver foto">
-                        <span className="material-symbols-outlined text-[16px]">image</span>
-                      </a>
                     )}
-                  </div>
-                </h3>
+                  </span>
+                  <span className="truncate">Concl: {formatDate(task.concluida_em)}</span>
+                </div>
                 {task.descricao && (
-                  <div className="mt-1 flex flex-col items-start w-full">
-                    <p className={`text-[11px] text-fg-secondary transition-all ${(expandedTasks.includes(task.id) || advancedSettings?.auto_expand_descriptions) ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}>
-                      <HighlightedText text={task.descricao} highlight={searchTerm} />
-                    </p>
-                    {(!advancedSettings?.auto_expand_descriptions && (task.descricao.length > 100 || task.descricao.includes('\n'))) && (
-                      <button 
-                        onClick={(e) => toggleTaskExpansion(task.id, e)}
-                        className="text-[#9D4EDD] text-[10px] font-bold mt-1 flex items-center hover:underline"
-                      >
-                        {expandedTasks.includes(task.id) ? (
-                          <>Ver menos <span className="material-symbols-outlined text-[14px]">expand_less</span></>
-                        ) : (
-                          <>Ver mais <span className="material-symbols-outlined text-[14px]">expand_more</span></>
-                        )}
-                      </button>
-                    )}
+                  <div className="mt-2 text-xs text-gray-300">
+                    <div className="font-semibold text-gray-500 mb-1">Descrição</div>
+                    <div className="whitespace-pre-wrap">{task.descricao}</div>
                   </div>
                 )}
               </div>
-            </div>
-            
-            <div className="mt-1 pl-6 pr-2">
-              <div className="flex justify-between items-center text-center mb-1 gap-1">
-                <div className="flex-1 flex justify-center items-center gap-1">
-  <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Status</span>
-  <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Estágio atual.")}><span className="material-symbols-outlined text-[6px] text-fg-muted">help</span></div>
-</div>
-                <div className="flex-1 flex justify-center items-center gap-1">
-  <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Prio</span>
-  <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Nível de urgência.")}><span className="material-symbols-outlined text-[6px] text-fg-muted">help</span></div>
-</div>
-                <div className="flex-1 flex justify-center items-center gap-1">
-  <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Categ</span>
-  <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Tipo de ação.")}><span className="material-symbols-outlined text-[6px] text-fg-muted">help</span></div>
-</div>
-                {visibleExtraCols.includes("responsavel") && <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider flex-1 truncate">Resp</span>}
-                <div className="flex-1 flex justify-center items-center gap-1">
-  <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Dim</span>
-  <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Área da vida.")}><span className="material-symbols-outlined text-[6px] text-fg-muted">help</span></div>
-</div>
-              </div>
-              <div className="flex justify-between items-center text-center gap-1">
-                <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'status')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="status" value={task.status} customColor={getColColor('status', task.status)} /></div></div>
-                <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'prioridade')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="prioridade" value={task.prioridade} customColor={getColColor('prioridade', task.prioridade)} /></div></div>
-                <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'categoria')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="categoria" value={task.categoria} customColor={getColColor('categoria', task.categoria)} /></div></div>
-                <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'responsavel')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="responsavel" value={task.responsavel} customColor={getColColor('responsavel', task.responsavel)} /></div></div>
-                <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'dimensao')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="dimensao" value={task.dimensao} customColor={getColColor('dimensao', task.dimensao)} /></div></div>
-              </div>
-            </div>
+            ))}
+            {localTasks.length === 0 && (
+              <div className="p-4 bg-surface rounded-lg border border-border-subtle shadow-sm relative animate-pulse-slow">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-2">
+                      Bem-vindo! Tarefa de exemplo.
+                      <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
+                        <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                        <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-left font-normal normal-case tracking-normal left-0">
+                          O nome principal da sua tarefa.
+                        </div>
+                      </div>
+                    </h3>
+                  </div>
+                </div>
 
-            <div className="flex items-center justify-between mt-2 border-t border-border-subtle pt-2 pb-1 text-[9px] text-fg-secondary pl-6 pr-2">
-              <span className="truncate">Cria: {formatDate(task.created_at)}</span>
-              <span className="truncate">Ini: {formatDate(task.inicio)}</span>
-              <span className="truncate flex items-center gap-1">
-                Fim: {formatDate(task.prazo)}
-                {task.prazo && (
-                  (() => {
-                    if (task.status === 'completa') {
-                      const days = getDaysUntil(task.prazo, task.concluida_em);
-                      if (days === null) return <span className="text-[#9D4EDD] font-bold">Concluída</span>;
-                      return <span className="text-[#9D4EDD] font-bold">Concluída ({days > 0 ? `+${days}d` : `${days}d`})</span>;
-                    }
-                    if (task.status === 'descartada') return <span className="text-fg-muted font-bold">-</span>;
-                    const days = getDaysUntil(task.prazo);
-                    if (days === null) return null;
-                    if (days < 0) return <span className="text-[#db4437] font-bold">({-days}d)</span>;
-                    if (days === 0) return <span className="text-[#db4437] font-bold">Hoje!</span>;
-                    return <span className="text-[#FFCC00] font-bold">{days}d</span>;
-                  })()
-                )}
-              </span>
-              <span className="truncate">Concl: {formatDate(task.concluida_em)}</span>
-            </div>
-            {task.descricao && (
-              <div className="mt-2 text-xs text-gray-300">
-                <div className="font-semibold text-gray-500 mb-1">Descrição</div>
-                <div className="whitespace-pre-wrap">{task.descricao}</div>
-              </div>
-            )}
-          </div>
-        ))}
-        {localTasks.length === 0 && (
-          <div className="p-4 bg-surface rounded-lg border border-border-subtle shadow-sm relative animate-pulse-slow">
-            <div className="flex items-start gap-3">
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-2">
-                  Bem-vindo! Tarefa de exemplo.
-                  <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                    <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
-                    <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-left font-normal normal-case tracking-normal left-0">
-                      O nome principal da sua tarefa.
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between text-[10px] bg-surface-hover p-2 rounded text-fg">
+                    <span className="text-fg-muted font-bold uppercase tracking-wider">Status</span>
+                    <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
+                      <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                      <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
+                        O estágio atual da tarefa (Ex: Em progresso).
+                      </div>
                     </div>
                   </div>
-                </h3>
-              </div>
-            </div>
+                  <div className="flex items-center justify-between text-[10px] bg-surface-hover p-2 rounded text-fg">
+                    <span className="text-fg-muted font-bold uppercase tracking-wider">Dimensão</span>
+                    <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
+                      <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                      <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
+                        A grande área da sua vida (Pessoal, Saúde, etc).
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] bg-surface-hover p-2 rounded text-fg">
+                    <span className="text-fg-muted font-bold uppercase tracking-wider">Prioridade</span>
+                    <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
+                      <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                      <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
+                        Nível de urgência (Alta, Média, Baixa).
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] bg-surface-hover p-2 rounded text-fg">
+                    <span className="text-fg-muted font-bold uppercase tracking-wider">Categoria</span>
+                    <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
+                      <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
+                      <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
+                        O tipo de ação (Ex: Programar, Estudar).
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <div className="flex items-center justify-between text-[10px] bg-surface-hover p-2 rounded text-fg">
-                <span className="text-fg-muted font-bold uppercase tracking-wider">Status</span>
-                <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                  <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
-                    O estágio atual da tarefa (Ex: Em progresso).
-                  </div>
+                <div className="mt-6 text-center text-fg-muted text-xs">
+                  Nenhuma tarefa encontrada.<br />Clique em <span className="text-[#FFCC00] font-bold">+ Nova Tarefa</span> para começar.
                 </div>
               </div>
-              <div className="flex items-center justify-between text-[10px] bg-surface-hover p-2 rounded text-fg">
-                <span className="text-fg-muted font-bold uppercase tracking-wider">Dimensão</span>
-                <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                  <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
-                    A grande área da sua vida (Pessoal, Saúde, etc).
-                  </div>
-                </div>
+            )}
+            {processedTasks.length === 0 && localTasks.length > 0 && (
+              <div className="p-8 text-center text-fg-muted text-sm bg-surface rounded-lg border border-border-subtle">
+                Nenhuma tarefa encontrada.
               </div>
-              <div className="flex items-center justify-between text-[10px] bg-surface-hover p-2 rounded text-fg">
-                <span className="text-fg-muted font-bold uppercase tracking-wider">Prioridade</span>
-                <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                  <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
-                    Nível de urgência (Alta, Média, Baixa).
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between text-[10px] bg-surface-hover p-2 rounded text-fg">
-                <span className="text-fg-muted font-bold uppercase tracking-wider">Categoria</span>
-                <div className="flex items-center gap-1 relative group/tooltip cursor-help w-fit">
-                  <span className="material-symbols-outlined text-[6px] text-fg-muted">help</span>
-                  <div className="absolute top-full mt-2 w-48 p-2 bg-app text-fg text-[11px] rounded border border-border-subtle shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible z-50 text-center font-normal normal-case tracking-normal right-0">
-                    O tipo de ação (Ex: Programar, Estudar).
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="mt-6 text-center text-fg-muted text-xs">
-              Nenhuma tarefa encontrada.<br/>Clique em <span className="text-[#FFCC00] font-bold">+ Nova Tarefa</span> para começar.
-            </div>
+            )}
           </div>
-        )}
-        {processedTasks.length === 0 && localTasks.length > 0 && (
-          <div className="p-8 text-center text-fg-muted text-sm bg-surface rounded-lg border border-border-subtle">
-            Nenhuma tarefa encontrada.
-          </div>
-        )}
-      </div>
-      </div>
+        </div>
       )}
 
       {viewMode !== 'list' && (
-          <TaskCalendar 
-            currentDate={calendarCurrentDate} 
-            onDateChange={setCalendarCurrentDate} 
-            format={viewMode === 'monthly' ? 'monthly' : 'weekly'}
-            tasks={displayMode === 'eventos' ? [] : processedTasks} 
-            events={displayMode === 'tarefas' ? [] : processedEvents}
-            onTaskClick={(t) => { setTaskToEdit(t); setIsModalOpen(true); }}
-            onEventClick={(e) => { setEventToEdit(e); setIsEventModalOpen(true); }}
-          />
-        )}
-        
-        {/* Events List */}
-        {displayMode !== 'tarefas' && (
-          <div className="mt-8 border border-border-subtle rounded-lg p-4 bg-surface/50">
-            <h3 className="text-fg-muted uppercase font-bold text-xs mb-4">Próximos Eventos</h3>
-            {processedEvents.length === 0 ? (
-              <div className="text-sm text-fg-muted">Nenhum evento programado.</div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {processedEvents.map(evt => (
-                  <div key={evt.id} onClick={() => { setEventToEdit(evt); setIsEventModalOpen(true); }} className="flex flex-col p-3 bg-surface border border-border-subtle hover:bg-surface-hover rounded hover:border-[#9D4EDD]/50 transition-colors cursor-pointer relative group">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[#26a69a] text-[16px]">event</span>
-                        <span className="font-bold text-sm text-fg-secondary">{evt.nome}</span>
-                      </div>
-                      <button onClick={(e) => handleEventFavoriteToggle(e, evt)} className={`transition-colors flex items-center justify-center ${evt.is_favorite ? 'text-[#FFCC00]' : 'text-fg-muted hover:text-[#FFCC00] opacity-0 group-hover:opacity-100'}`}>
-                        <span className={`material-symbols-outlined text-[18px] ${evt.is_favorite ? 'filled' : ''}`} style={evt.is_favorite ? { fontVariationSettings: "'FILL' 1" } : {}}>star</span>
-                      </button>
+        <TaskCalendar
+          currentDate={calendarCurrentDate}
+          onDateChange={setCalendarCurrentDate}
+          format={viewMode === 'monthly' ? 'monthly' : 'weekly'}
+          tasks={displayMode === 'eventos' ? [] : processedTasks}
+          events={displayMode === 'tarefas' ? [] : processedEvents}
+          onTaskClick={(t) => { setTaskToEdit(t); setIsModalOpen(true); }}
+          onEventClick={(e) => { setEventToEdit(e); setIsEventModalOpen(true); }}
+        />
+      )}
+
+      {/* Events List */}
+      {displayMode !== 'tarefas' && (
+        <div className="mt-8 border border-border-subtle rounded-lg p-4 bg-surface/50">
+          <h3 className="text-fg-muted uppercase font-bold text-xs mb-4">Próximos Eventos</h3>
+          {processedEvents.length === 0 ? (
+            <div className="text-sm text-fg-muted">Nenhum evento programado.</div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {processedEvents.map(evt => (
+                <div key={evt.id} onClick={() => { setEventToEdit(evt); setIsEventModalOpen(true); }} className="flex flex-col p-3 bg-surface border border-border-subtle hover:bg-surface-hover rounded hover:border-accent-primary/50 transition-colors cursor-pointer relative group">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[#26a69a] text-[16px]">event</span>
+                      <span className="font-bold text-sm text-fg-secondary">{evt.nome}</span>
                     </div>
-                    {(evt.data_inicio || evt.horarios_semanais) && (
-                      <div className="text-xs text-fg-muted mt-1 pl-6">
-                        {evt.frequencia === 'Semanal' && evt.horarios_semanais 
-                          ? Object.entries(evt.horarios_semanais).map(([dia, h]: [string, any]) => `${dia} (${h.inicio} - ${h.fim})`).join(', ')
-                          : evt.data_inicio ? new Date(evt.data_inicio).toLocaleDateString() : ''}
-                      </div>
-                    )}
+                    <button onClick={(e) => handleEventFavoriteToggle(e, evt)} className={`transition-colors flex items-center justify-center ${evt.is_favorite ? 'text-[#FFCC00]' : 'text-fg-muted hover:text-[#FFCC00] opacity-0 group-hover:opacity-100'}`}>
+                      <span className={`material-symbols-outlined text-[18px] ${evt.is_favorite ? 'filled' : ''}`} style={evt.is_favorite ? { fontVariationSettings: "'FILL' 1" } : {}}>star</span>
+                    </button>
                   </div>
-                ))}
-              </div>
-            )}
-            <button className="mt-4 px-4 py-2 bg-[#9D4EDD] text-white font-bold text-xs rounded-md hover:bg-[#8534C1] transition-colors shadow-sm" onClick={handleNewEvent}>
-              + Novo Evento
-            </button>
-          </div>
-        )}
+                  {(evt.data_inicio || evt.horarios_semanais) && (
+                    <div className="text-xs text-fg-muted mt-1 pl-6">
+                      {evt.frequencia === 'Semanal' && evt.horarios_semanais
+                        ? Object.entries(evt.horarios_semanais).map(([dia, h]: [string, any]) => `${dia} (${h.inicio} - ${h.fim})`).join(', ')
+                        : evt.data_inicio ? new Date(evt.data_inicio).toLocaleDateString() : ''}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <button className="mt-4 px-4 py-2 bg-accent-primary text-on-accent-primary font-bold text-xs rounded-md hover:bg-accent-primary-hover transition-colors shadow-sm" onClick={handleNewEvent}>
+            + Novo Evento
+          </button>
+        </div>
+      )}
 
-      {/* Floating Action Buttons Container */}
-      <div className={`fixed right-6 z-[999] flex flex-col items-center gap-4 ${isAurtistic ? 'bottom-40 md:bottom-24' : 'bottom-24 md:bottom-8'}`}>
-        
-        {/* Floating Bulk Edit Button */}
-        {selectedTasks.size > 0 && (
-          <button 
+      {/* Floating Action Bar Discreta quando houver seleção múltipla (Frente 2.7.6) */}
+      {selectedTasks.size > 0 && (
+        <div className="fixed bottom-6 right-6 z-[99] flex items-center gap-2 bg-surface/95 border border-accent-primary/50 backdrop-blur-md px-4 py-2 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom duration-200">
+          <span className="text-xs font-bold text-fg">
+            <span className="text-accent-secondary">{selectedTasks.size}</span> selecionadas
+          </span>
+          <button
+            type="button"
             onClick={() => setIsBulkEditModalOpen(true)}
-            className="bg-[#9D4EDD] hover:bg-[#8A3BCE] text-[#FFFFFF] p-3 rounded-full shadow-[0_8px_32px_rgba(157,78,221,0.3)] transition-all duration-300 flex items-center justify-center group"
-            title="Editar Selecionadas"
+            className="bg-accent-primary hover:bg-accent-primary-hover text-on-accent-primary px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
           >
-            <span className="material-symbols-outlined font-bold">edit</span>
+            <span className="material-symbols-outlined text-[14px]">edit</span>
+            Editar em Lote
           </button>
-        )}
-
-        {/* Floating Scroll to Top Button */}
-        {isAurtistic && (
-          <button 
-            onClick={scrollToTop}
-            className="bg-surface hover:bg-surface-hover border border-[#FFCC00]/50 hover:border-[#9D4EDD] text-fg-muted hover:text-[#9D4EDD] p-3 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center group"
-            title="Ir para o topo"
+          <button
+            type="button"
+            onClick={() => setSelectedTasks(new Set())}
+            className="text-fg-muted hover:text-white p-1 transition-colors cursor-pointer"
+            title="Limpar seleção"
           >
-            <span className="material-symbols-outlined">arrow_upward</span>
+            <span className="material-symbols-outlined text-[16px]">close</span>
           </button>
-        )}
-
-        {/* Floating Novo Evento Button */}
-        {displayMode !== 'tarefas' && (
-          <button 
-            onClick={handleNewEvent}
-            className="bg-[#9D4EDD] hover:bg-[#8338c7] text-[#FFFFFF] p-3 rounded-full shadow-[0_8px_32px_rgba(157,78,221,0.3)] transition-all duration-300 flex items-center justify-center group"
-            title="Novo Evento"
-          >
-            <span className="material-symbols-outlined font-bold">event</span>
-          </button>
-        )}
-
-        {/* Floating Nova Tarefa Button */}
-        {displayMode !== 'eventos' && (
-          <button 
-            onClick={handleNew}
-            className={`bg-[#FFCC00] hover:bg-[#e6b800] text-[#121212] p-3 rounded-full shadow-[0_8px_32px_rgba(255,204,0,0.3)] transition-all duration-300 flex items-center justify-center group ${localTasks.length === 0 ? 'animate-pulse ring-4 ring-[#FFCC00]/50' : ''}`}
-            title="Nova Tarefa"
-          >
-            <span className="material-symbols-outlined font-bold">add</span>
-          </button>
-        )}
-
-        {/* Floating Scroll to Bottom Button */}
-        <button 
-          onClick={scrollToBottom}
-          className="bg-surface hover:bg-surface-hover border border-[#FFCC00]/50 hover:border-[#9D4EDD] text-fg-muted hover:text-[#9D4EDD] p-3 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center group"
-          title="Ir para o fundo (Mais Recentes)"
-        >
-          <span className="material-symbols-outlined">arrow_downward</span>
-        </button>
-      </div>
+        </div>
+      )}
 
       {/* Modals */}
-      <TaskFormModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        task={taskToEdit} 
+      <TaskFormModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        task={taskToEdit}
         defaultValues={defaultTaskValues}
-        uniqueCategories={uniqueCategories} 
+        uniqueCategories={uniqueCategories}
         uniqueDimensions={uniqueDimensions}
         columns={columns}
         onEditColumn={(col) => setEditingColumn(col)}
@@ -2835,15 +3045,15 @@ export function TasksView({
         subteams={activeOrgDetails?.subteams || []}
         members={activeOrgDetails?.members || []}
         userFiles={userFiles}
-        onFilesUpdated={() => {}}
+        onFilesUpdated={() => { }}
       />
-      <BulkEditModal 
-        isOpen={isBulkEditModalOpen} 
-        onClose={() => setIsBulkEditModalOpen(false)} 
-        taskIds={Array.from(selectedTasks)} 
-        tasks={localTasks} 
-        onSuccess={() => { setIsBulkEditModalOpen(false); setSelectedTasks(new Set()); setLastSelectedTaskId(null); }} 
-        uniqueCategories={uniqueCategories} 
+      <BulkEditModal
+        isOpen={isBulkEditModalOpen}
+        onClose={() => setIsBulkEditModalOpen(false)}
+        taskIds={Array.from(selectedTasks)}
+        tasks={localTasks}
+        onSuccess={() => { setIsBulkEditModalOpen(false); setSelectedTasks(new Set()); setLastSelectedTaskId(null); }}
+        uniqueCategories={uniqueCategories}
         uniqueDimensions={uniqueDimensions}
         columns={columns}
         onEditColumn={(col) => setEditingColumn(col)}
@@ -2861,7 +3071,7 @@ export function TasksView({
         onSuccess={() => {
           setIsEventModalOpen(false);
           // O NextJS revalidatePath atualizará a página para mostrar o novo evento
-          window.location.reload(); 
+          window.location.reload();
         }}
       />
 
@@ -2873,7 +3083,7 @@ export function TasksView({
           window.location.reload();
         }}
       />
-      
+
       {editingColumn && (
         <OptionsEditorModal
           column={editingColumn!}
@@ -2885,7 +3095,7 @@ export function TasksView({
         />
       )}
 
-      
+
       {/* Active Tooltip Dropdown */}
       {activeTooltip && (
         <div
@@ -2899,7 +3109,7 @@ export function TasksView({
 
       {/* Quick Edit Dropdown */}
       {quickEdit && (
-        <div 
+        <div
           className="fixed z-[100] bg-surface border border-border-subtle rounded-md shadow-[0_8px_32px_rgba(0,0,0,0.8)] overflow-hidden min-w-[140px]"
           style={{ top: quickEdit.top, bottom: quickEdit.bottom, left: quickEdit.left }}
           onClick={(e) => e.stopPropagation()}
@@ -2908,19 +3118,19 @@ export function TasksView({
             {(() => {
               const col = columns.find(c => c.key === quickEdit.field);
               let opts = (col?.options || []).map((o: any) => o.value || o);
-              
+
               // Se for categoria ou dimensão, mescla com os valores únicos existentes nas tarefas para não perder nada
               if (quickEdit.field === 'categoria') opts = Array.from(new Set([...opts, ...uniqueCategories]));
               if (quickEdit.field === 'dimensao') opts = Array.from(new Set([...opts, ...uniqueDimensions.filter(d => d !== 'favoritas')]));
-              
+
               const displayOpts = Array.from(new Set([...opts, ""])); // Sempre permite limpar (Nenhum)
 
               return displayOpts.map(option => {
                 const optStr = String(option);
                 return (
-                  <button 
-                    key={optStr} 
-                    className={`text-left px-3 py-2 text-xs hover:bg-surface-hover transition-colors ${quickEdit.value?.toLowerCase() === optStr.toLowerCase() ? 'text-[#9D4EDD] font-bold bg-[#9D4EDD]/10' : 'text-fg-secondary'}`} 
+                  <button
+                    key={optStr}
+                    className={`text-left px-3 py-2 text-xs hover:bg-surface-hover transition-colors ${quickEdit.value?.toLowerCase() === optStr.toLowerCase() ? 'text-accent-primary font-bold bg-accent-primary/10' : 'text-fg-secondary'}`}
                     onClick={() => handleQuickSave(quickEdit.taskId, quickEdit.field, optStr)}
                   >
                     {optStr === "" ? "Nenhum" : (quickEdit.field === 'status' ? optStr.charAt(0).toUpperCase() + optStr.slice(1) : optStr)}
@@ -2940,25 +3150,25 @@ export function TasksView({
                 <span className="material-symbols-outlined text-[var(--accent-secondary)]">settings</span>
                 Filtros Rápidos
               </h2>
-              <button 
+              <button
                 onClick={() => setIsQuickFiltersModalOpen(false)}
                 className="text-fg-muted hover:text-fg transition-colors flex items-center justify-center p-1 rounded-full hover:bg-surface-hover"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
-            
+
             <div className="flex w-full border-b border-border-subtle bg-surface">
-               <button className={`flex-1 py-3 text-sm font-bold transition-colors cursor-pointer ${quickFiltersTab === 'visibilidade' ? 'text-[var(--accent-secondary)] border-b-2 border-[var(--accent-secondary)]' : 'text-fg-muted hover:text-fg'}`} onClick={() => setQuickFiltersTab('visibilidade')}>Visibilidade</button>
-               <button className={`flex-1 py-3 text-sm font-bold transition-colors cursor-pointer ${quickFiltersTab === 'ordem' ? 'text-[var(--accent-secondary)] border-b-2 border-[var(--accent-secondary)]' : 'text-fg-muted hover:text-fg'}`} onClick={() => setQuickFiltersTab('ordem')}>Ordem</button>
+              <button className={`flex-1 py-3 text-sm font-bold transition-colors cursor-pointer ${quickFiltersTab === 'visibilidade' ? 'text-[var(--accent-secondary)] border-b-2 border-[var(--accent-secondary)]' : 'text-fg-muted hover:text-fg'}`} onClick={() => setQuickFiltersTab('visibilidade')}>Visibilidade</button>
+              <button className={`flex-1 py-3 text-sm font-bold transition-colors cursor-pointer ${quickFiltersTab === 'ordem' ? 'text-[var(--accent-secondary)] border-b-2 border-[var(--accent-secondary)]' : 'text-fg-muted hover:text-fg'}`} onClick={() => setQuickFiltersTab('ordem')}>Ordem</button>
             </div>
-            
+
             <div className="p-4 flex flex-col gap-3 max-h-[60vh] overflow-y-auto">
-              
+
               {quickFiltersTab === 'visibilidade' ? (
                 <>
                   <p className="text-xs text-fg-secondary mb-2">Selecione quais colunas você quer que apareçam como botões para filtrar as tarefas.</p>
-                  
+
                   {['status', 'categoria', 'responsavel', 'dimensao'].map(key => {
                     if (isPersonalScope && key === 'responsavel') return null;
                     const isSelected = quickFilters.includes(key);
@@ -2971,11 +3181,11 @@ export function TasksView({
                     return (
                       <label key={key} className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-surface-hover rounded-md transition-colors">
                         <input type="checkbox" className="accent-[#FFCC00] w-4 h-4 cursor-pointer" checked={isSelected} onChange={(e) => {
-                            let newFilters = [...quickFilters];
-                            if (e.target.checked) newFilters.push(key);
-                            else newFilters = newFilters.filter(k => k !== key);
-                            setQuickFilters(newFilters);
-                          }}
+                          let newFilters = [...quickFilters];
+                          if (e.target.checked) newFilters.push(key);
+                          else newFilters = newFilters.filter(k => k !== key);
+                          setQuickFilters(newFilters);
+                        }}
                         />
                         <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-fg-muted group-hover:text-fg-secondary'}`}>{labels[key]}</span>
                       </label>
@@ -2992,11 +3202,11 @@ export function TasksView({
                     return (
                       <label key={col.id} className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-surface-hover rounded-md transition-colors">
                         <input type="checkbox" className="accent-[#FFCC00] w-4 h-4 cursor-pointer" checked={isSelected} onChange={(e) => {
-                            let newFilters = [...quickFilters];
-                            if (e.target.checked) newFilters.push(col.key);
-                            else newFilters = newFilters.filter(k => k !== col.key);
-                            setQuickFilters(newFilters);
-                          }}
+                          let newFilters = [...quickFilters];
+                          if (e.target.checked) newFilters.push(col.key);
+                          else newFilters = newFilters.filter(k => k !== col.key);
+                          setQuickFilters(newFilters);
+                        }}
                         />
                         <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-fg-muted group-hover:text-fg-secondary'}`}>{col.name}</span>
                       </label>
@@ -3006,7 +3216,7 @@ export function TasksView({
               ) : (
                 <>
                   <p className="text-xs text-fg-secondary mb-2">Selecione quais colunas podem ser usadas para ordenar a visualização das tarefas (Linha ORDEM).</p>
-                  
+
                   {['status', 'prazo', 'prioridade', 'categoria', 'manual'].map(key => {
                     const isSelected = quickSorts.includes(key);
                     const labels: Record<string, string> = {
@@ -3019,11 +3229,11 @@ export function TasksView({
                     return (
                       <label key={key} className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-surface-hover rounded-md transition-colors">
                         <input type="checkbox" className="accent-[#FFCC00] w-4 h-4 cursor-pointer" checked={isSelected} onChange={(e) => {
-                            let newSorts = [...quickSorts];
-                            if (e.target.checked) newSorts.push(key);
-                            else newSorts = newSorts.filter(k => k !== key);
-                            setQuickSorts(newSorts);
-                          }}
+                          let newSorts = [...quickSorts];
+                          if (e.target.checked) newSorts.push(key);
+                          else newSorts = newSorts.filter(k => k !== key);
+                          setQuickSorts(newSorts);
+                        }}
                         />
                         <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-fg-muted group-hover:text-fg-secondary'}`}>{labels[key]}</span>
                       </label>
@@ -3039,11 +3249,11 @@ export function TasksView({
                     return (
                       <label key={col.id} className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-surface-hover rounded-md transition-colors">
                         <input type="checkbox" className="accent-[#FFCC00] w-4 h-4 cursor-pointer" checked={isSelected} onChange={(e) => {
-                            let newSorts = [...quickSorts];
-                            if (e.target.checked) newSorts.push(col.key);
-                            else newSorts = newSorts.filter(k => k !== col.key);
-                            setQuickSorts(newSorts);
-                          }}
+                          let newSorts = [...quickSorts];
+                          if (e.target.checked) newSorts.push(col.key);
+                          else newSorts = newSorts.filter(k => k !== col.key);
+                          setQuickSorts(newSorts);
+                        }}
                         />
                         <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-fg-muted group-hover:text-fg-secondary'}`}>{col.name}</span>
                       </label>
@@ -3061,7 +3271,7 @@ export function TasksView({
                     const { saveQuickPreferences } = await import('@/app/(dashboard)/actions');
                     await saveQuickPreferences(quickFilters, quickSorts);
                     setIsQuickFiltersModalOpen(false);
-                  } catch(e: any) {
+                  } catch (e: any) {
                     alert('Erro ao salvar preferências: ' + e.message);
                   }
                 }}

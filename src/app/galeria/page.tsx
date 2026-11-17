@@ -1,6 +1,9 @@
 // Este programa é um software livre (Licença AGPLv3)
-import { redirect } from 'next/navigation';
+import React from 'react';
+import { GooglePhotosTimelineView } from '@/components/galeria/GooglePhotosTimelineView';
+
+export const dynamic = 'force-dynamic';
 
 export default function GaleriaPage() {
-  redirect('/portfolio');
+  return <GooglePhotosTimelineView />;
 }

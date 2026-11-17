@@ -2,8 +2,10 @@
 // ARQUIVO: src/components/organizacoes/LabDivWorkspaceClient.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useTransition } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useSwipeTabs } from '@/hooks/useSwipeTabs';
 import type { Task, TaskColumn, AgendaEvent } from '@/types';
 import type {
   Organization,
@@ -21,6 +23,9 @@ import { OrganizationGoalsPanel } from './OrganizationGoalsPanel';
 import { OrganizationRequestsPanel } from './OrganizationRequestsPanel';
 import { OrganizationScheduleAttendancePanel } from './OrganizationScheduleAttendancePanel';
 import { OrganizationAdminModal } from './OrganizationAdminModal';
+import { OrganizationMaterialSelector } from './OrganizationMaterialSelector';
+import { OrgBenchStockPanel } from './OrgBastidoresModules';
+import { OrganizationPostStudio } from './studio/OrganizationPostStudio';
 import { TasksView } from '@/components/dashboard/TasksView';
 import {
   createOrganizationMeetingAction,
@@ -30,6 +35,7 @@ import {
 import { saveTask } from '@/app/(dashboard)/actions';
 import { JoinOrganizationModal } from './JoinOrganizationModal';
 import { CreateOrganizationModal } from './CreateOrganizationModal';
+import { OrganizationBrandProvider } from './OrganizationBrandProvider';
 
 export interface LabDivWorkspaceClientProps {
   organization: Organization;
@@ -46,6 +52,9 @@ export interface LabDivWorkspaceClientProps {
   userEvents?: AgendaEvent[];
   isDbMigrationPending?: boolean;
   userOrganizations?: Organization[];
+  isEmbed?: boolean;
+  ticket?: string;
+  initialView?: 'organizacoes' | 'studio';
 }
 
 export function LabDivWorkspaceClient({
@@ -63,7 +72,11 @@ export function LabDivWorkspaceClient({
   userEvents = [],
   isDbMigrationPending = false,
   userOrganizations = [],
+  isEmbed = false,
+  ticket,
+  initialView = 'organizacoes',
 }: LabDivWorkspaceClientProps) {
+  const router = useRouter();
   const [currentOrg, setCurrentOrg] = useState<Organization>(initialOrg);
   const [subteams, setSubteams] = useState<OrganizationSubteam[]>(initialSubteams);
   const [members, setMembers] = useState<OrganizationMember[]>(initialMembers);
@@ -97,24 +110,68 @@ export function LabDivWorkspaceClient({
     const selected = userOrganizations.find((o) => o.id === orgId);
     if (selected) {
       setCurrentOrg(selected);
-      const res = await getOrganizationDetailsAction(orgId);
-      if (res.ok && res.organization) {
-        if (res.organization.subteams) setSubteams(res.organization.subteams);
-        if (res.organization.members) setMembers(res.organization.members);
+      setSelectedMemberFilter(null);
+      const [res, mRes] = await Promise.all([
+        getOrganizationDetailsAction(orgId),
+        getOrganizationMeetingsAction(orgId),
+      ]);
+      if (res.ok) {
+        if (Array.isArray((res as any).subteams)) setSubteams((res as any).subteams);
+        if (Array.isArray((res as any).members)) setMembers((res as any).members);
+        if (Array.isArray((res as any).tasks)) setTasks((res as any).tasks);
       }
-      const mRes = await getOrganizationMeetingsAction(orgId);
       if (mRes.ok && mRes.meetings) {
         setMeetings(mRes.meetings);
       }
+      if (!isEmbed && selected.slug) {
+        router.push(`/labdiv?org=${encodeURIComponent(selected.slug)}`);
+      }
     }
   };
+  const [activeMacroView, setActiveMacroView] = useState<'organizacoes' | 'studio'>(initialView);
+  const [studioVisited, setStudioVisited] = useState(initialView === 'studio');
+  const [showInlineVault, setShowInlineVault] = useState(true);
   const [isPlaybooksOpen, setIsPlaybooksOpen] = useState(false);
   const [activeMeetingForLive, setActiveMeetingForLive] = useState<OrganizationMeeting | null>(null);
   const [selectedMeetingForWhen2Meet, setSelectedMeetingForWhen2Meet] = useState<OrganizationMeeting | null>(null);
-  const [showMeetingsSection, setShowMeetingsSection] = useState(false);
-  const [showGoalsSection, setShowGoalsSection] = useState(false);
-  const [showScheduleSection, setShowScheduleSection] = useState(false);
-  const [showRequestsSection, setShowRequestsSection] = useState(false);
+  const [activeModuleTab, setActiveModuleTab] = useState<
+    'horarios_ponto' | 'metas_tarefas' | 'ideias_converse' | 'estoque' | 'equipe_acervo'
+  >('horarios_ponto');
+  const [visitedModules, setVisitedModules] = useState<Set<string>>(() => new Set(['horarios_ponto']));
+  const [, startSwitchTransition] = useTransition();
+
+  const selectModuleTab = (
+    tab: 'horarios_ponto' | 'metas_tarefas' | 'ideias_converse' | 'estoque' | 'equipe_acervo'
+  ) => {
+    setVisitedModules((prev) => {
+      if (prev.has(tab)) return prev;
+      const next = new Set(prev);
+      next.add(tab);
+      return next;
+    });
+    startSwitchTransition(() => {
+      setActiveModuleTab(tab);
+    });
+  };
+
+  const selectMacroView = (view: 'organizacoes' | 'studio') => {
+    if (view === 'studio') setStudioVisited(true);
+    startSwitchTransition(() => {
+      setActiveMacroView(view);
+    });
+  };
+  const swipeHandlers = useSwipeTabs({
+    enabled: !isEmbed,
+    onNext: () => {
+      if (activeMacroView === 'organizacoes') selectMacroView('studio');
+    },
+    onPrev: () => {
+      if (activeMacroView === 'studio') selectMacroView('organizacoes');
+      else router.push(`/servidor?org=${encodeURIComponent(currentOrg.id)}`);
+    },
+  });
+  const [pendingQrDirection, setPendingQrDirection] = useState<'entrada' | 'saida' | null>(null);
+  const [isCheckedIn, setIsCheckedIn] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [isCreatingMeeting, setIsCreatingMeeting] = useState(false);
   const [newMeetingTitle, setNewMeetingTitle] = useState('');
@@ -216,7 +273,8 @@ export function LabDivWorkspaceClient({
   };
 
   return (
-    <div className="min-h-full flex flex-col p-4 md:p-8 bg-app space-y-6 text-fg">
+    <OrganizationBrandProvider orgSlug={currentOrg.slug} brandConfig={currentOrg.brand_config}>
+      <div {...swipeHandlers} className="relative z-10 min-h-full flex flex-col p-4 md:p-8 space-y-6 text-fg">
       {isDbMigrationPending && (
         <div className="bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs shadow-md">
           <div className="flex items-center gap-2.5">
@@ -231,183 +289,522 @@ export function LabDivWorkspaceClient({
         </div>
       )}
 
-      {/* Alternador Macro Unificado: Organizações & Arquivos */}
-      <div data-tour="org-view-mode" className="flex flex-wrap items-center justify-between gap-3 bg-surface border border-border-subtle rounded-2xl px-4 py-2.5 shadow-md">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-fg-muted">
-            Aba Gestão:
-          </span>
-          <div className="flex items-center gap-1 bg-app p-1 rounded-xl border border-border-subtle">
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-teal-500 text-slate-950 shadow-sm">
-              <span className="material-symbols-outlined text-[16px]">domain</span>
-              <span>Equipe & Projetos</span>
-            </div>
+      {/* Faixa 1: Switch Macro M3 [ Cofre | Organizações | Studio ] acima de tudo */}
+      {!isEmbed && (
+        <div className="flex flex-col items-center gap-1.5 shrink-0">
+          <div className="inline-flex items-center p-1 bg-surface rounded-2xl border border-border-subtle shadow-md gap-1">
             <Link
-              href="/servidor"
-              className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-fg-secondary hover:text-white transition-colors"
+              href={`/servidor?org=${encodeURIComponent(currentOrg.id)}`}
+              prefetch={true}
+              className="flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold text-fg-secondary hover:text-fg transition-colors"
+              title={`Abrir Cofre de Arquivos de ${currentOrg.name}`}
             >
               <span className="material-symbols-outlined text-[16px]">folder_special</span>
-              <span>Cofre de Arquivos</span>
+              <span>Cofre</span>
             </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Topo: Identidade da Organização e Ações Rápidas */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-surface border border-border-subtle rounded-2xl p-5 shadow-lg">
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-teal-500/10 border border-teal-500/30 overflow-hidden p-2">
-            <img src="/labdiv-logo.png" alt="LabDiv" className="w-full h-full object-contain" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl font-black text-white">{organization.name}</h1>
-              {userOrganizations.length > 1 ? (
-                <select
-                  value={currentOrg.id}
-                  onChange={(e) => handleSwitchOrg(e.target.value)}
-                  className="rounded-xl border border-teal-500/30 bg-app px-3 py-1.5 text-xs font-bold text-teal-300 focus:border-teal-500 focus:outline-none cursor-pointer"
-                >
-                  {userOrganizations.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      🏛️ {o.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <span className="rounded-full bg-teal-500/10 border border-teal-500/30 px-2.5 py-0.5 text-xs font-bold text-teal-400">
-                  Workspace Oficial
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-fg-muted mt-1">
-              {organization.description || 'Laboratório de Divulgação Científica • IFUSP'}
-            </p>
-          </div>
-        </div>
-
-        {/* Bateria Cognitiva Pessoal e Botões do Topo */}
-        <div className="flex flex-wrap items-center gap-3">
-          <MemberCapacityQuickSelector
-            organizationId={organization.id}
-            initialCapacity={myMember?.cognitive_capacity || 'normal'}
-            initialNote={myMember?.capacity_note || ''}
-          />
-
-          <button
-            type="button"
-            onClick={() => setIsPlaybooksOpen(true)}
-            className="flex items-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-2 text-xs font-bold text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[16px]">menu_book</span>
-            Roteiros
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowMeetingsSection((prev) => !prev)}
-            className={`flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
-              showMeetingsSection
-                ? 'border-teal-500 bg-teal-500/20 text-teal-200 shadow-sm'
-                : 'border-teal-500/30 bg-teal-500/10 text-teal-300 hover:bg-teal-500/20'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[16px]">calendar_today</span>
-            Reuniões ({meetings.length})
-            <span className="material-symbols-outlined text-[16px]">
-              {showMeetingsSection ? 'expand_less' : 'expand_more'}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowGoalsSection((prev) => !prev)}
-            className={`flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
-              showGoalsSection
-                ? 'border-teal-500 bg-teal-500/20 text-teal-200 shadow-sm'
-                : 'border-teal-500/30 bg-teal-500/10 text-teal-300 hover:bg-teal-500/20'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[16px]">flag</span>
-            Metas & Objetivos
-            <span className="material-symbols-outlined text-[16px]">
-              {showGoalsSection ? 'expand_less' : 'expand_more'}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowScheduleSection((prev) => !prev)}
-            className={`flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
-              showScheduleSection
-                ? 'border-teal-500 bg-teal-500/20 text-teal-200 shadow-sm'
-                : 'border-teal-500/30 bg-teal-500/10 text-teal-300 hover:bg-teal-500/20'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[16px]">calendar_clock</span>
-            Escalas & Presenças (QR)
-            <span className="material-symbols-outlined text-[16px]">
-              {showScheduleSection ? 'expand_less' : 'expand_more'}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowRequestsSection((prev) => !prev)}
-            className={`flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
-              showRequestsSection
-                ? 'border-amber-500 bg-amber-500/20 text-amber-200 shadow-sm'
-                : 'border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[16px]">forward_to_inbox</span>
-            Pedidos & Sugestões
-            <span className="material-symbols-outlined text-[16px]">
-              {showRequestsSection ? 'expand_less' : 'expand_more'}
-            </span>
-          </button>
-
-          {isOrgAdmin && (
             <button
               type="button"
-              onClick={() => setIsAdminModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-purple-500/30 bg-purple-500/10 px-3.5 py-2 text-xs font-bold text-purple-300 hover:bg-purple-500/20 transition-colors cursor-pointer shadow-sm"
+              onClick={() => selectMacroView('organizacoes')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs transition-all duration-200 active:scale-95 cursor-pointer ${
+                activeMacroView === 'organizacoes'
+                  ? 'font-black bg-[#FFCC00] text-[#121212] shadow-sm'
+                  : 'font-bold text-fg-secondary hover:text-fg'
+              }`}
             >
-              <span className="material-symbols-outlined text-[16px]">shield_person</span>
-              Painel Administrativo
+              <span className="material-symbols-outlined text-[16px]">domain</span>
+              <span>Organizações</span>
             </button>
+            <button
+              type="button"
+              onClick={() => selectMacroView('studio')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs transition-all duration-200 active:scale-95 cursor-pointer ${
+                activeMacroView === 'studio'
+                  ? 'font-black bg-[#FFCC00] text-[#121212] shadow-sm'
+                  : 'font-bold text-fg-secondary hover:text-fg'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px]">palette</span>
+              <span>Studio</span>
+            </button>
+          </div>
+          {activeMacroView === 'studio' && (
+            <div
+              className="flex items-center gap-1.5 text-[10px] font-bold text-fg-muted"
+              title="O Studio une as iniciativas HUB LabDiv e Aurtistic"
+            >
+              <img src="/icone-HUBLabDiv.svg" alt="HUB LabDiv" className="h-4 w-4 object-contain" />
+              <span className="text-fg-secondary">HUB LabDiv</span>
+              <span className="opacity-60">×</span>
+              <span className="text-fg-secondary">Aurtistic</span>
+            </div>
           )}
-        </div>
-      </div>
-
-      {/* Painéis Expansíveis dos Botões do Topo (Abertura Imediatamente Abaixo da Barra de Ações) */}
-      {showGoalsSection && (
-        <div className="animate-in fade-in duration-200">
-          <OrganizationGoalsPanel
-            organization={organization}
-            subteams={subteams}
-            tasks={tasks}
-          />
         </div>
       )}
 
-      {showScheduleSection && (
-        <div className="animate-in fade-in duration-200">
+      {/* Faixa 2: Card Fixo Idêntico — Logo + Switch de Conta (Organização/Pessoal) + Ação no canto direito */}
+      <div data-tour="org-view-mode" className="relative shrink-0 flex flex-wrap items-center justify-between gap-4 bg-surface border border-border-subtle rounded-2xl p-4 shadow-lg z-20">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/30 overflow-hidden p-1.5 shadow-inner">
+            {currentOrg.slug === 'labdiv' || (!currentOrg.slug && currentOrg.name?.toLowerCase().includes('labdiv')) ? (
+              <img src="/labdiv-logo.png" alt="LabDiv" className="w-full h-full object-contain" />
+            ) : currentOrg.slug === 'show-da-fisica' ? (
+              <div className="w-full h-full flex flex-col items-center justify-center font-black text-center leading-none">
+                <span className="text-[9px] text-[#ff1e1e]">SHOW</span>
+                <span className="text-[8px] text-[#0066ff]">FÍSICA</span>
+              </div>
+            ) : currentOrg.slug === 'hs' ? (
+              <div className="w-full h-full flex items-center justify-center font-mono font-bold text-[#00ff66] text-[11px]">
+                &gt;_HS
+              </div>
+            ) : currentOrg.slug === 'profis' ? (
+              <div className="w-full h-full flex flex-col items-center justify-center font-black text-center leading-none">
+                <span className="text-[10px] text-[#F59E0B]">PRÓ</span>
+                <span className="text-[8px] text-[#FFCC00]">FÍSICA</span>
+              </div>
+            ) : currentOrg.avatar_url ? (
+              <img src={currentOrg.avatar_url} alt={currentOrg.name} className="w-full h-full object-contain" />
+            ) : (
+              <span className="text-lg font-black text-[var(--accent-primary)]">
+                {currentOrg.name.slice(0, 2).toUpperCase()}
+              </span>
+            )}
+          </div>
+          <div>
+            {isEmbed ? (
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h2 className="text-lg md:text-xl font-black font-bukra text-fg">
+                  {currentOrg.name}
+                </h2>
+                <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full bg-[var(--accent-primary)]/15 border border-[var(--accent-primary)]/30 text-[var(--accent-primary)]">
+                  Gestão Integrada
+                </span>
+              </div>
+            ) : (
+              <OrganizationMaterialSelector
+                organizations={userOrganizations}
+                selectedOrgId={currentOrg.id}
+                onSelectOrg={(id) => id && handleSwitchOrg(id)}
+                onCreateOrg={() => setIsCreateModalOpen(true)}
+                onJoinWithCode={() => setIsAdminModalOpen(true)}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Botão constante no canto direito na mesma altura e tom de Pedir Boost */}
+        {!isEmbed && isOrgAdmin && (
+          <button
+            type="button"
+            onClick={() => setIsAdminModalOpen(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-[var(--accent-primary)]/40 bg-[var(--accent-primary)]/10 px-3.5 py-2 text-xs font-bold text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/20 transition-colors cursor-pointer shadow-sm"
+          >
+            <span className="material-symbols-outlined text-[16px]">shield_person</span>
+            <span>Credenciamento</span>
+          </button>
+        )}
+      </div>
+
+      {activeMacroView === 'studio' ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3 bg-surface border border-border-subtle rounded-2xl p-4 shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[var(--md-sys-color-secondary)]/15 border border-[var(--md-sys-color-secondary)]/30 flex items-center justify-center">
+                <span className="material-symbols-outlined text-[20px] text-[var(--md-sys-color-secondary)]">
+                  palette
+                </span>
+              </div>
+              <div>
+                <h2 className="text-sm font-black uppercase tracking-wider text-fg">
+                  HUB Studio • {currentOrg.name}
+                </h2>
+                <p className="text-xs text-fg-muted">
+                  Criador visual integrado Aurtistic + HUB LabDiv com identidade da organização.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveMacroView('organizacoes')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border-subtle bg-app text-xs font-bold text-fg hover:bg-surface-hover cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+              <span>Voltar à Gestão</span>
+            </button>
+          </div>
+          <OrganizationPostStudio organizationId={currentOrg.id} orgSlug={currentOrg.slug} />
+        </div>
+      ) : (
+      <div className="space-y-6">
+      {/* Bento Grid Operacional (Nível 1 - 8px Grid) + Navigation Bar M3 (Seleção Única - 5 Módulos) */}
+      {(() => {
+        const isShow = currentOrg.slug === 'show-da-fisica';
+        const isHs = currentOrg.slug === 'hs';
+        const isProfis = currentOrg.slug === 'profis';
+        const opsTag = isShow
+          ? 'SF-OPS // BASTIDORES DO SHOW • Auditório Alessandro Volta • IFUSP'
+          : isHs
+            ? 'HS-OPS // HACKERSPACE • Oficina & Hardware Livre • IFUSP'
+            : isProfis
+              ? 'PF-OPS // PRÓ-FÍSICA (PROFIS) • Monitoria & Iniciação Científica • IFUSP'
+              : 'LD-OPS // BASTIDORES LABDIV • Portal HUB LabDiv • IFUSP';
+
+        const navModules = [
+          {
+            id: 'horarios_ponto' as const,
+            label: 'Ponto & Horários',
+            icon: 'calendar_clock',
+            accentToken: 'var(--md-sys-color-primary)',
+            textOnActive: isShow || isHs ? '#040714' : '#040714',
+          },
+          {
+            id: 'metas_tarefas' as const,
+            label: 'Metas & Tarefas',
+            icon: 'flag',
+            accentToken: 'var(--md-sys-color-secondary)',
+            textOnActive: '#040714',
+          },
+          {
+            id: 'ideias_converse' as const,
+            label: 'Ideias, Pedidos & Converse',
+            icon: 'forum',
+            accentToken: 'var(--md-sys-color-tertiary)',
+            textOnActive: isHs ? '#040714' : '#ffffff',
+          },
+          {
+            id: 'estoque' as const,
+            label: 'Estoque',
+            icon: 'inventory_2',
+            accentToken: 'var(--md-sys-color-primary-container)',
+            textOnActive: '#ffffff',
+          },
+          {
+            id: 'equipe_acervo' as const,
+            label: 'Equipe & Acervo',
+            icon: 'diversity_3',
+            accentToken: 'var(--md-sys-color-primary)',
+            textOnActive: '#040714',
+          },
+        ];
+
+        return (
+          <div className="space-y-4">
+            {/* Bento Grid Superior (3 Blocos Simétricos) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              {/* Bloco 1: Identidade Operacional & Bateria Cognitiva */}
+              <div
+                className={`lg:col-span-6 p-4 border flex flex-col justify-between gap-4 ${
+                  isShow || isHs
+                    ? 'neon-border-green bg-black rounded-none'
+                    : 'org-card rounded-2xl border-border-subtle bg-surface/90 backdrop-blur-xl'
+                }`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--md-sys-color-primary)] block">
+                      ● {opsTag}
+                    </span>
+                    <h2 className="text-lg sm:text-xl font-black uppercase tracking-wider mt-1">
+                      {isShow ? (
+                        <>
+                          <span className="neon-text-red">BASTIDORES</span> ·{' '}
+                          <span className="neon-text-blue">GESTÃO</span> ·{' '}
+                          <span className="neon-text-green">OPERAÇÃO</span>
+                        </>
+                      ) : (
+                        <span>BASTIDORES · GESTÃO · OPERAÇÃO</span>
+                      )}
+                    </h2>
+                  </div>
+                </div>
+                <MemberCapacityQuickSelector
+                  organizationId={currentOrg.id}
+                  initialCapacity={myMember?.cognitive_capacity || 'normal'}
+                  initialNote={myMember?.capacity_note || ''}
+                />
+              </div>
+
+              {/* Bloco 2: Marcador de Ponto QR Direto (Entrada vs Saída) */}
+              <div
+                className={`lg:col-span-3 p-4 border flex flex-col justify-between gap-3 ${
+                  isShow || isHs
+                    ? 'neon-border-blue bg-black rounded-none'
+                    : 'org-card rounded-2xl border-border-subtle bg-surface/90 backdrop-blur-xl'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-fg flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[18px] text-[var(--md-sys-color-primary)]">
+                      qr_code_scanner
+                    </span>
+                    Ponto QR
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                      isCheckedIn
+                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                        : 'bg-app text-fg-muted border-border-subtle'
+                    }`}
+                  >
+                    {isCheckedIn ? 'Em Turno' : 'Fora'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-fg-muted">
+                  Escaneie o QR Code na entrada e na saída para registrar seu turno.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      selectModuleTab('horarios_ponto');
+                      setPendingQrDirection('entrada');
+                    }}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--md-sys-color-primary)] text-slate-950 text-xs font-black hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">login</span>
+                    <span>Entrada</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      selectModuleTab('horarios_ponto');
+                      setPendingQrDirection('saida');
+                    }}
+                    style={{
+                      backgroundColor: 'var(--md-sys-color-tertiary)',
+                      color: isHs ? '#040714' : '#ffffff',
+                    }}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">logout</span>
+                    <span>Saída</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Bloco 3: Atalho HUB Studio */}
+              <div
+                className={`lg:col-span-3 p-4 border flex flex-col justify-between gap-3 ${
+                  isShow || isHs
+                    ? 'neon-border-yellow bg-black rounded-none'
+                    : 'org-card rounded-2xl border-border-subtle bg-surface/90 backdrop-blur-xl'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-fg flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[18px] text-[var(--md-sys-color-secondary)]">
+                      palette
+                    </span>
+                    HUB Studio
+                  </span>
+                  <span className="text-[10px] font-mono uppercase text-[var(--md-sys-color-secondary)]">
+                    Aurtistic + HUB
+                  </span>
+                </div>
+                <p className="text-[11px] text-fg-muted">
+                  Crie artes, carrosséis e comunicados com a identidade de {currentOrg.name}.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => selectMacroView('studio')}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[var(--md-sys-color-secondary)] text-slate-950 text-xs font-black hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
+                  <span>Abrir HUB Studio</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Navigation Bar M3 (Seleção Única — 5 Módulos Lógicos) */}
+            <nav
+              aria-label="Módulos da Gestão"
+              className={`p-1.5 border flex flex-wrap items-center gap-2 ${
+                isShow || isHs
+                  ? 'border-border-subtle bg-black rounded-none'
+                  : 'rounded-2xl border-border-subtle bg-surface/90 backdrop-blur-xl shadow-md'
+              }`}
+            >
+              {navModules.map((mod) => {
+                const isActive = activeModuleTab === mod.id;
+                return (
+                  <button
+                    key={mod.id}
+                    type="button"
+                    onClick={() => selectModuleTab(mod.id)}
+                    aria-current={isActive ? 'page' : undefined}
+                    style={
+                      isActive
+                        ? { backgroundColor: mod.accentToken, color: mod.textOnActive }
+                        : undefined
+                    }
+                    className={`flex-1 min-w-[140px] inline-flex items-center justify-center gap-2 px-3.5 py-2.5 text-xs font-bold transition-all duration-200 cursor-pointer active:scale-[0.98] ${
+                      isShow || isHs ? 'rounded-none' : 'rounded-xl'
+                    } ${
+                      isActive
+                        ? 'shadow-md font-black'
+                        : 'text-fg-muted hover:text-fg hover:bg-app'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">{mod.icon}</span>
+                    <span className="truncate">{mod.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        );
+      })()}
+
+      {/* Conteúdo dos Módulos com Keep-Mounted Cache (troca instantânea 0ms após primeira visita) */}
+      {visitedModules.has('horarios_ponto') && (
+        <div className={activeModuleTab === 'horarios_ponto' ? 'space-y-6' : 'hidden'}>
           <OrganizationScheduleAttendancePanel
-            organization={organization}
+            key={currentOrg.slug}
+            organization={currentOrg}
             subteams={subteams}
             members={members}
             currentUserId={currentUserId}
             currentUserName={myMember?.full_name || 'Membro do Laboratório'}
             isAdmin={isOrgAdmin}
+            externalOpenScanner={pendingQrDirection}
+            onExternalScannerHandled={() => setPendingQrDirection(null)}
+            onAttendanceStatusChange={({ isCheckedIn: nextStatus }) => setIsCheckedIn(nextStatus)}
+          />
+
+          <div
+            data-tour="org-meetings-section"
+            className="org-card p-4 md:p-6 bg-surface border border-border-subtle rounded-2xl shadow-lg space-y-4"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[20px] text-[var(--md-sys-color-primary)]">
+                  calendar_month
+                </span>
+                <h4 className="text-sm font-bold uppercase tracking-wider text-fg">
+                  Reuniões da Equipe & When2Meet ({meetings.length})
+                </h4>
+              </div>
+              <form onSubmit={handleCreateMeeting} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Título da reunião..."
+                  value={newMeetingTitle}
+                  onChange={(e) => setNewMeetingTitle(e.target.value)}
+                  className="rounded-xl border border-border-subtle bg-app text-fg px-3 py-1.5 text-xs placeholder-slate-500 focus:border-[var(--md-sys-color-primary)] focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={isCreatingMeeting || !newMeetingTitle.trim()}
+                  className="inline-flex items-center gap-1 rounded-xl bg-[var(--md-sys-color-primary)] px-3 py-1.5 text-xs font-bold text-slate-950 hover:brightness-110 transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">add</span>
+                  Agendar
+                </button>
+              </form>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {meetings.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex flex-col justify-between rounded-xl border border-border-subtle bg-app text-fg p-4 transition-colors hover:border-border-strong"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <span className="text-xs font-bold text-fg truncate">{m.title}</span>
+                      <span className="rounded bg-surface px-1.5 py-0.5 text-[10px] text-fg-muted font-mono">
+                        {m.status}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-fg-muted mb-3">
+                      {m.scheduled_at ? new Date(m.scheduled_at).toLocaleString('pt-BR') : 'Data a definir'} • {m.duration_minutes || 60} min
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2 border-t border-border-subtle">
+                    <button
+                      type="button"
+                      onClick={() => setActiveMeetingForLive(m)}
+                      className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-[var(--md-sys-color-primary)]/15 border border-[var(--md-sys-color-primary)]/30 py-1.5 text-xs font-semibold text-[var(--md-sys-color-primary)] hover:bg-[var(--md-sys-color-primary)]/25 transition-colors cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">mic</span>
+                      Abrir Ao Vivo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedMeetingForWhen2Meet(
+                          selectedMeetingForWhen2Meet?.id === m.id ? null : m
+                        )
+                      }
+                      className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                        selectedMeetingForWhen2Meet?.id === m.id
+                          ? 'bg-[var(--md-sys-color-secondary)]/20 border-[var(--md-sys-color-secondary)] text-[var(--md-sys-color-secondary)]'
+                          : 'border-border-subtle bg-surface text-fg-muted hover:text-fg hover:bg-surface-hover'
+                      }`}
+                    >
+                      Horários
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {selectedMeetingForWhen2Meet && (
+              <div className="pt-4 border-t border-border-subtle">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-xs font-bold text-[var(--md-sys-color-primary)]">
+                    Definindo melhor horário para: {selectedMeetingForWhen2Meet.title}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMeetingForWhen2Meet(null)}
+                    className="text-xs text-fg-muted hover:text-fg cursor-pointer"
+                  >
+                    Fechar Grade
+                  </button>
+                </div>
+                <When2MeetSchedulerGrid
+                  meetingId={selectedMeetingForWhen2Meet.id}
+                  currentUserId={currentUserId}
+                  userEvents={userEvents}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {visitedModules.has('metas_tarefas') && (
+        <div className={activeModuleTab === 'metas_tarefas' ? 'space-y-6' : 'hidden'}>
+          <OrganizationGoalsPanel
+            key={`goals-${currentOrg.slug}`}
+            organization={currentOrg}
+            subteams={subteams}
+            tasks={tasks}
+            currentUserId={currentUserId}
+            onTaskCreated={(newTask) => setTasks((prev) => [newTask, ...prev])}
+            onTaskUpdated={(updatedTask) =>
+              setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)))
+            }
+          />
+          <TasksView
+            key={`tasks-${currentOrg.slug}`}
+            initialTasks={tasks}
+            initialColumns={columns}
+            userId={currentUserId}
+            initialQuickFilters={quickFilters}
+            initialQuickSorts={quickSorts}
+            advancedSettings={advancedSettings}
+            showUnassignedBanner={true}
           />
         </div>
       )}
 
-      {showRequestsSection && (
-        <div className="animate-in fade-in duration-200">
+      {visitedModules.has('ideias_converse') && (
+        <div className={activeModuleTab === 'ideias_converse' ? 'block' : 'hidden'}>
           <OrganizationRequestsPanel
-            organization={organization}
+            key={`req-${currentOrg.slug}`}
+            organization={currentOrg}
             subteams={subteams}
             currentUserId={currentUserId}
             currentUserName={myMember?.full_name || 'Membro do Laboratório'}
@@ -416,126 +813,86 @@ export function LabDivWorkspaceClient({
         </div>
       )}
 
-      {/* Seção Expansível de Reuniões e When2Meet */}
-      {showMeetingsSection && (
-        <div data-tour="org-meetings-section" className="bg-surface border border-border-subtle rounded-2xl p-5 shadow-lg space-y-4 animate-in fade-in duration-200">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-3">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[20px] text-teal-400">calendar_month</span>
-              <h2 className="text-base font-bold text-white">Reuniões da Equipe & When2Meet</h2>
-            </div>
+      {visitedModules.has('estoque') && (
+        <div className={activeModuleTab === 'estoque' ? 'block' : 'hidden'}>
+          <OrgBenchStockPanel key={`stock-${currentOrg.slug}`} orgSlug={currentOrg.slug} />
+        </div>
+      )}
 
-            {/* Criar Nova Reunião */}
-            <form onSubmit={handleCreateMeeting} className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Título da reunião..."
-                value={newMeetingTitle}
-                onChange={(e) => setNewMeetingTitle(e.target.value)}
-                className="rounded-lg border border-border-subtle bg-app text-fg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-teal-500 focus:outline-none"
-              />
-              <button
-                type="submit"
-                disabled={isCreatingMeeting || !newMeetingTitle.trim()}
-                className="flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-teal-500 transition-colors disabled:opacity-50"
-              >
-                <span className="material-symbols-outlined text-[16px]">add</span>
-                Agendar
-              </button>
-            </form>
-          </div>
+      {visitedModules.has('equipe_acervo') && (
+        <div className={activeModuleTab === 'equipe_acervo' ? 'space-y-6' : 'hidden'}>
+          <TeamProgressPanel
+            key={`team-${currentOrg.slug}`}
+            organization={currentOrg}
+            subteams={subteams}
+            members={members}
+            tasks={tasks}
+            currentUserId={currentUserId}
+            onSelectMemberFilter={setSelectedMemberFilter}
+            selectedMemberId={selectedMemberFilter}
+            onClaimTask={handleClaimTask}
+            onRelieveTask={handleRelieveTask}
+            onAssignAllToMe={handleAssignAllToMe}
+          />
 
-          {/* Lista de Reuniões */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {meetings.map((m) => (
-              <div
-                key={m.id}
-                className="flex flex-col justify-between rounded-xl border border-border-subtle bg-app text-fg p-4 transition-colors hover:border-border-strong"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <span className="text-xs font-bold text-white truncate">{m.title}</span>
-                    <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400 font-mono">
-                      {m.status}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mb-3">
-                    {m.scheduled_at
-                      ? new Date(m.scheduled_at).toLocaleString('pt-BR')
-                      : 'Data a definir'}
-                    {' • '}
-                    {m.duration_minutes || 60} min
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 pt-2 border-t border-border-subtle">
-                  <button
-                    type="button"
-                    onClick={() => setActiveMeetingForLive(m)}
-                    className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-teal-600/20 border border-teal-500/30 py-1.5 text-xs font-semibold text-teal-300 hover:bg-teal-600/30 transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-[14px]">mic</span>
-                    Abrir Ao Vivo
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setSelectedMeetingForWhen2Meet(
-                        selectedMeetingForWhen2Meet?.id === m.id ? null : m
-                      )
-                    }
-                    className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                      selectedMeetingForWhen2Meet?.id === m.id
-                        ? 'bg-[#FFCC00]/20 border-[#FFCC00] text-[#FFCC00]'
-                        : 'border-border-subtle bg-surface text-fg-muted hover:text-fg hover:bg-surface-hover'
-                    }`}
-                  >
-                    Horários
-                  </button>
-                </div>
+          <div
+            className={`p-5 border space-y-4 ${
+              currentOrg.slug === 'show-da-fisica' || currentOrg.slug === 'hs'
+                ? 'neon-border-blue bg-black rounded-none'
+                : 'org-card rounded-2xl border-border-subtle bg-surface'
+            }`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-black uppercase text-fg">
+                  Acervo Técnico, Playbooks & Cofre da Organização
+                </h3>
+                <p className="text-xs text-fg-muted">
+                  POPs de segurança, roteiros técnicos e acesso ao Cofre de Mídia de {currentOrg.name}.
+                </p>
               </div>
-            ))}
-          </div>
-
-          {/* Grid When2Meet Expandido para a Reunião Selecionada */}
-          {selectedMeetingForWhen2Meet && (
-            <div className="pt-4 border-t border-border-subtle">
-              <div className="mb-3 flex items-center justify-between">
-                <span className="text-xs font-bold text-teal-400">
-                  Definindo melhor horário para: {selectedMeetingForWhen2Meet.title}
-                </span>
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setSelectedMeetingForWhen2Meet(null)}
-                  className="text-xs text-slate-500 hover:text-slate-300"
+                  onClick={() => setIsPlaybooksOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--md-sys-color-primary)]/40 bg-[var(--md-sys-color-primary)]/15 px-3.5 py-2 text-xs font-bold text-[var(--md-sys-color-primary)] hover:bg-[var(--md-sys-color-primary)]/25 cursor-pointer"
                 >
-                  Fechar Grade
+                  <span className="material-symbols-outlined text-[16px]">menu_book</span>
+                  Abrir Playbooks / POPs
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShowInlineVault((prev) => !prev)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--md-sys-color-secondary)]/40 bg-[var(--md-sys-color-secondary)]/15 px-3.5 py-2 text-xs font-bold text-[var(--md-sys-color-secondary)] hover:bg-[var(--md-sys-color-secondary)]/25 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">
+                    {showInlineVault ? 'unfold_less' : 'unfold_more'}
+                  </span>
+                  {showInlineVault ? 'Recolher Cofre Embutido' : 'Expandir Cofre Embutido'}
+                </button>
+                <Link
+                  href={`/servidor?org=${encodeURIComponent(currentOrg.id)}`}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--md-sys-color-primary)] px-3.5 py-2 text-xs font-bold text-slate-950 hover:brightness-110"
+                >
+                  <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                  Tela Cheia
+                </Link>
               </div>
-              <When2MeetSchedulerGrid
-                meetingId={selectedMeetingForWhen2Meet.id}
-                currentUserId={currentUserId}
-                userEvents={userEvents}
+            </div>
+          </div>
+
+          {showInlineVault && (
+            <div className="rounded-2xl border border-border-subtle overflow-hidden bg-[#07090e] shadow-xl">
+              <iframe
+                key={`inline-vault-${currentOrg.id}`}
+                src={`/servidor?org=${encodeURIComponent(currentOrg.id)}&embed=1&inline=1${ticket ? `&ticket=${encodeURIComponent(ticket)}` : ''}`}
+                className="w-full h-[680px] border-0 bg-[#07090e]"
+                title={`Cofre Compartilhado — ${currentOrg.name}`}
               />
             </div>
           )}
         </div>
       )}
-
-      {/* Painel de Progresso da Equipe e Subequipes */}
-      <TeamProgressPanel
-        organization={organization}
-        subteams={subteams}
-        members={members}
-        tasks={tasks}
-        currentUserId={currentUserId}
-        onSelectMemberFilter={setSelectedMemberFilter}
-        selectedMemberId={selectedMemberFilter}
-        onClaimTask={handleClaimTask}
-        onRelieveTask={handleRelieveTask}
-        onAssignAllToMe={handleAssignAllToMe}
-      />
 
       {/* Modal Administrativo de Governança, Atribuições e Perfis */}
       <OrganizationAdminModal
@@ -549,19 +906,6 @@ export function LabDivWorkspaceClient({
         onTasksUpdated={(updatedTasks) => setTasks(updatedTasks)}
         onSubteamsUpdated={handleUpdateSubteams}
       />
-
-      {/* Lista de Tarefas com Todas as Funcionalidades de TasksView */}
-      <div className="pt-2">
-        <TasksView
-          initialTasks={tasks}
-          initialColumns={columns}
-          userId={currentUserId}
-          initialQuickFilters={quickFilters}
-          initialQuickSorts={quickSorts}
-          advancedSettings={advancedSettings}
-          showUnassignedBanner={true}
-        />
-      </div>
 
       {/* Modal de Playbooks da Organização */}
       <OrganizationPlaybooksModal
@@ -600,6 +944,9 @@ export function LabDivWorkspaceClient({
           handleSwitchOrg(orgId);
         }}
       />
-    </div>
+      </div>
+      )}
+      </div>
+    </OrganizationBrandProvider>
   );
 }

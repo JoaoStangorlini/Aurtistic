@@ -119,7 +119,7 @@ export default function ExportImportPage() {
     <div className="min-h-screen bg-app text-fg p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-8 mt-16">
         <div>
-          <Link href="/" className="inline-flex items-center gap-2 text-fg-secondary hover:text-[#9D4EDD] transition-colors mb-4">
+          <Link href="/" className="inline-flex items-center gap-2 text-fg-secondary hover:text-accent-primary transition-colors mb-4">
             <span className="material-symbols-outlined">arrow_back</span>
             Voltar para Dashboard
           </Link>
@@ -133,7 +133,7 @@ export default function ExportImportPage() {
           {/* Tarefas */}
           <div className="bg-surface border border-border-subtle rounded-xl p-6 space-y-6">
             <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[#FFCC00] text-3xl">task_alt</span>
+              <span className="material-symbols-outlined text-accent-secondary text-3xl">task_alt</span>
               <h2 className="text-xl font-bold font-bukra">Tarefas</h2>
             </div>
             
@@ -152,7 +152,7 @@ export default function ExportImportPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="w-full flex items-center justify-center gap-2 bg-[#9D4EDD]/10 text-[#9D4EDD] hover:bg-[#9D4EDD]/20 border border-[#9D4EDD]/30 py-3 px-4 rounded-lg transition-colors font-medium cursor-pointer">
+                <label className="w-full flex items-center justify-center gap-2 bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20 border border-accent-primary/30 py-3 px-4 rounded-lg transition-colors font-medium cursor-pointer">
                   <span className="material-symbols-outlined">upload</span>
                   Importar Tarefas (CSV)
                   <input type="file" accept=".csv" className="hidden" onChange={handleImportTasksCSV} />
@@ -167,7 +167,7 @@ export default function ExportImportPage() {
           {/* Eventos */}
           <div className="bg-surface border border-border-subtle rounded-xl p-6 space-y-6">
             <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[#00E5FF] text-3xl">event</span>
+              <span className="material-symbols-outlined text-accent-primary text-3xl">event</span>
               <h2 className="text-xl font-bold font-bukra">Eventos</h2>
             </div>
             
@@ -186,7 +186,7 @@ export default function ExportImportPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="w-full flex items-center justify-center gap-2 bg-[#9D4EDD]/10 text-[#9D4EDD] hover:bg-[#9D4EDD]/20 border border-[#9D4EDD]/30 py-3 px-4 rounded-lg transition-colors font-medium cursor-pointer">
+                <label className="w-full flex items-center justify-center gap-2 bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20 border border-accent-primary/30 py-3 px-4 rounded-lg transition-colors font-medium cursor-pointer">
                   <span className="material-symbols-outlined">upload</span>
                   Importar Eventos (CSV)
                   <input type="file" accept=".csv" className="hidden" onChange={handleImportEventsCSV} />

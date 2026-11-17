@@ -6638,14 +6638,115 @@ async function ensureTenantRootProvisioned(userId) {
   return userRoot;
 }
 
+function resolvePortAwareTargetDir(targetUserId, targetRelPath) {
+  const userRoot = resolveSafeChildPath(USERS_ROOT_DIR, targetUserId);
+  const clean = normalizeTenantRelPath(targetRelPath || '');
+  const primary = clean ? resolveSafeChildPath(userRoot, clean) : userRoot;
+  if (fs.existsSync(primary)) return primary;
+  const lower = clean.toLowerCase();
+  const isPortRel =
+    lower === 'portfolio' ||
+    lower.startsWith('portfolio/') ||
+    lower === 'portifolio' ||
+    lower.startsWith('portifolio/');
+  if (isPortRel && PORTFOLIO_DIR) {
+    const legacySub = clean.replace(/^(portfolio|portifolio)\/?/i, '');
+    const legacyTarget = legacySub ? resolveSafeChildPath(PORTFOLIO_DIR, legacySub) : PORTFOLIO_DIR;
+    if (fs.existsSync(legacyTarget)) return legacyTarget;
+  }
+  return primary;
+}
+
+/**
+ * Detecta se uma rota aponta para uma pasta/arquivo através de um atalho (.shortcut.json).
+ * Suporta atalhos bidirecionais: Org -> Pessoal (ownerUserId/targetUserId) e Pessoal -> Org (targetOrgSlug).
+ * Valida estritamente que:
+ * 1) o arquivo ponteiro .shortcut.json está dentro de rootDir;
+ * 2) o subcaminho remainder permanece estritamente dentro de targetBase (anti path traversal);
+ * 3) se apontar para uma organização fora do escopo atual, exige allowedOrgSlugs ou role === 'admin'.
+ */
+function resolveOrgPersonalShortcutTarget(rootDir, cleanRel, options = {}) {
+  if (!cleanRel) return null;
+  const parts = cleanRel.split('/');
+
+  for (let i = 1; i <= parts.length; i++) {
+    const parentParts = parts.slice(0, i - 1);
+    const parentDir = parentParts.length > 0 ? resolveSafeChildPath(rootDir, parentParts.join('/')) : rootDir;
+    const baseName = parts[i - 1];
+    const remainder = parts.slice(i).join('/');
+
+    const candidateFiles = [
+      path.join(parentDir, `.${baseName}.shortcut.json`),
+      path.join(parentDir, `${baseName}.shortcut.json`),
+    ];
+
+    for (const cand of candidateFiles) {
+      if (fs.existsSync(cand)) {
+        try {
+          const raw = JSON.parse(fs.readFileSync(cand, 'utf8'));
+          const ownerUserId = raw?.ownerUserId || raw?.targetUserId;
+          if (raw && raw.isFolderShortcut && (raw.targetOrgSlug || ownerUserId)) {
+            let targetBase;
+            if (raw.targetOrgSlug) {
+              const targetSlug = String(raw.targetOrgSlug).toLowerCase();
+              if (
+                options.scopeType !== 'org' &&
+                options.role !== 'admin' &&
+                Array.isArray(options.allowedOrgSlugs) &&
+                !options.allowedOrgSlugs.includes(targetSlug)
+              ) {
+                const err = new Error('Sem permissão para acessar pasta desta organização.');
+                err.statusCode = 403;
+                throw err;
+              }
+              const orgRoot = resolveSafeChildPath(ORGS_ROOT_DIR, targetSlug);
+              targetBase = raw.targetRelPath ? resolveSafeChildPath(orgRoot, raw.targetRelPath) : orgRoot;
+            } else {
+              targetBase = resolvePortAwareTargetDir(ownerUserId, raw.targetRelPath || '');
+            }
+            const finalPhysicalPath = remainder ? resolveSafeChildPath(targetBase, remainder) : targetBase;
+            return {
+              shortcutInfo: raw,
+              shortcutName: raw.name || baseName,
+              shortcutCandidateFile: cand,
+              parentDir,
+              targetBase,
+              ownerUserId,
+              physicalPath: finalPhysicalPath,
+              isShortcutRoot: i === parts.length,
+            };
+          }
+        } catch (e) {
+          if (e && e.statusCode === 403) throw e;
+        }
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * [PONTE ZERO-COPY FAT32 — DETALHE OBRIGATÓRIO #1 & CORREÇÃO 4]:
- * Resolve caminhos dentro da jaula /users/{userId}/.
- * Para o PRIMARY_ADMIN_UUID em subcaminhos de "Portfolio/..." e escopo de usuário (scopeType !== 'org'),
- * se o arquivo ou subpasta não existir fisicamente em userRoot/Portfolio/..., faz fallback para PORTFOLIO_DIR/...
+ * Resolve caminhos dentro da jaula /users/{userId}/ ou /orgs/{orgSlug}/.
+ * Para escopo de usuário (scopeType !== 'org') em subcaminhos de "Portfolio/...",
+ * faz fallback para PORTFOLIO_DIR/... e resolve atalhos em ambos os escopos sem causar 403 Outside Root.
  */
-function resolveTenantSafePath(userId, userRoot, relPath = '', options = { forWrite: false }, scopeType = 'user', role = 'member') {
+function resolveTenantSafePath(userId, userRoot, relPath = '', options = { forWrite: false }, scopeType = 'user', role = 'member', allowedOrgSlugs = null) {
   const cleanRel = normalizeTenantRelPath(relPath);
+
+  // Resolução de atalhos bidirecionais dentro do cofre (Org ou Pessoal)
+  if (cleanRel) {
+    const shortcutMatch = resolveOrgPersonalShortcutTarget(userRoot, cleanRel, { scopeType, role, allowedOrgSlugs });
+    if (shortcutMatch && fs.existsSync(shortcutMatch.targetBase)) {
+      if (options.forWrite) {
+        return shortcutMatch.physicalPath;
+      }
+      if (fs.existsSync(shortcutMatch.physicalPath) || fs.existsSync(shortcutMatch.targetBase)) {
+        return shortcutMatch.physicalPath;
+      }
+    }
+  }
+
   const primaryTarget = cleanRel ? resolveSafeChildPath(userRoot, cleanRel) : userRoot;
 
   const isPortRel =
@@ -6675,8 +6776,16 @@ function resolveTenantSafePath(userId, userRoot, relPath = '', options = { forWr
  * Retorna os diretórios físicos que compõem uma pasta lógica do tenant.
  * Para PRIMARY_ADMIN_UUID em escopo de usuário (scopeType !== 'org') dentro de "Portfolio" ou "Portfolio/*",
  * retorna tanto o diretório em userRoot/Portfolio quanto o correspondente em PORTFOLIO_DIR para merge deduplicado!
+ * Para scopeType === 'org', resolve diretórios apontados por atalhos de pastas pessoais de membros.
  */
-function resolveTenantListingDirs(userId, userRoot, cleanRel, scopeType = 'user', role = 'member') {
+function resolveTenantListingDirs(userId, userRoot, cleanRel, scopeType = 'user', role = 'member', allowedOrgSlugs = null) {
+  if (cleanRel) {
+    const shortcutMatch = resolveOrgPersonalShortcutTarget(userRoot, cleanRel, { scopeType, role, allowedOrgSlugs });
+    if (shortcutMatch && fs.existsSync(shortcutMatch.physicalPath)) {
+      return [{ dirPath: shortcutMatch.physicalPath, isLegacyBridge: false, isOrgPersonalShortcut: true }];
+    }
+  }
+
   const primaryDir = cleanRel ? resolveSafeChildPath(userRoot, cleanRel) : userRoot;
   const dirs = [];
   if (fs.existsSync(primaryDir)) {
@@ -6969,11 +7078,16 @@ async function verifyTenantTicket(req, res, next) {
         : []
     );
 
+    const allowedOrgSlugs = Array.isArray(payload.allowedOrgSlugs)
+      ? payload.allowedOrgSlugs.map((s) => String(s).trim().toLowerCase()).filter(Boolean)
+      : null;
+
     req.tenant = {
       userId,
       scopeType,
       orgSlug: scopeType === 'org' ? String(payload.orgSlug).trim().toLowerCase() : null,
       organizationId: payload.organizationId || null,
+      allowedOrgSlugs,
       pinNamespaceId,
       role: payload.role === 'admin' ? 'admin' : 'member',
       purpose,
@@ -6985,8 +7099,8 @@ async function verifyTenantTicket(req, res, next) {
       allowDownload: payload.allowDownload !== false,
       unlockedPinsSet,
       userRoot,
-      resolveSafePath: (relPath, opts) => resolveTenantSafePath(userId, userRoot, relPath, opts, scopeType, payload.role),
-      resolveListingDirs: (cleanRel) => resolveTenantListingDirs(userId, userRoot, cleanRel, scopeType, payload.role),
+      resolveSafePath: (relPath, opts) => resolveTenantSafePath(userId, userRoot, relPath, opts, scopeType, payload.role, allowedOrgSlugs),
+      resolveListingDirs: (cleanRel) => resolveTenantListingDirs(userId, userRoot, cleanRel, scopeType, payload.role, allowedOrgSlugs),
       getUsedBytes: (force) => getTenantUsedBytes(pinNamespaceId, userRoot, force, scopeType),
       adjustUsedBytes: (delta) => adjustTenantUsedBytes(pinNamespaceId, userRoot, delta, scopeType),
     };
@@ -7143,11 +7257,62 @@ app.get('/api/tenant/list', verifyTenantTicket, async (req, res) => {
         ) {
           continue;
         }
-        // userRoot tem prioridade sobre a ponte legada caso o mesmo nome exista em ambos
-        if (folderMap.has(d.name) || fileMap.has(d.name)) continue;
 
         const entryFullPath = path.join(dirPath, d.name);
         const entryRelPath = cleanRel ? `${cleanRel}/${d.name}` : d.name;
+
+        // Detecção e injeção transparente de atalhos de pastas (.shortcut.json) em ambos os cofres (Org e Pessoal)
+        if (d.name.endsWith('.shortcut.json') || d.name.endsWith('.shortcut')) {
+          try {
+            const raw = JSON.parse(await fs.promises.readFile(entryFullPath, 'utf8'));
+            if (raw && raw.isFolderShortcut) {
+              const scName = raw.name || d.name.replace(/^\./, '').replace(/\.shortcut(\.json)?$/, '');
+              const scRel = cleanRel ? `${cleanRel}/${scName}` : scName;
+
+              // Detecção de atalho quebrado / pasta de destino excluída (resiliência contra ENOENT)
+              let isBroken = false;
+              try {
+                if (raw.targetOrgSlug) {
+                  const targetOrgDir = resolveSafeChildPath(ORGS_ROOT_DIR, String(raw.targetOrgSlug).toLowerCase());
+                  const physicalTarget = raw.targetRelPath ? resolveSafeChildPath(targetOrgDir, raw.targetRelPath) : targetOrgDir;
+                  if (!fs.existsSync(physicalTarget)) isBroken = true;
+                } else if (raw.ownerUserId || raw.targetUserId) {
+                  const physicalTarget = resolvePortAwareTargetDir(raw.ownerUserId || raw.targetUserId, raw.targetRelPath || '');
+                  if (!fs.existsSync(physicalTarget)) isBroken = true;
+                }
+              } catch {
+                isBroken = true;
+              }
+
+              folderMap.set(scName, {
+                name: scName,
+                relativePath: scRel,
+                path: scRel,
+                isDirectory: true,
+                sizeBytes: 0,
+                mimeType: 'inode/directory+shortcut',
+                kind: 'folder',
+                modifiedAt: raw.createdAt || new Date().toISOString(),
+                isShortcut: true,
+                brokenShortcut: isBroken,
+                shortcutType: raw.targetOrgSlug ? 'org_folder' : 'personal_folder',
+                shortcutTarget: raw.targetRelPath || '',
+                shortcutOwner: raw.ownerName || 'Membro',
+                shortcutFileName: d.name,
+                shortcutFileRelativePath: entryRelPath,
+                ownerUserId: raw.ownerUserId || raw.targetUserId,
+                targetUserId: raw.targetUserId,
+                targetOrgSlug: raw.targetOrgSlug,
+                hasPin: false,
+                isUnlocked: true,
+              });
+            }
+          } catch {}
+          continue;
+        }
+
+        // userRoot e atalhos têm prioridade sobre symlink/ponte legada
+        if (folderMap.has(d.name) || fileMap.has(d.name)) continue;
 
         try {
           const descriptor = await buildTenantEntryDescriptorAsync(
@@ -7226,8 +7391,8 @@ app.get('/api/tenant/list', verifyTenantTicket, async (req, res) => {
   }
 });
 
-// 11.5.2. GET /api/tenant/stream — Stream HTTP 206 com validação estrita de allowedPaths
-app.get('/api/tenant/stream', verifyTenantTicket, async (req, res) => {
+// 11.5.2. GET /api/tenant/stream e GET /api/tenant/download — Stream/Download HTTP 206 com suporte completo a Atalhos
+async function handleTenantStreamRequest(req, res, forceDownload = false) {
   try {
     const relPath = normalizeTenantRelPath(req.query.path);
     if (!relPath) return res.status(400).json({ error: 'Parâmetro path obrigatório.' });
@@ -7240,16 +7405,19 @@ app.get('/api/tenant/stream', verifyTenantTicket, async (req, res) => {
       return res.status(404).json({ error: 'Arquivo não encontrado no servidor.' });
     }
 
-    if (req.query.download === '1' && req.tenant.allowDownload === false) {
+    const wantDownload = forceDownload || req.query.download === '1';
+    if (wantDownload && req.tenant.allowDownload === false) {
       return res.status(403).json({ error: 'Download não autorizado para este ticket.' });
     }
 
-    const wantDownload = req.query.download === '1';
     return await streamFileWithRange(req, res, fullPath, { download: wantDownload });
   } catch (err) {
     return res.status(err.statusCode || 500).json({ error: err.message });
   }
-});
+}
+
+app.get('/api/tenant/stream', verifyTenantTicket, (req, res) => handleTenantStreamRequest(req, res, false));
+app.get('/api/tenant/download', verifyTenantTicket, (req, res) => handleTenantStreamRequest(req, res, true));
 
 // 11.5.3. GET /api/tenant/thumb — Miniatura ultra-rápida (reaproveita 100% dos 2.369 .avif + sig_index.json)
 app.get('/api/tenant/thumb', verifyTenantTicket, async (req, res) => {
@@ -7561,7 +7729,7 @@ app.post('/api/tenant/check-existing', verifyTenantTicket, async (req, res) => {
     return res.status(err.statusCode || 500).json({ error: err.message });
   }
 });
-app.post('/api/tenant/folder', verifyTenantTicket, async (req, res) => {
+async function handleTenantCreateFolderRequest(req, res) {
   try {
     if (req.tenant.readOnly || req.tenant.purpose === 'public_media' || req.tenant.quotaLimitBytes <= 0) {
       return res.status(403).json({ error: 'Sem permissão para criar pastas.' });
@@ -7593,6 +7761,156 @@ app.post('/api/tenant/folder', verifyTenantTicket, async (req, res) => {
       item,
       total_used_bytes: totalUsedBytes,
     });
+  } catch (err) {
+    return res.status(err.statusCode || 500).json({ error: err.message });
+  }
+}
+
+app.post('/api/tenant/folder', verifyTenantTicket, handleTenantCreateFolderRequest);
+app.post('/api/tenant/mkdir', verifyTenantTicket, handleTenantCreateFolderRequest);
+
+// 11.5.6.1. POST /api/tenant/shortcut — Criar Atalho Bidirecional no Cofre (Org <-> Pessoal ou Pessoal <-> Pessoal)
+app.post('/api/tenant/shortcut', verifyTenantTicket, async (req, res) => {
+  try {
+    if (req.tenant.readOnly) {
+      return res.status(403).json({ error: 'Sem permissão para adicionar atalhos neste cofre.' });
+    }
+
+    const parentFolder = normalizeTenantRelPath(req.body?.parentFolder || '');
+    const rawName = String(req.body?.name || req.body?.shortcutName || '').trim();
+    const shortcutName = sanitizeFilename(rawName);
+    const personalRelPath = normalizeTenantRelPath(req.body?.personalFolderRelPath || '');
+    const rawTargetOrgSlug = req.body?.targetOrgSlug ? String(req.body.targetOrgSlug).trim().toLowerCase() : '';
+    const ownerName = String(req.body?.ownerName || 'Membro').trim();
+
+    if (!shortcutName) {
+      return res.status(400).json({ error: 'Nome do atalho é obrigatório.' });
+    }
+
+    let targetPhysicalDir;
+    let isOrgTarget = false;
+
+    if (rawTargetOrgSlug) {
+      if (!/^[a-z0-9][a-z0-9_-]{1,62}$/.test(rawTargetOrgSlug)) {
+        return res.status(400).json({ error: 'Slug de organização de destino inválido.' });
+      }
+      if (
+        req.tenant.role !== 'admin' &&
+        Array.isArray(req.tenant.allowedOrgSlugs) &&
+        !req.tenant.allowedOrgSlugs.includes(rawTargetOrgSlug)
+      ) {
+        return res.status(403).json({ error: 'Sem permissão para criar atalho apontando para esta organização.' });
+      }
+      isOrgTarget = true;
+      const orgRoot = resolveSafeChildPath(ORGS_ROOT_DIR, rawTargetOrgSlug);
+      if (!fs.existsSync(orgRoot)) {
+        await fs.promises.mkdir(orgRoot, { recursive: true });
+      }
+      targetPhysicalDir = personalRelPath ? resolveSafeChildPath(orgRoot, personalRelPath) : orgRoot;
+      if (!fs.existsSync(targetPhysicalDir)) {
+        return res.status(404).json({ error: 'Pasta da organização de destino não encontrada no armazenamento.' });
+      }
+    } else {
+      targetPhysicalDir = resolvePortAwareTargetDir(req.tenant.userId, personalRelPath);
+      if (!fs.existsSync(targetPhysicalDir)) {
+        return res.status(404).json({ error: 'Pasta pessoal de destino não encontrada no armazenamento.' });
+      }
+    }
+
+    // Determina o diretório pai dentro do cofre atual (Org ou Pessoal) via resolveSafePath
+    const parentDir = parentFolder
+      ? req.tenant.resolveSafePath(parentFolder, { forWrite: true })
+      : req.tenant.userRoot;
+    if (!fs.existsSync(parentDir)) {
+      await fs.promises.mkdir(parentDir, { recursive: true });
+    }
+
+    const shortcutFile = path.join(parentDir, `.${shortcutName}.shortcut.json`);
+    const shortcutPayload = {
+      isFolderShortcut: true,
+      shortcutType: isOrgTarget ? 'org_folder' : 'personal_folder',
+      name: shortcutName,
+      ownerUserId: req.tenant.userId,
+      targetUserId: isOrgTarget ? undefined : req.tenant.userId,
+      targetOrgSlug: isOrgTarget ? rawTargetOrgSlug : undefined,
+      targetRelPath: personalRelPath,
+      ownerName,
+      createdAt: new Date().toISOString(),
+    };
+
+    await atomicWriteFile(shortcutFile, JSON.stringify(shortcutPayload, null, 2), 'utf8');
+
+    // Tenta criar symlink se suportado pelo filesystem
+    try {
+      const symlinkTarget = path.join(parentDir, shortcutName);
+      if (!fs.existsSync(symlinkTarget)) {
+        await fs.promises.symlink(targetPhysicalDir, symlinkTarget, 'dir');
+      }
+    } catch {}
+
+    const relPath = parentFolder ? `${parentFolder}/${shortcutName}` : shortcutName;
+    return res.json({
+      success: true,
+      shortcut: {
+        name: shortcutName,
+        relativePath: relPath,
+        path: relPath,
+        isDirectory: true,
+        sizeBytes: 0,
+        mimeType: 'inode/directory+shortcut',
+        kind: 'folder',
+        modifiedAt: shortcutPayload.createdAt,
+        isShortcut: true,
+        shortcutType: shortcutPayload.shortcutType,
+        shortcutTarget: personalRelPath,
+        shortcutOwner: ownerName,
+        ownerUserId: req.tenant.userId,
+        targetUserId: shortcutPayload.targetUserId,
+        targetOrgSlug: shortcutPayload.targetOrgSlug,
+      },
+    });
+  } catch (err) {
+    return res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
+
+// 11.5.6.2. DELETE /api/tenant/shortcut — Remover Atalho de Pasta do Cofre (Org ou Pessoal)
+app.delete('/api/tenant/shortcut', verifyTenantTicket, async (req, res) => {
+  try {
+    if (req.tenant.readOnly) {
+      return res.status(403).json({ error: 'Sem permissão para remover atalhos neste cofre.' });
+    }
+
+    const shortcutRelPath = normalizeTenantRelPath(req.body?.shortcutPath || req.query?.shortcutPath || '');
+    if (!shortcutRelPath) {
+      return res.status(400).json({ error: 'shortcutPath é obrigatório.' });
+    }
+
+    const parts = shortcutRelPath.split('/');
+    const baseName = parts.pop();
+    const parentFolder = parts.join('/');
+    const parentDir = parentFolder ? resolveSafeChildPath(req.tenant.userRoot, parentFolder) : req.tenant.userRoot;
+
+    const candidateFiles = [
+      path.join(parentDir, `.${baseName}.shortcut.json`),
+      path.join(parentDir, `${baseName}.shortcut.json`),
+      path.join(parentDir, baseName),
+    ];
+
+    let removed = false;
+    for (const f of candidateFiles) {
+      if (fs.existsSync(f)) {
+        try {
+          const st = fs.lstatSync(f);
+          if (st.isSymbolicLink() || st.isFile()) {
+            await fs.promises.unlink(f);
+            removed = true;
+          }
+        } catch {}
+      }
+    }
+
+    return res.json({ success: true, removed });
   } catch (err) {
     return res.status(err.statusCode || 500).json({ error: err.message });
   }
@@ -7693,6 +8011,54 @@ app.delete('/api/tenant/entry', verifyTenantTicket, async (req, res) => {
     }
 
     assertFolderPinUnlockedIfRequired(req, relPath);
+
+    // Se o item for a raiz de um atalho de pasta (Org ou Pessoal),
+    // apenas remove o arquivo de atalho e eventual symlink sem jamais deletar a pasta original!
+    const shortcutMatch = resolveOrgPersonalShortcutTarget(req.tenant.userRoot, relPath, {
+      scopeType: req.tenant.scopeType,
+      role: req.tenant.role,
+      allowedOrgSlugs: req.tenant.allowedOrgSlugs,
+    });
+    if (shortcutMatch && shortcutMatch.isShortcutRoot) {
+      try {
+        if (shortcutMatch.shortcutCandidateFile && fs.existsSync(shortcutMatch.shortcutCandidateFile)) {
+          await fs.promises.unlink(shortcutMatch.shortcutCandidateFile);
+        }
+        const symlinkCandidate = path.join(shortcutMatch.parentDir, shortcutMatch.shortcutName);
+        if (fs.existsSync(symlinkCandidate)) {
+          const st = fs.lstatSync(symlinkCandidate);
+          if (st.isSymbolicLink()) {
+            await fs.promises.unlink(symlinkCandidate);
+          }
+        }
+      } catch {}
+      return res.json({
+        success: true,
+        action: 'delete_shortcut',
+        item: {
+          name: shortcutMatch.shortcutName,
+          relativePath: relPath,
+          isDirectory: true,
+          isShortcut: true,
+        },
+        total_used_bytes: await req.tenant.getUsedBytes(),
+      });
+    }
+
+    // Impede que terceiros dentro da organização excluam arquivos originais de uma pasta pessoal compartilhada
+    if (
+      shortcutMatch &&
+      !shortcutMatch.isShortcutRoot &&
+      !shortcutMatch.shortcutInfo?.targetOrgSlug &&
+      shortcutMatch.ownerUserId &&
+      req.tenant.userId !== shortcutMatch.ownerUserId &&
+      req.tenant.role !== 'admin'
+    ) {
+      return res.status(403).json({
+        error: 'Não é permitido excluir arquivos originais de uma pasta pessoal compartilhada por outro membro.',
+      });
+    }
+
     const targetFull = req.tenant.resolveSafePath(relPath, { forWrite: false });
     if (!fs.existsSync(targetFull)) {
       return res.status(404).json({ error: 'Arquivo ou pasta não encontrado.' });

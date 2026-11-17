@@ -13,6 +13,7 @@ import { useCoachMarks } from '@/components/onboarding/CoachMarksProvider';
 import { ThemeDropdownSection } from '@/components/theme/ThemeDropdownSection';
 import { ThemedAurtisticLogo } from '@/components/theme/ThemedAurtisticLogo';
 import { ModulesConfig, getInitialModulesConfig } from '@/lib/modules-config';
+import { AurtisticSpotlightModal } from './AurtisticSpotlightModal';
 
 export default function AurtisticNavbar() {
   const { resolvedMode, paletteDef } = useTheme();
@@ -21,6 +22,7 @@ export default function AurtisticNavbar() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSpotlightOpen, setIsSpotlightOpen] = useState(false);
   const [isIdentityDropdownOpen, setIsIdentityDropdownOpen] = useState(false);
   const [isMobileIdentityOpen, setIsMobileIdentityOpen] = useState(false);
   const identityDropdownRef = useRef<HTMLDivElement>(null);
@@ -96,9 +98,26 @@ export default function AurtisticNavbar() {
     };
     document.addEventListener('mousedown', handleClickOutside);
 
+    const handleGlobalSearchKey = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isTyping =
+        activeEl instanceof HTMLInputElement ||
+        activeEl instanceof HTMLTextAreaElement ||
+        (activeEl as HTMLElement)?.isContentEditable;
+      if ((e.key === 'k' || e.key === 'K') && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        setIsSpotlightOpen(true);
+      } else if (e.key === '/' && !isTyping && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setIsSpotlightOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalSearchKey);
+
     return () => {
       authListener.subscription.unsubscribe();
       document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleGlobalSearchKey);
     };
   }, [supabase]);
 
@@ -230,8 +249,8 @@ export default function AurtisticNavbar() {
             </Link>
           )}
 
-          {/* 2. Organizações & Servidor (Unificado em uma aba) */}
-          {hasOrgsOrServer && (
+          {/* 2. Gestão (Cofre + Organizações unificados) */}
+          {(hasServidor || hasOrgs) && (
             <Link 
               href={orgsHref}
               className={`font-medium transition-colors ${
@@ -240,11 +259,11 @@ export default function AurtisticNavbar() {
                   : 'text-fg-secondary hover:text-[var(--accent-primary)]'
               }`}
             >
-              {orgsLabel}
+              {customLabels.organizacoes || 'Gestão'}
             </Link>
           )}
 
-          {/* 3. Identidade / Portfólio (Menu Unificado se houver mais de um módulo ativo) */}
+          {/* 4. Identidade / Portfólio (Menu Unificado se houver mais de um módulo ativo) */}
           {identityItems.length === 1 && (
             <Link 
               href={identityItems[0].href}
@@ -320,8 +339,34 @@ export default function AurtisticNavbar() {
           )}
         </nav>
 
-        {/* Right: Help Button (?) + Auth State / Settings Dropdown */}
-        <div className="flex justify-end items-center gap-2 sm:gap-3">
+        {/* Right: Busca Global (Ctrl+K) + Report Pulsante + Ajuda (?) + Auth State */}
+        <div className="flex justify-end items-center gap-2 sm:gap-2.5">
+          {/* Busca Global Unificada (Ctrl+K / /) */}
+          <button
+            type="button"
+            onClick={() => setIsSpotlightOpen(true)}
+            className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border-subtle bg-surface hover:border-[var(--accent-primary)] text-fg-muted hover:text-fg text-xs transition-colors cursor-pointer"
+            title="Busca Global (Ctrl+K ou /)"
+          >
+            <span className="material-symbols-outlined text-[16px]">search</span>
+            <span className="hidden md:inline">Buscar</span>
+            <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-app border border-border-subtle">
+              Ctrl+K
+            </kbd>
+          </button>
+
+          {/* Botão de Report Rápido Pulsante */}
+          <Link
+            href="/relatar-bug"
+            className="relative w-8 h-8 rounded-full border border-[#F14343]/40 bg-[#F14343]/15 hover:bg-[#F14343]/25 text-[#F14343] transition-colors flex items-center justify-center shrink-0"
+            title="Relatar Bug ou Sugestão"
+            aria-label="Relatar Bug ou Sugestão"
+          >
+            <span className="material-symbols-outlined text-[17px] animate-pulse">report</span>
+            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#F14343] animate-ping opacity-75" />
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#F14343]" />
+          </Link>
+
           {/* Botão de Ajuda (?) - Themed & Compacto */}
           <button
             type="button"
@@ -455,17 +500,23 @@ export default function AurtisticNavbar() {
           ) : (
             <Link 
               href="/login"
-              className="bg-[var(--accent-secondary)] text-[var(--on-accent-secondary)] px-5 py-2 rounded-md text-sm font-bold hover:brightness-95 transition-colors"
+              className="inline-flex items-center gap-1.5 bg-surface border border-border-subtle hover:border-[var(--accent-primary)] text-fg px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm"
+              title="Navegação em modo público. Clique para entrar."
             >
-              Entrar
+              <span className="material-symbols-outlined text-[15px] text-[var(--accent-primary)]">visibility</span>
+              <span>Visitante • Entrar</span>
             </Link>
           )}
 
         </div>
       </div>
+      <AurtisticSpotlightModal
+        isOpen={isSpotlightOpen}
+        onClose={() => setIsSpotlightOpen(false)}
+      />
     </header>
 
-      {/* Mobile Bottom Floating Pill Nav (Enxuto & Agrupado) */}
+      {/* Mobile Bottom Floating Pill Nav (Enxuto & Agrupado nos 4 Destinos Diretos) */}
       <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[99]" data-tour="nav-tabs">
         <div className="bg-surface/95 backdrop-blur-xl border border-border-subtle rounded-full p-1.5 flex items-center gap-1 shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
           {/* 1. Tarefas */}
@@ -484,8 +535,8 @@ export default function AurtisticNavbar() {
             </Link>
           )}
 
-          {/* 2. Organizações & Servidor (Unificado) */}
-          {hasOrgsOrServer && (
+          {/* 2. Gestão (Cofre + Organizações) */}
+          {(hasServidor || hasOrgs) && (
             <Link
               href={orgsHref}
               className={`flex items-center justify-center rounded-full transition-all duration-300 ease-out ${
@@ -493,16 +544,16 @@ export default function AurtisticNavbar() {
                   ? 'bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] px-4 py-2 gap-1.5'
                   : 'text-fg-muted hover:text-fg px-3 py-2'
               }`}
-              title={orgsLabel}
+              title="Gestão"
             >
-              <span className="material-symbols-outlined text-[20px]">domain</span>
+              <span className="material-symbols-outlined text-[20px]">folder_managed</span>
               {isOrgsActive && (
                 <span className="text-xs font-bold whitespace-nowrap">Gestão</span>
               )}
             </Link>
           )}
 
-          {/* 3. Identidade (Portfólio / Currículo / Resumo) */}
+          {/* 4. Identidade (Portfólio / Currículo / Resumo) */}
           {identityItems.length === 1 && (
             <Link
               href={identityItems[0].href}

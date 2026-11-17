@@ -207,7 +207,7 @@ export function JoinOrganizationModal({
                       onClick={() => setSelectedPlaceholderId(p.id)}
                       className={`px-2.5 py-1 text-xs rounded-lg border transition-colors flex items-center gap-1 ${
                         selectedPlaceholderId === p.id
-                          ? 'bg-indigo-600 text-fg font-bold border-indigo-400'
+                          ? 'bg-accent-primary text-on-accent-primary font-bold border-accent-primary'
                           : 'bg-app text-slate-300 border-border-subtle hover:text-fg'
                       }`}
                     >

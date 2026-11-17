@@ -55,7 +55,7 @@ function getFileIcon(name: string): { icon: string; color: string } {
     case 'mp3':
     case 'wav':
     case 'ogg':
-      return { icon: 'audiotrack', color: 'text-purple-500' };
+      return { icon: 'audiotrack', color: 'text-accent-primary' };
     case 'mp4':
     case 'webm':
     case 'mov':
@@ -286,11 +286,10 @@ export function VaultUploadManagerModal({
               <button
                 type="button"
                 onClick={() => handleSetTargetFolder('Portfolio')}
-                className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition-all flex items-center gap-1 shadow-sm ${
-                  effectiveTargetFolder.toLowerCase() === 'portfolio' || effectiveTargetFolder.toLowerCase() === 'portifolio'
+                className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition-all flex items-center gap-1 shadow-sm ${effectiveTargetFolder.toLowerCase() === 'portfolio' || effectiveTargetFolder.toLowerCase() === 'portifolio'
                     ? 'bg-[#FFCC00]/20 border-[#FFCC00] text-[#FFCC00]'
                     : 'bg-surface hover:bg-surface-hover border-border-subtle text-fg hover:border-[#FFCC00]/60'
-                }`}
+                  }`}
                 title="Direcionar envio para a pasta de Portfólio (com publicação automática)"
               >
                 <span className="material-symbols-outlined text-[15px] text-[#FFCC00]">photo_library</span>
@@ -300,11 +299,10 @@ export function VaultUploadManagerModal({
               <button
                 type="button"
                 onClick={() => handleSetTargetFolder('')}
-                className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition-all flex items-center gap-1 shadow-sm ${
-                  !effectiveTargetFolder
+                className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition-all flex items-center gap-1 shadow-sm ${!effectiveTargetFolder
                     ? 'bg-[var(--accent-primary)]/20 border-[var(--accent-primary)] text-[var(--accent-primary)]'
                     : 'bg-surface hover:bg-surface-hover border-border-subtle text-fg hover:border-fg-muted'
-                }`}
+                  }`}
                 title="Direcionar envio para a raiz do Cofre"
               >
                 <span className="material-symbols-outlined text-[15px]">home</span>
@@ -354,16 +352,14 @@ export function VaultUploadManagerModal({
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {/* Zona de Drop Interativa & Botões de Adição */}
           <div
-            className={`border-2 border-dashed rounded-2xl p-5 text-center transition-all ${
-              isDragOver
+            className={`border-2 border-dashed rounded-2xl p-5 text-center transition-all ${isDragOver
                 ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]/10 scale-[1.01]'
                 : 'border-border-subtle bg-app/50 hover:border-[var(--accent-primary)]/50'
-            }`}
+              }`}
           >
             <span
-              className={`material-symbols-outlined text-[36px] mb-1.5 block ${
-                isDragOver ? 'text-[var(--accent-secondary)] animate-bounce' : 'text-fg-muted'
-              }`}
+              className={`material-symbols-outlined text-[36px] mb-1.5 block ${isDragOver ? 'text-[var(--accent-secondary)] animate-bounce' : 'text-fg-muted'
+                }`}
             >
               {isDragOver ? 'file_download' : 'drive_folder_upload'}
             </span>
@@ -601,13 +597,12 @@ export function VaultUploadManagerModal({
               </div>
               <div className="w-full h-2 bg-app rounded-full overflow-hidden border border-border-subtle">
                 <div
-                  className={`h-full transition-all duration-300 ${
-                    completedFiles === totalFiles && totalFiles > 0
+                  className={`h-full transition-all duration-300 ${completedFiles === totalFiles && totalFiles > 0
                       ? 'bg-emerald-500'
                       : errorFiles > 0 && !isUploading
                         ? 'bg-rose-500'
                         : 'bg-[var(--accent-primary)]'
-                  }`}
+                    }`}
                   style={{ width: `${overallPercent}%` }}
                 />
               </div>
