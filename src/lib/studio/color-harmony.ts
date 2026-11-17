@@ -116,12 +116,12 @@ export function getContrastRatio(hex1: string, hex2: string): number {
   return (brightest + 0.05) / (darkest + 0.05);
 }
 
-// Busca rápida de cores por keyword
+// Busca rápida de cores por keyword (suporta múltiplos termos: 'azul + dourado')
 export function searchPaletteByKeyword(keyword: string): string[] {
-  const k = keyword.toLowerCase().trim();
   const map: Record<string, string[]> = {
     azul: ['#0066FF', '#00D4FF', '#0A2540', '#60A5FA'],
     dourado: ['#FFCC00', '#F59E0B', '#D97706', '#FEF3C7'],
+    amarelo: ['#FFCC00', '#F59E0B', '#FBBF24'],
     vermelho: ['#FF1E1E', '#DC2626', '#991B1B', '#F87171'],
     verde: ['#00FF66', '#10B981', '#064E3B', '#34D399'],
     roxo: ['#9D4EDD', '#7C3AED', '#4C1D95', '#C084FC'],
@@ -129,9 +129,16 @@ export function searchPaletteByKeyword(keyword: string): string[] {
     show: ['#FF1E1E', '#0066FF', '#00FF66', '#FFCC00'],
     labdiv: ['#0F4780', '#1F9FCF', '#F14343', '#FFCC00'],
   };
-  for (const key of Object.keys(map)) {
-    if (k.includes(key)) return map[key];
+
+  const tokens = keyword.toLowerCase().split(/[\s,+]+/).filter(Boolean);
+  const matched: string[] = [];
+  for (const t of tokens) {
+    for (const [k, colors] of Object.entries(map)) {
+      if (k.includes(t) || t.includes(k)) {
+        colors.forEach((c) => { if (!matched.includes(c)) matched.push(c); });
+      }
+    }
   }
-  return ['#0F4780', '#1F9FCF', '#FFCC00', '#9D4EDD', '#00FF66'];
+  return matched.length > 0 ? matched.slice(0, 8) : ['#0F4780', '#1F9FCF', '#FFCC00', '#9D4EDD', '#00FF66'];
 }
 

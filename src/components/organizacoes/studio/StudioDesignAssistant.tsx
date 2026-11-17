@@ -14,6 +14,16 @@ export function StudioDesignAssistant({ activeOverlay, onToggleOverlay }: Studio
   const { activeSlide, selectedLayer, updateSlide } = useStudio();
   const [tipsOpen, setTipsOpen] = useState(false);
   const [measuredContrast, setMeasuredContrast] = useState<number>(7.2);
+  const [dismissedTip, setDismissedTip] = useState(false);
+  const [hideTipsForever, setHideTipsForever] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('aurtistic_studio_hide_tips') === 'true') {
+        setHideTipsForever(true);
+      }
+    } catch {}
+  }, []);
 
   const currentOverlayDark = activeSlide.globalFilters.overlayDark ?? 0;
 
@@ -99,6 +109,41 @@ export function StudioDesignAssistant({ activeOverlay, onToggleOverlay }: Studio
           <span>Auto-Ajustar para 7:1 (AAA)</span>
         </button>
       </div>
+
+      {/* Dicas Contextuais Inteligentes */}
+      {!hideTipsForever && !dismissedTip && (
+        <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-400/25 space-y-1.5">
+          <div className="flex items-start gap-1.5">
+            <span className="material-symbols-outlined text-[15px] text-blue-400 shrink-0 mt-0.5">lightbulb</span>
+            <p className="text-[10px] text-blue-200">
+              {selectedLayer && Math.abs(selectedLayer.x + selectedLayer.width / 2 - 0.5) < 0.04
+                ? '🎯 Camada perfeitamente centralizada no eixo horizontal.'
+                : (activeSlide.globalFilters.temperature ?? 0) > 15
+                ? '🌡️ Fundo quente ativo: garanta bom contraste usando textos em tons frios ou neutros.'
+                : '💡 Mantenha títulos na metade superior do slide para melhor retenção visual no carrossel.'}
+            </p>
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-1 border-t border-blue-400/15">
+            <button
+              type="button"
+              onClick={() => setDismissedTip(true)}
+              className="text-[9px] text-slate-300 hover:text-white cursor-pointer font-semibold"
+            >
+              Entendi
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setHideTipsForever(true);
+                try { localStorage.setItem('aurtistic_studio_hide_tips', 'true'); } catch {}
+              }}
+              className="text-[9px] text-slate-400 hover:text-slate-200 cursor-pointer"
+            >
+              Não mostrar mais
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Overlays de Composição */}
       <div>

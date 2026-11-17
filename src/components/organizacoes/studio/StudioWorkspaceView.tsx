@@ -1,7 +1,7 @@
 // Este programa é um software livre (Licença AGPLv3)
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStudio } from './StudioContext';
 import { ASPECT_DIMENSIONS, type AspectRatioKey } from './types';
 import { StudioToolbarTabs } from './StudioToolbarTabs';
@@ -17,10 +17,11 @@ import { StudioCarouselStrip } from './StudioCarouselStrip';
 import { StudioMaskBrushModal } from './StudioMaskBrushModal';
 import { StudioDraftVersionsDrawer } from './StudioDraftVersionsDrawer';
 import { useStudioKeyboard } from '@/hooks/useStudioKeyboard';
+import { useStudioAutoSave } from '@/hooks/useStudioAutoSave';
 
 export function StudioWorkspaceView() {
   const {
-    stage: _stage,
+    stage,
     setStage,
     activeTab,
     aspectRatio,
@@ -36,10 +37,32 @@ export function StudioWorkspaceView() {
     reorderLayers,
     setSelectedLayerId,
     activeSlide,
+    slides,
+    orgSlug,
   } = useStudio();
 
   const [activeAuxTool, setActiveAuxTool] = useState<'none' | 'elements' | 'palette' | 'assistant'>('none');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  // Auto-Save contínuo com debounce de 5s no slot ativo
+  const currentDraft = useMemo(() => {
+    if (!activeDraftSlot) return null;
+    return {
+      id: `draft-slot-${activeDraftSlot}`,
+      slotIndex: activeDraftSlot,
+      title: `Rascunho ${activeDraftSlot}`,
+      aspectRatio,
+      updatedAt: new Date().toISOString(),
+      slides,
+    };
+  }, [activeDraftSlot, aspectRatio, slides]);
+
+  useStudioAutoSave({
+    stage,
+    activeDraftSlot,
+    draft: currentDraft,
+    orgSlug,
+  });
 
   // Atalhos de teclado profissionais (Ctrl+Z, Del, Ctrl+D, Setas, Ctrl+S)
   useStudioKeyboard({

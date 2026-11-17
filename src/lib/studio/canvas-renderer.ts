@@ -31,9 +31,11 @@ export function preloadImage(src: string): Promise<HTMLImageElement> {
 export function buildCssFilter(filters?: StudioLayerFilterConfig): string {
   if (!filters) return 'none';
   const p: string[] = [];
-  if (filters.brightness !== 100) p.push(`brightness(${filters.brightness}%)`);
+  const b = (filters.brightness ?? 100) * ((filters.exposure ?? 100) / 100);
+  if (Math.round(b) !== 100) p.push(`brightness(${Math.round(b)}%)`);
   if (filters.contrast !== 100) p.push(`contrast(${filters.contrast}%)`);
-  if (filters.saturation !== 100) p.push(`saturate(${filters.saturation}%)`);
+  const s = (filters.saturation ?? 100) * ((filters.vibrance ?? 100) / 100);
+  if (Math.round(s) !== 100) p.push(`saturate(${Math.round(s)}%)`);
   if (filters.blur > 0) p.push(`blur(${filters.blur}px)`);
   if (filters.grayscale > 0) p.push(`grayscale(${filters.grayscale}%)`);
   if (filters.sepia > 0) p.push(`sepia(${filters.sepia}%)`);
@@ -191,13 +193,21 @@ export function renderSlideToCanvas(
     } else if (layer.type === 'text') {
       const textLayer = layer as StudioTextLayer; ctx.globalAlpha = textLayer.opacity;
       const boxCenterX = (textLayer.x + textLayer.width / 2) * canvasW, boxTopY = textLayer.y * canvasH, maxBoxWidth = textLayer.width * canvasW;
+      let processed = (textLayer.text || '')
+        .replace(/\{TITULO\}/g, slide.title || '')
+        .replace(/\{ORG\}/g, tokens?.displayName || tokens?.badgeTag || '');
+      processed = processed.replace(/\{([A-Z0-9_]+)\}/g, '[y:{$1}]');
+
       if (tokens) {
         renderTokenizedRichTextCanvas(ctx, {
-          text: textLayer.text, mode: 'body', tokens, boxCenterX, boxTopY, maxBoxWidth, fontSize: textLayer.fontSize, align: textLayer.align, customColorOverride: textLayer.color,
+          text: processed, mode: textLayer.textKind === 'title' ? 'title' : 'body',
+          tokens, boxCenterX, boxTopY, maxBoxWidth, fontSize: textLayer.fontSize,
+          align: textLayer.align, customColorOverride: textLayer.color,
+          lineHeightMultiplier: textLayer.lineHeight || 1.24,
         });
       } else {
         ctx.font = `${textLayer.bold ? 'bold ' : ''}${textLayer.fontSize}px ${textLayer.fontFamily || 'sans-serif'}`;
-        ctx.fillStyle = textLayer.color || '#ffffff'; ctx.textAlign = textLayer.align || 'center'; ctx.fillText(textLayer.text, boxCenterX, boxTopY + textLayer.fontSize);
+        ctx.fillStyle = textLayer.color || '#ffffff'; ctx.textAlign = textLayer.align || 'center'; ctx.fillText(processed, boxCenterX, boxTopY + textLayer.fontSize);
       }
     } else if (layer.type === 'shape') {
       renderVectorShape(ctx, layer as StudioShapeLayer, canvasW, canvasH);

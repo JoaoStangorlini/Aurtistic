@@ -51,6 +51,9 @@ export function StudioCanvasStage() {
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDragging || !dragStartRef.current || !selectedLayerId) return;
+    const curLayer = activeSlide.layers.find((l) => l.id === selectedLayerId);
+    if (curLayer?.locked) return;
+
     const rect = e.currentTarget.getBoundingClientRect();
     const curX = (e.clientX - rect.left) / rect.width;
     const curY = (e.clientY - rect.top) / rect.height;
@@ -65,6 +68,21 @@ export function StudioCanvasStage() {
     // Snap Centro 50%
     if (Math.abs(centerX - 0.5) < 0.02) { nextX = 0.5 - dragStartRef.current.w / 2; guides.x = 0.5; }
     if (Math.abs(centerY - 0.5) < 0.02) { nextY = 0.5 - dragStartRef.current.h / 2; guides.y = 0.5; }
+
+    // Snap em bordas de outras camadas visíveis
+    for (const other of activeSlide.layers) {
+      if (other.id === selectedLayerId || !other.visible) continue;
+      if (Math.abs(nextX - other.x) < 0.015) { nextX = other.x; guides.x = other.x; }
+      if (Math.abs(nextX + dragStartRef.current.w - (other.x + other.width)) < 0.015) {
+        nextX = other.x + other.width - dragStartRef.current.w;
+        guides.x = other.x + other.width;
+      }
+      if (Math.abs(nextY - other.y) < 0.015) { nextY = other.y; guides.y = other.y; }
+      if (Math.abs(nextY + dragStartRef.current.h - (other.y + other.height)) < 0.015) {
+        nextY = other.y + other.height - dragStartRef.current.h;
+        guides.y = other.y + other.height;
+      }
+    }
 
     // Snap Safe Zones 9:16 (5% laterais, 15% topo, 20% base)
     if (aspectRatio === '9:16') {
@@ -148,6 +166,19 @@ export function StudioCanvasStage() {
               <span>{selectedLayer.name}</span>
               {selectedLayer.locked && <span className="material-symbols-outlined text-[10px]">lock</span>}
             </div>
+            {!selectedLayer.locked && (
+              <button
+                type="button"
+                className="absolute -top-7 left-1/2 -translate-x-1/2 w-4 h-4 bg-[#FFCC00] rounded-full border border-black flex items-center justify-center cursor-pointer pointer-events-auto shadow hover:scale-110 transition-transform"
+                title="Girar 15°"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  updateLayer(selectedLayer.id, { rotation: ((selectedLayer.rotation || 0) + 15) % 360 });
+                }}
+              >
+                <span className="material-symbols-outlined text-[10px] text-black">rotate_right</span>
+              </button>
+            )}
             <div className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-[#FFCC00] rounded-full border border-black" />
             <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-[#FFCC00] rounded-full border border-black" />
             <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 bg-[#FFCC00] rounded-full border border-black" />

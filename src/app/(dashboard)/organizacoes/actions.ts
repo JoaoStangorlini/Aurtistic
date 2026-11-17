@@ -180,7 +180,7 @@ export async function ensureEcosystemOrganizationsSeeded(
       updated_at: new Date().toISOString(),
     }));
 
-    await client.from('organizations').upsert(orgsToSeed, { onConflict: 'id' }).catch(() => null);
+    await client.from('organizations').upsert(orgsToSeed, { onConflict: 'id' });
 
     // 2. Subtimes padrão para as organizações
     const defaultSubteams = [
@@ -193,7 +193,7 @@ export async function ensureEcosystemOrganizationsSeeded(
       { id: '1ab41410-sub1-4000-8000-000000000004', organization_id: PROFIS_ORG_ID, name: 'Geral', color: '#F59E0B', is_active: true },
       { id: '1ab41410-sub2-4000-8000-000000000004', organization_id: PROFIS_ORG_ID, name: 'Nivelamento & Tutoria', color: '#FFCC00', is_active: true },
     ];
-    await client.from('organization_subteams').upsert(defaultSubteams, { onConflict: 'id' }).catch(() => null);
+    await client.from('organization_subteams').upsert(defaultSubteams, { onConflict: 'id' });
 
     // 3. Vínculo do usuário alvo nas 4 organizações
     if (targetUser?.id) {
@@ -211,7 +211,7 @@ export async function ensureEcosystemOrganizationsSeeded(
         updated_at: new Date().toISOString(),
       }));
 
-      await client.from('organization_members').upsert(membersToSeed, { onConflict: 'organization_id,user_id' }).catch(() => null);
+      await client.from('organization_members').upsert(membersToSeed, { onConflict: 'organization_id,user_id' });
     }
     return { ok: true };
   } catch (err) {

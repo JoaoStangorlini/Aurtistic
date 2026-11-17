@@ -25,7 +25,7 @@
 - **`src/app/api/meetings/analyze/route.ts`** (92L): L6:POST
 - **`src/app/api/meetings/transcribe-chunk/route.ts`** (63L): L6:POST
 - **`src/app/api/org/[slug]/ops-state/route.ts`** (165L): L8:corsHeaders | L18:getHubBaseUrl | L22:signServerToServer | L34:OPTIONS | L41:GET | L101:POST
-- **`src/app/api/studio/drafts/route.ts`** (77L): L5:GET | L43:POST
+- **`src/app/api/studio/drafts/route.ts`** (112L): L5:GET | L47:POST | L81:DELETE
 - **`src/app/api/studio/org-templates/route.ts`** (73L): L8:GET
 - **`src/app/api/studio/vault-save/route.ts`** (110L): L6:POST
 - **`src/app/auth/actions.ts`** (318L): L19:linkExistingAccountAction | L241:createAccountFromHubAction | L272:unlinkHubAccountAction
@@ -91,7 +91,7 @@
 - **`src/components/dashboard/TaskFormModal.tsx`** (1314L): L36:TaskFormModal
 - **`src/components/dashboard/TasksView.tsx`** (3356L): L39:WidgetPluginPlugin | L51:formatDate | L57:getDaysUntil | L73:getStatusWeight | L83:getPriorityWeight | L91:HighlightedText | L109:TasksView
 - **`src/components/dashboard/WidgetPreviews.tsx`** (724L): L4:WidgetTasksPreview | L74:WidgetCalendarPreview | L248:WidgetWeeklyCalendarPreview | L445:WidgetGlobalPreview
-- **`src/components/embed/EmbedAuthBridge.tsx`** (142L): L20:EmbedAuthBridge
+- **`src/components/embed/EmbedAuthBridge.tsx`** (146L): L20:EmbedAuthBridge
 - **`src/components/galeria/GooglePhotosTimelineView.tsx`** (683L): L21:TimelineSkeletonRow | L38:GooglePhotosTimelineViewProps | L44:GooglePhotosTimelineView
 - **`src/components/galeria/SmartBackupSettingsModal.tsx`** (191L): L17:loadSmartBackupPreferences | L28:saveSmartBackupPreferences | L41:SmartBackupSettingsModal
 - **`src/components/media/AurtisticMediaContext.tsx`** (590L): L19:MediaTrack | L31:InPlaceNoteState | L39:InPlacePreviewState | L49:AurtisticMediaContextType | L110:useAurtisticMedia | L118:AurtisticMediaProviderProps | L125:AurtisticMediaProvider
@@ -122,24 +122,27 @@
 - **`src/components/organizacoes/TeamProgressPanel.tsx`** (547L): L13:TeamProgressPanelProps | L28:TeamProgressPanel
 - **`src/components/organizacoes/When2MeetSchedulerGrid.tsx`** (232L): L10:When2MeetSchedulerGridProps | L21:When2MeetSchedulerGrid
 - **`src/components/organizacoes/studio/OrganizationPostStudio.tsx`** (66L): L8:OrganizationPostStudioProps | L42:StudioStageRouter | L57:OrganizationPostStudio
-- **`src/components/organizacoes/studio/StudioCanvasStage.tsx`** (161L): L10:StudioCanvasStage
+- **`src/components/organizacoes/studio/StudioCanvasStage.tsx`** (192L): L10:StudioCanvasStage
 - **`src/components/organizacoes/studio/StudioCarouselStrip.tsx`** (115L): L11:SlideThumbnail | L56:StudioCarouselStrip
-- **`src/components/organizacoes/studio/StudioContext.tsx`** (249L): L49:createDefaultSlide | L81:StudioProvider | L244:useStudio
-- **`src/components/organizacoes/studio/StudioDesignAssistant.tsx`** (155L): L8:StudioDesignAssistantProps | L13:StudioDesignAssistant
+- **`src/components/organizacoes/studio/StudioContext.tsx`** (231L): L51:StudioProvider | L226:useStudio
+- **`src/components/organizacoes/studio/StudioDesignAssistant.tsx`** (200L): L8:StudioDesignAssistantProps | L13:StudioDesignAssistant
 - **`src/components/organizacoes/studio/StudioDraftVersionsDrawer.tsx`** (174L): L9:StudioDraftVersionsDrawerProps | L14:StudioDraftVersionsDrawer
-- **`src/components/organizacoes/studio/StudioEditionPanel.tsx`** (186L): L8:StudioEditionPanel
+- **`src/components/organizacoes/studio/StudioEditionPanel.tsx`** (212L): L8:StudioEditionPanel
 - **`src/components/organizacoes/studio/StudioElementsGallery.tsx`** (126L): L11:StudioElementsGallery
-- **`src/components/organizacoes/studio/StudioImagePanel.tsx`** (231L): L10:StudioImagePanel
+- **`src/components/organizacoes/studio/StudioImagePanel.tsx`** (242L): L11:StudioImagePanel
 - **`src/components/organizacoes/studio/StudioLauncherView.tsx`** (192L): L10:StudioLauncherView
-- **`src/components/organizacoes/studio/StudioLayersPanel.tsx`** (179L): L8:StudioLayersPanel
+- **`src/components/organizacoes/studio/StudioLayersPanel.tsx`** (236L): L8:StudioLayersPanel
 - **`src/components/organizacoes/studio/StudioMaskBrushModal.tsx`** (214L): L10:StudioMaskBrushModal
-- **`src/components/organizacoes/studio/StudioPaletteCenter.tsx`** (168L): L9:StudioPaletteCenter
-- **`src/components/organizacoes/studio/StudioPublishModal.tsx`** (216L): L9:StudioPublishModal
-- **`src/components/organizacoes/studio/StudioTextPanel.tsx`** (236L): L11:StudioTextPanel
+- **`src/components/organizacoes/studio/StudioPaletteCenter.tsx`** (225L): L9:StudioPaletteCenter
+- **`src/components/organizacoes/studio/StudioPublishModal.tsx`** (220L): L9:StudioPublishModal
+- **`src/components/organizacoes/studio/StudioTextPanel.tsx`** (217L): L12:StudioTextPanel
+- **`src/components/organizacoes/studio/StudioTextPresetsSection.tsx`** (116L): L13:StudioTextPresetsSection
 - **`src/components/organizacoes/studio/StudioToolbarTabs.tsx`** (45L): L15:StudioToolbarTabs
-- **`src/components/organizacoes/studio/StudioWorkspaceView.tsx`** (177L): L21:StudioWorkspaceView
+- **`src/components/organizacoes/studio/StudioVaultMediaModal.tsx`** (73L): L15:StudioVaultMediaModal
+- **`src/components/organizacoes/studio/StudioWorkspaceView.tsx`** (200L): L22:StudioWorkspaceView
+- **`src/components/organizacoes/studio/studio-helpers.ts`** (58L): L5:createDefaultSlide | L41:adaptSlideLayersForAspect
 - **`src/components/organizacoes/studio/studio-presets.ts`** (102L): L5:getOrgStudioTemplates
-- **`src/components/organizacoes/studio/types.ts`** (184L): L2:AspectRatioKey | L4:AspectDimension | L18:StudioLayerFilterConfig | L38:StudioLayerBase | L53:StudioImageLayer | L67:StudioTextLayer | L84:StudioShapeType | L100:StudioShapeLayer | L110:StudioMathLayer | L117:LogoPreset | L119:StudioLogoLayer | L127:StudioLayer | L134:StudioSlide | L149:StudioDraft | L159:StudioTemplate | L171:StudioStage | L172:StudioActiveTab | L174:StudioPublishPayload
+- **`src/components/organizacoes/studio/types.ts`** (191L): L2:AspectRatioKey | L4:AspectDimension | L18:StudioLayerFilterConfig | L40:StudioLayerBase | L56:StudioImageLayer | L73:StudioTextLayer | L91:StudioShapeType | L107:StudioShapeLayer | L117:StudioMathLayer | L124:LogoPreset | L126:StudioLogoLayer | L134:StudioLayer | L141:StudioSlide | L156:StudioDraft | L166:StudioTemplate | L178:StudioStage | L179:StudioActiveTab | L181:StudioPublishPayload
 - **`src/components/portfolio/AurtisticGalleryGrid.tsx`** (1522L): L13:AurtisticGalleryGridProps | L79:resolveItemDeviceInfo | L114:resolveItemLensInfo | L129:parseItemTimestamp | L138:AurtisticGalleryGrid
 - **`src/components/portfolio/InstagramMuralSection.tsx`** (527L): L18:parseInstagramPostUrl | L37:buildInstagramEmbedSrc | L42:LazyInstagramEmbedFrame | L96:InstagramMuralSection
 - **`src/components/portfolio/PhotoInspectModal.tsx`** (463L): L10:PhotoInspectItem | L16:PhotoInspectModalProps | L26:PhotoInspectModal
@@ -165,7 +168,8 @@
 - **`src/contexts/VaultUploadContext.tsx`** (707L): L29:QueuedUploadItem | L39:UploadFinishedResults | L45:formatEta | L63:formatSpeed | L120:useVaultUpload | L134:VaultUploadProvider
 - **`src/hooks/useBackgroundSpeechTranscription.ts`** (182L): L7:UseBackgroundSpeechTranscriptionOptions | L14:useBackgroundSpeechTranscription
 - **`src/hooks/useEdgeUpload.ts`** (82L): L8:UseEdgeUploadOptions | L15:useEdgeUpload
-- **`src/hooks/useStudioHistory.ts`** (53L): L9:useStudioHistory
+- **`src/hooks/useStudioAutoSave.ts`** (61L): L16:useStudioAutoSave
+- **`src/hooks/useStudioHistory.ts`** (57L): L9:useStudioHistory
 - **`src/hooks/useStudioKeyboard.ts`** (109L): L19:useStudioKeyboard
 - **`src/hooks/useSwipeTabs.ts`** (118L): L21:shouldIgnore | L49:useSwipeTabs
 - **`src/hooks/useTenantTicketRefresh.ts`** (71L): L9:useTenantTicketRefresh
@@ -188,8 +192,8 @@
 - **`src/lib/portfolio-catalog.ts`** (215L): L10:EnsurePortfolioCatalogOptions | L23:ensurePortfolioCatalogLoaded
 - **`src/lib/proxy-signature.ts`** (49L): L10:appendProxySignatureTrailer | L23:hasProxySignatureMarker | L41:computeFileSha256
 - **`src/lib/self-care-config.ts`** (194L): L4:SelfCarePillarKey | L13:SelfCareSound | L15:SelfCareAlarmConfig | L33:SelfCareDailyLog | L128:getTodayKey | L133:getCurrentHHMM | L138:loadSelfCareConfigs | L154:saveSelfCareConfigs | L161:loadDailySelfCareLog | L188:saveDailySelfCareLog
-- **`src/lib/studio/canvas-renderer.ts`** (221L): L12:getImageSync | L14:preloadImage | L31:buildCssFilter | L43:applyPostEffects | L61:renderImageWithMask | L96:renderVectorShape | L138:renderLogoLayer | L158:renderSlideToCanvas
-- **`src/lib/studio/color-harmony.ts`** (138L): L4:hexToRgb | L12:rgbToHex | L18:srgbToLinear | L24:linearToSrgb | L29:rgbToOklch | L45:oklchToRgb | L62:oklchToHex | L68:getHarmonies | L88:applyPaletteStyle | L102:getRelativeLuminance | L111:getContrastRatio | L120:searchPaletteByKeyword
+- **`src/lib/studio/canvas-renderer.ts`** (231L): L12:getImageSync | L14:preloadImage | L31:buildCssFilter | L45:applyPostEffects | L63:renderImageWithMask | L98:renderVectorShape | L140:renderLogoLayer | L160:renderSlideToCanvas
+- **`src/lib/studio/color-harmony.ts`** (145L): L4:hexToRgb | L12:rgbToHex | L18:srgbToLinear | L24:linearToSrgb | L29:rgbToOklch | L45:oklchToRgb | L62:oklchToHex | L68:getHarmonies | L88:applyPaletteStyle | L102:getRelativeLuminance | L111:getContrastRatio | L120:searchPaletteByKeyword
 - **`src/lib/studio/studio-exporter.ts`** (78L): L7:exportSlideToPngDataUrl | L24:exportCarouselToPdf | L43:generatePostCaptionAndAlt | L60:saveToOrgVaultAction
 - **`src/lib/studio/studio-idb.ts`** (132L): L8:openDb | L25:rehydrateDraft | L47:sanitizeDraftForStorage | L67:saveDraftToIdb | L83:getDraftFromIdb | L101:getAllDraftsFromIdb | L119:deleteDraftFromIdb
 - **`src/lib/supabase/client.ts`** (10L): L4:createClient

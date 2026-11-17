@@ -25,6 +25,8 @@ export interface StudioLayerFilterConfig {
   overlayDark: number;  // 0..85 — overlay escuro sobre a imagem/camada
   temperature: number;  // -50..50 (negativo=frio/azul, positivo=quente/laranja)
   vignette: number;     // 0..100 — vigência de borda
+  exposure?: number;    // -100..100 — exposição luminosa
+  vibrance?: number;    // -100..100 — vivacidade seletiva
   targetMaskAreaOnly?: boolean;
   isCutoutMask?: boolean; // true = recorte total, false = edição seletiva
 }
@@ -32,7 +34,7 @@ export interface StudioLayerFilterConfig {
 export const DEFAULT_FILTERS: StudioLayerFilterConfig = {
   brightness: 100, contrast: 100, saturation: 100, blur: 0,
   grayscale: 0, sepia: 0, overlayDark: 0, temperature: 0, vignette: 0,
-  targetMaskAreaOnly: false, isCutoutMask: false,
+  exposure: 0, vibrance: 0, targetMaskAreaOnly: false, isCutoutMask: false,
 };
 
 export interface StudioLayerBase {
@@ -48,6 +50,7 @@ export interface StudioLayerBase {
   rotation: number; // em graus 0..360
   filters?: StudioLayerFilterConfig;
   maskDataUrl?: string; // Máscara offscreen monocromática em dataUrl
+  maskStrokes?: Array<{ x: number; y: number; r: number; mode: 'add' | 'erase' }>;
 }
 
 export interface StudioImageLayer extends StudioLayerBase {
@@ -61,6 +64,9 @@ export interface StudioImageLayer extends StudioLayerBase {
   cropY: number; // 0..1
   cropWidth: number; // 0..1
   cropHeight: number; // 0..1
+  aspectFit?: 'cover' | 'contain' | 'custom';
+  offsetX?: number;
+  offsetY?: number;
   vaultRelativePath?: string;
 }
 
@@ -75,6 +81,7 @@ export interface StudioTextLayer extends StudioLayerBase {
   italic: boolean;
   lineHeight: number;
   letterSpacing: number;
+  textKind?: 'title' | 'subtitle' | 'body' | 'label' | 'callout';
   strokeColor?: string;
   strokeWidth?: number;
   shadowColor?: string;

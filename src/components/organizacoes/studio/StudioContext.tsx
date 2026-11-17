@@ -4,8 +4,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { AspectRatioKey, StudioStage, StudioActiveTab, StudioSlide, StudioLayer, StudioDraft, StudioTemplate, StudioTextLayer } from './types';
 import { useOrganizationBrand } from '../OrganizationBrandProvider';
-import { saveDraftToIdb, getAllDraftsFromIdb, rehydrateDraft } from '@/lib/studio/studio-idb';
+import { saveDraftToIdb, getAllDraftsFromIdb, deleteDraftFromIdb, rehydrateDraft } from '@/lib/studio/studio-idb';
 import { rehydrateStudioDraftAction } from '@/app/(dashboard)/organizacoes/studio-actions';
+import { createDefaultSlide, adaptSlideLayersForAspect } from './studio-helpers';
 
 interface StudioContextValue {
   orgSlug?: string | null;
@@ -36,6 +37,7 @@ interface StudioContextValue {
   loadDraft: (draft: StudioDraft) => void;
   loadTemplate: (template: StudioTemplate) => void;
   saveCurrentToDraftSlot: (slot: 1 | 2 | 3, title?: string) => void;
+  deleteDraftSlot: (slot: 1 | 2 | 3) => void;
   resetToBlank: (aspect: AspectRatioKey) => void;
   maskModalLayerId: string | null;
   setMaskModalLayerId: (id: string | null) => void;
@@ -45,38 +47,6 @@ interface StudioContextValue {
 }
 
 const StudioContext = createContext<StudioContextValue | null>(null);
-
-function createDefaultSlide(id: string, aspect: AspectRatioKey, brand: ReturnType<typeof useOrganizationBrand>['tokens']): StudioSlide {
-  return {
-    id,
-    title: 'Tela 1',
-    aspectRatio: aspect,
-    backgroundColor: brand.bgApp || '#07090e',
-    globalFilters: { brightness: 100, contrast: 105, saturation: 105, blur: 0, grayscale: 0, sepia: 0, overlayDark: 0, temperature: 0, vignette: 0 },
-    showBrandBadge: true,
-    brandBadgeText: brand.badgeTag,
-    layers: [
-      {
-        id: `text-${Date.now()}-title`,
-        type: 'text',
-        name: 'Título Principal',
-        visible: true,
-        locked: false,
-        opacity: 1,
-        x: 0.1, y: 0.12, width: 0.8, height: 0.2, rotation: 0,
-        text: brand.defaultPostTitle || 'NOVIDADE NA EQUIPE',
-        fontFamily: brand.fontDisplay,
-        fontSize: 64,
-        color: brand.textPrimary || '#ffffff',
-        align: 'center',
-        bold: true,
-        italic: false,
-        lineHeight: 1.2,
-        letterSpacing: 0,
-      },
-    ],
-  };
-}
 
 export function StudioProvider({ children, orgSlug }: { children: React.ReactNode; orgSlug?: string | null }) {
   const { tokens } = useOrganizationBrand();
@@ -115,7 +85,11 @@ export function StudioProvider({ children, orgSlug }: { children: React.ReactNod
 
   const adaptFormatTo = useCallback((newAspect: AspectRatioKey) => {
     setAspectRatio(newAspect);
-    setSlides((prev) => prev.map((s) => ({ ...s, aspectRatio: newAspect })));
+    setSlides((prev) => prev.map((s) => ({
+      ...s,
+      aspectRatio: newAspect,
+      layers: adaptSlideLayersForAspect(s.layers, newAspect),
+    })));
   }, []);
 
   const addSlide = useCallback(() => {
@@ -216,6 +190,14 @@ export function StudioProvider({ children, orgSlug }: { children: React.ReactNod
     setActiveDraftSlot(slot);
   }, [aspectRatio, slides, orgSlug, tokens.themeId]);
 
+  const deleteDraftSlot = useCallback((slot: 1 | 2 | 3) => {
+    deleteDraftFromIdb(slot);
+    const slug = orgSlug || tokens.themeId;
+    fetch(`/api/studio/drafts?slotIndex=${slot}&orgSlug=${encodeURIComponent(slug)}`, { method: 'DELETE' }).catch(() => {});
+    setDrafts((prev) => prev.filter((d) => d.slotIndex !== slot));
+    if (activeDraftSlot === slot) setActiveDraftSlot(null);
+  }, [activeDraftSlot, orgSlug, tokens.themeId]);
+
   const resetToBlank = useCallback((aspect: AspectRatioKey) => {
     setAspectRatio(aspect);
     const blank = createDefaultSlide(`slide-${Date.now()}`, aspect, tokens);
@@ -232,7 +214,7 @@ export function StudioProvider({ children, orgSlug }: { children: React.ReactNod
         orgSlug, stage, setStage, activeTab, setActiveTab, aspectRatio, setAspectRatio, adaptFormatTo,
         slides, activeSlideId, activeSlide, setActiveSlideId, selectedLayerId, selectedLayer, setSelectedLayerId,
         updateSlide, addSlide, removeSlide, addLayer, updateLayer, removeLayer, reorderLayers, duplicateLayerWithMaskOnTop,
-        drafts, activeDraftSlot, loadDraft, loadTemplate, saveCurrentToDraftSlot, resetToBlank,
+        drafts, activeDraftSlot, loadDraft, loadTemplate, saveCurrentToDraftSlot, deleteDraftSlot, resetToBlank,
         maskModalLayerId, setMaskModalLayerId, activeOverlay, setActiveOverlay, fillEventPlaceholders,
       }}
     >

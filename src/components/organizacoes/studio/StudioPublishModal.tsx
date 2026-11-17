@@ -74,7 +74,11 @@ export function StudioPublishModal({ orgSlug }: { orgSlug?: string | null }) {
     };
     const isInsideIframe = typeof window !== 'undefined' && window.parent && window.parent !== window;
     if (isInsideIframe) {
-      window.parent.postMessage({ type: 'AURTISTIC_STUDIO_PUBLISH_HUB', payload }, '*');
+      let targetOrigin = '*';
+      if (document.referrer) {
+        try { targetOrigin = new URL(document.referrer).origin; } catch {}
+      }
+      window.parent.postMessage({ type: 'AURTISTIC_STUDIO_PUBLISH_HUB', payload }, targetOrigin);
       setNotice('Post enviado com sucesso para o feed do HUB LabDiv!');
     } else {
       setNotice('Post pronto para o feed da organização!');

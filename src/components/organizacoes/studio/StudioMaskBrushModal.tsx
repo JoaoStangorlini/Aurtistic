@@ -171,7 +171,7 @@ export function StudioMaskBrushModal() {
 
           <div className="flex items-center gap-2">
             <span className="text-slate-400">Tamanho:</span>
-            <input type="range" min={10} max={120} value={brushSize} onChange={(e) => setBrushSize(Number(e.target.value))} className="w-20 cursor-pointer" />
+            <input type="range" min={5} max={200} value={brushSize} onChange={(e) => setBrushSize(Number(e.target.value))} className="w-20 cursor-pointer" />
             <span className="font-mono text-white text-[11px]">{brushSize}px</span>
           </div>
         </div>

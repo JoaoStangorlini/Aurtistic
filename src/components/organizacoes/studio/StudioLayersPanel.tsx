@@ -57,29 +57,78 @@ export function StudioLayersPanel() {
       </div>
 
       {showLogoPresets && (
-        <div className="p-2.5 rounded-xl bg-black/50 border border-amber-400/30 space-y-1.5 animate-in fade-in">
+        <div className="p-2.5 rounded-xl bg-black/50 border border-amber-400/30 space-y-2 animate-in fade-in">
           <span className="text-[10px] text-slate-400 block font-bold uppercase">Escolha o Selo Oficial:</span>
           <div className="grid grid-cols-3 gap-1 text-[10px] font-bold">
             <button
               type="button"
               onClick={() => handleAddLogo('org-logo')}
-              className="p-1.5 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black transition-all"
+              className="p-1.5 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black transition-all cursor-pointer"
             >
               Logo da Org
             </button>
             <button
               type="button"
               onClick={() => handleAddLogo('show-da-fisica-tricolor')}
-              className="p-1.5 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black transition-all"
+              className="p-1.5 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black transition-all cursor-pointer"
             >
               Show Física
             </button>
             <button
               type="button"
               onClick={() => handleAddLogo('ifusp')}
-              className="p-1.5 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black transition-all"
+              className="p-1.5 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black transition-all cursor-pointer"
             >
               IFUSP
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 5 Posições Rápidas de Selo para Selo Selecionado */}
+      {selectedLayerId && layers.find((l) => l.id === selectedLayerId)?.type === 'logo' && (
+        <div className="p-2 rounded-xl bg-white/5 border border-white/10 space-y-1">
+          <span className="text-[10px] text-slate-400 block font-bold uppercase">Posição Rápida do Selo:</span>
+          <div className="grid grid-cols-5 gap-1 text-[10px] font-bold">
+            <button
+              type="button"
+              onClick={() => updateLayer(selectedLayerId, { x: 0.05, y: 0.05 })}
+              className="p-1 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black cursor-pointer text-center"
+              title="Topo Esquerda"
+            >
+              ↖ TE
+            </button>
+            <button
+              type="button"
+              onClick={() => updateLayer(selectedLayerId, { x: 0.73, y: 0.05 })}
+              className="p-1 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black cursor-pointer text-center"
+              title="Topo Direita"
+            >
+              ↗ TD
+            </button>
+            <button
+              type="button"
+              onClick={() => updateLayer(selectedLayerId, { x: 0.39, y: 0.88 })}
+              className="p-1 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black cursor-pointer text-center"
+              title="Base Centro"
+            >
+              ↓ BC
+            </button>
+            <button
+              type="button"
+              onClick={() => updateLayer(selectedLayerId, { x: 0.05, y: 0.88 })}
+              className="p-1 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black cursor-pointer text-center"
+              title="Base Esquerda"
+            >
+              ↙ BE
+            </button>
+            <button
+              type="button"
+              onClick={() => updateLayer(selectedLayerId, { x: 0.73, y: 0.88 })}
+              className="p-1 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black cursor-pointer text-center"
+              title="Base Direita"
+            >
+              ↘ BD
             </button>
           </div>
         </div>
@@ -98,6 +147,14 @@ export function StudioLayersPanel() {
             return (
               <div
                 key={layer.id}
+                draggable
+                onDragStart={(e) => e.dataTransfer.setData('text/plain', String(idx))}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const from = Number(e.dataTransfer.getData('text/plain'));
+                  if (!isNaN(from) && from !== idx) reorderLayers(from, idx);
+                }}
                 onClick={() => setSelectedLayerId(layer.id)}
                 className={`p-2 rounded-xl border transition-all flex items-center justify-between gap-2 cursor-pointer ${
                   isSelected ? 'border-[#FFCC00] bg-[#FFCC00]/10 shadow-xs' : 'border-white/10 bg-white/5 hover:border-white/20'

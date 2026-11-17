@@ -102,6 +102,32 @@ export function StudioEditionPanel() {
           />
         </div>
 
+        {/* Exposição */}
+        <div>
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span className="text-slate-300 font-medium text-[11px]">Exposição</span>
+            <span className="font-mono text-white font-bold text-[11px]">{currentFilters.exposure ?? 100}%</span>
+          </div>
+          <input
+            type="range" min={50} max={180} value={currentFilters.exposure ?? 100}
+            onChange={(e) => handleFilterChange('exposure', Number(e.target.value))}
+            className="w-full cursor-pointer"
+          />
+        </div>
+
+        {/* Vibrance */}
+        <div>
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span className="text-slate-300 font-medium text-[11px]">Vibração / Cor Viva</span>
+            <span className="font-mono text-white font-bold text-[11px]">{currentFilters.vibrance ?? 100}%</span>
+          </div>
+          <input
+            type="range" min={50} max={180} value={currentFilters.vibrance ?? 100}
+            onChange={(e) => handleFilterChange('vibrance', Number(e.target.value))}
+            className="w-full cursor-pointer"
+          />
+        </div>
+
         {/* Brilho */}
         <div>
           <div className="flex items-center justify-between text-xs mb-1">

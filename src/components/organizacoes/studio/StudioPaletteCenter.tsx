@@ -1,7 +1,7 @@
 // Este programa é um software livre (Licença AGPLv3)
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStudio } from './StudioContext';
 import { useOrganizationBrand } from '../OrganizationBrandProvider';
 import { getHarmonies, applyPaletteStyle, getContrastRatio, searchPaletteByKeyword } from '@/lib/studio/color-harmony';
@@ -14,6 +14,25 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
   const [harmonyType, setHarmonyType] = useState<'complementary' | 'analogous' | 'triadic' | 'tetradic' | 'monochromatic'>('analogous');
   const [activeStyle, setActiveStyle] = useState<'normal' | 'neon' | 'pastel' | 'dark' | 'metallic' | 'earthy'>('normal');
   const [searchQuery, setSearchQuery] = useState('');
+  const [favorites, setFavorites] = useState<string[][]>([]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('aurtistic_studio_fav_palettes');
+      if (saved) setFavorites(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  const toggleFavorite = (palette: string[]) => {
+    try {
+      const exists = favorites.some((f) => JSON.stringify(f) === JSON.stringify(palette));
+      const next = exists
+        ? favorites.filter((f) => JSON.stringify(f) !== JSON.stringify(palette))
+        : [palette, ...favorites].slice(0, 5);
+      setFavorites(next);
+      localStorage.setItem('aurtistic_studio_fav_palettes', JSON.stringify(next));
+    } catch {}
+  };
 
   const harmonies = getHarmonies(baseColor);
   let currentPalette = harmonies[harmonyType];
@@ -76,9 +95,22 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
 
       {/* Seletor de Harmonias */}
       <div>
-        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-          Harmonias OKLCH
-        </label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+            Harmonias OKLCH
+          </label>
+          <button
+            type="button"
+            onClick={() => toggleFavorite(currentPalette)}
+            className="flex items-center gap-1 text-[10px] text-amber-300 hover:text-amber-200 cursor-pointer"
+            title="Salvar esta paleta nos favoritos"
+          >
+            <span className="material-symbols-outlined text-[13px]">
+              {favorites.some((f) => JSON.stringify(f) === JSON.stringify(currentPalette)) ? 'star' : 'star_border'}
+            </span>
+            <span>Favoritar</span>
+          </button>
+        </div>
         <div className="grid grid-cols-5 gap-1 text-[10px] font-bold">
           {(
             [
@@ -137,6 +169,31 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
           ))}
         </div>
       </div>
+
+      {/* Paletas Favoritas */}
+      {favorites.length > 0 && (
+        <div className="pt-1 border-t border-white/10">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+            Paletas Salvas / Favoritas
+          </label>
+          <div className="space-y-1">
+            {favorites.map((fav, fi) => (
+              <div key={fi} className="flex items-center gap-1.5">
+                {fav.map((fc, ci) => (
+                  <button
+                    key={ci}
+                    type="button"
+                    onClick={() => handleApplyColor(fc)}
+                    className="w-5 h-5 rounded-md border border-white/20 hover:scale-110 cursor-pointer"
+                    style={{ backgroundColor: fc }}
+                    title={fc}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Busca Rápida de Cores */}
       <div className="pt-1">

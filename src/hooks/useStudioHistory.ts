@@ -18,6 +18,10 @@ export function useStudioHistory(initialSlides: StudioSlide[]) {
     }
     setHistory((prev) => {
       const upToCurrent = prev.slice(0, historyIndex + 1);
+      const current = upToCurrent[upToCurrent.length - 1];
+      if (current && JSON.stringify(current) === JSON.stringify(newSlides)) {
+        return prev;
+      }
       const next = [...upToCurrent, newSlides];
       if (next.length > MAX_HISTORY) next.shift();
       return next;

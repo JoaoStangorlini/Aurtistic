@@ -403,7 +403,7 @@ export function LabDivWorkspaceClient({
                 href="https://hublabdiv.com.br"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="ml-1 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider border border-border-subtle bg-app text-fg-secondary hover:text-fg hover:bg-surface transition-all shadow-xs"
+                className="ml-1 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider border border-border-subtle bg-app text-fg-secondary hover:text-[#FFCC00] hover:border-[#FFCC00]/50 hover:bg-surface hover:shadow-[0_0_12px_rgba(255,204,0,0.35)] transition-all shadow-xs cursor-pointer"
                 title="Conferir portal institucional do HUB LabDiv"
               >
                 <span>Conferir</span>

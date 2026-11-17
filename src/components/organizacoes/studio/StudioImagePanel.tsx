@@ -6,6 +6,7 @@ import { useStudio } from './StudioContext';
 import { useOrganizationBrand } from '../OrganizationBrandProvider';
 import type { StudioImageLayer } from './types';
 import { getStudioGalleryMediaAction, type StudioGalleryMediaItem } from '@/app/(dashboard)/organizacoes/studio-actions';
+import { StudioVaultMediaModal } from './StudioVaultMediaModal';
 
 export function StudioImagePanel() {
   const { activeSlide, selectedLayerId, setSelectedLayerId, addLayer, updateLayer, removeLayer, setMaskModalLayerId } = useStudio();
@@ -176,55 +177,65 @@ export function StudioImagePanel() {
               className="w-full cursor-pointer"
             />
           </div>
-        </div>
-      )}
-
-      {/* Modal do Cofre da Organização */}
-      {galleryOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="bg-[#0f172a] border border-white/15 rounded-3xl p-5 max-w-xl w-full shadow-2xl flex flex-col gap-4 max-h-[85vh]">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[20px] text-[#FFCC00]">folder_shared</span>
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Cofre de Mídia da Organização</h3>
-              </div>
-              <button type="button" onClick={() => setGalleryOpen(false)} className="p-1 rounded-lg text-slate-400 hover:text-white">
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
+          <div>
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-slate-400">Enquadramento</span>
+              <span className="font-mono text-white font-bold">{selectedImageLayer.aspectFit || 'cover'}</span>
             </div>
-            <div className="overflow-y-auto flex-1 min-h-[260px] max-h-[420px] pr-1 scrollbar-thin">
-              {galleryLoading ? (
-                <div className="h-48 flex items-center justify-center text-xs text-slate-400 font-mono animate-pulse">Carregando acervo do Cofre...</div>
-              ) : galleryItems.length === 0 ? (
-                <div className="h-48 flex flex-col items-center justify-center text-xs text-slate-400 gap-2">
-                  <span className="material-symbols-outlined text-[32px] text-slate-600">image_not_supported</span>
-                  <span>Nenhuma mídia encontrada no cofre desta organização.</span>
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-2.5">
-                  {galleryItems.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => {
-                        createAndAddImageLayer(item.streamUrl || item.thumbUrl, item.label || item.fileName, item.relativePath);
-                        setGalleryOpen(false);
-                      }}
-                      className="group relative rounded-xl overflow-hidden border border-white/10 hover:border-[#FFCC00] bg-black/40 text-left transition-all"
-                    >
-                      <img src={item.thumbUrl} alt={item.fileName} className="w-full aspect-square object-cover group-hover:scale-105 transition-transform" />
-                      <div className="p-1.5 bg-black/60 backdrop-blur-xs">
-                        <p className="text-[10px] font-bold text-white truncate">{item.label || item.fileName}</p>
-                        {item.category && <span className="text-[9px] text-[#FFCC00] block truncate">{item.category}</span>}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
+            <div className="flex items-center gap-1.5">
+              {(['cover', 'contain', 'custom'] as const).map((fit) => (
+                <button
+                  key={fit}
+                  type="button"
+                  onClick={() => updateLayer(selectedImageLayer.id, { aspectFit: fit })}
+                  className={`flex-1 py-1 rounded-lg text-[11px] font-bold capitalize transition-all cursor-pointer ${
+                    (selectedImageLayer.aspectFit || 'cover') === fit ? 'bg-[#FFCC00] text-black' : 'bg-white/10 text-slate-300 hover:text-white'
+                  }`}
+                >
+                  {fit === 'cover' ? 'Preencher' : fit === 'contain' ? 'Ajustar' : 'Livre'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="text-slate-400">Offset X</span>
+                <span className="font-mono text-white text-[11px]">{Math.round((selectedImageLayer.offsetX || 0) * 100)}%</span>
+              </div>
+              <input
+                type="range" min={-0.5} max={0.5} step={0.01} value={selectedImageLayer.offsetX || 0}
+                onChange={(e) => updateLayer(selectedImageLayer.id, { offsetX: Number(e.target.value) })}
+                className="w-full cursor-pointer"
+              />
+            </div>
+            <div>
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="text-slate-400">Offset Y</span>
+                <span className="font-mono text-white text-[11px]">{Math.round((selectedImageLayer.offsetY || 0) * 100)}%</span>
+              </div>
+              <input
+                type="range" min={-0.5} max={0.5} step={0.01} value={selectedImageLayer.offsetY || 0}
+                onChange={(e) => updateLayer(selectedImageLayer.id, { offsetY: Number(e.target.value) })}
+                className="w-full cursor-pointer"
+              />
             </div>
           </div>
         </div>
       )}
+
+      {/* Modal do Cofre da Organização */}
+      <StudioVaultMediaModal
+        isOpen={galleryOpen}
+        isLoading={galleryLoading}
+        items={galleryItems}
+        onClose={() => setGalleryOpen(false)}
+        onSelect={(item) => {
+          createAndAddImageLayer(item.streamUrl || item.thumbUrl, item.label || item.fileName, item.relativePath);
+          setGalleryOpen(false);
+        }}
+      />
     </div>
   );
 }
