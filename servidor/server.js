@@ -4800,7 +4800,13 @@ app.get('/api/vault/thumb', requireAdminSession, async (req, res) => {
     const relPath = String(req.query.path || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
     if (!relPath) return res.status(400).send('Parâmetro path obrigatório.');
     const driveRoot = resolveDriveRoot(req.query.drive);
-    const fullPath = resolveSafeChildPath(driveRoot, relPath);
+    let fullPath = resolveSafeChildPath(driveRoot, relPath);
+
+    // Fix: resolver atalho antes de gerar/cachear miniatura do original.
+    if (!fs.existsSync(fullPath)) {
+      const _sc = resolveOrgPersonalShortcutTarget(driveRoot, relPath, { role: 'admin' });
+      if (_sc && fs.existsSync(_sc.physicalPath)) fullPath = _sc.physicalPath;
+    }
 
     const cacheKey = crypto.createHash('md5').update(`${req.query.drive || 'primary'}_${relPath}`).digest('hex');
     const cachedThumbPath = path.join(INTERNAL_THUMBS_DIR, `vthumb_${cacheKey}.webp`);
@@ -5000,6 +5006,13 @@ app.get('/api/vault/stream', requireAdminSession, async (req, res) => {
     const driveRoot = resolveDriveRoot(req.query.drive);
     let fullPath = resolveSafeChildPath(driveRoot, relPath);
     if (fullPath === driveRoot) return res.status(400).json({ error: 'Caminho inválido.' });
+
+    // Fix: resolver atalhos virtuais (.shortcut.json) → foto em tela cheia não quebra.
+    // Miniatura passa (cacheada em vthumb_*.webp), mas o original falha sem resolver o atalho.
+    if (!fs.existsSync(fullPath)) {
+      const _sc = resolveOrgPersonalShortcutTarget(driveRoot, relPath, { role: 'admin' });
+      if (_sc && fs.existsSync(_sc.physicalPath)) fullPath = _sc.physicalPath;
+    }
 
     if (!fs.existsSync(fullPath) && relPath.startsWith('portfolio/')) {
       const portRel = relPath.replace(/^portfolio\/?/, '');
