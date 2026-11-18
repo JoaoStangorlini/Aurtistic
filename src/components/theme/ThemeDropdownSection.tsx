@@ -144,7 +144,7 @@ export function ThemeDropdownSection() {
                           ? 'Show de Física'
                           : p.id === 'hs'
                             ? 'Hackerspace'
-                            : 'Pró-Física'}
+                            : p.name}
                     </span>
                   </button>
                 );

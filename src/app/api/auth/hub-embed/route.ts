@@ -11,7 +11,6 @@ const ORG_SLUG_TO_ID: Record<string, string> = {
   labdiv: '1ab41410-0000-4000-8000-000000000001',
   'show-da-fisica': '1ab41410-0000-4000-8000-000000000002',
   hs: '1ab41410-0000-4000-8000-000000000003',
-  profis: '1ab41410-0000-4000-8000-000000000004',
 };
 
 const ALLOWED_ORIGINS = new Set([

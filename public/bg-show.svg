@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="360" height="360" viewBox="0 0 360 360" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-  <!-- 1. Canhão de Vórtice (Vermelho Show) -->
-  <g transform="translate(22, 18) scale(0.34) rotate(-24 36 36)" stroke="#f60011">
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="360" viewBox="0 0 360 360" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <!-- 1. Canhão de Vórtice (Vermelho Show) ampliado ~22% -->
+  <g transform="translate(18, 14) scale(0.415) rotate(-24 36 36)" stroke="#f60011">
     <ellipse cx="52" cy="24" rx="10" ry="18" />
     <path d="M16,10 L52,6 M16,38 L52,42" />
     <path d="M16,10 A8,14 0 0,0 16,38" />
@@ -10,15 +10,15 @@
     <ellipse cx="74" cy="24" rx="4" ry="11" stroke-dasharray="3 2" />
   </g>
 
-  <!-- 2. Balão de Física (Azul Show) -->
-  <g transform="translate(158, 44) scale(0.32) rotate(18 25 35)" stroke="#002ffe">
+  <!-- 2. Balão de Física (Azul Show) ampliado ~22% -->
+  <g transform="translate(154, 40) scale(0.39) rotate(18 25 35)" stroke="#002ffe">
     <path d="M25,4 C11,4 4,15 4,27 C4,41 18,52 25,57 C32,52 46,41 46,27 C46,15 39,4 25,4 Z" />
     <path d="M22,57 L28,57 L25,62 Z" />
     <path d="M25,62 Q30,72 22,82 Q18,90 25,96" />
   </g>
 
-  <!-- 3. Bobina de Tesla com Lâmpadas (Verde Show) -->
-  <g transform="translate(274, 22) scale(0.35) rotate(8 36 36)" stroke="#01f300">
+  <!-- 3. Bobina de Tesla com Lâmpadas (Verde Show) ampliado ~22% -->
+  <g transform="translate(268, 18) scale(0.427) rotate(8 36 36)" stroke="#01f300">
     <rect x="14" y="64" width="44" height="10" rx="2" />
     <rect x="28" y="24" width="16" height="40" rx="1.5" />
     <line x1="28" y1="32" x2="44" y2="32" />
@@ -31,8 +31,8 @@
     <path d="M20,10 L24,5 L27,12" stroke-width="1.4" />
   </g>
 
-  <!-- 4. Baú Radioativo (Verde Show) -->
-  <g transform="translate(56, 138) scale(0.35) rotate(-11 36 36)" stroke="#01f300">
+  <!-- 4. Baú Radioativo (Verde Show) ampliado ~22% -->
+  <g transform="translate(50, 132) scale(0.427) rotate(-11 36 36)" stroke="#01f300">
     <rect x="8" y="16" width="56" height="48" rx="3" />
     <line x1="8" y1="32" x2="64" y2="32" />
     <path d="M22,16 L22,10 L50,10 L50,16" />
@@ -42,8 +42,8 @@
     <path d="M41,51 L49,55 A9,9 0 0,0 44,45 Z" />
   </g>
 
-  <!-- 5. Máquina de Wimshurst (Azul Show) -->
-  <g transform="translate(194, 152) scale(0.36) rotate(14 40 40)" stroke="#002ffe">
+  <!-- 5. Máquina de Wimshurst (Azul Show) ampliado ~22% -->
+  <g transform="translate(188, 146) scale(0.44) rotate(14 40 40)" stroke="#002ffe">
     <rect x="6" y="68" width="68" height="8" rx="2" />
     <path d="M40,68 L40,36" />
     <circle cx="40" cy="34" r="24" />
@@ -56,8 +56,8 @@
     <path d="M36,11 L39,7 L41,14 L44,10" stroke-width="1.3" />
   </g>
 
-  <!-- 6. Medalha da Curie (Vermelho Show) -->
-  <g transform="translate(302, 128) scale(0.34) rotate(-16 36 36)" stroke="#f60011">
+  <!-- 6. Medalha da Curie (Vermelho Show) ampliado ~22% -->
+  <g transform="translate(296, 122) scale(0.415) rotate(-16 36 36)" stroke="#f60011">
     <path d="M14,6 L36,36 L58,6" />
     <path d="M22,6 L36,26 L50,6" />
     <circle cx="36" cy="52" r="18" />
@@ -66,8 +66,8 @@
     <path d="M36,46 L36,41 M31,55 L27,58 M41,55 L45,58" />
   </g>
 
-  <!-- 7. Garrafa de Combustão (Azul Show) -->
-  <g transform="translate(24, 268) scale(0.35) rotate(15 25 45)" stroke="#002ffe">
+  <!-- 7. Garrafa de Combustão (Azul Show) ampliado ~22% -->
+  <g transform="translate(20, 260) scale(0.427) rotate(15 25 45)" stroke="#002ffe">
     <rect x="18" y="8" width="14" height="6" rx="1.5" />
     <path d="M18,14 L10,28 L10,74 Q10,80 16,80 L34,80 Q40,80 40,74 L40,28 L32,14 Z" />
     <line x1="10" y1="42" x2="40" y2="42" opacity="0.6" />
@@ -75,8 +75,8 @@
     <path d="M25,6 Q21,-2 25,-8 Q29,-2 25,6 Z" />
   </g>
 
-  <!-- 8. Botijão Dewar de Nitrogênio Líquido (Verde Show) -->
-  <g transform="translate(152, 278) scale(0.35) rotate(-9 30 50)" stroke="#01f300">
+  <!-- 8. Botijão Dewar de Nitrogênio Líquido (Verde Show) ampliado ~22% -->
+  <g transform="translate(146, 270) scale(0.427) rotate(-9 30 50)" stroke="#01f300">
     <rect x="20" y="10" width="20" height="6" rx="2" />
     <path d="M22,16 L22,24 L10,36 L10,82 Q10,88 16,88 L44,88 Q50,88 50,82 L50,36 L38,24 L38,16" />
     <path d="M20,22 C12,22 10,28 14,32" />
@@ -85,8 +85,8 @@
     <path d="M14,88 Q4,94 12,98 Q22,102 30,98 Q40,102 48,98 Q56,94 46,88" stroke-dasharray="3 2" />
   </g>
 
-  <!-- 9. Balão extra solto (Vermelho Show) -->
-  <g transform="translate(284, 256) scale(0.29) rotate(-20 25 35)" stroke="#f60011">
+  <!-- 9. Balão extra solto (Vermelho Show) ampliado ~22% -->
+  <g transform="translate(280, 250) scale(0.354) rotate(-20 25 35)" stroke="#f60011">
     <path d="M25,4 C11,4 4,15 4,27 C4,41 18,52 25,57 C32,52 46,41 46,27 C46,15 39,4 25,4 Z" />
     <path d="M25,58 Q22,68 28,78" />
   </g>

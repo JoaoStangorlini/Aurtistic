@@ -52,7 +52,6 @@ function getInitialPreferences(): ThemePreferences {
         'labdiv',
         'show-da-fisica',
         'hs',
-        'profis',
       ];
       const validModes: ThemeMode[] = ['system', 'light', 'dark'];
       return {

@@ -6,6 +6,7 @@ export const DEFAULT_EDGE_STORAGE_URL = 'https://storage.hublabdiv.com.br';
 export function resolveClientEdgeServerUrl(explicitServerUrl?: string): string {
   const base =
     explicitServerUrl ||
+    process.env.STORAGE_SERVER_URL ||
     process.env.NEXT_PUBLIC_STORAGE_SERVER_URL ||
     DEFAULT_EDGE_STORAGE_URL;
   return base.replace(/\/+$/, '');

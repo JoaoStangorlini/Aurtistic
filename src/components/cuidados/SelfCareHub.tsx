@@ -131,7 +131,7 @@ export function SelfCareHub() {
   return (
     <div
       data-tour="self-care-hub"
-      className="mb-4 rounded-2xl border border-[var(--border-subtle,#2D2D2D)] bg-[var(--surface-primary,#1A1A1A)] p-3 sm:p-4 shadow-sm transition-all"
+      className="mb-4 rounded-2xl border border-border-subtle bg-surface p-3 sm:p-4 shadow-sm transition-all"
     >
       {/* Topo do Hub de Cuidados: Barra Compacta & Expansível */}
       <div className="flex items-center justify-between gap-3">

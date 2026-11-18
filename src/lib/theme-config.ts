@@ -10,8 +10,7 @@ export type ThemePaletteId =
   | 'emerald-violet'
   | 'labdiv'
   | 'show-da-fisica'
-  | 'hs'
-  | 'profis';
+  | 'hs';
 
 export interface ThemePreferences {
   mode: ThemeMode;
@@ -216,30 +215,9 @@ export const THEME_PALETTES: Record<ThemePaletteId, PaletteDefinition> = {
       secondary: '#FFCC00',
     },
   },
-  profis: {
-    id: 'profis',
-    name: 'Pró-Física (ProFis)',
-    primary: {
-      dark: '#F59E0B',
-      light: '#D97706',
-      onDark: '#121212',
-      onLight: '#FFFFFF',
-    },
-    secondary: {
-      dark: '#38BDF8',
-      light: '#0284C7',
-      textLight: '#0369A1',
-      onDark: '#082F49',
-      onLight: '#FFFFFF',
-    },
-    preview: {
-      primary: '#F59E0B',
-      secondary: '#38BDF8',
-    },
-  },
 };
 
-export const ORG_PALETTE_IDS: ThemePaletteId[] = ['labdiv', 'show-da-fisica', 'hs', 'profis'];
+export const ORG_PALETTE_IDS: ThemePaletteId[] = ['labdiv', 'show-da-fisica', 'hs'];
 
 export const PALETTE_LIST = Object.values(THEME_PALETTES).filter(
   (p) => !ORG_PALETTE_IDS.includes(p.id)
@@ -254,5 +232,5 @@ export const ORG_PALETTE_LIST = ORG_PALETTE_IDS.map((id) => THEME_PALETTES[id]);
  * Previne Hydration Mismatch e elimina 100% do FOUC (Flash of Unstyled Content).
  */
 export function buildThemeInitScript(): string {
-  return `(function(){try{var k='${THEME_STORAGE_KEY}';var raw=localStorage.getItem(k);var p=null;if(raw){try{p=JSON.parse(raw)}catch(e){}}var m=(p&&p.mode)?p.mode:'system';var pal=(p&&p.palette)?p.palette:'';if(!pal){var ck=document.cookie.match(/(?:^|; )aurtistic_palette=([^;]*)/);if(ck){pal=decodeURIComponent(ck[1]);}}if(!pal){pal='purple-gold';}var valid=['purple-gold','blue-red','pink-green','cyan-amber','emerald-violet','labdiv','show-da-fisica','hs','profis'];if(valid.indexOf(pal)===-1)pal='purple-gold';var res=m;if(m==='system'){var mql=window.matchMedia('(prefers-color-scheme: dark)');res=mql.matches?'dark':'light'}else if(m!=='dark'&&m!=='light'){res='dark'}var d=document.documentElement;d.setAttribute('data-theme-mode',res);d.setAttribute('data-theme-palette',pal);d.style.colorScheme=res}catch(e){}})();`;
+  return `(function(){try{var k='${THEME_STORAGE_KEY}';var raw=localStorage.getItem(k);var p=null;if(raw){try{p=JSON.parse(raw)}catch(e){}}var m=(p&&p.mode)?p.mode:'system';var pal=(p&&p.palette)?p.palette:'';if(!pal){var ck=document.cookie.match(/(?:^|; )aurtistic_palette=([^;]*)/);if(ck){pal=decodeURIComponent(ck[1]);}}if(!pal){pal='purple-gold';}var valid=['purple-gold','blue-red','pink-green','cyan-amber','emerald-violet','labdiv','show-da-fisica','hs'];if(valid.indexOf(pal)===-1)pal='purple-gold';var res=m;if(m==='system'){var mql=window.matchMedia('(prefers-color-scheme: dark)');res=mql.matches?'dark':'light'}else if(m!=='dark'&&m!=='light'){res='dark'}var d=document.documentElement;d.setAttribute('data-theme-mode',res);d.setAttribute('data-theme-palette',pal);d.style.colorScheme=res}catch(e){}})();`;
 }

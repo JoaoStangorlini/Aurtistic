@@ -1078,13 +1078,19 @@ export async function getGalleryTimelinePageAction(input?: {
     }
 
     const items: GalleryTimelineItem[] = pageRows.map((row: any) => {
+      const rowOrgId = row.organization_id || null;
+      const isRowOrgScoped = Boolean(rowOrgId);
+      const rowOrgSlug = rowOrgId
+        ? (rowOrgId === orgId ? resolvedOrgSlug : DEFAULT_ECOSYSTEM_ORGS_BY_ID[rowOrgId]?.slug)
+        : undefined;
+
       const signed = signEdgeTenantTicket({
-        userId: user.id,
+        userId: isRowOrgScoped ? user.id : (row.user_id || user.id),
         role: 'member',
         purpose: 'vault',
-        scopeType: orgId ? 'org' : 'user',
-        organizationId: orgId || undefined,
-        orgSlug: resolvedOrgSlug,
+        scopeType: isRowOrgScoped ? 'org' : 'user',
+        organizationId: rowOrgId || undefined,
+        orgSlug: rowOrgSlug,
         allowedPaths: [row.relative_path],
         readOnly: true,
         allowDownload: true,

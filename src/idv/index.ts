@@ -244,35 +244,6 @@ export const HACKERSPACE_IDV: InitiativeIdvDefinition = {
   shape: 'neon-sharp',
 };
 
-export const PROFIS_IDV: InitiativeIdvDefinition = {
-  id: 'profis',
-  category: 'org',
-  name: 'Pró-Física (ProFis)',
-  shortLabel: 'Pró-Física',
-  colors: {
-    primary: '#F59E0B',
-    primaryContainer: '#D97706',
-    secondary: '#38BDF8',
-    tertiary: '#FFCC00',
-    bgApp: '#080c16',
-    bgSurface: '#0f172a',
-    bgElevated: '#162038',
-    onPrimary: '#121212',
-    onSecondary: '#082F49',
-  },
-  lightColors: {
-    primary: '#D97706',
-    primaryContainer: '#B45309',
-    secondary: '#0284C7',
-    bgApp: AURTISTIC_SURFACE_TOKENS.light.bgApp,
-    bgSurface: AURTISTIC_SURFACE_TOKENS.light.bgSurface,
-    onPrimary: '#FFFFFF',
-    onSecondary: '#FFFFFF',
-  },
-  fonts: { display: DEFAULT_DISPLAY_FONT, body: DEFAULT_BODY_FONT },
-  shape: 'm3-rounded',
-};
-
 export const INITIATIVE_IDV_MAP: Record<ThemePaletteId, InitiativeIdvDefinition> = {
   'purple-gold': PURPLE_GOLD_IDV,
   'blue-red': BLUE_RED_IDV,
@@ -282,7 +253,6 @@ export const INITIATIVE_IDV_MAP: Record<ThemePaletteId, InitiativeIdvDefinition>
   labdiv: LABDIV_IDV,
   'show-da-fisica': SHOW_DA_FISICA_IDV,
   hs: HACKERSPACE_IDV,
-  profis: PROFIS_IDV,
 };
 
 export function getAurtisticIdv(id?: string | null): InitiativeIdvDefinition {

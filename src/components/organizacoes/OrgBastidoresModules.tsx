@@ -52,22 +52,13 @@ const DEFAULT_HS_APPARATUS: ApparatusItem[] = [
   { id: 'estacao-solda', title: 'Estação de Solda SMD & Ferro', concept: 'Montagem de PCBs', act: 'Eletrônica', status: 'disponivel', notes: '' },
 ];
 
-const DEFAULT_PROFIS_APPARATUS: ApparatusItem[] = [
-  { id: 'optica-didatica', title: 'Kit de Óptica Geométrica & Ondulatória', concept: 'Laser He-Ne, Fendas de Young e Difração', act: 'Física IV', status: 'disponivel', notes: '' },
-  { id: 'trilho-ar', title: 'Trilho de Ar Linear de Baixo Atrito', concept: 'Colisões Elásticas & Conservação do Momento', act: 'Física I', status: 'disponivel', notes: '' },
-  { id: 'bancada-circuitos', title: 'Bancada de Multímetros & Fontes DC', concept: 'Circuitos RLC, Lei de Ohm e Kirchhoff', act: 'Física III', status: 'disponivel', notes: '' },
-  { id: 'espectrofotometro', title: 'Espectrofotômetro Educacional', concept: 'Linhas de Emissão de Bohr & Balmer', act: 'Física Moderna', status: 'disponivel', notes: '' },
-];
-
 export function OrgBenchStockPanel({ orgSlug }: { orgSlug: string }) {
   const isShow = orgSlug === 'show-da-fisica';
   const baseList = isShow
     ? DEFAULT_SHOW_APPARATUS
     : orgSlug === 'hs'
       ? DEFAULT_HS_APPARATUS
-      : orgSlug === 'profis'
-        ? DEFAULT_PROFIS_APPARATUS
-        : DEFAULT_LABDIV_APPARATUS;
+      : DEFAULT_LABDIV_APPARATUS;
 
   const [items, setItems] = useState<ApparatusItem[]>(baseList);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -363,9 +354,7 @@ export function OrgLiveStageModerationPanel({ orgSlug }: { orgSlug: string }) {
               ? DEFAULT_SHOW_APPARATUS
               : orgSlug === 'hs'
                 ? DEFAULT_HS_APPARATUS
-                : orgSlug === 'profis'
-                  ? DEFAULT_PROFIS_APPARATUS
-                  : DEFAULT_LABDIV_APPARATUS
+                : DEFAULT_LABDIV_APPARATUS
             ).map((exp) => (
               <option key={exp.id} value={exp.id}>
                 {exp.title}

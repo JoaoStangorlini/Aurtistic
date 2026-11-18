@@ -159,6 +159,11 @@ function resolvePortfolioDir() {
     try { fs.mkdirSync(custom, { recursive: true }); } catch {}
     if (fs.existsSync(custom)) return custom;
   }
+  const userImagensPortifolio = '/home/stangorlini/Imagens/Portifólio';
+  const userImagensPortfolio = '/home/stangorlini/Imagens/Portfolio';
+  if (fs.existsSync(userImagensPortifolio)) return userImagensPortifolio;
+  if (fs.existsSync(userImagensPortfolio)) return userImagensPortfolio;
+
   const vaultPortI = path.join(STORAGE_DIR, 'vault/Stangorlini/portifolio');
   const vaultPortE = path.join(STORAGE_DIR, 'vault/Stangorlini/portfolio');
   if (fs.existsSync(vaultPortI)) return vaultPortI;
@@ -6729,11 +6734,17 @@ function resolvePortAwareTargetDir(targetUserId, targetRelPath) {
 
   const legacySub = clean.replace(/^(portfolio|portifolio)\/?/i, '');
   const candidates = [
+    findCaseInsensitiveFileOrDir('/home/stangorlini/Imagens/Portifólio', legacySub),
+    findCaseInsensitiveFileOrDir('/home/stangorlini/Imagens/Portfolio', legacySub),
+    findCaseInsensitiveFileOrDir('/home/stangorlini/Imagens/Portifólio', clean),
+    findCaseInsensitiveFileOrDir('/home/stangorlini/Imagens/Portfolio', clean),
     findCaseInsensitiveFileOrDir(PORTFOLIO_DIR, legacySub),
     findCaseInsensitiveFileOrDir(path.join(STORAGE_DIR, 'portfolio'), legacySub),
     findCaseInsensitiveFileOrDir(PORTFOLIO_ORIGINALS_DIR, legacySub),
     findCaseInsensitiveFileOrDir(path.join(STORAGE_DIR, 'vault/Stangorlini/portfolio'), legacySub),
     findCaseInsensitiveFileOrDir(path.join(STORAGE_DIR, 'vault/Stangorlini/portifolio'), legacySub),
+    '/home/stangorlini/Imagens/Portifólio/SHOW DE FÍSICA',
+    '/home/stangorlini/Imagens/Portifólio/Show de Física',
     '/home/stangorlini/Imagens/show da fisica',
     '/home/stangorlini/Imagens/show de fisica',
     '/home/stangorlini/HUB LabDiv/public/show',
@@ -6851,17 +6862,25 @@ function resolveTenantSafePath(userId, userRoot, relPath = '', options = { forWr
     cleanRel.toLowerCase() === 'portifolio' ||
     cleanRel.toLowerCase().startsWith('portifolio/');
 
-  if (
-    !options.forWrite &&
-    scopeType !== 'org' &&
-    (userId === PRIMARY_ADMIN_UUID || role === 'admin') &&
-    isPortRel &&
-    !fs.existsSync(primaryTarget)
-  ) {
+  if (!options.forWrite && !fs.existsSync(primaryTarget)) {
     const legacySub = cleanRel.replace(/^(portfolio|portifolio)\/?/i, '');
-    const legacyTarget = legacySub ? resolveSafeChildPath(PORTFOLIO_DIR, legacySub) : PORTFOLIO_DIR;
-    if (fs.existsSync(legacyTarget)) {
-      return legacyTarget;
+    
+    // Tenta resolução em PORTFOLIO_DIR e Imagens/Portifólio
+    const portCandidate = resolveResilientPhysicalFile(PORTFOLIO_DIR, legacySub);
+    if (portCandidate && fs.existsSync(portCandidate)) {
+      return portCandidate;
+    }
+
+    const imagensCandidate = resolveResilientPhysicalFile('/home/stangorlini/Imagens/Portifólio', legacySub);
+    if (imagensCandidate && fs.existsSync(imagensCandidate)) {
+      return imagensCandidate;
+    }
+
+    if (isPortRel && (userId === PRIMARY_ADMIN_UUID || role === 'admin')) {
+      const legacyTarget = legacySub ? resolveSafeChildPath(PORTFOLIO_DIR, legacySub) : PORTFOLIO_DIR;
+      if (fs.existsSync(legacyTarget)) {
+        return legacyTarget;
+      }
     }
   }
 
@@ -7155,7 +7174,23 @@ async function verifyTenantTicket(req, res, next) {
     let pinNamespaceId = userId;
 
     if (scopeType === 'org') {
-      const cleanOrgSlug = String(payload.orgSlug || '').trim().toLowerCase();
+      let cleanOrgSlug = String(payload.orgSlug || '').trim().toLowerCase();
+      if (!cleanOrgSlug && payload.organizationId) {
+        const KNOWN_ORGS = {
+          '1ab41410-0000-4000-8000-000000000001': 'labdiv',
+          '1ab41410-0000-4000-8000-000000000002': 'profis',
+          '1ab41410-0000-4000-8000-000000000003': 'cursinho-popular',
+          '1ab41410-0000-4000-8000-000000000004': 'show-da-fisica',
+          '1ab41410-0000-4000-8000-000000000005': 'gepape',
+        };
+        cleanOrgSlug = KNOWN_ORGS[payload.organizationId] || '';
+      }
+      if (!cleanOrgSlug && /^[0-9a-f-]{36}$/i.test(payload.userId)) {
+        cleanOrgSlug = 'labdiv';
+      }
+      if (['showdefisica', 'show-de-fisica'].includes(cleanOrgSlug)) {
+        cleanOrgSlug = 'show-da-fisica';
+      }
       if (!/^[a-z0-9][a-z0-9_-]{1,62}$/.test(cleanOrgSlug)) {
         return res.status(400).json({ error: 'Slug de organização inválido no ticket.' });
       }
@@ -7501,6 +7536,20 @@ async function handleTenantStreamRequest(req, res, forceDownload = false) {
       const fallbackFile = resolveResilientPhysicalFile(req.tenant.userRoot, relPath);
       if (fallbackFile && fs.existsSync(fallbackFile)) {
         fullPath = fallbackFile;
+      } else if (process.platform !== 'android' && !fs.existsSync('/storage/31E0-19FD')) {
+        // Fallback transparente via proxy para o servidor remoto/FireStick
+        const remoteStreamUrl = `${REMOTE_HUB_ORIGIN}/api/tenant/stream?${new URLSearchParams(req.query).toString()}`;
+        const proxyReq = https.get(remoteStreamUrl, { headers: { 'User-Agent': 'Mozilla/5.0 firestick-dev-proxy' } }, (proxyRes) => {
+          if (proxyRes.statusCode === 200 || proxyRes.statusCode === 206) {
+            res.writeHead(proxyRes.statusCode, proxyRes.headers);
+            return proxyRes.pipe(res);
+          }
+          return res.status(proxyRes.statusCode || 404).json({ error: 'Arquivo não encontrado localmente nem no servidor remoto.' });
+        });
+        proxyReq.on('error', () => {
+          res.status(404).json({ error: 'Arquivo não encontrado no servidor local nem remoto.' });
+        });
+        return;
       } else {
         return res.status(404).json({ error: 'Arquivo não encontrado no servidor.' });
       }

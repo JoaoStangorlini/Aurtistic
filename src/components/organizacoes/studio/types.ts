@@ -15,6 +15,23 @@ export const ASPECT_DIMENSIONS: Record<AspectRatioKey, AspectDimension> = {
   '16:9': { width: 1920, height: 1080, label: '16:9 Paisagem', cssAspect: '16 / 9' },
 };
 
+export interface CurvePoint {
+  x: number; // 0..255 (estritamente monotônico)
+  y: number; // 0..255
+}
+
+export type ArtisticFilterPreset =
+  | 'original'
+  | 'labdiv-clean'
+  | 'quantum-cyan'
+  | 'tri-x-mono'
+  | 'sepia-vintage'
+  | 'matrix-hs'
+  | 'nature-editorial'
+  | 'dark-moody';
+
+export type StudioBlendMode = 'source-over' | 'multiply' | 'screen' | 'overlay' | 'soft-light';
+
 export interface StudioLayerFilterConfig {
   brightness: number;   // 0..200 (100 = default)
   contrast: number;     // 0..200 (100 = default)
@@ -24,17 +41,59 @@ export interface StudioLayerFilterConfig {
   sepia: number;        // 0..100 (0 = default)
   overlayDark: number;  // 0..85 — overlay escuro sobre a imagem/camada
   temperature: number;  // -50..50 (negativo=frio/azul, positivo=quente/laranja)
-  vignette: number;     // 0..100 — vigência de borda
+  vignette: number;     // 0..100 — vinheta de borda
   exposure?: number;    // -100..100 — exposição luminosa
+  luminance?: number;   // -100..100 — luminância
+  highlights?: number;  // -100..100 — destaques
+  shadows?: number;     // -100..100 — sombras
+  whitePoint?: number;  // -50..50 — ponto branco
+  blackPoint?: number;  // -50..50 — ponto negro
+  curves?: {
+    rgb: CurvePoint[];
+    r: CurvePoint[];
+    g: CurvePoint[];
+    b: CurvePoint[];
+  };
+  tint?: number;        // -50..50 (verde <-> magenta)
   vibrance?: number;    // -100..100 — vivacidade seletiva
+  bwDesaturate?: boolean;
+  hueTint?: number;     // 0..360
+  hueTintIntensity?: number; // 0..100
+  splitHighlightsColor?: string;
+  splitShadowsColor?: string;
+  splitBalance?: number; // -50..50
+  bokehEnabled?: boolean;
+  bokehRadius?: number;  // 0..50
+  bokehFeather?: number; // 0..120
+  bokehShape?: 'radial' | 'linear';
+  bokehFocalX?: number;  // 0..1
+  bokehFocalY?: number;  // 0..1
+  grain?: number;        // 0..100
+  clarity?: number;      // 0..100
+  artisticFilter?: ArtisticFilterPreset;
+  filterOpacity?: number; // 0..100
+  blendMode?: StudioBlendMode;
   targetMaskAreaOnly?: boolean;
   isCutoutMask?: boolean; // true = recorte total, false = edição seletiva
 }
 
+export const DEFAULT_CURVE_POINTS: CurvePoint[] = [
+  { x: 0, y: 0 },
+  { x: 85, y: 85 },
+  { x: 170, y: 170 },
+  { x: 255, y: 255 },
+];
+
 export const DEFAULT_FILTERS: StudioLayerFilterConfig = {
   brightness: 100, contrast: 100, saturation: 100, blur: 0,
   grayscale: 0, sepia: 0, overlayDark: 0, temperature: 0, vignette: 0,
-  exposure: 0, vibrance: 0, targetMaskAreaOnly: false, isCutoutMask: false,
+  exposure: 0, luminance: 0, highlights: 0, shadows: 0, whitePoint: 0, blackPoint: 0,
+  tint: 0, vibrance: 0, bwDesaturate: false, hueTint: 0, hueTintIntensity: 0,
+  splitHighlightsColor: '#FFCC00', splitShadowsColor: '#1F9FCF', splitBalance: 0,
+  bokehEnabled: false, bokehRadius: 18, bokehFeather: 60, bokehShape: 'radial',
+  bokehFocalX: 0.5, bokehFocalY: 0.5,
+  grain: 0, clarity: 0, artisticFilter: 'original', filterOpacity: 100, blendMode: 'source-over',
+  targetMaskAreaOnly: false, isCutoutMask: false,
 };
 
 export interface StudioLayerBase {
@@ -47,7 +106,19 @@ export interface StudioLayerBase {
   y: number; // 0..1 normalizado relativo ao Canvas
   width: number; // 0..1 normalizado relativo ao Canvas
   height: number; // 0..1 normalizado relativo ao Canvas
-  rotation: number; // em graus 0..360
+  rotation: number; // em graus -180..180
+  flipH?: boolean;
+  flipV?: boolean;
+  skewX?: number; // -45..45 deg
+  skewY?: number; // -45..45 deg
+  cropRect?: {
+    active: boolean;
+    aspect: 'free' | '1:1' | '4:5' | '16:9';
+    x: number; // 0..1
+    y: number; // 0..1
+    width: number; // 0..1
+    height: number; // 0..1
+  };
   filters?: StudioLayerFilterConfig;
   maskDataUrl?: string; // Máscara offscreen monocromática em dataUrl
   maskStrokes?: Array<{ x: number; y: number; r: number; mode: 'add' | 'erase' }>;
@@ -82,10 +153,15 @@ export interface StudioTextLayer extends StudioLayerBase {
   lineHeight: number;
   letterSpacing: number;
   textKind?: 'title' | 'subtitle' | 'body' | 'label' | 'callout';
+  uppercase?: boolean;
+  pillBgColor?: string;
+  pillBgOpacity?: number; // 0..100
   strokeColor?: string;
   strokeWidth?: number;
   shadowColor?: string;
   shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
 }
 
 export type StudioShapeType =
@@ -112,6 +188,13 @@ export interface StudioShapeLayer extends StudioLayerBase {
   strokeWidth?: number;
   borderRadius?: number;
   tailDirection?: 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right';
+  frameClip?: {
+    src: string;
+    resolvedUrl?: string;
+    zoom: number; // 1..3
+    panX: number; // -0.5..0.5
+    panY: number; // -0.5..0.5
+  };
 }
 
 export interface StudioMathLayer extends StudioLayerBase {
@@ -129,6 +212,8 @@ export interface StudioLogoLayer extends StudioLayerBase {
   src?: string;           // para 'custom'
   preserveAspect: boolean;
   tintColor?: string;
+  sealPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
+  monochrome?: boolean;
 }
 
 export type StudioLayer =
@@ -137,6 +222,14 @@ export type StudioLayer =
   | StudioShapeLayer
   | StudioMathLayer
   | StudioLogoLayer;
+
+export type StudioGuideOverlayMode =
+  | 'none'
+  | 'thirds'
+  | 'diagonals'
+  | 'safe_area'
+  | 'golden_spiral'
+  | 'golden_grid';
 
 export interface StudioSlide {
   id: string;
@@ -149,8 +242,6 @@ export interface StudioSlide {
   layers: StudioLayer[];
   showBrandBadge: boolean;
   brandBadgeText?: string;
-  splitScreen?: 'none' | 'vertical' | 'horizontal';
-  splitRatio?: number; // padrão 0.5
 }
 
 export interface StudioDraft {

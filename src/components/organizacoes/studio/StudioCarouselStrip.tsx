@@ -13,13 +13,18 @@ function SlideThumbnail({
   isActive,
   thumbW,
   thumbH,
+  fullW,
+  fullH,
 }: {
   slide: StudioSlide;
   isActive: boolean;
   thumbW: number;
   thumbH: number;
+  fullW: number;
+  fullH: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const paintRef = useRef<(() => void) | null>(null);
   const { tokens } = useOrganizationBrand();
 
   const paint = useCallback(() => {
@@ -27,8 +32,18 @@ function SlideThumbnail({
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    renderSlideToCanvas(ctx, slide, thumbW, thumbH, tokens);
-  }, [slide, thumbW, thumbH, tokens]);
+    ctx.save();
+    ctx.clearRect(0, 0, thumbW, thumbH);
+    ctx.scale(thumbW / Math.max(1, fullW), thumbH / Math.max(1, fullH));
+    renderSlideToCanvas(ctx, slide, fullW, fullH, tokens, {
+      onNeedRepaint: () => paintRef.current?.(),
+    });
+    ctx.restore();
+  }, [slide, thumbW, thumbH, fullW, fullH, tokens]);
+
+  useEffect(() => {
+    paintRef.current = paint;
+  }, [paint]);
 
   useEffect(() => {
     if (isActive) {
@@ -56,11 +71,11 @@ function SlideThumbnail({
 export function StudioCarouselStrip() {
   const { slides, activeSlideId, setActiveSlideId, addSlide, removeSlide, aspectRatio } = useStudio();
   const dims = ASPECT_DIMENSIONS[aspectRatio];
-  const thumbW = dims.width > dims.height ? 96 : 64;
-  const thumbH = dims.height > dims.width ? 96 : 64;
+  const thumbH = 72;
+  const thumbW = Math.max(40, Math.round(thumbH * (dims.width / dims.height)));
 
   return (
-    <div className="w-full flex items-center gap-3 overflow-x-auto py-2 px-1 scrollbar-thin border-t border-white/10">
+    <div className="w-full flex items-center gap-3 overflow-x-auto py-2 px-2 scrollbar-thin border-b border-border-subtle bg-surface/60 rounded-2xl">
       <div className="flex items-center gap-2.5">
         {slides.map((slide, idx) => {
           const isActive = slide.id === activeSlideId;
@@ -73,12 +88,19 @@ export function StudioCarouselStrip() {
                 className={`relative rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
                   isActive
                     ? 'border-[#FFCC00] shadow-md shadow-[#FFCC00]/20'
-                    : 'border-white/15 hover:border-white/40 opacity-70 hover:opacity-100'
+                    : 'border-border-subtle hover:border-fg-muted opacity-75 hover:opacity-100'
                 }`}
                 style={{ width: thumbW, height: thumbH }}
               >
-                <SlideThumbnail slide={slide} isActive={isActive} thumbW={thumbW} thumbH={thumbH} />
-                <span className="absolute bottom-0.5 left-0.5 text-[9px] font-black font-mono text-white/80 bg-black/40 rounded px-0.5 leading-tight z-10">
+                <SlideThumbnail
+                  slide={slide}
+                  isActive={isActive}
+                  thumbW={thumbW}
+                  thumbH={thumbH}
+                  fullW={dims.width}
+                  fullH={dims.height}
+                />
+                <span className="absolute bottom-0.5 left-0.5 text-[9px] font-black font-mono text-white bg-black/60 rounded px-1 leading-tight z-10">
                   {idx + 1}
                 </span>
               </button>
@@ -101,7 +123,7 @@ export function StudioCarouselStrip() {
         <button
           type="button"
           onClick={addSlide}
-          className="shrink-0 flex flex-col items-center justify-center rounded-xl border border-dashed border-white/25 hover:border-[#FFCC00] hover:text-[#FFCC00] text-slate-400 transition-all cursor-pointer p-3 gap-1"
+          className="shrink-0 flex flex-col items-center justify-center rounded-xl border border-dashed border-border-subtle hover:border-[#FFCC00] hover:text-[#FFCC00] text-fg-muted transition-all cursor-pointer p-3 gap-1"
           style={{ width: thumbW, height: thumbH }}
           title="Adicionar Nova Tela ao Carrossel"
         >

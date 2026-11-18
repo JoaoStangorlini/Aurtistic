@@ -44,13 +44,6 @@ export const DEFAULT_ECOSYSTEM_ORGS_BY_ID: Record<
     storage_quota_bytes: 53687091200,
     storage_used_bytes: 0,
   },
-  '1ab41410-0000-4000-8000-000000000004': {
-    id: '1ab41410-0000-4000-8000-000000000004',
-    slug: 'profis',
-    name: 'Pró-Física (ProFis)',
-    storage_quota_bytes: 53687091200,
-    storage_used_bytes: 0,
-  },
 };
 
 export interface IssuedUserStorageSession {
@@ -488,7 +481,9 @@ export function signEdgeTenantTicket(options: SignEdgeTicketOptions): SignedEdge
     usedBytes,
     ...(options.scopeType ? { scopeType: options.scopeType } : {}),
     ...(options.organizationId ? { organizationId: options.organizationId } : {}),
-    ...(options.orgSlug ? { orgSlug: options.orgSlug } : {}),
+    ...(options.orgSlug || (options.organizationId && DEFAULT_ECOSYSTEM_ORGS_BY_ID[options.organizationId]?.slug)
+      ? { orgSlug: options.orgSlug || DEFAULT_ECOSYSTEM_ORGS_BY_ID[options.organizationId!]?.slug }
+      : {}),
     ...(options.allowedOrgSlugs?.length ? { allowedOrgSlugs: options.allowedOrgSlugs } : {}),
     ...(options.allowedPrefix ? { allowedPrefix: options.allowedPrefix } : {}),
     ...(normalizedAllowedPaths ? { allowedPaths: normalizedAllowedPaths } : {}),

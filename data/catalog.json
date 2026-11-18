@@ -1,0 +1,44 @@
+{
+  "settings": {
+    "title": "JOÃO PAULO STANGORLINI — PORTFOLIO",
+    "subtitle": "Fotografia, Ciência & Registro Visual",
+    "accentTag": "Comunicador - fotógrafo - desenvolvedor",
+    "layout": {
+      "gridMode": "masonry",
+      "defaultFit": "natural",
+      "defaultAspect": "auto",
+      "gapPx": 18,
+      "borderRadiusPx": 14,
+      "columnsDesktop": 4,
+      "gridGap": 18,
+      "cardRadius": 14,
+      "defaultColumns": 4,
+      "freeViewColsCount": 3,
+      "sections": {},
+      "folderMeta": {}
+    },
+    "albumOrder": [
+      "POLÍTICAS",
+      "EVENTOS",
+      "FESTAS",
+      "SHOW DE FISICA",
+      "STREET-TRILHAS",
+      "USP",
+      "BAHIA",
+      "CIENTEC"
+    ],
+    "mockOverrides": {}
+  },
+  "albums": [
+    "POLÍTICAS",
+    "EVENTOS",
+    "FESTAS",
+    "SHOW DE FISICA",
+    "STREET-TRILHAS",
+    "USP",
+    "BAHIA",
+    "CIENTEC"
+  ],
+  "subalbums": {},
+  "items": []
+}

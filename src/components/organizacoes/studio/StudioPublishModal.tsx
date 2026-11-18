@@ -89,13 +89,13 @@ export function StudioPublishModal({ orgSlug }: { orgSlug?: string | null }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
-      <div className="bg-[#0b0f19] border border-white/15 rounded-3xl p-5 max-w-4xl w-full shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto pr-1">
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+      <div className="bg-surface border border-border-subtle rounded-3xl p-5 max-w-4xl w-full shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto pr-1 text-fg">
+        <div className="flex items-center justify-between border-b border-border-subtle pb-3">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[22px] text-[#FFCC00]">rocket_launch</span>
-            <h3 className="text-base font-black text-white">Central de Publicação, Cofre & Exportação</h3>
+            <span className="material-symbols-outlined text-[22px] text-amber-500 dark:text-[#FFCC00]">rocket_launch</span>
+            <h3 className="text-base font-black text-fg">Central de Publicação, Cofre & Exportação</h3>
           </div>
-          <button type="button" onClick={() => setStage('editor')} className="p-1 text-slate-400 hover:text-white rounded-lg">
+          <button type="button" onClick={() => setStage('editor')} className="p-1 text-fg-muted hover:text-fg rounded-lg">
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
         </div>

@@ -26,6 +26,7 @@ export function StudioMaskBrushModal() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (targetLayer.maskDataUrl) {
       const img = new Image();
+      img.crossOrigin = 'anonymous';
       img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       img.src = targetLayer.maskDataUrl;
     }
@@ -123,13 +124,13 @@ export function StudioMaskBrushModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
-      <div className="bg-[#0b0f19] border border-white/15 rounded-3xl p-5 max-w-2xl w-full shadow-2xl flex flex-col gap-3.5">
-        <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+      <div className="bg-surface border border-border-subtle rounded-3xl p-5 max-w-2xl w-full shadow-2xl flex flex-col gap-3.5 text-fg">
+        <div className="flex items-center justify-between border-b border-border-subtle pb-2.5">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-[20px] text-red-400">brush</span>
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider">Máscara Offscreen • {targetLayer.name}</h3>
+            <h3 className="text-sm font-bold text-fg uppercase tracking-wider">Máscara Offscreen • {targetLayer.name}</h3>
           </div>
-          <button type="button" onClick={() => setMaskModalLayerId(null)} className="p-1 rounded-lg text-slate-400 hover:text-white">
+          <button type="button" onClick={() => setMaskModalLayerId(null)} className="p-1 rounded-lg text-fg-muted hover:text-fg">
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
         </div>

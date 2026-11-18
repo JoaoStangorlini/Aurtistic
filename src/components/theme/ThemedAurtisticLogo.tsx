@@ -35,9 +35,7 @@ export function ThemedAurtisticLogo({
         ? 'blue-red'
         : rawPalette === 'hs'
           ? 'emerald-violet'
-          : rawPalette === 'profis'
-            ? 'cyan-amber'
-            : rawPalette;
+          : rawPalette;
   const currentMode = resolvedMode || 'dark';
 
   // Modo somente ícone (circular / 1:1, ideal para avatares, spinners de carregamento e atalhos)

@@ -4,10 +4,11 @@
 import React, { useState, useEffect } from 'react';
 import { useStudio } from './StudioContext';
 import { getRelativeLuminance } from '@/lib/studio/color-harmony';
+import type { StudioGuideOverlayMode } from './types';
 
 export interface StudioDesignAssistantProps {
-  activeOverlay: 'none' | 'thirds' | 'golden' | 'diagonals';
-  onToggleOverlay: (type: 'none' | 'thirds' | 'golden' | 'diagonals') => void;
+  activeOverlay: StudioGuideOverlayMode;
+  onToggleOverlay: (type: StudioGuideOverlayMode) => void;
 }
 
 export function StudioDesignAssistant({ activeOverlay, onToggleOverlay }: StudioDesignAssistantProps) {
@@ -150,13 +151,15 @@ export function StudioDesignAssistant({ activeOverlay, onToggleOverlay }: Studio
         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
           Guias de Composição Fotográfica
         </label>
-        <div className="grid grid-cols-4 gap-1 text-[10px] font-bold">
+        <div className="grid grid-cols-3 gap-1 text-[10px] font-bold">
           {(
             [
               { id: 'none', label: 'Off' },
               { id: 'thirds', label: 'Terços' },
-              { id: 'golden', label: 'Áurea' },
               { id: 'diagonals', label: 'Diagonais' },
+              { id: 'safe_area', label: 'Safe Area' },
+              { id: 'golden_spiral', label: 'Espiral φ' },
+              { id: 'golden_grid', label: 'Grade φ' },
             ] as const
           ).map((ov) => (
             <button
@@ -164,7 +167,7 @@ export function StudioDesignAssistant({ activeOverlay, onToggleOverlay }: Studio
               type="button"
               onClick={() => onToggleOverlay(ov.id)}
               className={`py-1 rounded-md text-center cursor-pointer transition-all ${
-                activeOverlay === ov.id ? 'bg-[#FFCC00] text-black shadow-xs' : 'bg-white/5 text-slate-400 hover:text-white'
+                activeOverlay === ov.id ? 'bg-[#FFCC00] text-black shadow-xs' : 'bg-surface-hover text-fg-muted hover:text-fg'
               }`}
             >
               {ov.label}

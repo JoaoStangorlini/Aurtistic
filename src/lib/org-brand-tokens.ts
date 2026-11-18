@@ -1,7 +1,7 @@
 // Este programa é um software livre (Licença AGPLv3)
 // Motor compartilhado de Identidade Visual (IDV) por Organização
 
-export type OrgBrandSlug = 'show-da-fisica' | 'labdiv' | 'hs' | 'profis';
+export type OrgBrandSlug = 'show-da-fisica' | 'labdiv' | 'hs';
 
 export interface OrgBrandTokens {
   themeId: OrgBrandSlug;
@@ -111,40 +111,12 @@ export const ORG_BRAND_PRESETS: Record<OrgBrandSlug, OrgBrandTokens> = {
     defaultPostBody:
       'Bancadas abertas de *eletrônica*, *impressão 3D* e hardware livre todas as semanas no IFUSP.',
   },
-  profis: {
-    themeId: 'profis',
-    displayName: 'Pró-Física (ProFis)',
-    badgeTag: 'PROFIS • ENSINO & PESQUISA EM FÍSICA',
-    bgApp: '#080c16',
-    bgSurface: '#0f172a',
-    textPrimary: '#f8fafc',
-    textMuted: '#fde68a',
-    primaryColor: '#F59E0B',
-    secondaryColor: '#FFCC00',
-    tertiaryColor: '#38BDF8',
-    containerColor: '#78350F',
-    accents: ['#F59E0B', '#FFCC00', '#F97316', '#38BDF8'],
-    fontDisplay: "'Space Grotesk', 'Inter', sans-serif",
-    fontBody: "'Inter', sans-serif",
-    googleFontsHref:
-      'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Space+Grotesk:wght@600;700&display=swap',
-    uppercaseTitles: false,
-    letterSpacingTitle: '-0.02em',
-    glowIntensity: 0.9,
-    titleShadowCss: '0 0 16px rgba(245, 158, 11, 0.5), 0 0 30px rgba(255, 204, 0, 0.35)',
-    borderStyleCss: '1.5px solid rgba(245, 158, 11, 0.45)',
-    tricolorTitlePreset: false,
-    defaultPostTitle: 'Pró-Física *IFUSP*',
-    defaultPostBody:
-      'Incentivo à formação acadêmica, nivelamento e pesquisa científica de ponta no Instituto de Física.',
-  },
 };
 
 export function normalizeOrgBrandSlug(slugOrName?: string | null): OrgBrandSlug {
   const raw = (slugOrName || '').toLowerCase().trim();
   if (raw.includes('show') || raw === 'sdf') return 'show-da-fisica';
   if (raw === 'hs' || raw.includes('hacker')) return 'hs';
-  if (raw === 'profis' || raw.includes('profis') || raw.includes('pro-fis') || raw.includes('pro_fis')) return 'profis';
   return 'labdiv';
 }
 
@@ -155,7 +127,7 @@ export function resolveOrgBrandTokens(
   const key = normalizeOrgBrandSlug(slug);
   const preset = ORG_BRAND_PRESETS[key];
   // Organizações oficiais do ecossistema preservam estritamente seu preset canônico de IDV
-  if (key === 'labdiv' || key === 'show-da-fisica' || key === 'hs' || key === 'profis') {
+  if (key === 'labdiv' || key === 'show-da-fisica' || key === 'hs') {
     return preset;
   }
   if (!brandConfig || typeof brandConfig !== 'object') return preset;

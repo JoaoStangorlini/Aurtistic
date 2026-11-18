@@ -1,14 +1,10 @@
 # ACTIVE_STATE — Aurtistic & HUB LabDiv
 
-## ✅ Entregas Recentes
-1. **ScrollJellyCard (HUB LabDiv):** Corrigida física de squash & stretch — scroll vertical achata topo/base (scaleY↓) e compensa laterais (scaleX↑).
-2. **Login Primeira Tentativa (HUB LabDiv):** Resolvida falha de cookies SameSite=Lax em redirect chain OAuth; callback agora usa página intermediária com assentamento de cookies e `window.location.replace()`.
-3. **Show de Física (Aurtistic & HUB):** Varredura de copy completa "Show da Física" → "Show de Física" em texto visível, preservando slugs e identificadores de banco.
-4. **Resolução de Atalhos do Cofre & Studio (Aurtistic):**
-   - `servidor/server.js`: Adicionada resolução resiliente `resolveResilientPhysicalFile` e busca case-insensitive para atalhos de pastas do Portfólio (ex.: Show de Física) em `/api/tenant/stream`, `/api/tenant/thumb` e rotas de vault.
-   - `studio-actions.ts`: Ajustado `{ download: false }` para carregar imagens inline sem acionar download forçado via `Content-Disposition`.
-   - `canvas-renderer.ts` & `StudioImagePanel.tsx`: Suporte a `layer.resolvedUrl` e fallback gracioso para decodificação no Canvas.
-5. **Serviços Ativos:** Aurtistic (3000), HUB LabDiv (3001) e Portal Storage Daemon (8080).
+## ✅ STUDIO PRO V3 100% CONCLUÍDO (PRÉ-FASE + FASES 1 A 5)
+1. **Fase 5 da V3 (Performance & Fechamento):**
+   - `lut-processor.ts`: LUT única composta `Uint8Array(256)` por canal com clamp `[0, 255]`, pool estático reaproveitável (`getReusableCanvas`), cache por dirty-flag (`getCachedLayerCanvas`/`setCachedLayerCanvas`) e descarte explícito (`clearStudioRenderCache`).
+   - `canvas-renderer.ts`: Preview downscaled `0.35x` durante arrastes contínuos e passe `1.0x` no `pointerup` via `requestAnimationFrame` em `StudioCanvasStage.tsx`.
+   - `StudioContext.tsx`: Limpeza de buffers na troca de rascunhos/templates/reset e unmount.
 
-## 📌 Status
-- Verificação: `npm run verify:silent` (0 erros) e `verify_theme_and_tour.mjs` (91/91).
+## 📌 Status Final
+- `npm run verify:full` (TSC + ESLint + Build Produção + Server.js): ✅ Validado.

@@ -15,6 +15,7 @@ import { isUuid } from '@/lib/validators';
 const LABDIV_ORG_ID = '1ab41410-0000-4000-8000-000000000001';
 const SHOW_DA_FISICA_ORG_ID = '1ab41410-0000-4000-8000-000000000002';
 const HS_ORG_ID = '1ab41410-0000-4000-8000-000000000003';
+const PROFIS_ORG_ID = '1ab41410-0000-4000-8000-000000000004';
 
 const LABDIV_DEFAULT_ORG: any = {
   id: LABDIV_ORG_ID,
@@ -81,7 +82,7 @@ const HS_DEFAULT_ORG: any = {
   slug: 'hs',
   name: 'Hackerspace IFUSP',
   description: 'Laboratório comunitário de cultura maker, eletrônica e hardware livre',
-  avatar_url: null,
+  avatar_url: '/hs-logo.png',
   primary_color: '#00ff66',
   secondary_color: '#ffcc00',
   storage_quota_bytes: 53687091200,
@@ -106,43 +107,10 @@ const HS_DEFAULT_ORG: any = {
   myCapacity: 'normal',
 };
 
-const PROFIS_ORG_ID = '1ab41410-0000-4000-8000-000000000004';
-
-const PROFIS_DEFAULT_ORG: any = {
-  id: PROFIS_ORG_ID,
-  slug: 'profis',
-  name: 'Pró-Física (ProFis)',
-  description: 'Incentivo à formação acadêmica, nivelamento e pesquisa científica no IFUSP',
-  avatar_url: null,
-  primary_color: '#F59E0B',
-  secondary_color: '#FFCC00',
-  storage_quota_bytes: 53687091200,
-  storage_used_bytes: 0,
-  storage_policy: 'admin_or_permitted',
-  brand_config: {
-    themeId: 'profis',
-    bgApp: '#080c16',
-    bgSurface: '#0f172a',
-    textPrimary: '#f8fafc',
-    accents: ['#F59E0B', '#FFCC00', '#F97316', '#38BDF8'],
-    fontDisplay: 'Space Grotesk',
-    fontBody: 'Inter',
-    uppercaseTitles: false,
-    glowIntensity: 0.9,
-  },
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-  myRole: 'admin',
-  myMemberId: PROFIS_ORG_ID,
-  canUploadOrgVault: true,
-  myCapacity: 'normal',
-};
-
 const DEFAULT_ECOSYSTEM_ORGS = [
   LABDIV_DEFAULT_ORG,
   SHOW_DA_FISICA_DEFAULT_ORG,
   HS_DEFAULT_ORG,
-  PROFIS_DEFAULT_ORG,
 ];
 
 export async function ensureEcosystemOrganizationsSeeded(
@@ -190,8 +158,6 @@ export async function ensureEcosystemOrganizationsSeeded(
       { id: '1ab41410-sub2-4000-8000-000000000002', organization_id: SHOW_DA_FISICA_ORG_ID, name: 'Apresentadores & Palco', color: '#002FFE', is_active: true },
       { id: '1ab41410-sub1-4000-8000-000000000003', organization_id: HS_ORG_ID, name: 'Geral', color: '#00FF66', is_active: true },
       { id: '1ab41410-sub2-4000-8000-000000000003', organization_id: HS_ORG_ID, name: 'Eletrônica & IoT', color: '#FFCC00', is_active: true },
-      { id: '1ab41410-sub1-4000-8000-000000000004', organization_id: PROFIS_ORG_ID, name: 'Geral', color: '#F59E0B', is_active: true },
-      { id: '1ab41410-sub2-4000-8000-000000000004', organization_id: PROFIS_ORG_ID, name: 'Nivelamento & Tutoria', color: '#FFCC00', is_active: true },
     ];
     await client.from('organization_subteams').upsert(defaultSubteams, { onConflict: 'id' });
 
@@ -471,7 +437,7 @@ export async function syncHubOrganizationsAction(): Promise<{
   }
 
   if (isHubStaff || isGlobalAdmin) {
-    hubOrgs = ['labdiv', 'show-da-fisica', 'hs', 'profis'];
+    hubOrgs = ['labdiv', 'show-da-fisica', 'hs'];
   }
 
   let synced = 0;
@@ -536,7 +502,7 @@ export async function getOrganizationDetailsAction(orgId: string) {
         : targetOrgId === HS_ORG_ID
           ? 'Hackerspace'
           : targetOrgId === PROFIS_ORG_ID
-            ? 'Pró-Física'
+            ? 'PROFIS'
             : 'LabDiv';
 
     const orFilter = isLabDiv
@@ -655,24 +621,6 @@ export async function getOrganizationDetailsAction(orgId: string) {
       members: [
         { id: '1ab41410-0000-4000-8000-000000000411', organization_id: HS_ORG_ID, full_name: 'João Paulo Stangorlini', email: 'joaopaulostangorlini@usp.br', org_role: 'admin', is_placeholder: false, can_upload_org_vault: true, cognitive_capacity: 'normal' },
         { id: '1ab41410-0000-4000-8000-000000000412', organization_id: HS_ORG_ID, full_name: 'Equipe Hackerspace', email: 'hackerspace@if.usp.br', org_role: 'member', is_placeholder: false, can_upload_org_vault: true, cognitive_capacity: 'normal' }
-      ],
-      tasks: fallbackTasks,
-    };
-  }
-
-  // Fallback institucional para Pró-Física (ProFis)
-  if (orgId === PROFIS_ORG_ID) {
-    return {
-      ok: true,
-      organization: PROFIS_DEFAULT_ORG,
-      subteams: [
-        { id: '1ab41410-0000-4000-8000-000000000501', organization_id: PROFIS_ORG_ID, name: 'Apoio Pedagógico & Nivelamento', description: 'Monitorias e nivelamento em cálculo e física básica', color: '#f59e0b' },
-        { id: '1ab41410-0000-4000-8000-000000000502', organization_id: PROFIS_ORG_ID, name: 'Pesquisa & Iniciação Científica', description: 'Projetos avançados de pesquisa e bolsas de estudo', color: '#ffcc00' },
-        { id: '1ab41410-0000-4000-8000-000000000503', organization_id: PROFIS_ORG_ID, name: 'Comunicação & Divulgação', description: 'Materiais didáticos, mídias e seminários do ProFis', color: '#f97316' }
-      ],
-      members: [
-        { id: '1ab41410-0000-4000-8000-000000000511', organization_id: PROFIS_ORG_ID, full_name: 'João Paulo Stangorlini', email: 'joaopaulostangorlini@usp.br', org_role: 'admin', is_placeholder: false, can_upload_org_vault: true, cognitive_capacity: 'normal' },
-        { id: '1ab41410-0000-4000-8000-000000000512', organization_id: PROFIS_ORG_ID, full_name: 'Equipe Pró-Física (ProFis)', email: 'profis@if.usp.br', org_role: 'member', is_placeholder: false, can_upload_org_vault: true, cognitive_capacity: 'normal' }
       ],
       tasks: fallbackTasks,
     };
@@ -1263,9 +1211,6 @@ export async function joinOrganizationByCodeAction(input: {
     'HACKERSPACE-IFUSP': { orgId: HS_ORG_ID, slug: 'hs' },
     'HACKERSPACE-2026': { orgId: HS_ORG_ID, slug: 'hs' },
     'HS': { orgId: HS_ORG_ID, slug: 'hs' },
-    'PROFIS-IFUSP-2026': { orgId: PROFIS_ORG_ID, slug: 'profis' },
-    'PROFIS-2026': { orgId: PROFIS_ORG_ID, slug: 'profis' },
-    'PROFIS': { orgId: PROFIS_ORG_ID, slug: 'profis' },
   };
 
   const { data, error } = await supabase.rpc('accept_organization_invite', {
@@ -1321,7 +1266,6 @@ export async function joinOrganizationByCodeAction(input: {
     if (orgId === LABDIV_ORG_ID) orgSlug = 'labdiv';
     else if (orgId === SHOW_DA_FISICA_ORG_ID) orgSlug = 'show-da-fisica';
     else if (orgId === HS_ORG_ID) orgSlug = 'hs';
-    else if (orgId === PROFIS_ORG_ID) orgSlug = 'profis';
     else if (orgId) {
       const { data: dbOrg } = await supabase
         .from('organizations')

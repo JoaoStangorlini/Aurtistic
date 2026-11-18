@@ -124,7 +124,8 @@ export function LabDivWorkspaceClient({
         setMeetings(mRes.meetings);
       }
       if (!isEmbed && selected.slug) {
-        router.push(`/labdiv?org=${encodeURIComponent(selected.slug)}`);
+        const viewQs = activeMacroView === 'studio' ? '&view=studio' : '';
+        router.push(`/labdiv?org=${encodeURIComponent(selected.slug)}${viewQs}`);
       }
     }
   };
@@ -189,7 +190,7 @@ export function LabDivWorkspaceClient({
     }
   };
   const swipeHandlers = useSwipeTabs({
-    enabled: !isEmbed,
+    enabled: !isEmbed && activeMacroView !== 'studio',
     onNext: () => {
       if (activeMacroView === 'organizacoes') selectMacroView('studio');
     },
@@ -394,7 +395,7 @@ export function LabDivWorkspaceClient({
                     }
                   }}
                 />
-                <span className="font-black text-xs bg-gradient-to-r from-[#9D4EDD] via-[#C77DFF] to-[#FFCC00] bg-clip-text text-transparent tracking-tight">
+                <span className="font-black text-xs text-[#581c87] dark:bg-gradient-to-r dark:from-[#9D4EDD] dark:via-[#C77DFF] dark:to-[#FFCC00] dark:bg-clip-text dark:text-transparent tracking-tight">
                   Aurtistic
                 </span>
               </div>
@@ -406,7 +407,7 @@ export function LabDivWorkspaceClient({
                 className="ml-1 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider border border-border-subtle bg-app text-fg-secondary hover:text-[#FFCC00] hover:border-[#FFCC00]/50 hover:bg-surface hover:shadow-[0_0_12px_rgba(255,204,0,0.35)] transition-all shadow-xs cursor-pointer"
                 title="Conferir portal institucional do HUB LabDiv"
               >
-                <span>Conferir</span>
+                <span>Conferir o HUB</span>
                 <span className="material-symbols-outlined text-[12px]">open_in_new</span>
               </a>
             </div>
@@ -426,14 +427,7 @@ export function LabDivWorkspaceClient({
                 <span className="text-[8px] text-[#0066ff]">FÍSICA</span>
               </div>
             ) : currentOrg.slug === 'hs' ? (
-              <div className="w-full h-full flex items-center justify-center font-mono font-bold text-[#00ff66] text-[11px]">
-                &gt;_HS
-              </div>
-            ) : currentOrg.slug === 'profis' ? (
-              <div className="w-full h-full flex flex-col items-center justify-center font-black text-center leading-none">
-                <span className="text-[10px] text-[#F59E0B]">PRÓ</span>
-                <span className="text-[8px] text-[#FFCC00]">FÍSICA</span>
-              </div>
+              <img src="/hs-logo.png" alt="Hackerspace" className="w-full h-full object-cover rounded-xl" />
             ) : currentOrg.avatar_url ? (
               <img src={currentOrg.avatar_url} alt={currentOrg.name} className="w-full h-full object-contain" />
             ) : (
@@ -485,14 +479,11 @@ export function LabDivWorkspaceClient({
       {(() => {
         const isShow = currentOrg.slug === 'show-da-fisica';
         const isHs = currentOrg.slug === 'hs';
-        const isProfis = currentOrg.slug === 'profis';
         const opsTag = isShow
           ? 'SF-OPS // BASTIDORES DO SHOW • Auditório Alessandro Volta • IFUSP'
           : isHs
             ? 'HS-OPS // HACKERSPACE • Oficina & Hardware Livre • IFUSP'
-            : isProfis
-              ? 'PF-OPS // PRÓ-FÍSICA (PROFIS) • Monitoria & Iniciação Científica • IFUSP'
-              : 'LD-OPS // BASTIDORES LABDIV • Portal HUB LabDiv • IFUSP';
+            : 'LD-OPS // BASTIDORES LABDIV • Portal HUB LabDiv • IFUSP';
 
         const navModules = [
           {
@@ -540,7 +531,7 @@ export function LabDivWorkspaceClient({
               <div
                 className={`lg:col-span-6 p-4 border flex flex-col justify-between gap-4 ${
                   isShow || isHs
-                    ? 'neon-border-green bg-black rounded-none'
+                    ? 'neon-border-green bg-surface rounded-none'
                     : 'org-card rounded-2xl border-border-subtle bg-surface/90 backdrop-blur-xl'
                 }`}
               >
@@ -573,7 +564,7 @@ export function LabDivWorkspaceClient({
               <div
                 className={`lg:col-span-3 p-4 border flex flex-col justify-between gap-3 ${
                   isShow || isHs
-                    ? 'neon-border-blue bg-black rounded-none'
+                    ? 'neon-border-blue bg-surface rounded-none'
                     : 'org-card rounded-2xl border-border-subtle bg-surface/90 backdrop-blur-xl'
                 }`}
               >
@@ -631,7 +622,7 @@ export function LabDivWorkspaceClient({
               <div
                 className={`lg:col-span-3 p-4 border flex flex-col justify-between gap-3 ${
                   isShow || isHs
-                    ? 'neon-border-yellow bg-black rounded-none'
+                    ? 'neon-border-yellow bg-surface rounded-none'
                     : 'org-card rounded-2xl border-border-subtle bg-surface/90 backdrop-blur-xl'
                 }`}
               >
@@ -665,7 +656,7 @@ export function LabDivWorkspaceClient({
               aria-label="Módulos da Gestão"
               className={`p-1.5 border flex flex-wrap items-center gap-2 ${
                 isShow || isHs
-                  ? 'border-border-subtle bg-black rounded-none'
+                  ? 'border-border-subtle bg-surface rounded-none'
                   : 'rounded-2xl border-border-subtle bg-surface/90 backdrop-blur-xl shadow-md'
               }`}
             >
@@ -884,7 +875,7 @@ export function LabDivWorkspaceClient({
           <div
             className={`p-5 border space-y-4 ${
               currentOrg.slug === 'show-da-fisica' || currentOrg.slug === 'hs'
-                ? 'neon-border-blue bg-black rounded-none'
+                ? 'neon-border-blue bg-surface rounded-none'
                 : 'org-card rounded-2xl border-border-subtle bg-surface'
             }`}
           >

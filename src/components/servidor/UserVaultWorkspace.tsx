@@ -2431,14 +2431,7 @@ export function UserVaultWorkspace({
                 <span className="text-[8px] text-[#0066ff]">FÍSICA</span>
               </div>
             ) : selectedOrg.slug === 'hs' ? (
-              <div className="w-full h-full flex items-center justify-center font-mono font-bold text-[#00ff66] text-[11px]">
-                &gt;_HS
-              </div>
-            ) : selectedOrg.slug === 'profis' ? (
-              <div className="w-full h-full flex flex-col items-center justify-center font-black text-center leading-none">
-                <span className="text-[10px] text-[#F59E0B]">PRÓ</span>
-                <span className="text-[8px] text-[#FFCC00]">FÍSICA</span>
-              </div>
+              <img src="/hs-logo.png" alt="Hackerspace" className="w-full h-full object-cover rounded-xl" />
             ) : (
               <span className="text-lg font-black text-[var(--accent-primary)]">
                 {selectedOrg.name.slice(0, 2).toUpperCase()}
@@ -2651,7 +2644,7 @@ export function UserVaultWorkspace({
                   onClick={() => handleSetLayoutMode('grid')}
                   className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     layoutMode === 'grid'
-                      ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm'
+                      ? 'bg-[var(--accent-primary)] text-white font-bold shadow-sm'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
                   }`}
                   title="Grade de Miniaturas (Alt+1)"
@@ -2664,7 +2657,7 @@ export function UserVaultWorkspace({
                   onClick={() => handleSetLayoutMode('list')}
                   className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     layoutMode === 'list'
-                      ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm'
+                      ? 'bg-[var(--accent-primary)] text-white font-bold shadow-sm'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
                   }`}
                   title="Lista Detalhada (Alt+2)"
@@ -2677,7 +2670,7 @@ export function UserVaultWorkspace({
                   onClick={() => handleSetLayoutMode('ide')}
                   className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     layoutMode === 'ide'
-                      ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm ring-1 ring-[#FFCC00]/50'
+                      ? 'bg-[var(--accent-primary)] text-white font-bold shadow-sm ring-1 ring-[#FFCC00]/50'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
                   }`}
                   title="Visualização IDE com Árvore Lateral e Abas (Alt+3)"
@@ -2690,7 +2683,7 @@ export function UserVaultWorkspace({
                   onClick={() => handleSetLayoutMode('timeline')}
                   className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     layoutMode === 'timeline'
-                      ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm'
+                      ? 'bg-[var(--accent-primary)] text-white font-bold shadow-sm'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
                   }`}
                   title="Fotos e Mídia em Linha do Tempo (Alt+4)"
@@ -2706,7 +2699,7 @@ export function UserVaultWorkspace({
                   onClick={handleTogglePreview}
                   className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     isPreviewOpen
-                      ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm'
+                      ? 'bg-[var(--accent-primary)] text-white font-bold shadow-sm'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
                   }`}
                   title={isPreviewOpen ? 'Ocultar Painel Lateral (Alt+P / Alt+B)' : 'Abrir Painel Lateral (Alt+P / Alt+B)'}

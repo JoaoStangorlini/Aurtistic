@@ -70,7 +70,11 @@ export function OrganizationMaterialSelector({
   }, [isOpen]);
 
   const isPersonalActive = allowPersonal && (selectedOrgId === null || selectedOrgId === 'personal');
-  const activeOrg = organizations.find((o) => o.id === selectedOrgId) || (allowPersonal && isPersonalActive ? null : organizations[0]);
+  const availableOrgs = organizations.filter((o) => {
+    const s = (o.slug || o.name || '').toLowerCase();
+    return !s.includes('profis');
+  });
+  const activeOrg = availableOrgs.find((o) => o.id === selectedOrgId) || (allowPersonal && isPersonalActive ? null : availableOrgs[0]);
 
   const getOrgSlug = (org?: OrgOption | null) => {
     if (!org) return 'labdiv';
@@ -82,26 +86,21 @@ export function OrganizationMaterialSelector({
 
   const renderMonogram = (org: OrgOption) => {
     const slug = getOrgSlug(org);
-    if (slug === 'labdiv') {
+    if (slug === 'labdiv' || org.slug === 'labdiv') {
       return (
-        <div className="w-full h-full flex items-center justify-center font-black text-[11px] text-white bg-gradient-to-br from-[#0F4780] to-[#049FFF]">
-          <span className="text-white">L</span>
-          <span className="text-[#FFCC00]">D</span>
-        </div>
+        <img src="/labdiv-logo.png" alt="LabDiv" className="w-full h-full object-contain p-0.5 bg-surface" />
       );
     }
-    if (slug === 'show-da-fisica') {
+    if (slug === 'hs' || org.slug === 'hs') {
+      return (
+        <img src="/hs-logo.png" alt="Hackerspace" className="w-full h-full object-cover" />
+      );
+    }
+    if (slug === 'show-da-fisica' || org.slug === 'show-da-fisica') {
       return (
         <div className="w-full h-full flex items-center justify-center font-black text-[10px] text-white bg-black border border-[#0066ff]">
           <span className="text-[#ff1e1e]">S</span>
           <span className="text-[#00ff44]">F</span>
-        </div>
-      );
-    }
-    if (slug === 'hs') {
-      return (
-        <div className="w-full h-full flex items-center justify-center font-mono font-black text-[11px] text-[#00ff66] bg-black border border-[#00ff66]/40">
-          &gt;_
         </div>
       );
     }
@@ -216,16 +215,16 @@ export function OrganizationMaterialSelector({
       {isOpen && (
         <div
           role="listbox"
-          className="absolute z-50 left-0 mt-2 w-72 sm:w-80 rounded-2xl border bg-[#111622] p-2 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150"
+          className="absolute z-50 left-0 mt-2 w-72 sm:w-80 rounded-2xl border bg-surface/95 border-border-subtle p-2 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 text-fg"
           style={{
-            borderColor: `color-mix(in srgb, ${activePreset.primaryColor} 35%, rgba(255,255,255,0.15))`,
-            boxShadow: `0 16px 40px -10px color-mix(in srgb, ${activePreset.primaryColor} 25%, rgba(0,0,0,0.85))`,
+            borderColor: `color-mix(in srgb, ${activePreset.primaryColor} 35%, var(--border-subtle, rgba(255,255,255,0.15)))`,
+            boxShadow: `0 16px 40px -10px color-mix(in srgb, ${activePreset.primaryColor} 20%, rgba(0,0,0,0.5))`,
           }}
         >
           <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-fg-muted flex items-center justify-between">
             <span>Ambientes Disponíveis</span>
-            <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 font-mono">
-              {organizations.length + (allowPersonal ? 1 : 0)}
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-surface-hover font-mono">
+              {availableOrgs.length + (allowPersonal ? 1 : 0)}
             </span>
           </div>
 
@@ -240,8 +239,8 @@ export function OrganizationMaterialSelector({
                 }}
                 className={`w-full flex items-center justify-between gap-2.5 p-2 rounded-xl text-left transition-all cursor-pointer ${
                   isPersonalActive
-                    ? 'bg-[#FFCC00]/15 text-white font-bold border border-[#FFCC00]/30'
-                    : 'text-fg-secondary hover:bg-white/5 hover:text-white border border-transparent'
+                    ? 'bg-[#FFCC00]/15 text-fg font-bold border border-[#FFCC00]/40'
+                    : 'text-fg-secondary hover:bg-surface-hover hover:text-fg border border-transparent'
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -267,8 +266,8 @@ export function OrganizationMaterialSelector({
               </button>
             )}
 
-            {/* Lista de Organizações */}
-            {organizations.map((org) => {
+            {/* Lista de Organizações (sem PROFIS) */}
+            {availableOrgs.map((org) => {
               const isSelected = selectedOrgId === org.id;
               const slug = getOrgSlug(org);
               const preset = ORG_BRAND_PRESETS[slug] || ORG_BRAND_PRESETS.labdiv;
@@ -283,8 +282,8 @@ export function OrganizationMaterialSelector({
                   }}
                   className={`w-full flex items-center justify-between gap-2.5 p-2 rounded-xl text-left transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-white/10 text-white font-bold border'
-                      : 'text-fg-secondary hover:bg-white/5 hover:text-white border border-transparent'
+                      ? 'bg-surface-hover text-fg font-bold border'
+                      : 'text-fg-secondary hover:bg-surface-hover hover:text-fg border border-transparent'
                   }`}
                   style={{
                     borderColor: isSelected
@@ -327,7 +326,7 @@ export function OrganizationMaterialSelector({
 
           {/* Rodapé M3 com Ações Rápidas Integradas */}
           {(onCreateOrg || onJoinWithCode) && (
-            <div className="mt-2 pt-2 border-t border-white/10 flex items-center gap-1.5">
+            <div className="mt-2 pt-2 border-t border-border-subtle flex items-center gap-1.5">
               {onCreateOrg && (
                 <button
                   type="button"
@@ -335,7 +334,7 @@ export function OrganizationMaterialSelector({
                     setIsOpen(false);
                     onCreateOrg();
                   }}
-                  className="flex-1 py-1.5 px-2 rounded-lg bg-white/5 hover:bg-white/10 text-fg-secondary hover:text-white text-[11px] font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                  className="flex-1 py-1.5 px-2 rounded-lg bg-surface-hover hover:bg-surface text-fg-secondary hover:text-fg text-[11px] font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer border border-border-subtle"
                 >
                   <span className="material-symbols-outlined text-[14px]">add_business</span>
                   <span>Nova Org</span>
@@ -348,7 +347,7 @@ export function OrganizationMaterialSelector({
                     setIsOpen(false);
                     onJoinWithCode();
                   }}
-                  className="flex-1 py-1.5 px-2 rounded-lg bg-white/5 hover:bg-white/10 text-fg-secondary hover:text-white text-[11px] font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                  className="flex-1 py-1.5 px-2 rounded-lg bg-surface-hover hover:bg-surface text-fg-secondary hover:text-fg text-[11px] font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer border border-border-subtle"
                 >
                   <span className="material-symbols-outlined text-[14px]">key</span>
                   <span>Entrar com Código</span>

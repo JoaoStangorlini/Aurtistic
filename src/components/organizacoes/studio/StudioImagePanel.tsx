@@ -5,8 +5,7 @@ import React, { useRef, useState } from 'react';
 import { useStudio } from './StudioContext';
 import { useOrganizationBrand } from '../OrganizationBrandProvider';
 import type { StudioImageLayer } from './types';
-import { getStudioGalleryMediaAction, type StudioGalleryMediaItem } from '@/app/(dashboard)/organizacoes/studio-actions';
-import { StudioVaultMediaModal } from './StudioVaultMediaModal';
+import { StudioVaultBrowserModal, type VaultBrowserSelectedItem } from './StudioVaultBrowserModal';
 
 export function StudioImagePanel() {
   const { activeSlide, selectedLayerId, setSelectedLayerId, addLayer, updateLayer, removeLayer, setMaskModalLayerId } = useStudio();
@@ -14,8 +13,6 @@ export function StudioImagePanel() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [galleryOpen, setGalleryOpen] = useState(false);
-  const [galleryItems, setGalleryItems] = useState<StudioGalleryMediaItem[]>([]);
-  const [galleryLoading, setGalleryLoading] = useState(false);
 
   const imageLayers = activeSlide.layers.filter((l) => l.type === 'image') as StudioImageLayer[];
   const selectedImageLayer = imageLayers.find((l) => l.id === selectedLayerId) || imageLayers[0] || null;
@@ -50,17 +47,8 @@ export function StudioImagePanel() {
     addLayer(newLayer);
   };
 
-  const handleOpenVault = async () => {
+  const handleOpenVault = () => {
     setGalleryOpen(true);
-    setGalleryLoading(true);
-    try {
-      const res = await getStudioGalleryMediaAction({ orgSlug: tokens.themeId });
-      if (res.ok && res.items) setGalleryItems(res.items);
-    } catch {
-      // Falha silenciosa
-    } finally {
-      setGalleryLoading(false);
-    }
   };
 
   return (
@@ -79,10 +67,10 @@ export function StudioImagePanel() {
         <button
           type="button"
           onClick={handleOpenVault}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-white/20 bg-white/5 text-white font-bold text-xs hover:bg-white/10 transition-all cursor-pointer shadow-sm"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-border-subtle bg-app text-fg font-bold text-xs hover:bg-surface-hover transition-all cursor-pointer shadow-sm"
         >
           <span className="material-symbols-outlined text-[16px]">folder_shared</span>
-          <span>Cofre da Org</span>
+          <span>Cofre Pessoal / Org</span>
         </button>
       </div>
 
@@ -151,7 +139,7 @@ export function StudioImagePanel() {
             <input
               type="range" min={1} max={3} step={0.1} value={selectedImageLayer.zoom}
               onChange={(e) => updateLayer(selectedImageLayer.id, { zoom: Number(e.target.value) })}
-              className="w-full cursor-pointer"
+              className="w-full studio-range-slider"
             />
           </div>
 
@@ -163,7 +151,7 @@ export function StudioImagePanel() {
             <input
               type="range" min={0} max={360} step={5} value={selectedImageLayer.rotation}
               onChange={(e) => updateLayer(selectedImageLayer.id, { rotation: Number(e.target.value) })}
-              className="w-full cursor-pointer"
+              className="w-full studio-range-slider"
             />
           </div>
 
@@ -175,7 +163,7 @@ export function StudioImagePanel() {
             <input
               type="range" min={0} max={1} step={0.05} value={selectedImageLayer.opacity}
               onChange={(e) => updateLayer(selectedImageLayer.id, { opacity: Number(e.target.value) })}
-              className="w-full cursor-pointer"
+              className="w-full studio-range-slider"
             />
           </div>
           <div>
@@ -208,7 +196,7 @@ export function StudioImagePanel() {
               <input
                 type="range" min={-0.5} max={0.5} step={0.01} value={selectedImageLayer.offsetX || 0}
                 onChange={(e) => updateLayer(selectedImageLayer.id, { offsetX: Number(e.target.value) })}
-                className="w-full cursor-pointer"
+                className="w-full studio-range-slider"
               />
             </div>
             <div>
@@ -219,21 +207,22 @@ export function StudioImagePanel() {
               <input
                 type="range" min={-0.5} max={0.5} step={0.01} value={selectedImageLayer.offsetY || 0}
                 onChange={(e) => updateLayer(selectedImageLayer.id, { offsetY: Number(e.target.value) })}
-                className="w-full cursor-pointer"
+                className="w-full studio-range-slider"
               />
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal do Cofre da Organização */}
-      <StudioVaultMediaModal
+      {/* Modal do Cofre — Browser de Pastas */}
+      <StudioVaultBrowserModal
         isOpen={galleryOpen}
-        isLoading={galleryLoading}
-        items={galleryItems}
         onClose={() => setGalleryOpen(false)}
-        onSelect={(item) => {
-          createAndAddImageLayer(item.streamUrl || item.thumbUrl, item.label || item.fileName, item.relativePath);
+        orgSlug={tokens.themeId}
+        orgDisplayName={tokens.themeId?.toUpperCase() || 'Org'}
+        onUploadClick={() => fileInputRef.current?.click()}
+        onSelect={(item: VaultBrowserSelectedItem) => {
+          createAndAddImageLayer(item.streamUrl, item.name, item.relativePath);
           setGalleryOpen(false);
         }}
       />

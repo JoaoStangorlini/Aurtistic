@@ -3,7 +3,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { signEdgeTenantTicket } from '@/lib/edge-ticket';
-import { buildTenantStreamUrl, buildTenantThumbUrl } from '@/lib/edge-urls';
+import { buildTenantStreamUrl, buildTenantThumbUrl, resolveClientEdgeServerUrl } from '@/lib/edge-urls';
 
 export interface StudioGalleryMediaItem {
   id: string;
@@ -205,29 +205,6 @@ const HS_ACERVO: StudioGalleryMediaItem[] = [
   },
 ];
 
-const PROFIS_ACERVO: StudioGalleryMediaItem[] = [
-  {
-    id: 'profis-acervo-1',
-    fileName: 'IMG_00312.JPG',
-    label: 'Monitoria, Apoio Acadêmico & Nivelamento',
-    category: 'Ensino',
-    relativePath: '/show/IMG_00312.JPG',
-    thumbUrl: '/show/IMG_00312.JPG',
-    streamUrl: '/show/IMG_00312.JPG',
-    source: 'org_acervo',
-  },
-  {
-    id: 'profis-acervo-2',
-    fileName: 'IMG_8891.JPG',
-    label: 'Seminários, Pesquisa & Iniciação Científica',
-    category: 'Pesquisa',
-    relativePath: '/show/IMG_8891.JPG',
-    thumbUrl: '/show/IMG_8891.JPG',
-    streamUrl: '/show/IMG_8891.JPG',
-    source: 'org_acervo',
-  },
-];
-
 export async function getStudioGalleryMediaAction(input?: {
   organizationId?: string | null;
   orgSlug?: string | null;
@@ -255,8 +232,6 @@ export async function getStudioGalleryMediaAction(input?: {
       orgAcervo.push(...LABDIV_ACERVO);
     } else if (rawSlug === 'hs' || rawSlug === 'hackerspace' || orgId === '1ab41410-0000-4000-8000-000000000003') {
       orgAcervo.push(...HS_ACERVO);
-    } else if (rawSlug === 'profis' || rawSlug === 'pro-fis' || orgId === '1ab41410-0000-4000-8000-000000000004') {
-      orgAcervo.push(...PROFIS_ACERVO);
     }
 
     // 2. Fotos indexadas no Servidor (Cofre da Organização e Cofre Pessoal)
@@ -415,6 +390,225 @@ export async function getStudioGalleryMediaAction(input?: {
     };
   }
 }
+
+// ─── Tipos para o browser de pastas do Studio ───────────────────────────────
+
+export interface VaultFolderEntry {
+  name: string;
+  path: string;
+  isLocked?: boolean;
+  color?: string | null;
+  icon?: string | null;
+}
+
+export interface VaultFileEntry {
+  name: string;
+  path: string;
+  kind: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  thumbUrl: string | null;
+  streamUrl: string;
+}
+
+export interface ListVaultFolderResult {
+  ok: boolean;
+  folders: VaultFolderEntry[];
+  files: VaultFileEntry[];
+  breadcrumbs: { name: string; path: string }[];
+  error?: string;
+}
+
+export async function listVaultFolderAction(input: {
+  folder: string;
+  scopeType: 'org' | 'user';
+  orgSlug?: string;
+  organizationId?: string;
+}): Promise<ListVaultFolderResult> {
+  'use server';
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { ok: false, folders: [], files: [], breadcrumbs: [], error: 'Não autenticado.' };
+  }
+
+  try {
+    const edgeBase = resolveClientEdgeServerUrl();
+
+    const signed = signEdgeTenantTicket({
+      userId: user.id,
+      scopeType: input.scopeType,
+      orgSlug: input.scopeType === 'org' ? input.orgSlug : undefined,
+      organizationId: input.scopeType === 'org' ? input.organizationId : undefined,
+      role: 'member',
+      purpose: 'share',
+      readOnly: true,
+      allowDownload: false,
+      ttlMs: 10 * 60 * 1000,
+    });
+
+    const params = new URLSearchParams({ folder: input.folder || '', ticket: signed.ticket });
+    const res = await fetch(`${edgeBase}/api/tenant/list?${params.toString()}`, {
+      cache: 'no-store',
+    });
+
+    if (!res.ok) {
+      return {
+        ok: false,
+        folders: [],
+        files: [],
+        breadcrumbs: [],
+        error: `Servidor retornou ${res.status}`,
+      };
+    }
+
+    const json = (await res.json()) as {
+      folders?: (VaultFolderEntry & { relativePath?: string })[];
+      files?: { name: string; path?: string; relativePath?: string; kind?: string; mimeType?: string; sizeBytes?: number; thumbUrl?: string | null; streamUrl?: string }[];
+      breadcrumbs?: { name: string; path: string }[];
+      currentFolder?: string;
+      error?: string;
+    };
+
+    const folders: VaultFolderEntry[] = (json.folders || []).map((f) => ({
+      ...f,
+      path: f.path || f.relativePath || f.name,
+    }));
+
+    // Remonta URLs assinadas para thumb/stream
+    const files: VaultFileEntry[] = (json.files || []).map((f) => {
+      const filePath = f.path || f.relativePath || f.name;
+      const isImg = f.kind === 'image' || /\.(jpe?g|png|webp|avif|gif|bmp|tiff?)$/i.test(f.name);
+      const thumbSigned = signEdgeTenantTicket({
+        userId: user.id,
+        scopeType: input.scopeType,
+        orgSlug: input.scopeType === 'org' ? input.orgSlug : undefined,
+        organizationId: input.scopeType === 'org' ? input.organizationId : undefined,
+        role: 'member',
+        purpose: 'share',
+        allowedPaths: [filePath],
+        readOnly: true,
+        allowDownload: false,
+        ttlMs: 2 * 60 * 60 * 1000,
+      });
+      return {
+        name: f.name,
+        path: filePath,
+        kind: isImg ? 'image' : (f.kind || 'file'),
+        mimeType: f.mimeType,
+        sizeBytes: f.sizeBytes,
+        thumbUrl: isImg ? buildTenantThumbUrl(filePath, thumbSigned.ticket) : null,
+        streamUrl: buildTenantStreamUrl(filePath, thumbSigned.ticket, { download: false }),
+      };
+    });
+
+    // Fallback: Se o daemon de arquivos retornar 0 imagens no escopo da organização,
+    // busca do acervo oficial indexado no Supabase para garantir que nunca exiba "Imagens (0)"
+    if (files.length === 0 && input.scopeType === 'org') {
+      const orgId = input.organizationId;
+      const slug = (input.orgSlug || '').toLowerCase().replace(/_/g, '-');
+
+      try {
+        let sbQuery = supabase
+          .from('user_files_index')
+          .select('id, filename, relative_path, mime_type')
+          .eq('is_directory', false)
+          .limit(60);
+
+        if (orgId) {
+          sbQuery = sbQuery.eq('organization_id', orgId);
+        } else {
+          sbQuery = sbQuery.not('organization_id', 'is', null);
+        }
+        const { data: dbFiles } = await sbQuery;
+
+        if (dbFiles && dbFiles.length > 0) {
+          for (const dbf of dbFiles) {
+            const filePath = dbf.relative_path || dbf.filename;
+            const isImg = !dbf.mime_type || dbf.mime_type.startsWith('image/') || /\.(jpe?g|png|webp|avif|gif)$/i.test(dbf.filename);
+            if (isImg) {
+              const signed = signEdgeTenantTicket({
+                userId: user.id,
+                scopeType: 'org',
+                orgSlug: input.orgSlug,
+                organizationId: input.organizationId,
+                role: 'member',
+                purpose: 'share',
+                allowedPaths: [filePath],
+                readOnly: true,
+                allowDownload: false,
+                ttlMs: 2 * 60 * 60 * 1000,
+              });
+              files.push({
+                name: dbf.filename,
+                path: filePath,
+                kind: 'image',
+                mimeType: dbf.mime_type || 'image/jpeg',
+                thumbUrl: buildTenantThumbUrl(filePath, signed.ticket),
+                streamUrl: buildTenantStreamUrl(filePath, signed.ticket, { download: false }),
+              });
+            }
+          }
+        }
+      } catch {
+        // Fallback silencioso
+      }
+
+      // Se ainda estiver vazio no disco, injeta os itens do acervo oficial canônico da organização
+      if (files.length === 0) {
+        const canonical = slug.includes('show')
+          ? SHOW_DA_FISICA_ACERVO
+          : slug.includes('hs')
+            ? HS_ACERVO
+            : LABDIV_ACERVO;
+        for (const item of canonical) {
+          files.push({
+            name: item.fileName,
+            path: item.relativePath,
+            kind: 'image',
+            thumbUrl: item.thumbUrl,
+            streamUrl: item.streamUrl,
+          });
+        }
+      }
+    }
+
+    // Breadcrumbs padrão se não vier do server
+    const folder = input.folder || '';
+    const rootLabel = input.scopeType === 'org' ? 'Cofre da Organização' : 'Cofre Pessoal';
+    const rawBreadcrumbs = json.breadcrumbs && json.breadcrumbs.length > 0
+      ? json.breadcrumbs.map((b, idx) => (idx === 0 ? { ...b, name: rootLabel } : b))
+      : [
+          { name: rootLabel, path: '' },
+          ...(folder
+            ? folder.split('/').map((seg, i, arr) => ({
+                name: seg,
+                path: arr.slice(0, i + 1).join('/'),
+              }))
+            : []),
+        ];
+
+    return {
+      ok: true,
+      folders,
+      files,
+      breadcrumbs: rawBreadcrumbs,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      folders: [],
+      files: [],
+      breadcrumbs: [],
+      error: err instanceof Error ? err.message : 'Erro ao listar pasta.',
+    };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function rehydrateStudioDraftAction(
   draft: import('@/components/organizacoes/studio/types').StudioDraft,

@@ -300,33 +300,50 @@
     --on-accent-secondary: #121212;
   }
 
-  /* 9. Pró-Física (ProFis - Membros) */
-  html[data-theme-palette="profis"] {
-    --accent-primary: #F59E0B;
-    --accent-primary-hover: #D97706;
-    --accent-primary-text: #F59E0B;
-    --on-accent-primary: #121212;
-
-    --accent-secondary: #38BDF8;
-    --accent-secondary-hover: #0284C7;
-    --accent-secondary-text: #38BDF8;
-    --on-accent-secondary: #082F49;
-  }
-  html[data-theme-palette="profis"][data-theme-mode="light"] {
-    --accent-primary: #D97706;
-    --accent-primary-hover: #B45309;
-    --accent-primary-text: #B45309;
-    --on-accent-primary: #FFFFFF;
-
-    --accent-secondary: #0284C7;
-    --accent-secondary-hover: #0369A1;
-    --accent-secondary-text: #0369A1;
-    --on-accent-secondary: #FFFFFF;
-  }
-
   html {
     forced-color-adjust: none;
     transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Aplicação Global dos Temas de Organização no Body (Aurtistic Global) */
+  html[data-theme-palette="show-da-fisica"] body {
+    background-color: var(--bg-app);
+    background-image: url('/bg-show.svg');
+    background-repeat: repeat;
+    background-size: 360px 360px;
+    background-attachment: fixed;
+  }
+  html[data-theme-palette="show-da-fisica"][data-theme-mode="light"] body {
+    background-color: #f0f4fc;
+    background-image: radial-gradient(circle at 10% 20%, rgba(0, 102, 255, 0.05) 0%, transparent 40%),
+                      radial-gradient(circle at 90% 80%, rgba(255, 30, 86, 0.05) 0%, transparent 40%),
+                      url('/bg-show.svg');
+    background-repeat: repeat;
+    background-size: 360px 360px;
+    background-attachment: fixed;
+  }
+
+  html[data-theme-palette="labdiv"] body {
+    background-color: var(--bg-app);
+    background-attachment: fixed;
+  }
+  html[data-theme-palette="labdiv"][data-theme-mode="light"] body {
+    background-color: #f8fafc;
+    background-image: radial-gradient(at 0% 0%, rgba(0, 212, 255, 0.12) 0px, transparent 50%),
+                      radial-gradient(at 100% 0%, rgba(255, 204, 0, 0.12) 0px, transparent 50%),
+                      radial-gradient(at 50% 100%, rgba(79, 70, 229, 0.08) 0px, transparent 50%);
+    background-attachment: fixed;
+  }
+
+  html[data-theme-palette="hs"] body {
+    background-color: var(--bg-app);
+    background-attachment: fixed;
+  }
+  html[data-theme-palette="hs"][data-theme-mode="light"] body {
+    background-color: #f0fdf4;
+    background-image: radial-gradient(at 0% 0%, rgba(5, 150, 105, 0.08) 0px, transparent 50%),
+                      radial-gradient(at 100% 100%, rgba(217, 119, 6, 0.08) 0px, transparent 50%);
+    background-attachment: fixed;
   }
 
   /* Previne Flash na Tipografia da Logo antes da hidratação */
@@ -557,36 +574,51 @@ html:not([data-theme-palette="purple-gold"]) .from-\[\#FFCC00\].to-\[\#9D4EDD\] 
 .studio-range-slider {
   -webkit-appearance: none;
   appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--text-muted, #94a3b8) 28%, transparent);
+  outline: none;
+  cursor: pointer;
+}
+.studio-range-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 9999px;
 }
 .studio-range-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
+  margin-top: -4.5px;
   border-radius: 9999px;
-  background: #ffffff;
-  border: 2px solid var(--org-primary, #049fff);
-  box-shadow: 0 0 10px rgba(4, 159, 255, 0.7), 0 1px 3px rgba(0, 0, 0, 0.5);
+  background: #FFCC00;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
   cursor: ew-resize;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .studio-range-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.25);
-  box-shadow: 0 0 14px rgba(4, 159, 255, 0.95);
+  transform: scale(1.2);
+  box-shadow: 0 0 10px rgba(255, 204, 0, 0.75);
 }
 .studio-range-slider::-webkit-slider-thumb:active {
-  transform: scale(1.15);
+  transform: scale(1.1);
+}
+.studio-range-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--text-muted, #94a3b8) 28%, transparent);
 }
 .studio-range-slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   border-radius: 9999px;
-  background: #ffffff;
-  border: 2px solid var(--org-primary, #049fff);
-  box-shadow: 0 0 10px rgba(4, 159, 255, 0.7), 0 1px 3px rgba(0, 0, 0, 0.5);
+  background: #FFCC00;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
   cursor: ew-resize;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .studio-range-slider::-moz-range-thumb:hover {
-  transform: scale(1.25);
+  transform: scale(1.2);
 }

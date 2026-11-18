@@ -29,8 +29,8 @@ export default async function LabDivPage({ searchParams }: LabDivPageProps) {
       ? 'hs'
       : rawOrgParam === 'show' || rawOrgParam === 'show_da_fisica' || rawOrgParam === 'showdefisica'
         ? 'show-da-fisica'
-        : rawOrgParam === 'pro-fis' || rawOrgParam === 'pro_fis'
-          ? 'profis'
+        : rawOrgParam.includes('profis')
+          ? 'labdiv'
           : rawOrgParam;
   const supabase = await createClient();
   const {
@@ -106,7 +106,7 @@ export default async function LabDivPage({ searchParams }: LabDivPageProps) {
       name: 'Hackerspace IFUSP',
       slug: 'hs',
       description: 'Laboratório comunitário de cultura maker, eletrônica e hardware livre',
-      avatar_url: null,
+      avatar_url: '/hs-logo.png',
       primary_color: '#00ff66',
       secondary_color: '#ffcc00',
       storage_quota_bytes: 53687091200,
@@ -122,31 +122,6 @@ export default async function LabDivPage({ searchParams }: LabDivPageProps) {
         fontBody: 'Open Sans',
         uppercaseTitles: true,
         glowIntensity: 0.75,
-      },
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    profis: {
-      id: '1ab41410-0000-4000-8000-000000000004',
-      name: 'Pró-Física (ProFis)',
-      slug: 'profis',
-      description: 'Incentivo à formação acadêmica, nivelamento e pesquisa científica no IFUSP',
-      avatar_url: null,
-      primary_color: '#F59E0B',
-      secondary_color: '#FFCC00',
-      storage_quota_bytes: 53687091200,
-      storage_used_bytes: 0,
-      storage_policy: 'admin_or_permitted',
-      brand_config: {
-        themeId: 'profis',
-        bgApp: '#080c16',
-        bgSurface: '#0f172a',
-        textPrimary: '#f8fafc',
-        accents: ['#F59E0B', '#FFCC00', '#F97316', '#38BDF8'],
-        fontDisplay: 'Space Grotesk',
-        fontBody: 'Inter',
-        uppercaseTitles: false,
-        glowIntensity: 0.9,
       },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -404,15 +379,12 @@ export default async function LabDivPage({ searchParams }: LabDivPageProps) {
 
   const isShow = organization.slug === 'show-da-fisica';
   const isHs = organization.slug === 'hs';
-  const isProfis = organization.slug === 'profis';
-  const isLabDiv = !isShow && !isHs && !isProfis;
+  const isLabDiv = !isShow && !isHs;
   const dimFilter = isShow
     ? 'Show de Física'
     : isHs
       ? 'Hackerspace'
-      : isProfis
-        ? 'Pró-Física'
-        : 'LabDiv';
+      : 'LabDiv';
 
   const orFilter = isLabDiv
     ? `organization_id.eq.${organization.id},dimensao.eq.LabDiv,dimensao.eq.HUB`

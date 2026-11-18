@@ -5,6 +5,13 @@ import type {
 } from '@/components/organizacoes/studio/types';
 import type { OrgBrandTokens } from '@/lib/org-brand-tokens';
 import { renderTokenizedRichTextCanvas } from '@/lib/canvas-tokenized-text';
+import {
+  buildCompositeLut,
+  applyCompositeLutToContext,
+  getReusableCanvas,
+  getCachedLayerCanvas,
+  setCachedLayerCanvas,
+} from './lut-processor';
 
 const resolvedImageCache = new Map<string, HTMLImageElement>();
 const inFlightPromises = new Map<string, Promise<HTMLImageElement>>();
@@ -31,14 +38,32 @@ export function preloadImage(src: string): Promise<HTMLImageElement> {
 export function buildCssFilter(filters?: StudioLayerFilterConfig): string {
   if (!filters) return 'none';
   const p: string[] = [];
-  const b = (filters.brightness ?? 100) * ((filters.exposure ?? 100) / 100);
+  const expFactor = 1 + (filters.exposure ?? 0) / 150 + (filters.luminance ?? 0) / 200;
+  const b = (filters.brightness ?? 100) * Math.max(0.2, expFactor);
   if (Math.round(b) !== 100) p.push(`brightness(${Math.round(b)}%)`);
   if (filters.contrast !== 100) p.push(`contrast(${filters.contrast}%)`);
-  const s = (filters.saturation ?? 100) * ((filters.vibrance ?? 100) / 100);
+  const satMult = 1 + (filters.vibrance ?? 0) / 150;
+  const s = filters.bwDesaturate ? 0 : (filters.saturation ?? 100) * Math.max(0, satMult);
   if (Math.round(s) !== 100) p.push(`saturate(${Math.round(s)}%)`);
   if (filters.blur > 0) p.push(`blur(${filters.blur}px)`);
   if (filters.grayscale > 0) p.push(`grayscale(${filters.grayscale}%)`);
   if (filters.sepia > 0) p.push(`sepia(${filters.sepia}%)`);
+  if (filters.hueTint && filters.hueTintIntensity && filters.hueTintIntensity > 0) {
+    p.push(`hue-rotate(${Math.round((filters.hueTint * filters.hueTintIntensity) / 100)}deg)`);
+  }
+
+  // Submenu 13: Presets de Filtros Artísticos
+  const preset = filters.artisticFilter;
+  if (preset && preset !== 'original') {
+    if (preset === 'labdiv-clean') p.push('contrast(108%) saturate(112%)');
+    else if (preset === 'quantum-cyan') p.push('contrast(115%) saturate(125%) hue-rotate(175deg)');
+    else if (preset === 'tri-x-mono') p.push('grayscale(100%) contrast(135%)');
+    else if (preset === 'sepia-vintage') p.push('sepia(75%) contrast(105%) brightness(96%)');
+    else if (preset === 'matrix-hs') p.push('contrast(125%) saturate(140%) hue-rotate(85deg)');
+    else if (preset === 'nature-editorial') p.push('saturate(118%) contrast(106%) brightness(103%)');
+    else if (preset === 'dark-moody') p.push('brightness(85%) contrast(125%) saturate(80%)');
+  }
+
   return p.length > 0 ? p.join(' ') : 'none';
 }
 
@@ -52,6 +77,11 @@ function applyPostEffects(ctx: CanvasRenderingContext2D, f: StudioLayerFilterCon
     ctx.fillStyle = f.temperature > 0 ? `rgba(255,140,0,${f.temperature / 200})` : `rgba(0,100,255,${-f.temperature / 200})`;
     ctx.fillRect(x, y, w, h); ctx.restore();
   }
+  if (f.tint && f.tint !== 0) {
+    ctx.save(); ctx.globalCompositeOperation = 'overlay';
+    ctx.fillStyle = f.tint > 0 ? `rgba(236,72,153,${f.tint / 220})` : `rgba(34,197,94,${-f.tint / 220})`;
+    ctx.fillRect(x, y, w, h); ctx.restore();
+  }
   if (f.vignette && f.vignette > 0) {
     ctx.save();
     const grad = ctx.createRadialGradient(x + w / 2, y + h / 2, Math.max(w, h) * 0.1, x + w / 2, y + h / 2, Math.max(w, h) * 0.75);
@@ -60,80 +90,271 @@ function applyPostEffects(ctx: CanvasRenderingContext2D, f: StudioLayerFilterCon
   }
 }
 
-function renderImageWithMask(ctx: CanvasRenderingContext2D, layer: StudioImageLayer, img: HTMLImageElement, maskImg: HTMLImageElement | null, canvasW: number, canvasH: number) {
+function renderImageWithMask(
+  ctx: CanvasRenderingContext2D,
+  layer: StudioImageLayer,
+  img: HTMLImageElement,
+  maskImg: HTMLImageElement | null,
+  canvasW: number,
+  canvasH: number,
+  interactive = false
+) {
   const x = layer.x * canvasW, y = layer.y * canvasH, w = layer.width * canvasW, h = layer.height * canvasH;
   const zoom = Math.max(1, layer.zoom || 1), zW = w * zoom, zH = h * zoom;
-  const selectiveEdit = layer.filters?.targetMaskAreaOnly && layer.filters?.isCutoutMask === false && maskImg;
+  const sx = (layer.cropX || 0) * img.naturalWidth;
+  const sy = (layer.cropY || 0) * img.naturalHeight;
+  const sw = Math.max(1, (layer.cropWidth || 1) * img.naturalWidth);
+  const sh = Math.max(1, (layer.cropHeight || 1) * img.naturalHeight);
+  const f = layer.filters;
+  const selectiveEdit = f?.targetMaskAreaOnly && f?.isCutoutMask === false && maskImg;
 
+  // Escala reduzida (0.35x) no pointermove contínuo para manter 60 FPS
+  const scale = interactive ? 0.35 : 1;
+  const bufW = Math.max(1, Math.round(canvasW * scale));
+  const bufH = Math.max(1, Math.round(canvasH * scale));
+
+  const applyGeom = (targetCtx: CanvasRenderingContext2D, s = 1) => {
+    targetCtx.translate((x + w / 2) * s, (y + h / 2) * s);
+    if (layer.rotation) targetCtx.rotate((layer.rotation * Math.PI) / 180);
+    if (layer.flipH || layer.flipV) targetCtx.scale(layer.flipH ? -1 : 1, layer.flipV ? -1 : 1);
+    if (layer.skewX || layer.skewY) {
+      targetCtx.transform(
+        1,
+        Math.tan(((layer.skewY || 0) * Math.PI) / 180),
+        Math.tan(((layer.skewX || 0) * Math.PI) / 180),
+        1,
+        0,
+        0
+      );
+    }
+  };
+
+  // Passo 1: Se edição seletiva via máscara, desenha base nítida antes
   if (selectiveEdit) {
-    ctx.save(); ctx.translate(x + w / 2, y + h / 2);
-    if (layer.rotation) ctx.rotate((layer.rotation * Math.PI) / 180);
-    ctx.globalAlpha = layer.opacity; ctx.drawImage(img, -zW / 2, -zH / 2, zW, zH); ctx.restore();
-
-    const off = document.createElement('canvas'); off.width = canvasW; off.height = canvasH;
-    const offCtx = off.getContext('2d');
-    if (offCtx) {
-      offCtx.save(); offCtx.translate(x + w / 2, y + h / 2);
-      if (layer.rotation) offCtx.rotate((layer.rotation * Math.PI) / 180);
-      offCtx.filter = buildCssFilter(layer.filters); offCtx.globalAlpha = layer.opacity;
-      offCtx.drawImage(img, -zW / 2, -zH / 2, zW, zH); offCtx.restore();
-      offCtx.save(); offCtx.globalCompositeOperation = 'destination-in'; offCtx.drawImage(maskImg, x, y, w, h); offCtx.restore();
-      ctx.drawImage(off, 0, 0);
-    }
-  } else {
-    const off = document.createElement('canvas'); off.width = canvasW; off.height = canvasH;
-    const offCtx = off.getContext('2d');
-    if (offCtx) {
-      offCtx.save(); offCtx.translate(x + w / 2, y + h / 2);
-      if (layer.rotation) offCtx.rotate((layer.rotation * Math.PI) / 180);
-      offCtx.filter = buildCssFilter(layer.filters); offCtx.globalAlpha = layer.opacity;
-      offCtx.drawImage(img, -zW / 2, -zH / 2, zW, zH); offCtx.restore();
-      if (maskImg) { offCtx.save(); offCtx.globalCompositeOperation = 'destination-in'; offCtx.drawImage(maskImg, x, y, w, h); offCtx.restore(); }
-      ctx.drawImage(off, 0, 0);
-    }
+    ctx.save();
+    applyGeom(ctx, 1);
+    ctx.globalAlpha = layer.opacity;
+    ctx.drawImage(img, sx, sy, sw, sh, -zW / 2, -zH / 2, zW, zH);
+    ctx.restore();
   }
-  applyPostEffects(ctx, layer.filters, x, y, w, h);
+
+  // Dirty Flag / Cache por camada: se assinatura não mudou, reaproveita buffer sem recalcular LUT/blur
+  const sig = JSON.stringify([
+    img.src, sx, sy, sw, sh, x, y, w, h, zoom,
+    layer.rotation, layer.flipH, layer.flipV, layer.skewX, layer.skewY,
+    layer.opacity, scale, layer.maskDataUrl || '', f || null,
+  ]);
+  const cachedCanvas = getCachedLayerCanvas(layer.id, sig);
+  const filterAlpha = (f?.filterOpacity ?? 100) / 100;
+
+  if (cachedCanvas) {
+    if (filterAlpha < 1) {
+      ctx.save();
+      applyGeom(ctx, 1);
+      ctx.globalAlpha = layer.opacity * (1 - filterAlpha);
+      ctx.drawImage(img, sx, sy, sw, sh, -zW / 2, -zH / 2, zW, zH);
+      ctx.restore();
+    }
+    ctx.save();
+    if (f?.blendMode && f.blendMode !== 'source-over') {
+      ctx.globalCompositeOperation = f.blendMode;
+    }
+    ctx.globalAlpha = filterAlpha;
+    ctx.drawImage(cachedCanvas, 0, 0, canvasW, canvasH);
+    ctx.restore();
+    return;
+  }
+
+  // Passo 2 (Multi-Pass Isolado com Pool Reaproveitável): Processa imagem + Bokeh + LUT única
+  const { canvas: off, ctx: offCtx } = getReusableCanvas('blur', bufW, bufH);
+  if (offCtx) {
+    const bokehActive = Boolean(f?.bokehEnabled && (f?.bokehRadius ?? 0) > 0);
+    const bokehRadius = (f?.bokehRadius ?? 0) * scale;
+
+    offCtx.save();
+    applyGeom(offCtx, scale);
+    const baseFilterConfig = bokehActive && f
+      ? { ...f, blur: (f.blur || 0) * scale + bokehRadius }
+      : f ? { ...f, blur: (f.blur || 0) * scale } : undefined;
+    offCtx.filter = buildCssFilter(baseFilterConfig);
+    offCtx.globalAlpha = layer.opacity;
+    offCtx.drawImage(img, sx, sy, sw, sh, (-zW * scale) / 2, (-zH * scale) / 2, zW * scale, zH * scale);
+    offCtx.restore();
+
+    if (bokehActive && f) {
+      const { canvas: sharpOff, ctx: sharpCtx } = getReusableCanvas('sharp', bufW, bufH);
+      if (sharpCtx) {
+        sharpCtx.save();
+        applyGeom(sharpCtx, scale);
+        sharpCtx.filter = buildCssFilter(f ? { ...f, blur: (f.blur || 0) * scale } : undefined);
+        sharpCtx.globalAlpha = layer.opacity;
+        sharpCtx.drawImage(img, sx, sy, sw, sh, (-zW * scale) / 2, (-zH * scale) / 2, zW * scale, zH * scale);
+        sharpCtx.restore();
+
+        const focalX = (x + (f.bokehFocalX ?? 0.5) * w) * scale;
+        const focalY = (y + (f.bokehFocalY ?? 0.5) * h) * scale;
+        const featherPx = Math.max(12, (f.bokehFeather ?? 60) * (Math.max(w, h) / 400)) * scale;
+
+        sharpCtx.save();
+        sharpCtx.globalCompositeOperation = 'destination-in';
+        if (f.bokehShape === 'linear') {
+          const halfSpan = Math.max(w, h) * 0.16 * scale + featherPx;
+          const linGrad = sharpCtx.createLinearGradient(focalX, focalY - halfSpan, focalX, focalY + halfSpan);
+          linGrad.addColorStop(0, 'rgba(0,0,0,0)');
+          linGrad.addColorStop(0.35, 'rgba(0,0,0,1)');
+          linGrad.addColorStop(0.65, 'rgba(0,0,0,1)');
+          linGrad.addColorStop(1, 'rgba(0,0,0,0)');
+          sharpCtx.fillStyle = linGrad;
+        } else {
+          const rInner = Math.max(w, h) * 0.14 * scale;
+          const rOuter = rInner + featherPx * 1.8;
+          const radGrad = sharpCtx.createRadialGradient(focalX, focalY, rInner, focalX, focalY, rOuter);
+          radGrad.addColorStop(0, 'rgba(0,0,0,1)');
+          radGrad.addColorStop(1, 'rgba(0,0,0,0)');
+          sharpCtx.fillStyle = radGrad;
+        }
+        sharpCtx.fillRect(0, 0, bufW, bufH);
+        sharpCtx.restore();
+
+        offCtx.drawImage(sharpOff, 0, 0);
+      }
+    }
+
+    // LUT única composta (Uint8Array(256) por canal) aplicada em O(1) por pixel
+    const lut = buildCompositeLut(f);
+    applyCompositeLutToContext(offCtx, bufW, bufH, lut);
+
+    // Efeitos pós-processamento confinados ao buffer offscreen da camada
+    applyPostEffects(offCtx, f, x * scale, y * scale, w * scale, h * scale);
+
+    if (maskImg) {
+      offCtx.save();
+      offCtx.globalCompositeOperation = 'destination-in';
+      offCtx.drawImage(maskImg, x * scale, y * scale, w * scale, h * scale);
+      offCtx.restore();
+    }
+
+    // Armazena resultado no cache por camada (Dirty Flag)
+    setCachedLayerCanvas(layer.id, sig, off);
+
+    if (filterAlpha < 1) {
+      ctx.save();
+      applyGeom(ctx, 1);
+      ctx.globalAlpha = layer.opacity * (1 - filterAlpha);
+      ctx.drawImage(img, sx, sy, sw, sh, -zW / 2, -zH / 2, zW, zH);
+      ctx.restore();
+    }
+
+    ctx.save();
+    if (f?.blendMode && f.blendMode !== 'source-over') {
+      ctx.globalCompositeOperation = f.blendMode;
+    }
+    ctx.globalAlpha = filterAlpha;
+    ctx.drawImage(off, 0, 0, canvasW, canvasH);
+    ctx.restore();
+  }
 }
 
-function renderVectorShape(ctx: CanvasRenderingContext2D, layer: StudioShapeLayer, canvasW: number, canvasH: number) {
+function buildShapePath(ctx: CanvasRenderingContext2D, layer: StudioShapeLayer, x: number, y: number, w: number, h: number) {
+  const t = layer.shapeType;
+  ctx.beginPath();
+  if (t === 'circle') {
+    ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+  } else if (t === 'triangle') {
+    ctx.moveTo(x + w / 2, y); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.closePath();
+  } else if (t === 'hexagon') {
+    for (let i = 0; i < 6; i++) {
+      const a = (i * Math.PI) / 3;
+      const px = x + w / 2 + (w / 2) * Math.cos(a);
+      const py = y + h / 2 + (h / 2) * Math.sin(a);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  } else if (t === 'callout') {
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h * 0.8, 12);
+    else ctx.rect(x, y, w, h * 0.8);
+  } else {
+    ctx.rect(x, y, w, h);
+  }
+}
+
+function renderVectorShape(ctx: CanvasRenderingContext2D, layer: StudioShapeLayer, canvasW: number, canvasH: number, onNeedRepaint?: () => void) {
   const x = layer.x * canvasW, y = layer.y * canvasH, w = layer.width * canvasW, h = layer.height * canvasH;
-  ctx.save(); ctx.globalAlpha = layer.opacity; ctx.fillStyle = layer.fillColor || '#ffffff'; ctx.strokeStyle = layer.strokeColor || '#FFCC00';
-  ctx.lineWidth = layer.strokeWidth || 3;
+  ctx.save();
+  ctx.globalAlpha = layer.opacity;
+  ctx.translate(x + w / 2, y + h / 2);
+  if (layer.rotation) ctx.rotate((layer.rotation * Math.PI) / 180);
+  ctx.translate(-(x + w / 2), -(y + h / 2));
+
+  ctx.fillStyle = layer.fillColor || '#ffffff';
+  ctx.strokeStyle = layer.strokeColor || '#FFCC00';
+  ctx.lineWidth = layer.strokeWidth ?? 0;
   const t = layer.shapeType;
 
-  if (t === 'circle') { ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill(); if (layer.strokeWidth) ctx.stroke(); }
-  else if (t === 'triangle') { ctx.beginPath(); ctx.moveTo(x + w / 2, y); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill(); if (layer.strokeWidth) ctx.stroke(); }
-  else if (t === 'hexagon') {
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) { const a = (i * Math.PI) / 3; const px = x + w / 2 + (w / 2) * Math.cos(a); const py = y + h / 2 + (h / 2) * Math.sin(a); if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
-    ctx.closePath(); ctx.fill(); if (layer.strokeWidth) ctx.stroke();
-  }
-  else if (t === 'callout') {
-    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h * 0.8, 12) : ctx.rect(x, y, w, h * 0.8); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(x + w * 0.2, y + h * 0.8); ctx.lineTo(x + w * 0.35, y + h); ctx.lineTo(x + w * 0.45, y + h * 0.8); ctx.closePath(); ctx.fill();
-    if (layer.strokeWidth) ctx.stroke();
-  }
-  else if (t === 'arrow' || t === 'arrow-double' || t === 'arrow-curved') {
+  if (t === 'arrow' || t === 'arrow-double' || t === 'arrow-curved') {
+    ctx.lineWidth = layer.strokeWidth || 4;
     ctx.beginPath(); ctx.moveTo(x, y + h / 2);
     if (t === 'arrow-curved') ctx.quadraticCurveTo(x + w * 0.5, y, x + w - 16, y + h / 2);
     else ctx.lineTo(x + w - 16, y + h / 2);
     ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x + w, y + h / 2); ctx.lineTo(x + w - 18, y + h / 2 - 12); ctx.lineTo(x + w - 18, y + h / 2 + 12); ctx.closePath(); ctx.fill();
     if (t === 'arrow-double') { ctx.beginPath(); ctx.moveTo(x, y + h / 2); ctx.lineTo(x + 18, y + h / 2 - 12); ctx.lineTo(x + 18, y + h / 2 + 12); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+    return;
   }
-  else if (t === 'science-atom') {
-    const cx = x + w / 2, cy = y + h / 2;
-    for (let i = 0; i < 3; i++) { ctx.save(); ctx.translate(cx, cy); ctx.rotate((i * Math.PI) / 3); ctx.beginPath(); ctx.ellipse(0, 0, w / 2, h / 5, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
-    ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.fill();
-  }
-  else if (t === 'science-wave') {
+
+  if (t === 'science-wave') {
+    ctx.lineWidth = layer.strokeWidth || 4;
     ctx.beginPath();
     for (let i = 0; i <= w; i += 4) { const wy = y + h / 2 + (h / 3) * Math.sin((i / w) * Math.PI * 4); if (i === 0) ctx.moveTo(x + i, wy); else ctx.lineTo(x + i, wy); }
     ctx.stroke();
+    ctx.restore();
+    return;
   }
-  else {
-    ctx.fillRect(x, y, w, h); if (layer.strokeWidth) ctx.strokeRect(x, y, w, h);
+
+  // Guardrail 6: Se houver frameClip, desenha foto dentro de ctx.save()->ctx.clip()->drawImage->ctx.restore()
+  // e desenha o contorno (strokeWidth 0..40px) APÓS ctx.restore() para não cortar metade da borda!
+  if (layer.frameClip?.src) {
+    const clipSrc = layer.frameClip.resolvedUrl || layer.frameClip.src;
+    const clipImg = getImageSync(clipSrc);
+    if (!clipImg) {
+      preloadImage(clipSrc).then(() => onNeedRepaint?.()).catch(() => {});
+    }
+
+    ctx.save();
+    if (t === 'science-atom') {
+      // Para o átomo com frameClip, recorta pelo círculo orbital central
+      ctx.beginPath();
+      ctx.ellipse(x + w / 2, y + h / 2, w * 0.45, h * 0.45, 0, 0, Math.PI * 2);
+    } else {
+      buildShapePath(ctx, layer, x, y, w, h);
+    }
+    ctx.clip();
+    if (clipImg) {
+      const z = Math.max(1, layer.frameClip.zoom || 1);
+      const dw = w * z;
+      const dh = h * z;
+      const dx = x + (w - dw) / 2 + (layer.frameClip.panX || 0) * w;
+      const dy = y + (h - dh) / 2 + (layer.frameClip.panY || 0) * h;
+      ctx.drawImage(clipImg, dx, dy, dw, dh);
+    }
+    ctx.restore();
+  } else if (t !== 'science-atom') {
+    buildShapePath(ctx, layer, x, y, w, h);
+    ctx.fill();
   }
+
+  // Desenho do contorno limpo após ctx.restore()
+  if (t === 'science-atom') {
+    const cx = x + w / 2, cy = y + h / 2;
+    ctx.lineWidth = layer.strokeWidth || 4;
+    for (let i = 0; i < 3; i++) { ctx.save(); ctx.translate(cx, cy); ctx.rotate((i * Math.PI) / 3); ctx.beginPath(); ctx.ellipse(0, 0, w / 2, h / 5, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
+    ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.fill();
+  } else if (layer.strokeWidth && layer.strokeWidth > 0) {
+    buildShapePath(ctx, layer, x, y, w, h);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 
@@ -158,25 +379,11 @@ function renderLogoLayer(ctx: CanvasRenderingContext2D, layer: StudioLogoLayer, 
 }
 
 export function renderSlideToCanvas(
-  ctx: CanvasRenderingContext2D, slide: StudioSlide, canvasW: number, canvasH: number, tokens?: OrgBrandTokens, options?: { onNeedRepaint?: () => void }
+  ctx: CanvasRenderingContext2D, slide: StudioSlide, canvasW: number, canvasH: number, tokens?: OrgBrandTokens, options?: { onNeedRepaint?: () => void; interactive?: boolean }
 ): void {
   ctx.save(); ctx.clearRect(0, 0, canvasW, canvasH);
   ctx.fillStyle = slide.backgroundGradient || slide.backgroundColor || tokens?.bgApp || '#07090e';
   ctx.fillRect(0, 0, canvasW, canvasH);
-
-  // Modo Split-Screen 50/50 (Antes vs Depois)
-  if (slide.splitScreen && slide.splitScreen !== 'none') {
-    const ratio = slide.splitRatio ?? 0.5;
-    ctx.save(); ctx.fillStyle = 'rgba(255,255,255,0.06)';
-    if (slide.splitScreen === 'vertical') {
-      ctx.fillRect(canvasW * ratio, 0, canvasW * (1 - ratio), canvasH);
-      ctx.strokeStyle = '#FFCC00'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(canvasW * ratio, 0); ctx.lineTo(canvasW * ratio, canvasH); ctx.stroke();
-    } else {
-      ctx.fillRect(0, canvasH * ratio, canvasW, canvasH * (1 - ratio));
-      ctx.strokeStyle = '#FFCC00'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, canvasH * ratio); ctx.lineTo(canvasW, canvasH * ratio); ctx.stroke();
-    }
-    ctx.restore();
-  }
   applyPostEffects(ctx, slide.globalFilters, 0, 0, canvasW, canvasH);
 
   for (const layer of slide.layers) {
@@ -197,14 +404,37 @@ export function renderSlideToCanvas(
           });
       } else {
         if (imgLayer.maskDataUrl && !maskImg) { preloadImage(imgLayer.maskDataUrl).then(() => options?.onNeedRepaint?.()).catch(() => {}); }
-        renderImageWithMask(ctx, imgLayer, img, maskImg, canvasW, canvasH);
+        renderImageWithMask(ctx, imgLayer, img, maskImg, canvasW, canvasH, options?.interactive);
       }
     } else if (layer.type === 'text') {
       const textLayer = layer as StudioTextLayer; ctx.globalAlpha = textLayer.opacity;
-      const boxCenterX = (textLayer.x + textLayer.width / 2) * canvasW, boxTopY = textLayer.y * canvasH, maxBoxWidth = textLayer.width * canvasW;
+      const boxX = textLayer.x * canvasW, boxY = textLayer.y * canvasH;
+      const boxCenterX = (textLayer.x + textLayer.width / 2) * canvasW, boxTopY = boxY, maxBoxWidth = textLayer.width * canvasW;
+      const boxH = textLayer.height * canvasH;
+
+      // Tarja Pill de Fundo (Submenu 20)
+      if (textLayer.pillBgOpacity && textLayer.pillBgOpacity > 0) {
+        ctx.save();
+        ctx.globalAlpha = (textLayer.opacity ?? 1) * (textLayer.pillBgOpacity / 100);
+        ctx.fillStyle = textLayer.pillBgColor || '#1F9FCF';
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(boxX - 12, boxY - 8, maxBoxWidth + 24, boxH + 16, 18);
+        else ctx.rect(boxX - 12, boxY - 8, maxBoxWidth + 24, boxH + 16);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      if (textLayer.shadowBlur && textLayer.shadowBlur > 0) {
+        ctx.shadowColor = textLayer.shadowColor || 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur = textLayer.shadowBlur;
+        ctx.shadowOffsetX = textLayer.shadowOffsetX ?? 0;
+        ctx.shadowOffsetY = textLayer.shadowOffsetY ?? 2;
+      }
+
       let processed = (textLayer.text || '')
         .replace(/\{TITULO\}/g, slide.title || '')
         .replace(/\{ORG\}/g, tokens?.displayName || tokens?.badgeTag || '');
+      if (textLayer.uppercase) processed = processed.toUpperCase();
       processed = processed.replace(/\{([A-Z0-9_]+)\}/g, '[y:{$1}]');
 
       if (tokens) {
@@ -215,11 +445,11 @@ export function renderSlideToCanvas(
           lineHeightMultiplier: textLayer.lineHeight || 1.24,
         });
       } else {
-        ctx.font = `${textLayer.bold ? 'bold ' : ''}${textLayer.fontSize}px ${textLayer.fontFamily || 'sans-serif'}`;
+        ctx.font = `${textLayer.italic ? 'italic ' : ''}${textLayer.bold ? 'bold ' : ''}${textLayer.fontSize}px ${textLayer.fontFamily || 'sans-serif'}`;
         ctx.fillStyle = textLayer.color || '#ffffff'; ctx.textAlign = textLayer.align || 'center'; ctx.fillText(processed, boxCenterX, boxTopY + textLayer.fontSize);
       }
     } else if (layer.type === 'shape') {
-      renderVectorShape(ctx, layer as StudioShapeLayer, canvasW, canvasH);
+      renderVectorShape(ctx, layer as StudioShapeLayer, canvasW, canvasH, options?.onNeedRepaint);
     } else if (layer.type === 'logo') {
       renderLogoLayer(ctx, layer as StudioLogoLayer, canvasW, canvasH, options?.onNeedRepaint);
     } else if (layer.type === 'math') {
