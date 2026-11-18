@@ -427,7 +427,7 @@ export function InstagramMuralSection({
                     type="text"
                     value={accountName}
                     onChange={(e) => setAccountName(e.target.value)}
-                    placeholder="Show da Física IFUSP"
+                    placeholder="Show de Física IFUSP"
                     className="w-full bg-app border border-border-subtle rounded-xl px-3 py-2 text-sm text-fg"
                   />
                 </div>

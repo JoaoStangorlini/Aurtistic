@@ -40,7 +40,7 @@ export interface CurriculumVerifiedDocument {
 
 export interface PressClippingItem {
   id: string;
-  title: string;                  // Ex: "Destaque no Jornal da USP — Show da Física"
+  title: string;                  // Ex: "Destaque no Jornal da USP — Show de Física"
   newspaperName: string;          // Ex: "Jornal da USP" / "Folha de S.Paulo"
   publicationDate: string;        // YYYY-MM-DD
   editionOrSection?: string;      // Ex: "Caderno Ciência & Educação, pág. A12"
@@ -62,7 +62,7 @@ export interface InstagramMentionEmbed {
   postType: 'p' | 'reel' | 'tv';  // Extraído de forma sanitizada
   shortcode: string;              // Extraído via regex estrita: "Cxyz12345"
   accountHandle: string;          // Ex: "@showdafisica.ifusp"
-  accountName?: string;           // Ex: "Show da Física IFUSP"
+  accountName?: string;           // Ex: "Show de Física IFUSP"
   photoCreditNote: string;        // Ex: "Fotografia autoral por João Paulo Stangorlini"
   eventOrContext?: string;        // Ex: "Sessão Especial — Instituto de Física da USP"
   originalFileId?: string | null; // Vínculo opcional com a foto original no acervo

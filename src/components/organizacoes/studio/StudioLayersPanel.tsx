@@ -24,7 +24,7 @@ export function StudioLayersPanel() {
     const layer: StudioLogoLayer = {
       id: `logo-${Date.now()}`,
       type: 'logo',
-      name: `Selo ${preset === 'show-da-fisica-tricolor' ? 'Show da Física' : preset === 'ifusp' ? 'IFUSP' : 'Logo Org'}`,
+      name: `Selo ${preset === 'show-da-fisica-tricolor' ? 'Show de Física' : preset === 'ifusp' ? 'IFUSP' : 'Logo Org'}`,
       preset,
       preserveAspect: true,
       visible: true,

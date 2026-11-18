@@ -49,7 +49,7 @@ const LABDIV_DEFAULT_ORG: any = {
 const SHOW_DA_FISICA_DEFAULT_ORG: any = {
   id: SHOW_DA_FISICA_ORG_ID,
   slug: 'show-da-fisica',
-  name: 'Show da Física',
+  name: 'Show de Física',
   description: 'Demonstrações teatrais e lúdicas de fenômenos físicos — IFUSP',
   avatar_url: null,
   primary_color: '#0066ff',
@@ -532,7 +532,7 @@ export async function getOrganizationDetailsAction(orgId: string) {
     const isLabDiv = targetOrgId === LABDIV_ORG_ID;
     const dimFilter =
       targetOrgId === SHOW_DA_FISICA_ORG_ID
-        ? 'Show da Física'
+        ? 'Show de Física'
         : targetOrgId === HS_ORG_ID
           ? 'Hackerspace'
           : targetOrgId === PROFIS_ORG_ID
@@ -624,7 +624,7 @@ export async function getOrganizationDetailsAction(orgId: string) {
     };
   }
 
-  // Fallback institucional para Show da Física
+  // Fallback institucional para Show de Física
   if (orgId === SHOW_DA_FISICA_ORG_ID) {
     return {
       ok: true,
@@ -636,7 +636,7 @@ export async function getOrganizationDetailsAction(orgId: string) {
       ],
       members: [
         { id: '1ab41410-0000-4000-8000-000000000311', organization_id: SHOW_DA_FISICA_ORG_ID, full_name: 'João Paulo Stangorlini', email: 'joaopaulostangorlini@usp.br', org_role: 'admin', is_placeholder: false, can_upload_org_vault: true, cognitive_capacity: 'normal' },
-        { id: '1ab41410-0000-4000-8000-000000000312', organization_id: SHOW_DA_FISICA_ORG_ID, full_name: 'Equipe Show da Física', email: 'showdafisica@if.usp.br', org_role: 'member', is_placeholder: false, can_upload_org_vault: true, cognitive_capacity: 'normal' }
+        { id: '1ab41410-0000-4000-8000-000000000312', organization_id: SHOW_DA_FISICA_ORG_ID, full_name: 'Equipe Show de Física', email: 'showdafisica@if.usp.br', org_role: 'member', is_placeholder: false, can_upload_org_vault: true, cognitive_capacity: 'normal' }
       ],
       tasks: fallbackTasks,
     };

@@ -32,8 +32,8 @@ export interface OrgBrandTokens {
 export const ORG_BRAND_PRESETS: Record<OrgBrandSlug, OrgBrandTokens> = {
   'show-da-fisica': {
     themeId: 'show-da-fisica',
-    displayName: 'Show da Física',
-    badgeTag: 'SHOW DA FÍSICA • IFUSP',
+    displayName: 'Show de Física',
+    badgeTag: 'SHOW DE FÍSICA • IFUSP',
     bgApp: '#040714',
     bgSurface: '#090e24',
     textPrimary: '#ffffff',

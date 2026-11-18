@@ -188,7 +188,7 @@ export const LABDIV_IDV: InitiativeIdvDefinition = {
 export const SHOW_DA_FISICA_IDV: InitiativeIdvDefinition = {
   id: 'show-da-fisica',
   category: 'org',
-  name: 'Show da Física',
+  name: 'Show de Física',
   shortLabel: 'Show',
   colors: {
     primary: '#0066FF',

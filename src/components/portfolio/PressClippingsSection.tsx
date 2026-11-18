@@ -562,7 +562,7 @@ export function PressClippingsSection({
                   required
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  placeholder="Ex: Destaque no Jornal da USP — Show da Física"
+                  placeholder="Ex: Destaque no Jornal da USP — Show de Física"
                   className="w-full bg-app border border-border-subtle rounded-xl px-3 py-2 text-sm text-fg"
                 />
               </div>

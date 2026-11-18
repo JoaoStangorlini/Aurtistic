@@ -5104,7 +5104,7 @@ export function UserVaultWorkspace({
                 type="text"
                 value={shortcutDisplayName}
                 onChange={(e) => setShortcutDisplayName(e.target.value)}
-                placeholder="Ex: Fotos - Show da Física"
+                placeholder="Ex: Fotos - Show de Física"
                 className="w-full px-3 py-2 rounded-xl bg-app border border-border-subtle text-xs text-fg placeholder:text-fg-muted focus:outline-none focus:border-amber-400"
               />
             </div>

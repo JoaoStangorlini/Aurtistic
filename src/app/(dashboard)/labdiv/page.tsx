@@ -78,7 +78,7 @@ export default async function LabDivPage({ searchParams }: LabDivPageProps) {
     },
     'show-da-fisica': {
       id: '1ab41410-0000-4000-8000-000000000002',
-      name: 'Show da Física',
+      name: 'Show de Física',
       slug: 'show-da-fisica',
       description: 'Demonstrações teatrais e lúdicas de fenômenos físicos — IFUSP',
       avatar_url: null,
@@ -407,7 +407,7 @@ export default async function LabDivPage({ searchParams }: LabDivPageProps) {
   const isProfis = organization.slug === 'profis';
   const isLabDiv = !isShow && !isHs && !isProfis;
   const dimFilter = isShow
-    ? 'Show da Física'
+    ? 'Show de Física'
     : isHs
       ? 'Hackerspace'
       : isProfis

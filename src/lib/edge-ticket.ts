@@ -33,7 +33,7 @@ export const DEFAULT_ECOSYSTEM_ORGS_BY_ID: Record<
   '1ab41410-0000-4000-8000-000000000002': {
     id: '1ab41410-0000-4000-8000-000000000002',
     slug: 'show-da-fisica',
-    name: 'Show da Física',
+    name: 'Show de Física',
     storage_quota_bytes: 53687091200,
     storage_used_bytes: 0,
   },
