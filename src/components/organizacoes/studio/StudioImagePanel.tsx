@@ -38,6 +38,7 @@ export function StudioImagePanel() {
       type: 'image',
       name,
       src,
+      resolvedUrl: src,
       vaultRelativePath,
       visible: true,
       locked: false,

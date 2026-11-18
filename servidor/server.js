@@ -6651,22 +6651,105 @@ async function ensureTenantRootProvisioned(userId) {
   return userRoot;
 }
 
+
+function findCaseInsensitiveFileOrDir(parentDir, childName) {
+  if (!parentDir || !childName || !fs.existsSync(parentDir)) return null;
+  const direct = path.join(parentDir, childName);
+  if (fs.existsSync(direct)) return direct;
+  try {
+    const entries = fs.readdirSync(parentDir);
+    const targetNorm = childName.toLowerCase().replace(/[-_\s]+/g, '');
+    for (const ent of entries) {
+      if (ent.toLowerCase() === childName.toLowerCase()) {
+        return path.join(parentDir, ent);
+      }
+      if (ent.toLowerCase().replace(/[-_\s]+/g, '') === targetNorm) {
+        return path.join(parentDir, ent);
+      }
+    }
+  } catch {}
+  return null;
+}
+
+function resolveResilientPhysicalFile(targetBase, remainder) {
+  if (!remainder) return targetBase;
+  try {
+    const direct = resolveSafeChildPath(targetBase, remainder);
+    if (fs.existsSync(direct)) return direct;
+  } catch {}
+
+  const ciMatch = findCaseInsensitiveFileOrDir(targetBase, remainder);
+  if (ciMatch && fs.existsSync(ciMatch)) return ciMatch;
+
+  const baseFile = path.basename(remainder);
+  const subCandidateDirs = [
+    path.join(targetBase, 'originals'),
+    path.join(targetBase, 'JPG'),
+    path.join(targetBase, '11-04/JPG'),
+    PORTFOLIO_ORIGINALS_DIR,
+    path.join(PORTFOLIO_DIR, 'SHOW DE FISICA'),
+    path.join(PORTFOLIO_DIR, 'show da fisica'),
+    '/home/stangorlini/Imagens/show da fisica/11-04/JPG',
+    '/home/stangorlini/Imagens/show da fisica',
+    '/home/stangorlini/HUB LabDiv/public/show',
+  ];
+
+  for (const sDir of subCandidateDirs) {
+    if (sDir && fs.existsSync(sDir)) {
+      const match = findCaseInsensitiveFileOrDir(sDir, baseFile);
+      if (match && fs.existsSync(match)) return match;
+    }
+  }
+
+  if (Array.isArray(memoryCatalog?.items)) {
+    const lowerBase = baseFile.toLowerCase();
+    const item = memoryCatalog.items.find(
+      (it) =>
+        (it.originalFile && it.originalFile.toLowerCase() === lowerBase) ||
+        (it.relativePath && it.relativePath.toLowerCase().endsWith(lowerBase))
+    );
+    if (item && typeof findPortfolioItemPhysicalPath === 'function') {
+      const pPath = findPortfolioItemPhysicalPath(item);
+      if (pPath && fs.existsSync(pPath)) return pPath;
+    }
+  }
+
+  try {
+    return resolveSafeChildPath(targetBase, remainder);
+  } catch {
+    return path.join(targetBase, remainder);
+  }
+}
+
 function resolvePortAwareTargetDir(targetUserId, targetRelPath) {
   const userRoot = resolveSafeChildPath(USERS_ROOT_DIR, targetUserId);
   const clean = normalizeTenantRelPath(targetRelPath || '');
   const primary = clean ? resolveSafeChildPath(userRoot, clean) : userRoot;
   if (fs.existsSync(primary)) return primary;
-  const lower = clean.toLowerCase();
-  const isPortRel =
-    lower === 'portfolio' ||
-    lower.startsWith('portfolio/') ||
-    lower === 'portifolio' ||
-    lower.startsWith('portifolio/');
-  if (isPortRel && PORTFOLIO_DIR) {
-    const legacySub = clean.replace(/^(portfolio|portifolio)\/?/i, '');
-    const legacyTarget = legacySub ? resolveSafeChildPath(PORTFOLIO_DIR, legacySub) : PORTFOLIO_DIR;
-    if (fs.existsSync(legacyTarget)) return legacyTarget;
+
+  const legacySub = clean.replace(/^(portfolio|portifolio)\/?/i, '');
+  const candidates = [
+    findCaseInsensitiveFileOrDir(PORTFOLIO_DIR, legacySub),
+    findCaseInsensitiveFileOrDir(path.join(STORAGE_DIR, 'portfolio'), legacySub),
+    findCaseInsensitiveFileOrDir(PORTFOLIO_ORIGINALS_DIR, legacySub),
+    findCaseInsensitiveFileOrDir(path.join(STORAGE_DIR, 'vault/Stangorlini/portfolio'), legacySub),
+    findCaseInsensitiveFileOrDir(path.join(STORAGE_DIR, 'vault/Stangorlini/portifolio'), legacySub),
+    '/home/stangorlini/Imagens/show da fisica',
+    '/home/stangorlini/Imagens/show de fisica',
+    '/home/stangorlini/HUB LabDiv/public/show',
+  ];
+
+  for (const c of candidates) {
+    if (c && fs.existsSync(c)) return c;
   }
+
+  if (PORTFOLIO_DIR && fs.existsSync(PORTFOLIO_DIR)) {
+    if (legacySub) {
+      const direct = path.join(PORTFOLIO_DIR, legacySub);
+      if (fs.existsSync(direct)) return direct;
+    }
+  }
+
   return primary;
 }
 
@@ -6717,7 +6800,7 @@ function resolveOrgPersonalShortcutTarget(rootDir, cleanRel, options = {}) {
             } else {
               targetBase = resolvePortAwareTargetDir(ownerUserId, raw.targetRelPath || '');
             }
-            const finalPhysicalPath = remainder ? resolveSafeChildPath(targetBase, remainder) : targetBase;
+            const finalPhysicalPath = remainder ? resolveResilientPhysicalFile(targetBase, remainder) : targetBase;
             return {
               shortcutInfo: raw,
               shortcutName: raw.name || baseName,
@@ -7413,9 +7496,14 @@ async function handleTenantStreamRequest(req, res, forceDownload = false) {
     assertPublicMediaPathAllowed(req, relPath);
     assertFolderPinUnlockedIfRequired(req, relPath);
 
-    const fullPath = req.tenant.resolveSafePath(relPath, { forWrite: false });
+    let fullPath = req.tenant.resolveSafePath(relPath, { forWrite: false });
     if (!fs.existsSync(fullPath)) {
-      return res.status(404).json({ error: 'Arquivo não encontrado no servidor.' });
+      const fallbackFile = resolveResilientPhysicalFile(req.tenant.userRoot, relPath);
+      if (fallbackFile && fs.existsSync(fallbackFile)) {
+        fullPath = fallbackFile;
+      } else {
+        return res.status(404).json({ error: 'Arquivo não encontrado no servidor.' });
+      }
     }
 
     const wantDownload = forceDownload || req.query.download === '1';

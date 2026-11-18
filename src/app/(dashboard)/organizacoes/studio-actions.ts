@@ -313,7 +313,7 @@ export async function getStudioGalleryMediaAction(input?: {
           label: row.filename || 'Foto do Cofre da Organização',
           relativePath: row.relative_path,
           thumbUrl: buildTenantThumbUrl(row.relative_path, signed.ticket),
-          streamUrl: buildTenantStreamUrl(row.relative_path, signed.ticket, { download: true }),
+          streamUrl: buildTenantStreamUrl(row.relative_path, signed.ticket, { download: false }),
           source,
           category: isOrgVault ? 'Cofre da Organização' : 'Servidor',
         };
@@ -388,7 +388,7 @@ export async function getStudioGalleryMediaAction(input?: {
             label: `${pRow.filename || 'Foto'} (${sc.filename || 'Atalho'})`,
             relativePath: scDisplayPath,
             thumbUrl: buildTenantThumbUrl(pRow.relative_path, signed.ticket),
-            streamUrl: buildTenantStreamUrl(pRow.relative_path, signed.ticket, { download: true }),
+            streamUrl: buildTenantStreamUrl(pRow.relative_path, signed.ticket, { download: false }),
             source: 'org_vault',
             category: `Atalho: ${sc.filename || targetRel}`,
           });

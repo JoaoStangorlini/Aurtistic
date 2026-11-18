@@ -183,10 +183,19 @@ export function renderSlideToCanvas(
     if (!layer.visible) continue;
     ctx.save();
     if (layer.type === 'image') {
-      const imgLayer = layer as StudioImageLayer; const img = getImageSync(imgLayer.src);
+      const imgLayer = layer as StudioImageLayer;
+      const effectiveSrc = imgLayer.resolvedUrl || imgLayer.src;
+      const img = getImageSync(effectiveSrc);
       const maskImg = imgLayer.maskDataUrl ? getImageSync(imgLayer.maskDataUrl) : null;
-      if (!img) { preloadImage(imgLayer.src).then(() => options?.onNeedRepaint?.()).catch(() => {}); }
-      else {
+      if (!img) {
+        preloadImage(effectiveSrc)
+          .then(() => options?.onNeedRepaint?.())
+          .catch(() => {
+            if (imgLayer.src && imgLayer.src !== effectiveSrc) {
+              preloadImage(imgLayer.src).then(() => options?.onNeedRepaint?.()).catch(() => {});
+            }
+          });
+      } else {
         if (imgLayer.maskDataUrl && !maskImg) { preloadImage(imgLayer.maskDataUrl).then(() => options?.onNeedRepaint?.()).catch(() => {}); }
         renderImageWithMask(ctx, imgLayer, img, maskImg, canvasW, canvasH);
       }
