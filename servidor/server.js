@@ -2176,20 +2176,54 @@ const webdavServer = new WebdavServer(STORAGE_DIR, {
 });
 app.use(webdavServer.middleware());
 
+const ENV_ALLOWED_CORS_ORIGINS = String(process.env.ALLOWED_CORS_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+function isAllowedCorsOrigin(origin) {
+  if (!origin) return false;
+  if (ENV_ALLOWED_CORS_ORIGINS.includes(origin)) return true;
+  return (
+    origin === 'https://aurtistic.vercel.app' ||
+    origin === 'https://hub-lab-div.vercel.app' ||
+    /^https:\/\/aurtistic-[a-z0-9-]+-stangorlinis-projects\.vercel\.app$/i.test(origin) ||
+    /^https:\/\/hub-lab-div-[a-z0-9-]+-stangorlinis-projects\.vercel\.app$/i.test(origin) ||
+    origin === 'https://storage.hublabdiv.com.br' ||
+    origin === 'https://hublabdiv.com.br' ||
+    origin.endsWith('.hublabdiv.com.br') ||
+    origin.startsWith('http://localhost') ||
+    origin.startsWith('http://127.0.0.1') ||
+    origin.startsWith('http://192.168.') ||
+    origin === 'capacitor://localhost' ||
+    origin === 'https://localhost'
+  );
+}
+
+function applyTenantMediaCorsHeaders(req, res) {
+  const origin = req.headers.origin;
+  if (origin && isAllowedCorsOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } else if (!origin) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+}
+
+function handleTenantMediaPreflight(req, res) {
+  applyTenantMediaCorsHeaders(req, res);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Range, x-tenant-ticket');
+  return res.status(204).end();
+}
+
 app.use(
   cors({
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
-      const allowed =
-        origin === 'https://aurtistic.vercel.app' ||
-        origin.endsWith('.vercel.app') ||
-        origin === 'https://storage.hublabdiv.com.br' ||
-        origin.startsWith('http://localhost') ||
-        origin.startsWith('http://127.0.0.1') ||
-        origin.startsWith('http://192.168.') ||
-        origin === 'capacitor://localhost' ||
-        origin === 'https://localhost';
-      return cb(null, allowed ? origin : true);
+      return cb(null, isAllowedCorsOrigin(origin) ? origin : false);
     },
     credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -6620,13 +6654,12 @@ function resolveTenantHmacSecret() {
 
 function normalizeTenantRelPath(rawPath) {
   const raw = String(rawPath || '');
-  if (raw.includes('\0')) {
-    const err = new Error('Caractere nulo inválido no caminho.');
+  if (raw.includes('\0') || raw.includes('\\')) {
+    const err = new Error('Caractere inválido no caminho.');
     err.statusCode = 400;
     throw err;
   }
   const clean = raw
-    .replace(/\\/g, '/')
     .replace(/\/+/g, '/')
     .replace(/^\/+|\/+$/g, '')
     .trim();
@@ -6657,18 +6690,27 @@ async function ensureTenantRootProvisioned(userId) {
 }
 
 
+function stripAccentsLower(str) {
+  return String(str || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
 function findCaseInsensitiveFileOrDir(parentDir, childName) {
   if (!parentDir || !childName || !fs.existsSync(parentDir)) return null;
   const direct = path.join(parentDir, childName);
   if (fs.existsSync(direct)) return direct;
   try {
     const entries = fs.readdirSync(parentDir);
-    const targetNorm = childName.toLowerCase().replace(/[-_\s]+/g, '');
+    const targetLower = stripAccentsLower(childName);
+    const targetCompact = targetLower.replace(/[-_\s]+/g, '');
     for (const ent of entries) {
-      if (ent.toLowerCase() === childName.toLowerCase()) {
+      const entLower = stripAccentsLower(ent);
+      if (entLower === targetLower) {
         return path.join(parentDir, ent);
       }
-      if (ent.toLowerCase().replace(/[-_\s]+/g, '') === targetNorm) {
+      if (entLower.replace(/[-_\s]+/g, '') === targetCompact) {
         return path.join(parentDir, ent);
       }
     }
@@ -6676,14 +6718,35 @@ function findCaseInsensitiveFileOrDir(parentDir, childName) {
   return null;
 }
 
+function walkCaseInsensitiveSubpath(baseDir, subPath) {
+  if (!baseDir || !fs.existsSync(baseDir)) return null;
+  const clean = normalizeTenantRelPath(subPath || '');
+  if (!clean) return baseDir;
+  let current = path.resolve(baseDir);
+  for (const seg of clean.split('/')) {
+    const next = findCaseInsensitiveFileOrDir(current, seg);
+    if (!next) return null;
+    const resolvedNext = path.resolve(next);
+    if (resolvedNext !== current && !resolvedNext.startsWith(current + path.sep)) {
+      return null;
+    }
+    current = resolvedNext;
+  }
+  return current;
+}
+
 function resolveResilientPhysicalFile(targetBase, remainder) {
   if (!remainder) return targetBase;
+  const resolvedBase = path.resolve(targetBase);
   try {
-    const direct = resolveSafeChildPath(targetBase, remainder);
+    const direct = resolveSafeChildPath(resolvedBase, remainder);
     if (fs.existsSync(direct)) return direct;
   } catch {}
 
-  const ciMatch = findCaseInsensitiveFileOrDir(targetBase, remainder);
+  const walked = walkCaseInsensitiveSubpath(resolvedBase, remainder);
+  if (walked && fs.existsSync(walked)) return walked;
+
+  const ciMatch = findCaseInsensitiveFileOrDir(resolvedBase, remainder);
   if (ciMatch && fs.existsSync(ciMatch)) return ciMatch;
 
   const baseFile = path.basename(remainder);
@@ -6731,18 +6794,20 @@ function resolvePortAwareTargetDir(targetUserId, targetRelPath) {
   const clean = normalizeTenantRelPath(targetRelPath || '');
   const primary = clean ? resolveSafeChildPath(userRoot, clean) : userRoot;
   if (fs.existsSync(primary)) return primary;
+  const walkedPrimary = clean ? walkCaseInsensitiveSubpath(userRoot, clean) : null;
+  if (walkedPrimary && fs.existsSync(walkedPrimary)) return walkedPrimary;
 
   const legacySub = clean.replace(/^(portfolio|portifolio)\/?/i, '');
   const candidates = [
-    findCaseInsensitiveFileOrDir('/home/stangorlini/Imagens/Portifólio', legacySub),
-    findCaseInsensitiveFileOrDir('/home/stangorlini/Imagens/Portfolio', legacySub),
-    findCaseInsensitiveFileOrDir('/home/stangorlini/Imagens/Portifólio', clean),
-    findCaseInsensitiveFileOrDir('/home/stangorlini/Imagens/Portfolio', clean),
-    findCaseInsensitiveFileOrDir(PORTFOLIO_DIR, legacySub),
-    findCaseInsensitiveFileOrDir(path.join(STORAGE_DIR, 'portfolio'), legacySub),
-    findCaseInsensitiveFileOrDir(PORTFOLIO_ORIGINALS_DIR, legacySub),
-    findCaseInsensitiveFileOrDir(path.join(STORAGE_DIR, 'vault/Stangorlini/portfolio'), legacySub),
-    findCaseInsensitiveFileOrDir(path.join(STORAGE_DIR, 'vault/Stangorlini/portifolio'), legacySub),
+    walkCaseInsensitiveSubpath('/home/stangorlini/Imagens/Portifólio', legacySub),
+    walkCaseInsensitiveSubpath('/home/stangorlini/Imagens/Portfolio', legacySub),
+    walkCaseInsensitiveSubpath('/home/stangorlini/Imagens/Portifólio', clean),
+    walkCaseInsensitiveSubpath('/home/stangorlini/Imagens/Portfolio', clean),
+    walkCaseInsensitiveSubpath(PORTFOLIO_DIR, legacySub),
+    walkCaseInsensitiveSubpath(path.join(STORAGE_DIR, 'portfolio'), legacySub),
+    walkCaseInsensitiveSubpath(PORTFOLIO_ORIGINALS_DIR, legacySub),
+    walkCaseInsensitiveSubpath(path.join(STORAGE_DIR, 'vault/Stangorlini/portfolio'), legacySub),
+    walkCaseInsensitiveSubpath(path.join(STORAGE_DIR, 'vault/Stangorlini/portifolio'), legacySub),
     '/home/stangorlini/Imagens/Portifólio/SHOW DE FÍSICA',
     '/home/stangorlini/Imagens/Portifólio/Show de Física',
     '/home/stangorlini/Imagens/show da fisica',
@@ -6772,20 +6837,55 @@ function resolvePortAwareTargetDir(targetUserId, targetRelPath) {
  * 2) o subcaminho remainder permanece estritamente dentro de targetBase (anti path traversal);
  * 3) se apontar para uma organização fora do escopo atual, exige allowedOrgSlugs ou role === 'admin'.
  */
-function resolveOrgPersonalShortcutTarget(rootDir, cleanRel, options = {}) {
-  if (!cleanRel) return null;
+const MAX_SHORTCUT_HOPS = 5;
+
+function findShortcutFileInDir(parentDir, baseName) {
+  if (!parentDir || !baseName || !fs.existsSync(parentDir)) return [];
+  const exact = [
+    path.join(parentDir, `.${baseName}.shortcut.json`),
+    path.join(parentDir, `${baseName}.shortcut.json`),
+    path.join(parentDir, `.${baseName}.shortcut`),
+    path.join(parentDir, `${baseName}.shortcut`),
+  ].filter((c) => fs.existsSync(c));
+  if (exact.length > 0) return exact;
+
+  const targetNorm = stripAccentsLower(baseName).replace(/[-_\s]+/g, '');
+  const matched = [];
+  try {
+    const entries = fs.readdirSync(parentDir);
+    for (const ent of entries) {
+      if (!ent.endsWith('.shortcut.json') && !ent.endsWith('.shortcut')) continue;
+      const full = path.join(parentDir, ent);
+      try {
+        const raw = JSON.parse(fs.readFileSync(full, 'utf8'));
+        const candidateName = stripAccentsLower(raw?.name || ent.replace(/^\./, '').replace(/\.shortcut(\.json)?$/, ''));
+        if (
+          candidateName === stripAccentsLower(baseName) ||
+          candidateName.replace(/[-_\s]+/g, '') === targetNorm
+        ) {
+          matched.push(full);
+        }
+      } catch {}
+    }
+  } catch {}
+  return matched;
+}
+
+function resolveOrgPersonalShortcutTarget(rootDir, cleanRel, options = {}, _hop = 0, _visited = new Set()) {
+  if (!cleanRel || _hop >= MAX_SHORTCUT_HOPS) return null;
+  const resolvedRoot = path.resolve(rootDir);
+  if (_visited.has(resolvedRoot)) return null;
+  _visited.add(resolvedRoot);
+
   const parts = cleanRel.split('/');
 
   for (let i = 1; i <= parts.length; i++) {
     const parentParts = parts.slice(0, i - 1);
-    const parentDir = parentParts.length > 0 ? resolveSafeChildPath(rootDir, parentParts.join('/')) : rootDir;
+    const parentDir = parentParts.length > 0 ? resolveSafeChildPath(resolvedRoot, parentParts.join('/')) : resolvedRoot;
     const baseName = parts[i - 1];
     const remainder = parts.slice(i).join('/');
 
-    const candidateFiles = [
-      path.join(parentDir, `.${baseName}.shortcut.json`),
-      path.join(parentDir, `${baseName}.shortcut.json`),
-    ];
+    const candidateFiles = findShortcutFileInDir(parentDir, baseName);
 
     for (const cand of candidateFiles) {
       if (fs.existsSync(cand)) {
@@ -6811,20 +6911,36 @@ function resolveOrgPersonalShortcutTarget(rootDir, cleanRel, options = {}) {
             } else {
               targetBase = resolvePortAwareTargetDir(ownerUserId, raw.targetRelPath || '');
             }
-            const finalPhysicalPath = remainder ? resolveResilientPhysicalFile(targetBase, remainder) : targetBase;
+            const resolvedTargetBase = path.resolve(targetBase);
+            if (_visited.has(resolvedTargetBase)) {
+              const err = new Error('Loop de atalho bloqueado.');
+              err.statusCode = 400;
+              throw err;
+            }
+            if (remainder) {
+              const nested = resolveOrgPersonalShortcutTarget(resolvedTargetBase, remainder, options, _hop + 1, _visited);
+              if (nested) return nested;
+            }
+            const finalPhysicalPath = remainder ? resolveResilientPhysicalFile(resolvedTargetBase, remainder) : resolvedTargetBase;
+            const resolvedFinal = path.resolve(finalPhysicalPath);
+            if (resolvedFinal !== resolvedTargetBase && !resolvedFinal.startsWith(resolvedTargetBase + path.sep)) {
+              const err = new Error('Acesso fora do diretório do atalho bloqueado.');
+              err.statusCode = 403;
+              throw err;
+            }
             return {
               shortcutInfo: raw,
               shortcutName: raw.name || baseName,
               shortcutCandidateFile: cand,
               parentDir,
-              targetBase,
+              targetBase: resolvedTargetBase,
               ownerUserId,
-              physicalPath: finalPhysicalPath,
+              physicalPath: resolvedFinal,
               isShortcutRoot: i === parts.length,
             };
           }
         } catch (e) {
-          if (e && e.statusCode === 403) throw e;
+          if (e && (e.statusCode === 403 || e.statusCode === 400)) throw e;
         }
       }
     }
@@ -7048,25 +7164,26 @@ function assertFolderPinUnlockedIfRequired(req, relPath) {
 
 function assertPublicMediaPathAllowed(req, normalizedRelPath) {
   const cleanRel = normalizeTenantRelPath(normalizedRelPath);
+  const cleanNorm = stripAccentsLower(cleanRel);
   if (req.tenant.purpose === 'public_media') {
     if (req.tenant.allowedPrefix) {
-      const prefix = normalizeTenantRelPath(req.tenant.allowedPrefix);
-      if (cleanRel !== prefix && !cleanRel.startsWith(`${prefix}/`)) {
+      const prefixNorm = stripAccentsLower(normalizeTenantRelPath(req.tenant.allowedPrefix));
+      if (cleanNorm !== prefixNorm && !cleanNorm.startsWith(`${prefixNorm}/`)) {
         const err = new Error('Acesso negado: caminho fora da pasta autorizada para este ticket.');
         err.statusCode = 403;
         throw err;
       }
       return;
     }
-    if (!req.tenant.allowedPathsSet || !req.tenant.allowedPathsSet.has(cleanRel)) {
+    if (!req.tenant.allowedPathsNormSet || !req.tenant.allowedPathsNormSet.has(cleanNorm)) {
       const err = new Error('Acesso negado: caminho não autorizado neste ticket público.');
       err.statusCode = 403;
       throw err;
     }
   }
   if (req.tenant.allowedPrefix) {
-    const prefix = normalizeTenantRelPath(req.tenant.allowedPrefix);
-    if (cleanRel !== prefix && !cleanRel.startsWith(`${prefix}/`)) {
+    const prefixNorm = stripAccentsLower(normalizeTenantRelPath(req.tenant.allowedPrefix));
+    if (cleanNorm !== prefixNorm && !cleanNorm.startsWith(`${prefixNorm}/`)) {
       const err = new Error('Acesso negado: caminho fora da pasta compartilhada.');
       err.statusCode = 403;
       throw err;
@@ -7178,10 +7295,8 @@ async function verifyTenantTicket(req, res, next) {
       if (!cleanOrgSlug && payload.organizationId) {
         const KNOWN_ORGS = {
           '1ab41410-0000-4000-8000-000000000001': 'labdiv',
-          '1ab41410-0000-4000-8000-000000000002': 'profis',
-          '1ab41410-0000-4000-8000-000000000003': 'cursinho-popular',
-          '1ab41410-0000-4000-8000-000000000004': 'show-da-fisica',
-          '1ab41410-0000-4000-8000-000000000005': 'gepape',
+          '1ab41410-0000-4000-8000-000000000002': 'show-da-fisica',
+          '1ab41410-0000-4000-8000-000000000003': 'hs',
         };
         cleanOrgSlug = KNOWN_ORGS[payload.organizationId] || '';
       }
@@ -7213,6 +7328,7 @@ async function verifyTenantTicket(req, res, next) {
       ? payload.allowedOrgSlugs.map((s) => String(s).trim().toLowerCase()).filter(Boolean)
       : null;
 
+    const rawPrefix = payload.allowedPrefix || payload.allowedPathPrefix || null;
     req.tenant = {
       userId,
       scopeType,
@@ -7224,8 +7340,9 @@ async function verifyTenantTicket(req, res, next) {
       purpose,
       quotaLimitBytes: Math.max(0, Number(payload.quotaLimitBytes) || 0),
       usedBytes: Math.max(0, Number(payload.usedBytes) || 0),
-      allowedPrefix: payload.allowedPrefix ? normalizeTenantRelPath(payload.allowedPrefix) : null,
+      allowedPrefix: rawPrefix ? normalizeTenantRelPath(rawPrefix) : null,
       allowedPathsSet: new Set(allowedPathsArr),
+      allowedPathsNormSet: new Set(allowedPathsArr.map((p) => stripAccentsLower(p))),
       readOnly: Boolean(payload.readOnly || purpose === 'public_media'),
       allowDownload: payload.allowDownload !== false,
       unlockedPinsSet,
@@ -7334,16 +7451,17 @@ app.get('/api/tenant/list', verifyTenantTicket, async (req, res) => {
 
     const rawFolder = req.query.folder ? String(req.query.folder) : '';
     const cleanRel = normalizeTenantRelPath(rawFolder);
+    const effectiveRel = cleanRel || (req.tenant.allowedPrefix ? normalizeTenantRelPath(req.tenant.allowedPrefix) : '');
 
     if (req.tenant.allowedPrefix) {
-      assertPublicMediaPathAllowed(req, cleanRel || req.tenant.allowedPrefix);
+      assertPublicMediaPathAllowed(req, effectiveRel);
     }
 
-    const lockInfo = isTenantPathPinProtected(req.tenant.userId, cleanRel);
+    const lockInfo = isTenantPathPinProtected(req.tenant.userId, effectiveRel);
     const breadcrumbs = [
       { name: 'Meus Arquivos', path: '' },
-      ...(cleanRel
-        ? cleanRel.split('/').map((seg, idx, arr) => ({
+      ...(effectiveRel
+        ? effectiveRel.split('/').map((seg, idx, arr) => ({
             name: seg,
             path: arr.slice(0, idx + 1).join('/'),
           }))
@@ -7352,7 +7470,7 @@ app.get('/api/tenant/list', verifyTenantTicket, async (req, res) => {
 
     if (lockInfo && !req.tenant.unlockedPinsSet.has(lockInfo.lockedScope)) {
       return res.json({
-        currentFolder: cleanRel,
+        currentFolder: effectiveRel,
         breadcrumbs,
         folders: [],
         files: [],
@@ -7365,9 +7483,10 @@ app.get('/api/tenant/list', verifyTenantTicket, async (req, res) => {
     const dirTargets = resolveTenantListingDirs(
       req.tenant.userId,
       req.tenant.userRoot,
-      cleanRel,
+      effectiveRel,
       req.tenant.scopeType,
-      req.tenant.role
+      req.tenant.role,
+      req.tenant.allowedOrgSlugs
     );
     if (dirTargets.length === 0) {
       return res.status(404).json({ error: 'Pasta não encontrada.' });
@@ -7390,7 +7509,7 @@ app.get('/api/tenant/list', verifyTenantTicket, async (req, res) => {
         }
 
         const entryFullPath = path.join(dirPath, d.name);
-        const entryRelPath = cleanRel ? `${cleanRel}/${d.name}` : d.name;
+        const entryRelPath = effectiveRel ? `${effectiveRel}/${d.name}` : d.name;
 
         // Detecção e injeção transparente de atalhos de pastas (.shortcut.json) em ambos os cofres (Org e Pessoal)
         if (d.name.endsWith('.shortcut.json') || d.name.endsWith('.shortcut')) {
@@ -7398,7 +7517,7 @@ app.get('/api/tenant/list', verifyTenantTicket, async (req, res) => {
             const raw = JSON.parse(await fs.promises.readFile(entryFullPath, 'utf8'));
             if (raw && raw.isFolderShortcut) {
               const scName = raw.name || d.name.replace(/^\./, '').replace(/\.shortcut(\.json)?$/, '');
-              const scRel = cleanRel ? `${cleanRel}/${scName}` : scName;
+              const scRel = effectiveRel ? `${effectiveRel}/${scName}` : scName;
 
               // Detecção de atalho quebrado / pasta de destino excluída (resiliência contra ENOENT)
               let isBroken = false;
@@ -7524,6 +7643,7 @@ app.get('/api/tenant/list', verifyTenantTicket, async (req, res) => {
 
 // 11.5.2. GET /api/tenant/stream e GET /api/tenant/download — Stream/Download HTTP 206 com suporte completo a Atalhos
 async function handleTenantStreamRequest(req, res, forceDownload = false) {
+  applyTenantMediaCorsHeaders(req, res);
   try {
     const relPath = normalizeTenantRelPath(req.query.path);
     if (!relPath) return res.status(400).json({ error: 'Parâmetro path obrigatório.' });
@@ -7541,7 +7661,13 @@ async function handleTenantStreamRequest(req, res, forceDownload = false) {
         const remoteStreamUrl = `${REMOTE_HUB_ORIGIN}/api/tenant/stream?${new URLSearchParams(req.query).toString()}`;
         const proxyReq = https.get(remoteStreamUrl, { headers: { 'User-Agent': 'Mozilla/5.0 firestick-dev-proxy' } }, (proxyRes) => {
           if (proxyRes.statusCode === 200 || proxyRes.statusCode === 206) {
-            res.writeHead(proxyRes.statusCode, proxyRes.headers);
+            const headers = { ...proxyRes.headers };
+            delete headers['access-control-allow-origin'];
+            delete headers['access-control-allow-credentials'];
+            delete headers['access-control-allow-headers'];
+            delete headers['cross-origin-resource-policy'];
+            delete headers['vary'];
+            res.writeHead(proxyRes.statusCode, headers);
             return proxyRes.pipe(res);
           }
           return res.status(proxyRes.statusCode || 404).json({ error: 'Arquivo não encontrado localmente nem no servidor remoto.' });
@@ -7566,11 +7692,20 @@ async function handleTenantStreamRequest(req, res, forceDownload = false) {
   }
 }
 
-app.get('/api/tenant/stream', verifyTenantTicket, (req, res) => handleTenantStreamRequest(req, res, false));
-app.get('/api/tenant/download', verifyTenantTicket, (req, res) => handleTenantStreamRequest(req, res, true));
+const tenantMediaCorsMiddleware = (req, res, next) => {
+  applyTenantMediaCorsHeaders(req, res);
+  return next();
+};
+
+app.options('/api/tenant/stream', handleTenantMediaPreflight);
+app.options('/api/tenant/download', handleTenantMediaPreflight);
+app.options('/api/tenant/thumb', handleTenantMediaPreflight);
+app.get('/api/tenant/stream', tenantMediaCorsMiddleware, verifyTenantTicket, (req, res) => handleTenantStreamRequest(req, res, false));
+app.get('/api/tenant/download', tenantMediaCorsMiddleware, verifyTenantTicket, (req, res) => handleTenantStreamRequest(req, res, true));
 
 // 11.5.3. GET /api/tenant/thumb — Miniatura ultra-rápida (reaproveita 100% dos 2.369 .avif + sig_index.json)
-app.get('/api/tenant/thumb', verifyTenantTicket, async (req, res) => {
+app.get('/api/tenant/thumb', tenantMediaCorsMiddleware, verifyTenantTicket, async (req, res) => {
+  applyTenantMediaCorsHeaders(req, res);
   try {
     const relPath = normalizeTenantRelPath(req.query.path);
     if (!relPath) return res.status(400).json({ error: 'Parâmetro path obrigatório.' });
@@ -7579,9 +7714,17 @@ app.get('/api/tenant/thumb', verifyTenantTicket, async (req, res) => {
     assertFolderPinUnlockedIfRequired(req, relPath);
 
     const fullPath = req.tenant.resolveSafePath(relPath, { forWrite: false });
+    const allowPortfolioPrebuilt =
+      req.tenant.scopeType !== 'org' ||
+      Boolean(req.tenant.allowedPrefix?.toLowerCase().startsWith('portfolio')) ||
+      relPath.toLowerCase().includes('portfolio');
 
     // 1. Reaproveita imediatamente miniaturas .avif / .webp pré-existentes no cache ext4 (Zero-Touch no USB)
-    const prebuilt = await resolveExistingPrebuiltThumbnail(relPath, fullPath);
+    const prebuilt = await resolveExistingPrebuiltThumbnail(
+      relPath,
+      fullPath,
+      allowPortfolioPrebuilt ? 'user' : req.tenant.scopeType
+    );
     if (prebuilt && fs.existsSync(prebuilt.path)) {
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
       res.setHeader('Content-Type', prebuilt.mimeType);
@@ -7589,10 +7732,11 @@ app.get('/api/tenant/thumb', verifyTenantTicket, async (req, res) => {
       return fs.createReadStream(prebuilt.path).pipe(res);
     }
 
-    // 2. Cache específico do tenant no ext4 interno
+    // 2. Cache específico do tenant no ext4 interno (NFC POSIX + pinNamespaceId)
+    const nfcRel = relPath.normalize('NFC').replace(/\\/g, '/');
     const tenantThumbKey = crypto
       .createHash('md5')
-      .update(`${req.tenant.userId}:${relPath}`)
+      .update(`${req.tenant.pinNamespaceId}:${nfcRel}`)
       .digest('hex');
     const tenantThumbPath = path.join(INTERNAL_THUMBS_DIR, `tthumb_${tenantThumbKey}.webp`);
     if (fs.existsSync(tenantThumbPath)) {
@@ -8488,12 +8632,13 @@ app.get('/api/tenant/zip', verifyTenantTicket, async (req, res) => {
       return res.status(403).json({ error: 'Download não autorizado para este ticket.' });
     }
     const folderRel = normalizeTenantRelPath(req.query.folder || '');
+    const effectiveRel = folderRel || (req.tenant.allowedPrefix ? normalizeTenantRelPath(req.tenant.allowedPrefix) : '');
     if (req.tenant.allowedPrefix) {
-      assertPublicMediaPathAllowed(req, folderRel || req.tenant.allowedPrefix);
+      assertPublicMediaPathAllowed(req, effectiveRel);
     }
-    assertFolderPinUnlockedIfRequired(req, folderRel);
+    assertFolderPinUnlockedIfRequired(req, effectiveRel);
 
-    const targetDir = req.tenant.resolveSafePath(folderRel, { forWrite: false });
+    const targetDir = req.tenant.resolveSafePath(effectiveRel, { forWrite: false });
 
     // Suporte a download seletivo via ?files= (JSON ou lista separada por vírgula)
     let filterSet = null;

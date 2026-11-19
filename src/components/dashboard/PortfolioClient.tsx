@@ -339,7 +339,7 @@ export default function PortfolioClient({
   };
 
   return (
-    <div className="min-h-full flex flex-col p-4 md:p-8 bg-app text-fg font-['Open_Sans'] overflow-y-auto">
+    <div className="min-h-full flex flex-col p-4 md:p-8 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8 bg-transparent text-fg font-['Open_Sans'] overflow-y-auto">
       {/* Workspace Header */}
       <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0 border-b border-border-subtle/30 pb-4">
         <div>

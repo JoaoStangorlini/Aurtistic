@@ -47,7 +47,7 @@ export default async function ConfigurarNotificacoesPage() {
   const userTasks = tasksData || [];
 
   return (
-    <div className="min-h-full bg-app text-fg p-4 md:p-8">
+    <div className="min-h-full bg-transparent text-fg p-4 md:p-8">
       <div className="max-w-2xl mx-auto mt-12">
         <h1 className="text-3xl font-bold text-[#FFCC00] mb-2 flex items-center gap-3">
           <span className="material-symbols-outlined text-[32px]">notifications_active</span>

@@ -8,18 +8,20 @@ import {
   type VaultFileEntry,
 } from '@/app/(dashboard)/organizacoes/studio-actions';
 
+import type { StudioVaultRef } from './types';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos
 // ─────────────────────────────────────────────────────────────────────────────
 
 type ScopeMode = 'upload' | 'org' | 'personal';
-type ApiScopeType = 'org' | 'user';
 
 export interface VaultBrowserSelectedItem {
   name: string;
   relativePath: string;
   streamUrl: string;
   thumbUrl?: string | null;
+  vaultRef?: StudioVaultRef;
 }
 
 interface StudioVaultBrowserModalProps {
@@ -135,7 +137,16 @@ function FolderBrowser({
       </div>
 
       {error && (
-        <p className="text-xs text-red-400 bg-red-900/20 rounded-xl px-3 py-2">{error}</p>
+        <div className="text-xs text-red-700 dark:text-red-300 bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => loadFolder(currentPath)}
+            className="px-2.5 py-1 rounded-lg bg-red-500/15 hover:bg-red-500/25 font-bold text-[11px] shrink-0 cursor-pointer"
+          >
+            Tentar novamente
+          </button>
+        </div>
       )}
 
       {/* Pastas */}
@@ -156,11 +167,18 @@ function FolderBrowser({
                   className="material-symbols-outlined text-[18px] shrink-0"
                   style={{ color: f.color || '#FFCC00' }}
                 >
-                  {f.icon || 'folder'}
+                  {f.isShortcut ? 'folder_shared' : (f.icon || 'folder')}
                 </span>
-                <span className="text-[11px] font-bold text-fg truncate leading-tight">
-                  {f.name}
-                </span>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[11px] font-bold text-fg truncate leading-tight block">
+                    {f.name}
+                  </span>
+                  {f.isShortcut && (
+                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wider text-accent-primary">
+                      Atalho{f.shortcutOwner ? ` • ${f.shortcutOwner}` : ''}
+                    </span>
+                  )}
+                </div>
                 <span className="material-symbols-outlined text-[12px] text-fg-muted group-hover:text-fg ml-auto shrink-0">
                   chevron_right
                 </span>
@@ -196,6 +214,12 @@ function FolderBrowser({
                       relativePath: file.path,
                       streamUrl: file.streamUrl,
                       thumbUrl: file.thumbUrl,
+                      vaultRef: {
+                        scopeType,
+                        orgSlug: scopeType === 'org' ? orgSlug : undefined,
+                        organizationId: scopeType === 'org' ? organizationId : undefined,
+                        relativePath: file.path,
+                      },
                     })
                   }
                   className="group relative w-full break-inside-avoid rounded-xl overflow-hidden border border-border-subtle hover:border-[#FFCC00] bg-surface/70 text-left transition-all cursor-pointer shadow-xs block"

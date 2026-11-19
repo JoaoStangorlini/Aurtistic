@@ -156,7 +156,7 @@ export function StudioWorkspaceView() {
           <button
             type="button"
             onClick={() => saveCurrentToDraftSlot(activeDraftSlot || 1)}
-            className="px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-xs font-bold text-amber-600 dark:text-amber-300 hover:bg-amber-500/20 flex items-center gap-1 cursor-pointer"
+            className="px-3 py-1.5 rounded-xl border border-amber-500/50 bg-amber-500/15 text-xs font-bold text-amber-800 dark:text-amber-300 hover:bg-amber-500/25 flex items-center gap-1 cursor-pointer"
           >
             <span className="material-symbols-outlined text-[16px]">save</span>
             <span>Salvar</span>

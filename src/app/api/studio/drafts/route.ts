@@ -1,6 +1,7 @@
 // Este programa é um software livre (Licença AGPLv3)
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { sanitizeDraftForStorage } from '@/lib/studio/studio-idb';
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,6 +20,14 @@ export async function GET(req: NextRequest) {
       orgId = anyOrg?.id || null;
     }
     if (!orgId) return NextResponse.json({ drafts: [] });
+
+    const { data: memberRow } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', orgId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!memberRow) return NextResponse.json({ drafts: [] }, { status: 403 });
 
     const { data } = await supabase
       .from('studio_draft_versions')
@@ -62,13 +71,23 @@ export async function POST(req: NextRequest) {
     }
     if (!orgId) return NextResponse.json({ ok: false, error: 'Org não encontrada' }, { status: 400 });
 
+    const { data: memberRow } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', orgId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!memberRow) return NextResponse.json({ ok: false, error: 'Sem permissão' }, { status: 403 });
+
+    const cleanDraft = sanitizeDraftForStorage(draft);
+
     await supabase.from('studio_draft_versions').upsert({
       user_id: user.id,
       org_id: orgId,
       slot_index: slotIndex,
-      title: draft.title || `Rascunho ${slotIndex}`,
-      aspect_ratio: draft.aspectRatio || '1:1',
-      draft_payload: draft,
+      title: cleanDraft.title || `Rascunho ${slotIndex}`,
+      aspect_ratio: cleanDraft.aspectRatio || '1:1',
+      draft_payload: cleanDraft,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id,org_id,slot_index' });
 

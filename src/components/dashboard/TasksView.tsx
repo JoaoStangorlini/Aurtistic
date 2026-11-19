@@ -1673,8 +1673,8 @@ export function TasksView({
                   if (viewMode === 'org_management') setViewMode('list');
                 }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${activeScope === 'individual'
-                    ? 'bg-gradient-brand text-[var(--on-accent-primary)] shadow-sm font-black'
-                    : 'text-neutral-400 hover:text-white hover:bg-white/5'
+                    ? 'bg-accent-primary text-on-accent-primary shadow-sm font-black'
+                    : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
                   }`}
               >
                 <span className="material-symbols-outlined text-[15px]">person</span>
@@ -2032,7 +2032,7 @@ export function TasksView({
               <button
                 type="button"
                 onClick={() => setIsQuickCreateMenuOpen(!isQuickCreateMenuOpen)}
-                className="h-[34px] bg-gradient-brand text-[var(--on-accent-secondary)] font-black px-3 py-1 text-xs rounded-lg hover:brightness-110 transition-all shadow-md flex items-center gap-1.5 shrink-0 cursor-pointer"
+                className="h-[34px] bg-accent-secondary text-on-accent-secondary font-black px-3 py-1 text-xs rounded-lg hover:brightness-110 transition-all shadow-md flex items-center gap-1.5 shrink-0 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">bolt</span>
                 <span>Criar</span>

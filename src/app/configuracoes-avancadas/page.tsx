@@ -64,7 +64,7 @@ export default async function ConfiguracoesAvancadasPage() {
   const hubConnection = profile.features_config?.hub_connection || null;
 
   return (
-    <main className="min-h-full bg-app p-4 md:p-8">
+    <main className="min-h-full bg-transparent p-4 md:p-8">
       <AdvancedConfigClient 
         initialConfig={currentAdvancedConfig}
         availableStatuses={availableStatuses}

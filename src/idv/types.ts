@@ -3,7 +3,7 @@ import type { ThemePaletteId } from '@/lib/theme-config';
 
 export interface InitiativeIdvDefinition {
   id: ThemePaletteId;
-  category: 'native' | 'org';
+  category?: 'native' | 'org';
   name: string;
   shortLabel: string;
   colors: {
@@ -13,27 +13,32 @@ export interface InitiativeIdvDefinition {
     tertiary: string;
     bgApp: string;
     bgSurface: string;
-    bgElevated: string;
-    onPrimary: string;
-    onSecondary: string;
+    bgElevated?: string;
+    onPrimary?: string;
+    onSecondary?: string;
+    brandVariants?: string[];
   };
   lightColors: {
     primary: string;
     primaryContainer: string;
     secondary: string;
+    tertiary?: string;
     bgApp: string;
     bgSurface: string;
-    onPrimary: string;
-    onSecondary: string;
+    onPrimary?: string;
+    onSecondary?: string;
   };
   fonts: {
     display: string;
     body: string;
   };
   shape: 'm3-rounded' | 'neon-sharp';
+  backdropPattern?: string;
   assets?: {
     faviconPng?: string;
+    faviconSvg?: string;
     bgPatternSvg?: string;
+    logoSvg?: string;
   };
 }
 

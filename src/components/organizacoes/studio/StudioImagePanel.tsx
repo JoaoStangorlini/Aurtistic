@@ -4,11 +4,11 @@
 import React, { useRef, useState } from 'react';
 import { useStudio } from './StudioContext';
 import { useOrganizationBrand } from '../OrganizationBrandProvider';
-import type { StudioImageLayer } from './types';
+import type { StudioImageLayer, StudioVaultRef } from './types';
 import { StudioVaultBrowserModal, type VaultBrowserSelectedItem } from './StudioVaultBrowserModal';
 
 export function StudioImagePanel() {
-  const { activeSlide, selectedLayerId, setSelectedLayerId, addLayer, updateLayer, removeLayer, setMaskModalLayerId } = useStudio();
+  const { orgSlug, organizationId, activeSlide, selectedLayerId, setSelectedLayerId, addLayer, updateLayer, removeLayer, setMaskModalLayerId } = useStudio();
   const { tokens } = useOrganizationBrand();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -29,7 +29,7 @@ export function StudioImagePanel() {
     e.target.value = '';
   };
 
-  const createAndAddImageLayer = (src: string, name: string, vaultRelativePath?: string) => {
+  const createAndAddImageLayer = (src: string, name: string, vaultRelativePath?: string, vaultRef?: StudioVaultRef) => {
     const newLayer: StudioImageLayer = {
       id: `img-${Date.now()}`,
       type: 'image',
@@ -37,6 +37,7 @@ export function StudioImagePanel() {
       src,
       resolvedUrl: src,
       vaultRelativePath,
+      vaultRef,
       visible: true,
       locked: false,
       opacity: 1,
@@ -76,11 +77,11 @@ export function StudioImagePanel() {
 
       {/* Lista de Imagens */}
       <div className="space-y-2">
-        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+        <label className="text-[11px] font-bold text-fg-muted uppercase tracking-wider block">
           Imagens Nesta Tela ({imageLayers.length})
         </label>
         {imageLayers.length === 0 ? (
-          <div className="p-4 rounded-xl border border-dashed border-white/10 text-center text-xs text-slate-400">
+          <div className="p-4 rounded-xl border border-dashed border-border-subtle text-center text-xs text-fg-muted">
             Nenhuma imagem adicionada. Faça upload ou selecione do cofre.
           </div>
         ) : (
@@ -90,13 +91,13 @@ export function StudioImagePanel() {
                 key={img.id}
                 onClick={() => setSelectedLayerId(img.id)}
                 className={`p-2 rounded-xl border cursor-pointer flex items-center gap-2 transition-all ${
-                  img.id === selectedImageLayer?.id ? 'border-[#FFCC00] bg-[#FFCC00]/10' : 'border-white/10 bg-white/5 hover:border-white/25'
+                  img.id === selectedImageLayer?.id ? 'border-[#FFCC00] bg-[#FFCC00]/10' : 'border-border-subtle bg-elevated/60 hover:border-border-strong'
                 }`}
               >
-                <img src={img.src} alt={img.name} className="w-9 h-9 rounded-lg object-cover bg-black" />
+                <img src={img.src} alt={img.name} crossOrigin="anonymous" className="w-9 h-9 rounded-lg object-cover bg-black" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-white truncate">{img.name || `Imagem ${idx + 1}`}</p>
-                  <span className="text-[10px] text-slate-400">Zoom: {img.zoom || 1}x</span>
+                  <p className="text-xs font-bold text-fg truncate">{img.name || `Imagem ${idx + 1}`}</p>
+                  <span className="text-[10px] text-fg-muted">Zoom: {img.zoom || 1}x</span>
                 </div>
               </div>
             ))}
@@ -106,9 +107,9 @@ export function StudioImagePanel() {
 
       {/* Controles da Imagem Selecionada */}
       {selectedImageLayer && (
-        <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-3.5">
-          <div className="flex items-center justify-between border-b border-white/10 pb-2">
-            <span className="text-xs font-bold text-white flex items-center gap-1.5 truncate max-w-[150px]">
+        <div className="p-3.5 rounded-2xl bg-elevated/60 border border-border-subtle space-y-3.5">
+          <div className="flex items-center justify-between border-b border-border-subtle pb-2">
+            <span className="text-xs font-bold text-fg flex items-center gap-1.5 truncate max-w-[150px]">
               <span className="material-symbols-outlined text-[16px] text-[#FFCC00]">photo</span>
               {selectedImageLayer.name}
             </span>
@@ -116,7 +117,7 @@ export function StudioImagePanel() {
               <button
                 type="button"
                 onClick={() => setMaskModalLayerId(selectedImageLayer.id)}
-                className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-400/20 text-amber-300 hover:bg-amber-400/30 flex items-center gap-1 cursor-pointer"
+                className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-400/20 text-amber-700 dark:text-amber-300 hover:bg-amber-400/30 flex items-center gap-1 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[14px]">brush</span>
                 <span>Máscara</span>
@@ -133,8 +134,8 @@ export function StudioImagePanel() {
 
           <div>
             <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-slate-400">Zoom</span>
-              <span className="font-mono text-white font-bold">{selectedImageLayer.zoom.toFixed(1)}x</span>
+              <span className="text-fg-muted">Zoom</span>
+              <span className="font-mono text-fg font-bold">{selectedImageLayer.zoom.toFixed(1)}x</span>
             </div>
             <input
               type="range" min={1} max={3} step={0.1} value={selectedImageLayer.zoom}
@@ -145,8 +146,8 @@ export function StudioImagePanel() {
 
           <div>
             <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-slate-400">Rotação</span>
-              <span className="font-mono text-white font-bold">{selectedImageLayer.rotation}°</span>
+              <span className="text-fg-muted">Rotação</span>
+              <span className="font-mono text-fg font-bold">{selectedImageLayer.rotation}°</span>
             </div>
             <input
               type="range" min={0} max={360} step={5} value={selectedImageLayer.rotation}
@@ -157,8 +158,8 @@ export function StudioImagePanel() {
 
           <div>
             <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-slate-400">Opacidade</span>
-              <span className="font-mono text-white font-bold">{Math.round(selectedImageLayer.opacity * 100)}%</span>
+              <span className="text-fg-muted">Opacidade</span>
+              <span className="font-mono text-fg font-bold">{Math.round(selectedImageLayer.opacity * 100)}%</span>
             </div>
             <input
               type="range" min={0} max={1} step={0.05} value={selectedImageLayer.opacity}
@@ -168,8 +169,8 @@ export function StudioImagePanel() {
           </div>
           <div>
             <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-slate-400">Enquadramento</span>
-              <span className="font-mono text-white font-bold">{selectedImageLayer.aspectFit || 'cover'}</span>
+              <span className="text-fg-muted">Enquadramento</span>
+              <span className="font-mono text-fg font-bold">{selectedImageLayer.aspectFit || 'cover'}</span>
             </div>
             <div className="flex items-center gap-1.5">
               {(['cover', 'contain', 'custom'] as const).map((fit) => (
@@ -178,7 +179,7 @@ export function StudioImagePanel() {
                   type="button"
                   onClick={() => updateLayer(selectedImageLayer.id, { aspectFit: fit })}
                   className={`flex-1 py-1 rounded-lg text-[11px] font-bold capitalize transition-all cursor-pointer ${
-                    (selectedImageLayer.aspectFit || 'cover') === fit ? 'bg-[#FFCC00] text-black' : 'bg-white/10 text-slate-300 hover:text-white'
+                    (selectedImageLayer.aspectFit || 'cover') === fit ? 'bg-[#FFCC00] text-black' : 'bg-elevated text-fg-secondary hover:text-fg'
                   }`}
                 >
                   {fit === 'cover' ? 'Preencher' : fit === 'contain' ? 'Ajustar' : 'Livre'}
@@ -190,8 +191,8 @@ export function StudioImagePanel() {
           <div className="grid grid-cols-2 gap-2">
             <div>
               <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-slate-400">Offset X</span>
-                <span className="font-mono text-white text-[11px]">{Math.round((selectedImageLayer.offsetX || 0) * 100)}%</span>
+                <span className="text-fg-muted">Offset X</span>
+                <span className="font-mono text-fg text-[11px]">{Math.round((selectedImageLayer.offsetX || 0) * 100)}%</span>
               </div>
               <input
                 type="range" min={-0.5} max={0.5} step={0.01} value={selectedImageLayer.offsetX || 0}
@@ -201,8 +202,8 @@ export function StudioImagePanel() {
             </div>
             <div>
               <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-slate-400">Offset Y</span>
-                <span className="font-mono text-white text-[11px]">{Math.round((selectedImageLayer.offsetY || 0) * 100)}%</span>
+                <span className="text-fg-muted">Offset Y</span>
+                <span className="font-mono text-fg text-[11px]">{Math.round((selectedImageLayer.offsetY || 0) * 100)}%</span>
               </div>
               <input
                 type="range" min={-0.5} max={0.5} step={0.01} value={selectedImageLayer.offsetY || 0}
@@ -218,11 +219,12 @@ export function StudioImagePanel() {
       <StudioVaultBrowserModal
         isOpen={galleryOpen}
         onClose={() => setGalleryOpen(false)}
-        orgSlug={tokens.themeId}
-        orgDisplayName={tokens.themeId?.toUpperCase() || 'Org'}
+        orgSlug={orgSlug || tokens.themeId}
+        organizationId={organizationId || undefined}
+        orgDisplayName={tokens.displayName || tokens.themeId?.toUpperCase() || 'Org'}
         onUploadClick={() => fileInputRef.current?.click()}
         onSelect={(item: VaultBrowserSelectedItem) => {
-          createAndAddImageLayer(item.streamUrl, item.name, item.relativePath);
+          createAndAddImageLayer(item.streamUrl, item.name, item.relativePath, item.vaultRef);
           setGalleryOpen(false);
         }}
       />

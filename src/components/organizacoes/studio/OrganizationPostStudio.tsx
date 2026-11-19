@@ -54,9 +54,9 @@ function StudioStageRouter({ orgSlug }: { orgSlug?: string | null }) {
   );
 }
 
-export function OrganizationPostStudio({ organizationId: _organizationId, orgSlug }: OrganizationPostStudioProps) {
+export function OrganizationPostStudio({ organizationId, orgSlug }: OrganizationPostStudioProps) {
   return (
-    <StudioProvider orgSlug={orgSlug}>
+    <StudioProvider organizationId={organizationId} orgSlug={orgSlug}>
       <div className="text-fg">
         <StudioStageRouter orgSlug={orgSlug} />
       </div>

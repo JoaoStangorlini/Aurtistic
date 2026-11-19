@@ -223,7 +223,7 @@ export default async function ServidorPage({
     : null;
 
   return (
-    <div className="min-h-full flex flex-col bg-app">
+    <div className="min-h-full flex flex-col bg-transparent">
       <UserVaultWorkspace
         profile={session.profile}
         isApprovedForStorage={session.isApprovedForStorage}

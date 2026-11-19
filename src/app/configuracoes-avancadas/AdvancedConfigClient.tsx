@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateAdvancedConfig } from '@/app/(dashboard)/actions';
 import { HubLinkCard } from '@/components/auth/HubLinkCard';
+import { useTheme } from '@/components/theme/ThemeProvider';
 import type { HubConnectionData } from '@/lib/hub-sso';
 
 interface AdvancedConfig {
@@ -51,6 +52,7 @@ export default function AdvancedConfigClient({
   hubConnection?: HubConnectionData | null
 }) {
   const router = useRouter();
+  const { overrideOrgTheme, setOverrideOrgTheme } = useTheme();
   const safeInitialConfig = {
     ...initialConfig,
     default_task_values: initialConfig.default_task_values || {}
@@ -136,6 +138,36 @@ export default function AdvancedConfigClient({
         <div className="max-w-2xl mx-auto space-y-6">
           {/* Card de Integração e Vínculo com HUB LabDiv */}
           <HubLinkCard hubConnection={hubConnection} userEmail={userEmail} />
+
+          {/* Aparência & Temas */}
+          <div className="bg-surface border border-border-subtle rounded-xl p-6 shadow-xl">
+            <h2 className="text-lg font-bold text-fg mb-4 border-b border-border-subtle pb-2">
+              Aparência & Temas
+            </h2>
+            <div className="flex justify-between items-start gap-4">
+              <div>
+                <h3 className="text-sm font-bold text-fg-secondary">Sobrescrever tema da organização</h3>
+                <p className="text-xs text-fg-muted mt-1">
+                  Quando ativado, o seu Tema Global escolhido no menu de perfil permanece ativo até dentro da aba Gestão. Os templates, selos e fontes do Studio continuam fiéis à organização editada.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={overrideOrgTheme}
+                onClick={() => setOverrideOrgTheme(!overrideOrgTheme)}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors cursor-pointer ${
+                  overrideOrgTheme ? 'bg-accent-primary' : 'bg-surface-hover border border-border-strong'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    overrideOrgTheme ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
 
           {/* Lado Esquerdo: Módulos */}
           <div className="bg-surface border border-border-subtle rounded-xl p-6 shadow-xl">

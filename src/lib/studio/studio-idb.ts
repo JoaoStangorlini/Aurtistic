@@ -30,12 +30,15 @@ export function rehydrateDraft(draft: StudioDraft): StudioDraft {
       layers: s.layers.map((l) => {
         if (l.type === 'image') {
           const img = l as StudioImageLayer;
-          if (img.vaultRelativePath) {
-            const resolved = img.resolvedUrl ||
-              (img.vaultRelativePath.startsWith('http') || img.vaultRelativePath.startsWith('/')
-                ? img.vaultRelativePath
-                : '/' + img.vaultRelativePath.replace(/^\/+/, ''));
-            return { ...img, resolvedUrl: resolved, src: resolved };
+          const rel = img.vaultRef?.relativePath || img.vaultRelativePath;
+          if (rel) {
+            const isPublicAsset =
+              rel.startsWith('http') ||
+              rel.startsWith('/galeria') ||
+              rel.startsWith('/show') ||
+              rel.startsWith('/Logo');
+            const resolved = img.resolvedUrl || (isPublicAsset ? rel : img.src);
+            return { ...img, vaultRelativePath: img.vaultRelativePath || rel, resolvedUrl: resolved, src: resolved };
           }
         }
         return l;
@@ -44,7 +47,7 @@ export function rehydrateDraft(draft: StudioDraft): StudioDraft {
   };
 }
 
-function sanitizeDraftForStorage(draft: StudioDraft): StudioDraft {
+export function sanitizeDraftForStorage(draft: StudioDraft): StudioDraft {
   return {
     ...draft,
     slides: draft.slides.map((s) => ({
@@ -52,11 +55,12 @@ function sanitizeDraftForStorage(draft: StudioDraft): StudioDraft {
       layers: s.layers.map((l) => {
         if (l.type === 'image') {
           const img = l as StudioImageLayer;
-          // Se tiver caminho canônico do cofre e src for blob temporário, salva o caminho canônico
-          if (img.vaultRelativePath && img.src.startsWith('blob:')) {
-            return { ...img, src: img.vaultRelativePath, resolvedUrl: undefined };
+          const rel = img.vaultRef?.relativePath || img.vaultRelativePath;
+          // Apenas camadas com referência do cofre têm URLs temporárias (?ticket=/blob:) limpas;
+          // uploads locais (sem vaultRef/vaultRelativePath) são preservados intactos.
+          if (rel && (img.src.startsWith('blob:') || img.src.includes('ticket='))) {
+            return { ...img, vaultRelativePath: rel, src: rel, resolvedUrl: undefined };
           }
-          // Se for upload local (sem vaultRelativePath), preserva img intacta (data URL)
         }
         return l;
       }),

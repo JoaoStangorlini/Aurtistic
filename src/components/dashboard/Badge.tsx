@@ -13,7 +13,7 @@ export function getBadgeColorClass(type: BadgeType, value: string | null): strin
     else if (text.includes('testar')) colorClass = 'bg-[#f4b400]/15 text-[#f4b400] border-[#f4b400]/30'; // Yellow
     else if (text.includes('descartada')) colorClass = 'bg-[#db4437]/15 text-[#db4437] border-[#db4437]/30'; // Red
     else if (text.includes('progresso')) colorClass = 'bg-[#4285f4]/15 text-[#4285f4] border-[#4285f4]/30'; // Blue
-    else if (text.includes('iniciada')) colorClass = 'bg-[#E0E0E0]/15 text-fg-secondary border-[#E0E0E0]/30'; // Light Gray
+    else if (text.includes('iniciada')) colorClass = 'bg-elevated text-fg-secondary border-border-strong'; // Light/Dark Neutral
     else if (text.includes('rascunho')) colorClass = 'bg-[#8E8E8E]/15 text-fg-muted border-[#8E8E8E]/30 text-dashed'; // Gray with different feel
   } 
   else if (type === 'prioridade') {

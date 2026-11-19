@@ -153,7 +153,7 @@ export function StorageQuotaCard({
                     Vitrine pública:{' '}
                     <a
                       href={`/portfolio/${publicSlug}`}
-                      className="text-accent-secondary hover:underline font-medium"
+                      className="text-[var(--accent-secondary-text)] dark:text-[var(--accent-secondary)] hover:underline font-semibold"
                     >
                       /portfolio/{publicSlug}
                     </a>

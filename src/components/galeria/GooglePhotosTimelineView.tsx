@@ -381,7 +381,7 @@ export function GooglePhotosTimelineView({
           <button
             type="button"
             onClick={() => setIsBackupModalOpen(true)}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-bold border border-teal-500/40 bg-teal-500/10 text-teal-300 hover:bg-teal-500/20 cursor-pointer"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-bold border border-teal-500/40 bg-teal-500/10 text-teal-700 dark:text-teal-300 hover:bg-teal-500/20 cursor-pointer"
           >
             Backup Wi-Fi &amp; Espaço
           </button>

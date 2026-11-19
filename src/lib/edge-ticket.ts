@@ -430,6 +430,7 @@ export interface SignEdgeTicketOptions {
   orgSlug?: string;
   allowedOrgSlugs?: string[];
   allowedPrefix?: string;
+  allowedPathPrefix?: string;
   /** Lista explícita de caminhos relativos permitidos quando purpose === 'public_media' */
   allowedPaths?: string[];
   readOnly?: boolean;
@@ -451,9 +452,10 @@ export function signEdgeTenantTicket(options: SignEdgeTicketOptions): SignedEdge
         .filter(Boolean)
     : undefined;
 
+  const resolvedAllowedPrefix = options.allowedPrefix || options.allowedPathPrefix;
   if (
     purpose === 'public_media' &&
-    !options.allowedPrefix &&
+    !resolvedAllowedPrefix &&
     (!normalizedAllowedPaths || normalizedAllowedPaths.length === 0)
   ) {
     throw new Error('[EdgeTicket] Escopo public_media exige allowedPaths ou allowedPrefix explícito.');
@@ -485,7 +487,7 @@ export function signEdgeTenantTicket(options: SignEdgeTicketOptions): SignedEdge
       ? { orgSlug: options.orgSlug || DEFAULT_ECOSYSTEM_ORGS_BY_ID[options.organizationId!]?.slug }
       : {}),
     ...(options.allowedOrgSlugs?.length ? { allowedOrgSlugs: options.allowedOrgSlugs } : {}),
-    ...(options.allowedPrefix ? { allowedPrefix: options.allowedPrefix } : {}),
+    ...(resolvedAllowedPrefix ? { allowedPrefix: resolvedAllowedPrefix } : {}),
     ...(normalizedAllowedPaths ? { allowedPaths: normalizedAllowedPaths } : {}),
     ...(isReadOnly ? { readOnly: true } : {}),
     ...(options.allowDownload !== undefined ? { allowDownload: options.allowDownload } : {}),

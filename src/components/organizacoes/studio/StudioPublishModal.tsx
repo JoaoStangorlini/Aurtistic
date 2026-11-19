@@ -101,7 +101,7 @@ export function StudioPublishModal({ orgSlug }: { orgSlug?: string | null }) {
         </div>
 
         {notice && (
-          <div className="p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-xs text-center font-bold">
+          <div className="p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-700 dark:text-emerald-200 text-xs text-center font-bold">
             {notice}
           </div>
         )}
@@ -109,16 +109,16 @@ export function StudioPublishModal({ orgSlug }: { orgSlug?: string | null }) {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
           {/* Mockup de Celular (Esquerda) */}
           <div className="md:col-span-5 flex flex-col items-center gap-2.5">
-            <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/10 text-xs">
+            <div className="flex items-center gap-1 bg-elevated/70 p-1 rounded-xl border border-border-subtle text-xs">
               <button
                 type="button" onClick={() => setPreviewMode('feed')}
-                className={`px-3 py-1 rounded-lg font-bold ${previewMode === 'feed' ? 'bg-[#FFCC00] text-black' : 'text-slate-400'}`}
+                className={`px-3 py-1 rounded-lg font-bold ${previewMode === 'feed' ? 'bg-[#FFCC00] text-black' : 'text-fg-muted'}`}
               >
                 Feed 1:1 / 4:5
               </button>
               <button
                 type="button" onClick={() => setPreviewMode('stories')}
-                className={`px-3 py-1 rounded-lg font-bold ${previewMode === 'stories' ? 'bg-[#FFCC00] text-black' : 'text-slate-400'}`}
+                className={`px-3 py-1 rounded-lg font-bold ${previewMode === 'stories' ? 'bg-[#FFCC00] text-black' : 'text-fg-muted'}`}
               >
                 Stories 9:16
               </button>
@@ -128,7 +128,7 @@ export function StudioPublishModal({ orgSlug }: { orgSlug?: string | null }) {
             <div className={`relative rounded-3xl border-4 border-slate-700 bg-black overflow-hidden shadow-2xl p-1 flex items-center justify-center ${previewMode === 'stories' ? 'w-[200px] h-[355px]' : 'w-[240px] h-[300px]'}`}>
               <img src={previewPng} alt="Preview Post" className="w-full h-full object-contain rounded-2xl" />
             </div>
-            <span className="text-[10px] text-slate-400 font-mono">Mockup em Tempo Real ({slides.length} Telas)</span>
+            <span className="text-[10px] text-fg-muted font-mono">Mockup em Tempo Real ({slides.length} Telas)</span>
           </div>
 
           {/* Legenda, Acessibilidade e Exportação (Direita) */}
@@ -136,45 +136,45 @@ export function StudioPublishModal({ orgSlug }: { orgSlug?: string | null }) {
             {/* Legenda Automática */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-slate-300">Legenda Automática</span>
+                <span className="font-bold text-fg-secondary">Legenda Automática</span>
                 <button
                   type="button"
                   onClick={() => { navigator.clipboard.writeText(caption); setCopiedCaption(true); setTimeout(() => setCopiedCaption(false), 2000); }}
-                  className="text-amber-300 hover:underline font-bold text-[11px]"
+                  className="text-amber-700 dark:text-amber-300 hover:underline font-bold text-[11px]"
                 >
                   {copiedCaption ? '✓ Copiado!' : 'Copiar Legenda'}
                 </button>
               </div>
-              <textarea readOnly rows={4} value={caption} className="w-full p-2.5 rounded-xl bg-black/40 border border-white/10 text-xs text-slate-200" />
+              <textarea readOnly rows={4} value={caption} className="w-full p-2.5 rounded-xl bg-elevated/70 border border-border-subtle text-xs text-fg" />
             </div>
 
             {/* Alt Text de Acessibilidade */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-slate-300">Alt-Text Acessível (Leitores de Tela)</span>
+                <span className="font-bold text-fg-secondary">Alt-Text Acessível (Leitores de Tela)</span>
                 <button
                   type="button"
                   onClick={() => { navigator.clipboard.writeText(altText); setCopiedAlt(true); setTimeout(() => setCopiedAlt(false), 2000); }}
-                  className="text-amber-300 hover:underline font-bold text-[11px]"
+                  className="text-amber-700 dark:text-amber-300 hover:underline font-bold text-[11px]"
                 >
                   {copiedAlt ? '✓ Copiado!' : 'Copiar Alt'}
                 </button>
               </div>
-              <input readOnly type="text" value={altText} className="w-full p-2 rounded-xl bg-black/40 border border-white/10 text-[11px] text-slate-300" />
+              <input readOnly type="text" value={altText} className="w-full p-2 rounded-xl bg-elevated/70 border border-border-subtle text-[11px] text-fg-secondary" />
             </div>
 
             {/* Ações de Envio e Salvamento no Cofre */}
             <div className="grid grid-cols-2 gap-2 pt-1">
               <button
                 type="button" disabled={publishing} onClick={() => handleSaveVault('prontos')}
-                className="py-2.5 px-3 rounded-xl border border-white/20 bg-white/5 hover:bg-white/10 text-xs font-bold text-white flex items-center justify-center gap-1.5"
+                className="py-2.5 px-3 rounded-xl border border-white/20 bg-elevated/60 hover:bg-elevated text-xs font-bold text-fg flex items-center justify-center gap-1.5"
               >
                 <span className="material-symbols-outlined text-[16px]">cloud_upload</span>
                 <span>Salvar no Cofre</span>
               </button>
               <button
                 type="button" disabled={publishing} onClick={() => handleSaveVault('modelos')}
-                className="py-2.5 px-3 rounded-xl border border-amber-400/30 bg-amber-400/10 hover:bg-amber-400/20 text-xs font-bold text-amber-300 flex items-center justify-center gap-1.5"
+                className="py-2.5 px-3 rounded-xl border border-amber-400/30 bg-amber-400/10 hover:bg-amber-400/20 text-xs font-bold text-amber-700 dark:text-amber-300 flex items-center justify-center gap-1.5"
               >
                 <span className="material-symbols-outlined text-[16px]">bookmark_add</span>
                 <span>Salvar como Modelo</span>
@@ -185,19 +185,19 @@ export function StudioPublishModal({ orgSlug }: { orgSlug?: string | null }) {
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button" onClick={() => handleDownloadPng(1)}
-                className="py-2 rounded-xl border border-white/10 bg-black/40 text-xs font-bold text-slate-300 hover:text-white text-center"
+                className="py-2 rounded-xl border border-border-subtle bg-elevated/70 text-xs font-bold text-fg-secondary hover:text-fg text-center"
               >
                 Baixar PNG 1x
               </button>
               <button
                 type="button" onClick={() => handleDownloadPng(2)}
-                className="py-2 rounded-xl border border-white/10 bg-black/40 text-xs font-bold text-slate-300 hover:text-white text-center"
+                className="py-2 rounded-xl border border-border-subtle bg-elevated/70 text-xs font-bold text-fg-secondary hover:text-fg text-center"
               >
                 PNG 2x Retina
               </button>
               <button
                 type="button" disabled={pdfLoading} onClick={handleDownloadPdf}
-                className="py-2 rounded-xl border border-white/10 bg-black/40 text-xs font-bold text-slate-300 hover:text-white text-center disabled:opacity-50"
+                className="py-2 rounded-xl border border-border-subtle bg-elevated/70 text-xs font-bold text-fg-secondary hover:text-fg text-center disabled:opacity-50"
               >
                 {pdfLoading ? 'Gerando…' : `PDF (${slides.length} pág.)`}
               </button>

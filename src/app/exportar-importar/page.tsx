@@ -116,7 +116,7 @@ export default function ExportImportPage() {
   }
 
   return (
-    <div className="min-h-screen bg-app text-fg p-4 md:p-8">
+    <div className="min-h-screen bg-transparent text-fg p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-8 mt-16">
         <div>
           <Link href="/" className="inline-flex items-center gap-2 text-fg-secondary hover:text-accent-primary transition-colors mb-4">

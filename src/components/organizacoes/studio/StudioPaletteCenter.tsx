@@ -60,9 +60,9 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
   const isAa = Number(contrastWhite) >= 4.5;
 
   return (
-    <div className="space-y-3.5 p-3.5 rounded-2xl bg-white/5 border border-white/10 text-xs">
+    <div className="space-y-3.5 p-3.5 rounded-2xl bg-elevated/60 border border-border-subtle text-xs">
       {/* Cabeçalho com Cor Base + Pipeta */}
-      <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2.5">
+      <div className="flex items-center justify-between gap-2 border-b border-border-subtle pb-2.5">
         <div className="flex items-center gap-2">
           <input
             type="color"
@@ -71,13 +71,13 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
             className="w-7 h-7 rounded-lg cursor-pointer bg-transparent border-0"
           />
           <div>
-            <span className="text-[10px] text-slate-400 block font-mono">COR BASE</span>
-            <span className="font-mono text-white font-bold">{baseColor.toUpperCase()}</span>
+            <span className="text-[10px] text-fg-muted block font-mono">COR BASE</span>
+            <span className="font-mono text-fg font-bold">{baseColor.toUpperCase()}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5">
-          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${isAaa ? 'bg-emerald-500/20 text-emerald-300' : isAa ? 'bg-amber-500/20 text-amber-300' : 'bg-red-500/20 text-red-300'}`}>
+          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${isAaa ? 'bg-emerald-500/20 text-emerald-300' : isAa ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300' : 'bg-red-500/20 text-red-300'}`}>
             {isAaa ? 'WCAG AAA (7:1)' : isAa ? 'WCAG AA' : 'Baixo Contraste'}
           </span>
           {onPickColor && (
@@ -85,7 +85,7 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
               type="button"
               onClick={onPickColor}
               title="Pipeta Eyedropper"
-              className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-amber-300 cursor-pointer"
+              className="p-1.5 rounded-lg bg-elevated hover:bg-white/20 text-amber-700 dark:text-amber-300 cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">colorize</span>
             </button>
@@ -96,13 +96,13 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
       {/* Seletor de Harmonias */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+          <label className="text-[10px] font-bold text-fg-muted uppercase tracking-wider block">
             Harmonias OKLCH
           </label>
           <button
             type="button"
             onClick={() => toggleFavorite(currentPalette)}
-            className="flex items-center gap-1 text-[10px] text-amber-300 hover:text-amber-200 cursor-pointer"
+            className="flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 hover:text-amber-200 cursor-pointer"
             title="Salvar esta paleta nos favoritos"
           >
             <span className="material-symbols-outlined text-[13px]">
@@ -125,7 +125,7 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
               key={h.id}
               type="button"
               onClick={() => setHarmonyType(h.id)}
-              className={`py-1 rounded-md text-center cursor-pointer transition-all ${harmonyType === h.id ? 'bg-[#FFCC00] text-black' : 'bg-white/5 text-slate-400 hover:text-white'}`}
+              className={`py-1 rounded-md text-center cursor-pointer transition-all ${harmonyType === h.id ? 'bg-[#FFCC00] text-black' : 'bg-elevated/60 text-fg-muted hover:text-fg'}`}
             >
               {h.label}
             </button>
@@ -144,7 +144,7 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
             style={{ backgroundColor: color }}
             title={`Aplicar ${color}`}
           >
-            <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 text-[9px] font-mono text-white rounded-xl">
+            <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-elevated/70 text-[9px] font-mono text-fg rounded-xl">
               Usar
             </span>
           </button>
@@ -152,8 +152,8 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
       </div>
 
       {/* Paleta Oficial da Organização */}
-      <div className="pt-1 border-t border-white/10">
-        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+      <div className="pt-1 border-t border-border-subtle">
+        <label className="text-[10px] font-bold text-fg-muted uppercase tracking-wider block mb-1">
           Identidade Visual Oficial ({tokens.displayName})
         </label>
         <div className="flex items-center gap-2">
@@ -172,8 +172,8 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
 
       {/* Paletas Favoritas */}
       {favorites.length > 0 && (
-        <div className="pt-1 border-t border-white/10">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+        <div className="pt-1 border-t border-border-subtle">
+          <label className="text-[10px] font-bold text-fg-muted uppercase tracking-wider block mb-1">
             Paletas Salvas / Favoritas
           </label>
           <div className="space-y-1">
@@ -202,7 +202,7 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Buscar cores (ex: azul, dourado, show)..."
-          className="w-full px-2.5 py-1.5 rounded-xl bg-black/40 border border-white/15 text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-[#FFCC00]"
+          className="w-full px-2.5 py-1.5 rounded-xl bg-elevated/70 border border-border-strong text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-[#FFCC00]"
         />
         {searchResults.length > 0 && (
           <div className="flex items-center gap-2 mt-2">

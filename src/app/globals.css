@@ -82,6 +82,16 @@
     --scrollbar-track: #121212;
     --scrollbar-thumb: #2D2D2D;
     --scrollbar-thumb-hover: #A0A0A0;
+
+    --md-sys-color-primary: var(--accent-primary);
+    --md-sys-color-primary-container: var(--accent-primary-hover);
+    --md-sys-color-secondary: var(--accent-secondary);
+    --md-sys-color-tertiary: #F14343;
+    --md-sys-color-on-primary: var(--on-accent-primary);
+    --md-sys-color-on-secondary: var(--on-accent-secondary);
+    --org-primary: var(--accent-primary);
+    --org-secondary: var(--accent-secondary);
+    --org-tertiary: #F14343;
   }
 
   /* Modo Claro */
@@ -101,6 +111,16 @@
     --scrollbar-track: #ECEEF3;
     --scrollbar-thumb: #D8DCE6;
     --scrollbar-thumb-hover: #8E8E8E;
+
+    --md-sys-color-primary: var(--accent-primary);
+    --md-sys-color-primary-container: var(--accent-primary-hover);
+    --md-sys-color-secondary: var(--accent-secondary);
+    --md-sys-color-tertiary: #DC2626;
+    --md-sys-color-on-primary: var(--on-accent-primary);
+    --md-sys-color-on-secondary: var(--on-accent-secondary);
+    --org-primary: var(--accent-primary);
+    --org-secondary: var(--accent-secondary);
+    --org-tertiary: #DC2626;
   }
 
   /* =====================================================================
@@ -230,54 +250,132 @@
 
   /* 6. LabDiv (IFUSP - Membros) */
   html[data-theme-palette="labdiv"] {
+    --bg-app: #070c16;
+    --bg-surface: #0d1524;
+    --bg-elevated: #131e33;
+    --bg-hover: #1a2944;
+    --border-subtle: rgba(31, 159, 207, 0.25);
+    --border-strong: rgba(31, 159, 207, 0.45);
+    --font-title: var(--font-space-grotesk), 'Space Grotesk', sans-serif;
+
     --accent-primary: #1F9FCF;
     --accent-primary-hover: #0F4780;
-    --accent-primary-text: #1F9FCF;
+    --accent-primary-text: #38BDF8;
     --on-accent-primary: #041222;
 
     --accent-secondary: #FFCC00;
     --accent-secondary-hover: #F14343;
     --accent-secondary-text: #FFCC00;
     --on-accent-secondary: #121212;
+
+    --md-sys-color-primary: #1F9FCF;
+    --md-sys-color-primary-container: #0F4780;
+    --md-sys-color-secondary: #FFCC00;
+    --md-sys-color-tertiary: #F14343;
+    --md-sys-color-on-primary: #041222;
+    --md-sys-color-on-secondary: #121212;
+    --org-primary: #1F9FCF;
+    --org-secondary: #FFCC00;
+    --org-tertiary: #F14343;
   }
   html[data-theme-palette="labdiv"][data-theme-mode="light"] {
+    --bg-app: #F0F7FF;
+    --bg-surface: #FFFFFF;
+    --bg-elevated: #E6F0FA;
+    --bg-hover: #D9E8F7;
+    --border-subtle: rgba(15, 71, 128, 0.16);
+    --border-strong: rgba(15, 71, 128, 0.30);
+
     --accent-primary: #0F4780;
     --accent-primary-hover: #0F6688;
     --accent-primary-text: #0F4780;
     --on-accent-primary: #FFFFFF;
 
-    --accent-secondary: #F14343;
-    --accent-secondary-hover: #D93838;
-    --accent-secondary-text: #B91C1C;
-    --on-accent-secondary: #FFFFFF;
+    --accent-secondary: #FFCC00;
+    --accent-secondary-hover: #E6B800;
+    --accent-secondary-text: #B45309;
+    --on-accent-secondary: #121212;
+
+    --md-sys-color-primary: #0F4780;
+    --md-sys-color-primary-container: #0F6688;
+    --md-sys-color-secondary: #FFCC00;
+    --md-sys-color-tertiary: #F14343;
+    --md-sys-color-on-primary: #FFFFFF;
+    --md-sys-color-on-secondary: #121212;
+    --org-primary: #0F4780;
+    --org-secondary: #FFCC00;
+    --org-tertiary: #F14343;
   }
 
-  /* 7. Show de Física (IFUSP - Membros) */
+  /* 7. Show de Física (IFUSP - Oficial show-da-fisica.ts) */
   html[data-theme-palette="show-da-fisica"] {
-    --accent-primary: #0066FF;
-    --accent-primary-hover: #0052CC;
-    --accent-primary-text: #38BDF8;
-    --on-accent-primary: #FFFFFF;
+    --bg-app: #040714;
+    --bg-surface: #090e24;
+    --bg-elevated: #0f1738;
+    --bg-hover: #16224f;
+    --border-subtle: rgba(0, 212, 255, 0.28);
+    --border-strong: rgba(0, 212, 255, 0.55);
+    --font-title: var(--font-orbitron), 'Orbitron', sans-serif;
 
-    --accent-secondary: #FF1E56;
-    --accent-secondary-hover: #E11D48;
-    --accent-secondary-text: #FF4D79;
-    --on-accent-secondary: #FFFFFF;
+    --accent-primary: #00D4FF;
+    --accent-primary-hover: #002FFE;
+    --accent-primary-text: #00D4FF;
+    --on-accent-primary: #040714;
+
+    --accent-secondary: #FFE600;
+    --accent-secondary-hover: #FFD000;
+    --accent-secondary-text: #FFE600;
+    --on-accent-secondary: #040714;
+
+    --md-sys-color-primary: #00D4FF;
+    --md-sys-color-primary-container: #002FFE;
+    --md-sys-color-secondary: #FFE600;
+    --md-sys-color-tertiary: #FF1E56;
+    --md-sys-color-on-primary: #040714;
+    --md-sys-color-on-secondary: #040714;
+    --org-primary: #00D4FF;
+    --org-secondary: #FFE600;
+    --org-tertiary: #FF1E56;
   }
   html[data-theme-palette="show-da-fisica"][data-theme-mode="light"] {
-    --accent-primary: #0052CC;
-    --accent-primary-hover: #003D99;
-    --accent-primary-text: #0052CC;
+    --bg-app: #F8FAFC;
+    --bg-surface: #FFFFFF;
+    --bg-elevated: #EEF4FF;
+    --bg-hover: #E0EBFF;
+    --border-subtle: rgba(0, 47, 254, 0.18);
+    --border-strong: rgba(0, 47, 254, 0.35);
+
+    --accent-primary: #002FFE;
+    --accent-primary-hover: #0052CC;
+    --accent-primary-text: #002FFE;
     --on-accent-primary: #FFFFFF;
 
-    --accent-secondary: #E11D48;
-    --accent-secondary-hover: #BE123C;
-    --accent-secondary-text: #BE123C;
-    --on-accent-secondary: #FFFFFF;
+    --accent-secondary: #FFCC00;
+    --accent-secondary-hover: #E6B800;
+    --accent-secondary-text: #B45309;
+    --on-accent-secondary: #040714;
+
+    --md-sys-color-primary: #002FFE;
+    --md-sys-color-primary-container: #0052CC;
+    --md-sys-color-secondary: #FFCC00;
+    --md-sys-color-tertiary: #F60011;
+    --md-sys-color-on-primary: #FFFFFF;
+    --md-sys-color-on-secondary: #040714;
+    --org-primary: #002FFE;
+    --org-secondary: #FFCC00;
+    --org-tertiary: #F60011;
   }
 
   /* 8. Hackerspace IFUSP (Membros) */
   html[data-theme-palette="hs"] {
+    --bg-app: #060a08;
+    --bg-surface: #0d1410;
+    --bg-elevated: #131f18;
+    --bg-hover: #1a2c22;
+    --border-subtle: rgba(0, 255, 102, 0.24);
+    --border-strong: rgba(0, 255, 102, 0.45);
+    --font-title: var(--font-jetbrains-mono), 'JetBrains Mono', monospace;
+
     --accent-primary: #00FF66;
     --accent-primary-hover: #00CC52;
     --accent-primary-text: #00FF66;
@@ -287,8 +385,25 @@
     --accent-secondary-hover: #E6B800;
     --accent-secondary-text: #FFCC00;
     --on-accent-secondary: #121212;
+
+    --md-sys-color-primary: #00FF66;
+    --md-sys-color-primary-container: #0b2918;
+    --md-sys-color-secondary: #FFCC00;
+    --md-sys-color-tertiary: #06B6D4;
+    --md-sys-color-on-primary: #041A0E;
+    --md-sys-color-on-secondary: #121212;
+    --org-primary: #00FF66;
+    --org-secondary: #FFCC00;
+    --org-tertiary: #06B6D4;
   }
   html[data-theme-palette="hs"][data-theme-mode="light"] {
+    --bg-app: #F2FBF6;
+    --bg-surface: #FFFFFF;
+    --bg-elevated: #E6F7EE;
+    --bg-hover: #D5F2E3;
+    --border-subtle: rgba(5, 150, 105, 0.18);
+    --border-strong: rgba(5, 150, 105, 0.34);
+
     --accent-primary: #059669;
     --accent-primary-hover: #047857;
     --accent-primary-text: #059669;
@@ -298,6 +413,16 @@
     --accent-secondary-hover: #B45309;
     --accent-secondary-text: #B45309;
     --on-accent-secondary: #121212;
+
+    --md-sys-color-primary: #059669;
+    --md-sys-color-primary-container: #047857;
+    --md-sys-color-secondary: #D97706;
+    --md-sys-color-tertiary: #0891B2;
+    --md-sys-color-on-primary: #FFFFFF;
+    --md-sys-color-on-secondary: #121212;
+    --org-primary: #059669;
+    --org-secondary: #D97706;
+    --org-tertiary: #0891B2;
   }
 
   html {
@@ -314,13 +439,78 @@
     background-attachment: fixed;
   }
   html[data-theme-palette="show-da-fisica"][data-theme-mode="light"] body {
-    background-color: #f0f4fc;
-    background-image: radial-gradient(circle at 10% 20%, rgba(0, 102, 255, 0.05) 0%, transparent 40%),
-                      radial-gradient(circle at 90% 80%, rgba(255, 30, 86, 0.05) 0%, transparent 40%),
+    background-color: var(--bg-app);
+    background-image: radial-gradient(circle at 10% 20%, rgba(0, 47, 254, 0.05) 0%, transparent 40%),
+                      radial-gradient(circle at 90% 80%, rgba(246, 0, 17, 0.05) 0%, transparent 40%),
                       url('/bg-show.svg');
     background-repeat: repeat;
     background-size: 360px 360px;
     background-attachment: fixed;
+  }
+
+  /* Estética Neon-Sharp Oficial (Show de Física / Hackerspace) */
+  html[data-theme-palette="show-da-fisica"] h1,
+  html[data-theme-palette="show-da-fisica"] h2 {
+    font-family: var(--font-title);
+  }
+
+  .neon-border-green {
+    border: 1.5px solid #01F300;
+    box-shadow: 0 0 14px rgba(1, 243, 0, 0.28), inset 0 0 10px rgba(1, 243, 0, 0.08);
+  }
+  .neon-border-blue {
+    border: 1.5px solid #00D4FF;
+    box-shadow: 0 0 14px rgba(0, 212, 255, 0.30), inset 0 0 10px rgba(0, 47, 254, 0.10);
+  }
+  .neon-border-yellow {
+    border: 1.5px solid #FFE600;
+    box-shadow: 0 0 14px rgba(255, 230, 0, 0.28), inset 0 0 10px rgba(255, 230, 0, 0.08);
+  }
+  .neon-border-red {
+    border: 1.5px solid #F60011;
+    box-shadow: 0 0 14px rgba(246, 0, 17, 0.30), inset 0 0 10px rgba(246, 0, 17, 0.08);
+  }
+
+  .neon-text-red {
+    color: #FFFFFF;
+    text-shadow: 0 0 8px #F60011, 0 0 18px rgba(246, 0, 17, 0.72);
+  }
+  .neon-text-blue {
+    color: #FFFFFF;
+    text-shadow: 0 0 8px #00D4FF, 0 0 18px rgba(0, 47, 254, 0.80);
+  }
+  .neon-text-green {
+    color: #FFFFFF;
+    text-shadow: 0 0 8px #01F300, 0 0 18px rgba(1, 243, 0, 0.72);
+  }
+
+  html[data-theme-mode="light"] .neon-border-green {
+    border: 1.5px solid #059669;
+    box-shadow: 0 2px 10px rgba(5, 150, 105, 0.12);
+  }
+  html[data-theme-mode="light"] .neon-border-blue {
+    border: 1.5px solid #002FFE;
+    box-shadow: 0 2px 10px rgba(0, 47, 254, 0.12);
+  }
+  html[data-theme-mode="light"] .neon-border-yellow {
+    border: 1.5px solid #D97706;
+    box-shadow: 0 2px 10px rgba(217, 119, 6, 0.12);
+  }
+  html[data-theme-mode="light"] .neon-border-red {
+    border: 1.5px solid #DC2626;
+    box-shadow: 0 2px 10px rgba(220, 38, 38, 0.12);
+  }
+  html[data-theme-mode="light"] .neon-text-red {
+    color: #DC2626;
+    text-shadow: none;
+  }
+  html[data-theme-mode="light"] .neon-text-blue {
+    color: #002FFE;
+    text-shadow: none;
+  }
+  html[data-theme-mode="light"] .neon-text-green {
+    color: #059669;
+    text-shadow: none;
   }
 
   html[data-theme-palette="labdiv"] body {
@@ -380,9 +570,10 @@
 }
 
 /* =====================================================================
-   CÂMARA ESCURA PARA FOTOGRAFIA & LIGHTBOX (PRESERVAÇÃO ÓPTICA)
+   CÂMARA ESCURA PARA FOTOGRAFIA & DOCK DO STUDIO (PRESERVAÇÃO ÓPTICA)
    ===================================================================== */
-[data-darkroom="true"] {
+[data-darkroom="true"],
+.studio-dock-dark {
   color-scheme: dark !important;
   --bg-app: #0A0A0A !important;
   --bg-surface: #141414 !important;
@@ -406,42 +597,42 @@ html[data-theme-mode="light"] body {
   color: var(--text-primary);
 }
 
-html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#121212\] {
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.studio-dock-dark):not(.studio-dock-dark *) .bg-\[\#121212\] {
   background-color: var(--bg-app) !important;
 }
-html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#121212\]\/90 {
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.studio-dock-dark):not(.studio-dock-dark *) .bg-\[\#121212\]\/90 {
   background-color: rgba(244, 245, 248, 0.9) !important;
 }
-html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#121212\]\/95 {
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.studio-dock-dark):not(.studio-dock-dark *) .bg-\[\#121212\]\/95 {
   background-color: rgba(244, 245, 248, 0.95) !important;
 }
-html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#1A1A1A\],
-html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#1a1a1a\],
-html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#1E1E1E\],
-html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#1e1e1e\] {
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.studio-dock-dark):not(.studio-dock-dark *) .bg-\[\#1A1A1A\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.studio-dock-dark):not(.studio-dock-dark *) .bg-\[\#1a1a1a\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.studio-dock-dark):not(.studio-dock-dark *) .bg-\[\#1E1E1E\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.studio-dock-dark):not(.studio-dock-dark *) .bg-\[\#1e1e1e\] {
   background-color: var(--bg-surface) !important;
 }
-html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#1A1A1A\]\/95,
-html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#1A1A1A\]\/80 {
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.studio-dock-dark):not(.studio-dock-dark *) .bg-\[\#1A1A1A\]\/95,
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.studio-dock-dark):not(.studio-dock-dark *) .bg-\[\#1A1A1A\]\/80 {
   background-color: rgba(255, 255, 255, 0.92) !important;
 }
-html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#242424\],
-html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#252525\] {
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.studio-dock-dark):not(.studio-dock-dark *) .bg-\[\#242424\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.studio-dock-dark):not(.studio-dock-dark *) .bg-\[\#252525\] {
   background-color: var(--bg-elevated) !important;
 }
-html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#2D2D2D\],
-html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .bg-\[\#2d2d2d\] {
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.studio-dock-dark):not(.studio-dock-dark *) .bg-\[\#2D2D2D\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.studio-dock-dark):not(.studio-dock-dark *) .bg-\[\#2d2d2d\] {
   background-color: var(--bg-hover) !important;
 }
 
-html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .border-\[\#2D2D2D\],
-html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .border-\[\#2d2d2d\],
-html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .border-\[\#353534\],
-html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .border-\[\#3D3D3D\] {
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.studio-dock-dark):not(.studio-dock-dark *) .border-\[\#2D2D2D\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.studio-dock-dark):not(.studio-dock-dark *) .border-\[\#2d2d2d\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.studio-dock-dark):not(.studio-dock-dark *) .border-\[\#353534\],
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.studio-dock-dark):not(.studio-dock-dark *) .border-\[\#3D3D3D\] {
   border-color: var(--border-subtle) !important;
 }
 
-html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.bg-\[\#FFCC00\]):not(.bg-\[\#ffcc00\]):not(.bg-\[\#9D4EDD\]):not(.bg-\[\#9d4edd\]).text-white {
+html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *):not(.studio-dock-dark):not(.studio-dock-dark *):not(.bg-\[\#FFCC00\]):not(.bg-\[\#ffcc00\]):not(.bg-\[\#9D4EDD\]):not(.bg-\[\#9d4edd\]):not(.bg-\[var\(--accent-primary\)\]):not(.bg-accent-primary).text-white {
   color: var(--text-primary) !important;
 }
 html[data-theme-mode="light"] :not([data-darkroom="true"]):not([data-darkroom="true"] *) .text-\[\#A0A0A0\],
@@ -591,7 +782,7 @@ html:not([data-theme-palette="purple-gold"]) .from-\[\#FFCC00\].to-\[\#9D4EDD\] 
   height: 15px;
   margin-top: -4.5px;
   border-radius: 9999px;
-  background: #FFCC00;
+  background: var(--accent-secondary, #FFCC00);
   border: 2px solid #ffffff;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
   cursor: ew-resize;
@@ -599,7 +790,7 @@ html:not([data-theme-palette="purple-gold"]) .from-\[\#FFCC00\].to-\[\#9D4EDD\] 
 }
 .studio-range-slider::-webkit-slider-thumb:hover {
   transform: scale(1.2);
-  box-shadow: 0 0 10px rgba(255, 204, 0, 0.75);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-secondary, #FFCC00) 75%, transparent);
 }
 .studio-range-slider::-webkit-slider-thumb:active {
   transform: scale(1.1);
@@ -613,7 +804,7 @@ html:not([data-theme-palette="purple-gold"]) .from-\[\#FFCC00\].to-\[\#9D4EDD\] 
   width: 15px;
   height: 15px;
   border-radius: 9999px;
-  background: #FFCC00;
+  background: var(--accent-secondary, #FFCC00);
   border: 2px solid #ffffff;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
   cursor: ew-resize;

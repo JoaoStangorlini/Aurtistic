@@ -108,7 +108,7 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
                   >
                     <div>
                       <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="font-mono font-bold text-amber-600 dark:text-amber-300 text-[10px]">
+                        <span className="font-mono font-bold text-amber-600 dark:text-amber-700 dark:text-amber-300 text-[10px]">
                           SLOT {slot}
                         </span>
                         {draft && (

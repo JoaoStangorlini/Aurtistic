@@ -1,6 +1,7 @@
 // Este programa é um software livre (Licença AGPLv3)
 import type { Metadata } from "next";
-import { Open_Sans } from "next/font/google";
+import { Open_Sans, JetBrains_Mono, Orbitron, Space_Grotesk } from "next/font/google";
+import { cookies } from "next/headers";
 import Navbar from "@/components/Navbar";
 
 import "./globals.css";
@@ -8,6 +9,24 @@ import "./globals.css";
 const openSans = Open_Sans({
   variable: "--font-open-sans",
   subsets: ["latin"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
+  subsets: ["latin"],
+  weight: ["500", "700", "800"],
+});
+
+const orbitron = Orbitron({
+  variable: "--font-orbitron",
+  subsets: ["latin"],
+  weight: ["700", "800", "900"],
+});
+
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  subsets: ["latin"],
+  weight: ["600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -27,8 +46,9 @@ import { Suspense } from "react";
 import { AurtisticMediaProvider } from "@/components/media/AurtisticMediaContext";
 import { GlobalAudioDock } from "@/components/media/GlobalAudioDock";
 import { issueUserStorageSession } from "@/lib/edge-ticket";
-import { buildThemeInitScript } from "@/lib/theme-config";
+import { buildThemeInitScript, type ThemeMode, type ThemePaletteId, type ThemePreferences } from "@/lib/theme-config";
 import { ThemeProvider, ThemedTopLoader } from "@/components/theme/ThemeProvider";
+import { GlobalOrgThemeBackdrop } from "@/components/theme/GlobalOrgThemeBackdrop";
 import { CoachMarksProvider } from "@/components/onboarding/CoachMarksProvider";
 import { FirstTimeOnboardingModal } from "@/components/onboarding/FirstTimeOnboardingModal";
 import { SelfCareAlarmProvider } from "@/components/cuidados/SelfCareAlarmProvider";
@@ -49,9 +69,28 @@ export default async function RootLayout({
   let initialMediaTicket: string | undefined;
   let initialVaultTicket: string | undefined;
   let serverUrl: string | undefined;
-  let initialTheme = undefined;
+  let initialTheme: Partial<ThemePreferences> | undefined = undefined;
   let onboardingUserId: string | undefined;
   let hasConfiguredModules = false;
+
+  let ssrPalette: ThemePaletteId = 'purple-gold';
+  let ssrModeAttr: 'dark' | 'light' | undefined = undefined;
+
+  try {
+    const cookieStore = await cookies();
+    const ckPal = cookieStore.get('aurtistic_palette')?.value as ThemePaletteId | undefined;
+    const ckMode = cookieStore.get('aurtistic_mode')?.value as ThemeMode | undefined;
+    const ckOverride = cookieStore.get('aurtistic_override_org')?.value;
+    if (ckPal) ssrPalette = ckPal;
+    if (ckMode === 'dark' || ckMode === 'light') ssrModeAttr = ckMode;
+    if (ckPal || ckMode || ckOverride !== undefined) {
+      initialTheme = {
+        ...(ckPal ? { palette: ckPal } : {}),
+        ...(ckMode ? { mode: ckMode } : {}),
+        ...(ckOverride !== undefined ? { overrideOrgTheme: ckOverride === '1' } : {}),
+      };
+    }
+  } catch {}
 
   if (user) {
     onboardingUserId = user.id;
@@ -70,7 +109,14 @@ export default async function RootLayout({
         .eq('id', user.id)
         .single();
       if (profile?.features_config?.theme) {
-        initialTheme = profile.features_config.theme;
+        const dbTheme = profile.features_config.theme;
+        initialTheme = {
+          ...initialTheme,
+          ...dbTheme,
+          updatedAt: dbTheme.updated_at || dbTheme.updatedAt,
+        };
+        if (dbTheme.palette) ssrPalette = dbTheme.palette;
+        if (dbTheme.mode === 'dark' || dbTheme.mode === 'light') ssrModeAttr = dbTheme.mode;
       }
       if (
         profile?.features_config?.modules ||
@@ -99,7 +145,9 @@ export default async function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${openSans.variable} antialiased h-full overflow-x-hidden`}
+      data-theme-palette={ssrPalette}
+      {...(ssrModeAttr ? { 'data-theme-mode': ssrModeAttr } : {})}
+      className={`${openSans.variable} ${jetbrainsMono.variable} ${orbitron.variable} ${spaceGrotesk.variable} antialiased h-full overflow-x-hidden`}
       suppressHydrationWarning
     >
       <head>
@@ -133,6 +181,7 @@ export default async function RootLayout({
       </head>
       <body className="h-full bg-app flex flex-col overflow-hidden text-fg max-w-[100vw]">
         <ThemeProvider initialTheme={initialTheme}>
+          <GlobalOrgThemeBackdrop />
           <CoachMarksProvider>
             <SelfCareAlarmProvider>
               <AurtisticMediaProvider
@@ -149,7 +198,7 @@ export default async function RootLayout({
                     <GlobalHighlighter />
                   </Suspense>
                   <Navbar initialRole={userRole} initialTargetHref={targetHref} />
-                  <main className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden">
+                  <main className="relative z-10 flex-1 flex flex-col overflow-y-auto overflow-x-hidden bg-transparent">
                     {children}
                   </main>
                   {Boolean(onboardingUserId) && (

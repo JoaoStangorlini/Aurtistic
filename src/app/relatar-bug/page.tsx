@@ -14,7 +14,7 @@ export default async function BugReportPage() {
   }
 
   return (
-    <main className="min-h-full bg-app p-4 md:p-8 flex items-center justify-center">
+    <main className="min-h-full bg-transparent p-4 md:p-8 flex items-center justify-center">
       <div className="w-full max-w-2xl">
         <BugReportClient userEmail={user.email || ''} />
       </div>

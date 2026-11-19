@@ -188,7 +188,7 @@ export function SelfCareHub() {
                       </span>
                     )}
                     {configs.some((c) => c.key === 'eye_rest_20_20_20' && c.enabled) && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20 flex items-center gap-1">
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 flex items-center gap-1">
                         <span className="material-symbols-outlined text-[11px]">visibility</span>
                         {dailyLog.eyeRestsDone || 0}
                       </span>
@@ -197,8 +197,8 @@ export function SelfCareHub() {
                       <span
                         className={`text-[10px] px-2 py-0.5 rounded-md border flex items-center gap-1 ${
                           dailyLog.medsTaken
-                            ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
-                            : 'bg-rose-500/10 text-rose-300 border-rose-500/20'
+                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20'
+                            : 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20'
                         }`}
                       >
                         <span className="material-symbols-outlined text-[11px]">medication</span>
@@ -220,7 +220,7 @@ export function SelfCareHub() {
               <button
                 type="button"
                 onClick={() => playSound('zen_bell')}
-                className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-[var(--surface-secondary,#242424)] hover:bg-[var(--surface-hover,#2D2D2D)] text-[var(--text-secondary,#A0A0A0)] hover:text-[var(--text-primary,#F5F5F5)] border border-[var(--border-subtle,#2D2D2D)] flex items-center gap-1 transition-colors"
+                className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] text-[var(--fg-secondary)] hover:text-[var(--fg)] border border-[var(--border-subtle)] flex items-center gap-1 transition-colors"
                 title="Testar sintetizador Web Audio nativo"
               >
                 <span className="material-symbols-outlined text-[14px] text-[var(--accent-secondary,#FFCC00)]">volume_up</span>
@@ -232,7 +232,7 @@ export function SelfCareHub() {
                 <button
                   type="button"
                   onClick={deactivateHyperfocus}
-                  className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 flex items-center gap-1 transition-colors"
+                  className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/40 flex items-center gap-1 transition-colors"
                   title="Desativar modo hiperfoco"
                 >
                   <span className="material-symbols-outlined text-[14px]">pause_circle</span>
@@ -242,7 +242,7 @@ export function SelfCareHub() {
                 <button
                   type="button"
                   onClick={() => activateHyperfocus(60)}
-                  className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-[var(--surface-secondary,#242424)] hover:bg-[var(--surface-hover,#2D2D2D)] text-[var(--text-secondary,#A0A0A0)] hover:text-[var(--text-primary,#F5F5F5)] border border-[var(--border-subtle,#2D2D2D)] flex items-center gap-1 transition-colors"
+                  className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] text-[var(--fg-secondary)] hover:text-[var(--fg)] border border-[var(--border-subtle)] flex items-center gap-1 transition-colors"
                   title="Pausar alertas leves por 60 min"
                 >
                   <span className="material-symbols-outlined text-[14px]">psychology</span>
@@ -254,7 +254,7 @@ export function SelfCareHub() {
               <button
                 type="button"
                 onClick={() => setIsNewCareModalOpen(true)}
-                className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-[var(--surface-secondary,#242424)] hover:bg-[var(--surface-hover,#2D2D2D)] text-[var(--text-secondary,#A0A0A0)] hover:text-[var(--text-primary,#F5F5F5)] border border-[var(--border-subtle,#2D2D2D)] flex items-center gap-1 transition-colors"
+                className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] text-[var(--fg-secondary)] hover:text-[var(--fg)] border border-[var(--border-subtle)] flex items-center gap-1 transition-colors"
                 title="Criar novo alarme de autocuidado"
               >
                 <span className="material-symbols-outlined text-[14px] text-[var(--accent-primary)]">add</span>
@@ -265,7 +265,7 @@ export function SelfCareHub() {
                 <button
                   type="button"
                   onClick={handleRequestNotifications}
-                  className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-[var(--surface-secondary,#242424)] hover:bg-[var(--surface-hover,#2D2D2D)] text-[var(--text-secondary,#A0A0A0)] hover:text-[var(--text-primary,#F5F5F5)] border border-[var(--border-subtle,#2D2D2D)] flex items-center gap-1 transition-colors"
+                  className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] text-[var(--fg-secondary)] hover:text-[var(--fg)] border border-[var(--border-subtle)] flex items-center gap-1 transition-colors"
                   title="Permitir notificações do navegador em segundo plano"
                 >
                   <span className="material-symbols-outlined text-[14px] text-amber-400">
@@ -279,7 +279,7 @@ export function SelfCareHub() {
               <button
                 type="button"
                 onClick={() => setIsConfigOpen((prev) => !prev)}
-                className="p-1.5 rounded-lg text-[var(--text-muted,#8E8E8E)] hover:text-[var(--text-primary,#F5F5F5)] hover:bg-[var(--surface-hover,#2D2D2D)] transition-colors"
+                className="p-1.5 rounded-lg text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-hover)] transition-colors"
                 title="Configurar intervalos e sons dos alarmes"
               >
                 <span className="material-symbols-outlined text-[18px]">tune</span>
@@ -289,7 +289,7 @@ export function SelfCareHub() {
             <button
               type="button"
               onClick={() => setIsNewCareModalOpen(true)}
-              className="p-1.5 rounded-lg text-[var(--text-muted,#8E8E8E)] hover:text-[var(--accent-primary)] hover:bg-[var(--surface-hover,#2D2D2D)] transition-colors"
+              className="p-1.5 rounded-lg text-[var(--fg-muted)] hover:text-[var(--accent-primary)] hover:bg-[var(--bg-hover)] transition-colors"
               title="Definir novo lembrete de autocuidado"
             >
               <span className="material-symbols-outlined text-[18px]">add</span>
@@ -300,7 +300,7 @@ export function SelfCareHub() {
           <button
             type="button"
             onClick={toggleExpanded}
-            className="p-1.5 rounded-lg text-[var(--text-muted,#8E8E8E)] hover:text-[var(--text-primary,#F5F5F5)] hover:bg-[var(--surface-hover,#2D2D2D)] transition-colors"
+            className="p-1.5 rounded-lg text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-hover)] transition-colors"
             title={isExpanded ? 'Recolher menu de autocuidado' : 'Expandir menu de autocuidado'}
             aria-label={isExpanded ? 'Recolher menu de autocuidado' : 'Expandir menu de autocuidado'}
           >
@@ -319,16 +319,16 @@ export function SelfCareHub() {
       {isExpanded && (
         <div className="pt-2 animate-in fade-in duration-200">
           {configs.length === 0 ? (
-            <div className="mt-2 p-4 rounded-xl bg-[var(--surface-secondary,#242424)] border border-dashed border-[var(--border-subtle,#2D2D2D)] flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+            <div className="mt-2 p-4 rounded-xl bg-[var(--bg-elevated)] border border-dashed border-[var(--border-subtle)] flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-[var(--accent-primary)]/15 border border-[var(--accent-primary)]/30 text-[var(--accent-primary)] flex items-center justify-center shrink-0">
                   <span className="material-symbols-outlined text-[20px]">alarm_on</span>
                 </div>
                 <div>
-                  <span className="text-xs font-bold text-[var(--text-primary,#F5F5F5)] block">
+                  <span className="text-xs font-bold text-[var(--fg)] block">
                     Nenhum lembrete automático ativo
                   </span>
-                  <span className="text-[11px] text-[var(--text-muted,#8E8E8E)] block">
+                  <span className="text-[11px] text-[var(--fg-muted)] block">
                     Defina os lembretes de autocuidado de acordo com sua rotina pessoal (hidratação, pausas, refeições, remédios).
                   </span>
                 </div>
@@ -349,7 +349,7 @@ export function SelfCareHub() {
                 <button
                   type="button"
                   onClick={addWaterGlass}
-                  className="group p-2.5 rounded-xl bg-[var(--surface-secondary,#242424)] hover:bg-[var(--surface-hover,#2D2D2D)] border border-[var(--border-subtle,#2D2D2D)] flex items-center justify-between gap-2 text-left transition-all"
+                  className="group p-2.5 rounded-xl bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] border border-[var(--border-subtle)] flex items-center justify-between gap-2 text-left transition-all"
                   title="Clique para adicionar +1 copo d'água"
                 >
                   <div className="flex items-center gap-2 min-w-0">
@@ -357,8 +357,8 @@ export function SelfCareHub() {
                       water_drop
                     </span>
                     <div className="min-w-0">
-                      <span className="text-[10px] text-[var(--text-muted,#8E8E8E)] block">Água</span>
-                      <span className="text-xs font-bold text-[var(--text-primary,#F5F5F5)]">
+                      <span className="text-[10px] text-[var(--fg-muted)] block">Água</span>
+                      <span className="text-xs font-bold text-[var(--fg)]">
                         {waterCount}/{waterGoal} copos
                       </span>
                     </div>
@@ -374,7 +374,7 @@ export function SelfCareHub() {
                 <button
                   type="button"
                   onClick={triggerEyeRestNow}
-                  className="group p-2.5 rounded-xl bg-[var(--surface-secondary,#242424)] hover:bg-[var(--surface-hover,#2D2D2D)] border border-[var(--border-subtle,#2D2D2D)] flex items-center justify-between gap-2 text-left transition-all"
+                  className="group p-2.5 rounded-xl bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] border border-[var(--border-subtle)] flex items-center justify-between gap-2 text-left transition-all"
                   title="Iniciar contagem de 20s para descanso visual"
                 >
                   <div className="flex items-center gap-2 min-w-0">
@@ -382,8 +382,8 @@ export function SelfCareHub() {
                       visibility
                     </span>
                     <div className="min-w-0">
-                      <span className="text-[10px] text-[var(--text-muted,#8E8E8E)] block">Visão 20-20</span>
-                      <span className="text-xs font-bold text-[var(--text-primary,#F5F5F5)]">
+                      <span className="text-[10px] text-[var(--fg-muted)] block">Visão 20-20</span>
+                      <span className="text-xs font-bold text-[var(--fg)]">
                         {dailyLog.eyeRestsDone || 0} feitas
                       </span>
                     </div>
@@ -399,7 +399,7 @@ export function SelfCareHub() {
                 <button
                   type="button"
                   onClick={addMealDone}
-                  className="group p-2.5 rounded-xl bg-[var(--surface-secondary,#242424)] hover:bg-[var(--surface-hover,#2D2D2D)] border border-[var(--border-subtle,#2D2D2D)] flex items-center justify-between gap-2 text-left transition-all"
+                  className="group p-2.5 rounded-xl bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] border border-[var(--border-subtle)] flex items-center justify-between gap-2 text-left transition-all"
                   title="Registrar refeição realizada"
                 >
                   <div className="flex items-center gap-2 min-w-0">
@@ -407,8 +407,8 @@ export function SelfCareHub() {
                       soup_kitchen
                     </span>
                     <div className="min-w-0">
-                      <span className="text-[10px] text-[var(--text-muted,#8E8E8E)] block">Refeições</span>
-                      <span className="text-xs font-bold text-[var(--text-primary,#F5F5F5)]">
+                      <span className="text-[10px] text-[var(--fg-muted)] block">Refeições</span>
+                      <span className="text-xs font-bold text-[var(--fg)]">
                         {mealsCount}/{mealsGoal} feitas
                       </span>
                     </div>
@@ -424,7 +424,7 @@ export function SelfCareHub() {
                 <button
                   type="button"
                   onClick={() => logCompleted('stand_stretch')}
-                  className="group p-2.5 rounded-xl bg-[var(--surface-secondary,#242424)] hover:bg-[var(--surface-hover,#2D2D2D)] border border-[var(--border-subtle,#2D2D2D)] flex items-center justify-between gap-2 text-left transition-all"
+                  className="group p-2.5 rounded-xl bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] border border-[var(--border-subtle)] flex items-center justify-between gap-2 text-left transition-all"
                   title="Marcar que se levantou ou alongou"
                 >
                   <div className="flex items-center gap-2 min-w-0">
@@ -432,8 +432,8 @@ export function SelfCareHub() {
                       accessibility_new
                     </span>
                     <div className="min-w-0">
-                      <span className="text-[10px] text-[var(--text-muted,#8E8E8E)] block">Alongar</span>
-                      <span className="text-xs font-bold text-[var(--text-primary,#F5F5F5)]">
+                      <span className="text-[10px] text-[var(--fg-muted)] block">Alongar</span>
+                      <span className="text-xs font-bold text-[var(--fg)]">
                         {dailyLog.stretchesDone || 0} vezes
                       </span>
                     </div>
@@ -449,7 +449,7 @@ export function SelfCareHub() {
                 <button
                   type="button"
                   onClick={() => logCompleted('bathroom_check')}
-                  className="group p-2.5 rounded-xl bg-[var(--surface-secondary,#242424)] hover:bg-[var(--surface-hover,#2D2D2D)] border border-[var(--border-subtle,#2D2D2D)] flex items-center justify-between gap-2 text-left transition-all"
+                  className="group p-2.5 rounded-xl bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] border border-[var(--border-subtle)] flex items-center justify-between gap-2 text-left transition-all"
                   title="Checagem sensorial de bexiga / banheiro"
                 >
                   <div className="flex items-center gap-2 min-w-0">
@@ -457,8 +457,8 @@ export function SelfCareHub() {
                       wc
                     </span>
                     <div className="min-w-0">
-                      <span className="text-[10px] text-[var(--text-muted,#8E8E8E)] block">Banheiro</span>
-                      <span className="text-xs font-bold text-[var(--text-primary,#F5F5F5)]">
+                      <span className="text-[10px] text-[var(--fg-muted)] block">Banheiro</span>
+                      <span className="text-xs font-bold text-[var(--fg)]">
                         {dailyLog.bathroomChecksDone || 0} vezes
                       </span>
                     </div>
@@ -477,7 +477,7 @@ export function SelfCareHub() {
                   className={`group p-2.5 rounded-xl border flex items-center justify-between gap-2 text-left transition-all ${
                     dailyLog.medsTaken
                       ? 'bg-emerald-500/10 border-emerald-500/30'
-                      : 'bg-[var(--surface-secondary,#242424)] hover:bg-[var(--surface-hover,#2D2D2D)] border-[var(--border-subtle,#2D2D2D)]'
+                      : 'bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] border-[var(--border-subtle)]'
                   }`}
                   title="Registrar medicação do dia tomada"
                 >
@@ -490,8 +490,8 @@ export function SelfCareHub() {
                       medication
                     </span>
                     <div className="min-w-0">
-                      <span className="text-[10px] text-[var(--text-muted,#8E8E8E)] block">Remédios</span>
-                      <span className="text-xs font-bold text-[var(--text-primary,#F5F5F5)]">
+                      <span className="text-[10px] text-[var(--fg-muted)] block">Remédios</span>
+                      <span className="text-xs font-bold text-[var(--fg)]">
                         {dailyLog.medsTaken ? 'Tomado ✓' : 'Pendente'}
                       </span>
                     </div>
@@ -520,20 +520,20 @@ export function SelfCareHub() {
           aria-modal="true"
           className="fixed inset-0 z-[180] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
         >
-          <div className="w-full max-w-lg bg-[var(--surface-primary,#1A1A1A)] border border-[var(--border-subtle,#2D2D2D)] rounded-2xl p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-[var(--border-subtle,#2D2D2D)] pb-3">
+          <div className="w-full max-w-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[20px] text-[var(--accent-primary)]">
                   add_circle
                 </span>
-                <h3 className="text-sm font-bold text-[var(--text-primary,#F5F5F5)]">
+                <h3 className="text-sm font-bold text-[var(--fg)]">
                   Definir Lembrete de Autocuidado
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsNewCareModalOpen(false)}
-                className="text-[var(--text-muted,#8E8E8E)] hover:text-white"
+                className="text-[var(--fg-muted)] hover:text-fg"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
@@ -541,7 +541,7 @@ export function SelfCareHub() {
 
             {/* Modelos Prontos de 1 Clique */}
             <div>
-              <span className="text-[11px] font-bold text-[var(--text-muted,#8E8E8E)] uppercase block mb-2">
+              <span className="text-[11px] font-bold text-[var(--fg-muted)] uppercase block mb-2">
                 Modelos de Autocuidado (1 Clique para Ativar)
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -558,8 +558,8 @@ export function SelfCareHub() {
                       }}
                       className={`p-2.5 rounded-xl border text-left flex items-center justify-between gap-2 transition-all ${
                         isAlreadyAdded
-                          ? 'bg-[var(--surface-secondary,#242424)]/50 border-[var(--border-subtle,#2D2D2D)] opacity-50 cursor-not-allowed'
-                          : 'bg-[var(--surface-secondary,#242424)] hover:bg-[var(--surface-hover,#2D2D2D)] border-[var(--border-subtle,#2D2D2D)] hover:border-[var(--accent-primary)]'
+                          ? 'bg-[var(--bg-elevated)]/50 border-[var(--border-subtle)] opacity-50 cursor-not-allowed'
+                          : 'bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] border-[var(--border-subtle)] hover:border-[var(--accent-primary)]'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
@@ -567,10 +567,10 @@ export function SelfCareHub() {
                           {tmpl.icon}
                         </span>
                         <div className="min-w-0">
-                          <span className="text-xs font-bold text-[var(--text-primary,#F5F5F5)] block truncate">
+                          <span className="text-xs font-bold text-[var(--fg)] block truncate">
                             {tmpl.name}
                           </span>
-                          <span className="text-[10px] text-[var(--text-muted,#8E8E8E)] block truncate">
+                          <span className="text-[10px] text-[var(--fg-muted)] block truncate">
                             {tmpl.intervalMinutes ? `A cada ${tmpl.intervalMinutes}m` : 'Horários fixos'}
                           </span>
                         </div>
@@ -584,15 +584,15 @@ export function SelfCareHub() {
               </div>
             </div>
 
-            <div className="h-[1px] bg-[var(--border-subtle,#2D2D2D)] my-2" />
+            <div className="h-[1px] bg-[var(--border-subtle)] my-2" />
 
             <div>
-              <span className="text-[11px] font-bold text-[var(--text-muted,#8E8E8E)] uppercase block mb-2">
+              <span className="text-[11px] font-bold text-[var(--fg-muted)] uppercase block mb-2">
                 Ou Criar Lembrete Personalizado
               </span>
               <form onSubmit={handleCreateCustomCare} className="space-y-3">
                 <div>
-                  <label className="text-[11px] font-bold text-[var(--text-muted,#8E8E8E)] uppercase block mb-1">
+                  <label className="text-[11px] font-bold text-[var(--fg-muted)] uppercase block mb-1">
                     Nome do Cuidado
                   </label>
                   <input
@@ -601,12 +601,12 @@ export function SelfCareHub() {
                     value={newCareName}
                     onChange={(e) => setNewCareName(e.target.value)}
                     placeholder="Ex: Descansar Ombros, Gotas nos Olhos..."
-                    className="w-full bg-[var(--surface-secondary,#242424)] border border-[var(--border-subtle,#2D2D2D)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary,#F5F5F5)] focus:outline-none focus:border-[var(--accent-primary)]"
+                    className="w-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-lg px-3 py-2 text-xs text-[var(--fg)] focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-[var(--text-muted,#8E8E8E)] uppercase block mb-1">
+                  <label className="text-[11px] font-bold text-[var(--fg-muted)] uppercase block mb-1">
                     Descrição ou Dica
                   </label>
                   <input
@@ -614,19 +614,19 @@ export function SelfCareHub() {
                     value={newCareDesc}
                     onChange={(e) => setNewCareDesc(e.target.value)}
                     placeholder="Ex: Respiração profunda em 4 tempos"
-                    className="w-full bg-[var(--surface-secondary,#242424)] border border-[var(--border-subtle,#2D2D2D)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary,#F5F5F5)] focus:outline-none focus:border-[var(--accent-primary)]"
+                    className="w-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-lg px-3 py-2 text-xs text-[var(--fg)] focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[11px] font-bold text-[var(--text-muted,#8E8E8E)] uppercase block mb-1">
+                    <label className="text-[11px] font-bold text-[var(--fg-muted)] uppercase block mb-1">
                       Intervalo
                     </label>
                     <select
                       value={newCareInterval}
                       onChange={(e) => setNewCareInterval(Number(e.target.value))}
-                      className="w-full bg-[var(--surface-secondary,#242424)] border border-[var(--border-subtle,#2D2D2D)] rounded-lg px-2.5 py-2 text-xs text-[var(--text-primary,#F5F5F5)] focus:outline-none"
+                      className="w-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-lg px-2.5 py-2 text-xs text-[var(--fg)] focus:outline-none"
                     >
                       <option value={15}>15 minutos</option>
                       <option value={30}>30 minutos</option>
@@ -640,13 +640,13 @@ export function SelfCareHub() {
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-bold text-[var(--text-muted,#8E8E8E)] uppercase block mb-1">
+                    <label className="text-[11px] font-bold text-[var(--fg-muted)] uppercase block mb-1">
                       Som
                     </label>
                     <select
                       value={newCareSound}
                       onChange={(e) => setNewCareSound(e.target.value as SelfCareSound)}
-                      className="w-full bg-[var(--surface-secondary,#242424)] border border-[var(--border-subtle,#2D2D2D)] rounded-lg px-2.5 py-2 text-xs text-[var(--text-primary,#F5F5F5)] focus:outline-none"
+                      className="w-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-lg px-2.5 py-2 text-xs text-[var(--fg)] focus:outline-none"
                     >
                       <option value="zen_bell">Sino Zen (528 Hz)</option>
                       <option value="lofi_chime">Acorde Lo-Fi</option>
@@ -656,11 +656,11 @@ export function SelfCareHub() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border-subtle,#2D2D2D)]">
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
                   <button
                     type="button"
                     onClick={() => setIsNewCareModalOpen(false)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--text-muted,#8E8E8E)] hover:text-white"
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--fg-muted)] hover:text-fg"
                   >
                     Cancelar
                   </button>
@@ -679,15 +679,15 @@ export function SelfCareHub() {
 
       {/* Painel Expansível de Configurações */}
       {isConfigOpen && (
-        <div className="mt-4 p-4 rounded-xl bg-[var(--surface-secondary,#242424)] border border-[var(--border-subtle,#2D2D2D)] space-y-4 animate-in fade-in duration-200">
+        <div className="mt-4 p-4 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] space-y-4 animate-in fade-in duration-200">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary,#F5F5F5)]">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--fg)]">
               Ajuste de Alarmes e Intervalos
             </h4>
             <button
               type="button"
               onClick={() => setIsConfigOpen(false)}
-              className="text-xs text-[var(--text-muted,#8E8E8E)] hover:text-[var(--text-primary,#F5F5F5)]"
+              className="text-xs text-[var(--fg-muted)] hover:text-[var(--fg)]"
             >
               Fechar
             </button>
@@ -697,17 +697,17 @@ export function SelfCareHub() {
             {configs.map((cfg) => (
               <div
                 key={cfg.id}
-                className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-[var(--surface-primary,#1A1A1A)] border border-[var(--border-subtle,#2D2D2D)] flex-wrap"
+                className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex-wrap"
               >
                 <div className="flex items-center gap-2 min-w-[180px]">
                   <span className="material-symbols-outlined text-[20px] text-[var(--accent-primary)]">
                     {cfg.icon}
                   </span>
                   <div>
-                    <span className="text-xs font-bold text-[var(--text-primary,#F5F5F5)] block">
+                    <span className="text-xs font-bold text-[var(--fg)] block">
                       {cfg.name}
                     </span>
-                    <span className="text-[10px] text-[var(--text-muted,#8E8E8E)] block">
+                    <span className="text-[10px] text-[var(--fg-muted)] block">
                       {cfg.description}
                     </span>
                   </div>
@@ -715,14 +715,14 @@ export function SelfCareHub() {
 
                 <div className="flex items-center gap-3">
                   {/* Seletor de Intervalo */}
-                  <label className="flex items-center gap-1 text-[11px] text-[var(--text-secondary,#A0A0A0)]">
+                  <label className="flex items-center gap-1 text-[11px] text-[var(--fg-secondary)]">
                     <span>A cada:</span>
                     <select
                       value={cfg.intervalMinutes}
                       onChange={(e) =>
                         updateConfig(cfg.id, { intervalMinutes: Number(e.target.value) })
                       }
-                      className="bg-[var(--surface-secondary,#242424)] text-[var(--text-primary,#F5F5F5)] px-2 py-1 rounded text-xs border border-[var(--border-subtle,#2D2D2D)] focus:outline-none"
+                      className="bg-[var(--bg-elevated)] text-[var(--fg)] px-2 py-1 rounded text-xs border border-[var(--border-subtle)] focus:outline-none"
                     >
                       <option value={15}>15 min</option>
                       <option value={20}>20 min</option>
@@ -745,7 +745,7 @@ export function SelfCareHub() {
                           soundPreference: e.target.value as SelfCareSound,
                         })
                       }
-                      className="bg-[var(--surface-secondary,#242424)] text-[var(--text-primary,#F5F5F5)] px-2 py-1 rounded text-xs border border-[var(--border-subtle,#2D2D2D)] focus:outline-none"
+                      className="bg-[var(--bg-elevated)] text-[var(--fg)] px-2 py-1 rounded text-xs border border-[var(--border-subtle)] focus:outline-none"
                     >
                       <option value="zen_bell">Sino Zen (528 Hz)</option>
                       <option value="lofi_chime">Acorde Lo-Fi</option>
@@ -756,7 +756,7 @@ export function SelfCareHub() {
                     <button
                       type="button"
                       onClick={() => playSound(cfg.soundPreference)}
-                      className="p-1 text-[var(--text-muted,#8E8E8E)] hover:text-[var(--accent-primary)]"
+                      className="p-1 text-[var(--fg-muted)] hover:text-[var(--accent-primary)]"
                       title="Testar som"
                     >
                       <span className="material-symbols-outlined text-[16px]">volume_up</span>
@@ -770,7 +770,7 @@ export function SelfCareHub() {
                     className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
                       cfg.enabled
                         ? 'bg-[var(--accent-primary)] text-white'
-                        : 'bg-[var(--surface-secondary,#242424)] text-[var(--text-muted,#8E8E8E)] hover:text-white'
+                        : 'bg-[var(--bg-elevated)] text-[var(--fg-muted)] hover:text-fg'
                     }`}
                   >
                     {cfg.enabled ? 'Ativo' : 'Pausado'}
@@ -780,7 +780,7 @@ export function SelfCareHub() {
                   <button
                     type="button"
                     onClick={() => removeConfig(cfg.id)}
-                    className="p-1 text-rose-400 hover:text-rose-300 hover:bg-rose-500/15 rounded-lg transition-colors"
+                    className="p-1 text-rose-400 hover:text-rose-700 dark:text-rose-300 hover:bg-rose-500/15 rounded-lg transition-colors"
                     title="Excluir lembrete"
                   >
                     <span className="material-symbols-outlined text-[16px]">delete</span>

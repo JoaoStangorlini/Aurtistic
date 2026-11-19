@@ -4,10 +4,21 @@
 import React, { useEffect, useState } from 'react';
 import { useTheme } from './ThemeProvider';
 import { PALETTE_LIST, ORG_PALETTE_LIST, type ThemeMode } from '@/lib/theme-config';
+import { normalizeOrgBrandSlug } from '@/lib/org-brand-tokens';
 import { getUserOrganizationsAction } from '@/app/(dashboard)/organizacoes/actions';
 
 export function ThemeDropdownSection() {
-  const { mode, palette, resolvedMode, setThemeMode, setThemePalette, paletteDef } = useTheme();
+  const {
+    mode,
+    palette,
+    activeOrgPalette,
+    overrideOrgTheme,
+    setOverrideOrgTheme,
+    resolvedMode,
+    setThemeMode,
+    setThemePalette,
+    paletteDef,
+  } = useTheme();
   const [memberSlugs, setMemberSlugs] = useState<string[]>([]);
 
   useEffect(() => {
@@ -15,9 +26,13 @@ export function ThemeDropdownSection() {
     void getUserOrganizationsAction()
       .then((res) => {
         if (!active || !res?.ok || !Array.isArray(res.organizations)) return;
-        const slugs = res.organizations
-          .map((o: { slug?: string }) => String(o.slug || '').toLowerCase())
-          .filter(Boolean);
+        const slugs = Array.from(
+          new Set(
+            res.organizations
+              .map((o: { slug?: string }) => normalizeOrgBrandSlug(o.slug))
+              .filter(Boolean)
+          )
+        );
         setMemberSlugs(slugs);
       })
       .catch(() => {});
@@ -149,6 +164,39 @@ export function ThemeDropdownSection() {
                   </button>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {activeOrgPalette && (
+          <div className="pt-2 border-t border-border-subtle/60 space-y-1.5">
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-app border border-border-subtle px-2.5 py-2">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-fg leading-tight">
+                  {overrideOrgTheme
+                    ? 'Sobrescrevendo tema da organização'
+                    : 'Interface usando tema da organização atual'}
+                </p>
+                <p className="text-[9px] text-fg-muted leading-tight mt-0.5">
+                  Sobrescrever tema da organização
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={overrideOrgTheme}
+                onClick={() => setOverrideOrgTheme(!overrideOrgTheme)}
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors cursor-pointer ${
+                  overrideOrgTheme ? 'bg-[var(--accent-primary)]' : 'bg-surface-hover border border-border-strong'
+                }`}
+                title="Sobrescrever tema da organização na aba Gestão"
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                    overrideOrgTheme ? 'translate-x-4.5' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
             </div>
           </div>
         )}

@@ -178,7 +178,7 @@ export default function AurtisticWorkspaceClient({
   };
 
   return (
-    <div className="min-h-full flex flex-col p-4 md:p-8 bg-app text-fg relative">
+    <div className="min-h-full flex flex-col p-4 md:p-8 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8 bg-transparent text-fg relative">
       {/* Toast Notification */}
       {showToast && (
         <div className="fixed bottom-8 right-8 z-[99] bg-[var(--accent-primary)] text-white px-5 py-3 rounded-xl shadow-[0_4px_20px_rgba(157,78,221,0.4)] border border-[var(--accent-primary)]/50 flex items-center gap-2 animate-in fade-in slide-in-from-bottom duration-300">

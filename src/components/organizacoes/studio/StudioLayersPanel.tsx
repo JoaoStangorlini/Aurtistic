@@ -43,13 +43,13 @@ export function StudioLayersPanel() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+        <label className="text-[11px] font-bold text-fg-muted uppercase tracking-wider block">
           Pilha de Camadas ({layers.length})
         </label>
         <button
           type="button"
           onClick={() => setShowLogoPresets(!showLogoPresets)}
-          className="px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 font-bold text-[10px] hover:bg-amber-400/30 flex items-center gap-1 cursor-pointer"
+          className="px-2 py-0.5 rounded bg-amber-400/20 text-amber-700 dark:text-amber-300 font-bold text-[10px] hover:bg-amber-400/30 flex items-center gap-1 cursor-pointer"
         >
           <span className="material-symbols-outlined text-[13px]">verified</span>
           <span>+ Selo/Assinatura</span>
@@ -57,27 +57,27 @@ export function StudioLayersPanel() {
       </div>
 
       {showLogoPresets && (
-        <div className="p-2.5 rounded-xl bg-black/50 border border-amber-400/30 space-y-2 animate-in fade-in">
-          <span className="text-[10px] text-slate-400 block font-bold uppercase">Escolha o Selo Oficial:</span>
+        <div className="p-2.5 rounded-xl bg-elevated border border-amber-400/30 space-y-2 animate-in fade-in">
+          <span className="text-[10px] text-fg-muted block font-bold uppercase">Escolha o Selo Oficial:</span>
           <div className="grid grid-cols-3 gap-1 text-[10px] font-bold">
             <button
               type="button"
               onClick={() => handleAddLogo('org-logo')}
-              className="p-1.5 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black transition-all cursor-pointer"
+              className="p-1.5 rounded bg-elevated hover:bg-[#FFCC00] hover:text-black transition-all cursor-pointer"
             >
               Logo da Org
             </button>
             <button
               type="button"
               onClick={() => handleAddLogo('show-da-fisica-tricolor')}
-              className="p-1.5 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black transition-all cursor-pointer"
+              className="p-1.5 rounded bg-elevated hover:bg-[#FFCC00] hover:text-black transition-all cursor-pointer"
             >
               Show Física
             </button>
             <button
               type="button"
               onClick={() => handleAddLogo('ifusp')}
-              className="p-1.5 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black transition-all cursor-pointer"
+              className="p-1.5 rounded bg-elevated hover:bg-[#FFCC00] hover:text-black transition-all cursor-pointer"
             >
               IFUSP
             </button>
@@ -87,13 +87,13 @@ export function StudioLayersPanel() {
 
       {/* 5 Posições Rápidas de Selo para Selo Selecionado */}
       {selectedLayerId && layers.find((l) => l.id === selectedLayerId)?.type === 'logo' && (
-        <div className="p-2 rounded-xl bg-white/5 border border-white/10 space-y-1">
-          <span className="text-[10px] text-slate-400 block font-bold uppercase">Posição Rápida do Selo:</span>
+        <div className="p-2 rounded-xl bg-elevated/60 border border-border-subtle space-y-1">
+          <span className="text-[10px] text-fg-muted block font-bold uppercase">Posição Rápida do Selo:</span>
           <div className="grid grid-cols-5 gap-1 text-[10px] font-bold">
             <button
               type="button"
               onClick={() => updateLayer(selectedLayerId, { x: 0.05, y: 0.05 })}
-              className="p-1 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black cursor-pointer text-center"
+              className="p-1 rounded bg-elevated hover:bg-[#FFCC00] hover:text-black cursor-pointer text-center"
               title="Topo Esquerda"
             >
               ↖ TE
@@ -101,7 +101,7 @@ export function StudioLayersPanel() {
             <button
               type="button"
               onClick={() => updateLayer(selectedLayerId, { x: 0.73, y: 0.05 })}
-              className="p-1 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black cursor-pointer text-center"
+              className="p-1 rounded bg-elevated hover:bg-[#FFCC00] hover:text-black cursor-pointer text-center"
               title="Topo Direita"
             >
               ↗ TD
@@ -109,7 +109,7 @@ export function StudioLayersPanel() {
             <button
               type="button"
               onClick={() => updateLayer(selectedLayerId, { x: 0.39, y: 0.88 })}
-              className="p-1 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black cursor-pointer text-center"
+              className="p-1 rounded bg-elevated hover:bg-[#FFCC00] hover:text-black cursor-pointer text-center"
               title="Base Centro"
             >
               ↓ BC
@@ -117,7 +117,7 @@ export function StudioLayersPanel() {
             <button
               type="button"
               onClick={() => updateLayer(selectedLayerId, { x: 0.05, y: 0.88 })}
-              className="p-1 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black cursor-pointer text-center"
+              className="p-1 rounded bg-elevated hover:bg-[#FFCC00] hover:text-black cursor-pointer text-center"
               title="Base Esquerda"
             >
               ↙ BE
@@ -125,7 +125,7 @@ export function StudioLayersPanel() {
             <button
               type="button"
               onClick={() => updateLayer(selectedLayerId, { x: 0.73, y: 0.88 })}
-              className="p-1 rounded bg-white/10 hover:bg-[#FFCC00] hover:text-black cursor-pointer text-center"
+              className="p-1 rounded bg-elevated hover:bg-[#FFCC00] hover:text-black cursor-pointer text-center"
               title="Base Direita"
             >
               ↘ BD
@@ -135,7 +135,7 @@ export function StudioLayersPanel() {
       )}
 
       {layers.length === 0 ? (
-        <div className="p-4 rounded-xl border border-dashed border-white/10 text-center text-xs text-slate-400">
+        <div className="p-4 rounded-xl border border-dashed border-border-subtle text-center text-xs text-fg-muted">
           Nenhuma camada nesta tela.
         </div>
       ) : (
@@ -157,14 +157,14 @@ export function StudioLayersPanel() {
                 }}
                 onClick={() => setSelectedLayerId(layer.id)}
                 className={`p-2 rounded-xl border transition-all flex items-center justify-between gap-2 cursor-pointer ${
-                  isSelected ? 'border-[#FFCC00] bg-[#FFCC00]/10 shadow-xs' : 'border-white/10 bg-white/5 hover:border-white/20'
+                  isSelected ? 'border-[#FFCC00] bg-[#FFCC00]/10 shadow-xs' : 'border-border-subtle bg-elevated/60 hover:border-white/20'
                 }`}
               >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <span className="material-symbols-outlined text-[16px] text-[#FFCC00] shrink-0">
                     {layer.type === 'image' ? 'photo' : layer.type === 'text' ? 'title' : layer.type === 'logo' ? 'verified' : layer.type === 'math' ? 'functions' : 'category'}
                   </span>
-                  <span className="text-xs font-bold text-white truncate">{layer.name}</span>
+                  <span className="text-xs font-bold text-fg truncate">{layer.name}</span>
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -173,7 +173,7 @@ export function StudioLayersPanel() {
                       type="button"
                       onClick={() => duplicateLayerWithMaskOnTop(layer.id)}
                       title="✨ Duplicar com Máscara no Topo (Efeito Sanduíche)"
-                      className="p-1 rounded-lg text-amber-300 hover:bg-amber-400/20"
+                      className="p-1 rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-400/20"
                     >
                       <span className="material-symbols-outlined text-[15px]">layers_spark</span>
                     </button>
@@ -183,7 +183,7 @@ export function StudioLayersPanel() {
                     type="button"
                     disabled={idx === layers.length - 1}
                     onClick={() => reorderLayers(idx, idx + 1)}
-                    className="p-1 rounded-md text-slate-400 hover:text-white disabled:opacity-20"
+                    className="p-1 rounded-md text-fg-muted hover:text-fg disabled:opacity-20"
                     title="Subir Camada"
                   >
                     <span className="material-symbols-outlined text-[15px]">arrow_upward</span>
@@ -192,7 +192,7 @@ export function StudioLayersPanel() {
                     type="button"
                     disabled={idx === 0}
                     onClick={() => reorderLayers(idx, idx - 1)}
-                    className="p-1 rounded-md text-slate-400 hover:text-white disabled:opacity-20"
+                    className="p-1 rounded-md text-fg-muted hover:text-fg disabled:opacity-20"
                     title="Descer Camada"
                   >
                     <span className="material-symbols-outlined text-[15px]">arrow_downward</span>
@@ -201,7 +201,7 @@ export function StudioLayersPanel() {
                   <button
                     type="button"
                     onClick={() => updateLayer(layer.id, { visible: !layer.visible })}
-                    className={`p-1 rounded-md ${layer.visible ? 'text-slate-300 hover:text-white' : 'text-slate-600'}`}
+                    className={`p-1 rounded-md ${layer.visible ? 'text-fg-secondary hover:text-fg' : 'text-slate-600'}`}
                     title={layer.visible ? 'Ocultar' : 'Exibir'}
                   >
                     <span className="material-symbols-outlined text-[15px]">{layer.visible ? 'visibility' : 'visibility_off'}</span>
@@ -210,7 +210,7 @@ export function StudioLayersPanel() {
                   <button
                     type="button"
                     onClick={() => updateLayer(layer.id, { locked: !layer.locked })}
-                    className={`p-1 rounded-md ${layer.locked ? 'text-amber-400' : 'text-slate-500 hover:text-white'}`}
+                    className={`p-1 rounded-md ${layer.locked ? 'text-amber-400' : 'text-slate-500 hover:text-fg'}`}
                     title={layer.locked ? 'Desbloquear' : 'Bloquear'}
                   >
                     <span className="material-symbols-outlined text-[15px]">{layer.locked ? 'lock' : 'lock_open'}</span>

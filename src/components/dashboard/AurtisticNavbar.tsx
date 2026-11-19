@@ -402,7 +402,7 @@ export default function AurtisticNavbar() {
               </div>
 
               {isSettingsOpen && (
-                <div className="absolute right-0 mt-2 w-72 bg-surface border border-border-subtle rounded-2xl shadow-2xl overflow-hidden py-1 z-50">
+                <div className="absolute right-0 mt-2 w-72 max-h-[calc(100dvh-80px)] overflow-y-auto bg-surface border border-border-subtle rounded-2xl shadow-2xl py-1 z-50">
                   {/* Cabeçalho do Usuário */}
                   <div className="px-4 py-2.5 border-b border-border-subtle bg-app">
                     <p className="text-xs font-bold text-fg truncate">{displayName}</p>

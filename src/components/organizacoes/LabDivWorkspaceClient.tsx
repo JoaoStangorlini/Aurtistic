@@ -491,21 +491,21 @@ export function LabDivWorkspaceClient({
             label: 'Ponto & Horários',
             icon: 'calendar_clock',
             accentToken: 'var(--md-sys-color-primary)',
-            textOnActive: isShow || isHs ? '#040714' : '#040714',
+            textOnActive: 'var(--md-sys-color-on-primary, var(--on-accent-primary))',
           },
           {
             id: 'metas_tarefas' as const,
             label: 'Metas & Tarefas',
             icon: 'flag',
             accentToken: 'var(--md-sys-color-secondary)',
-            textOnActive: '#040714',
+            textOnActive: 'var(--md-sys-color-on-secondary, var(--on-accent-secondary))',
           },
           {
             id: 'ideias_converse' as const,
             label: 'Ideias, Pedidos & Converse',
             icon: 'forum',
             accentToken: 'var(--md-sys-color-tertiary)',
-            textOnActive: isHs ? '#040714' : '#ffffff',
+            textOnActive: '#ffffff',
           },
           {
             id: 'estoque' as const,
@@ -519,7 +519,7 @@ export function LabDivWorkspaceClient({
             label: 'Equipe & Acervo',
             icon: 'diversity_3',
             accentToken: 'var(--md-sys-color-primary)',
-            textOnActive: '#040714',
+            textOnActive: 'var(--md-sys-color-on-primary, var(--on-accent-primary))',
           },
         ];
 
@@ -531,7 +531,7 @@ export function LabDivWorkspaceClient({
               <div
                 className={`lg:col-span-6 p-4 border flex flex-col justify-between gap-4 ${
                   isShow || isHs
-                    ? 'neon-border-green bg-surface rounded-none'
+                    ? 'neon-border-green bg-surface/85 backdrop-blur-md rounded-none'
                     : 'org-card rounded-2xl border-border-subtle bg-surface/90 backdrop-blur-xl'
                 }`}
               >
@@ -564,7 +564,7 @@ export function LabDivWorkspaceClient({
               <div
                 className={`lg:col-span-3 p-4 border flex flex-col justify-between gap-3 ${
                   isShow || isHs
-                    ? 'neon-border-blue bg-surface rounded-none'
+                    ? 'neon-border-blue bg-surface/85 backdrop-blur-md rounded-none'
                     : 'org-card rounded-2xl border-border-subtle bg-surface/90 backdrop-blur-xl'
                 }`}
               >
@@ -578,7 +578,7 @@ export function LabDivWorkspaceClient({
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
                       isCheckedIn
-                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
                         : 'bg-app text-fg-muted border-border-subtle'
                     }`}
                   >
@@ -595,7 +595,7 @@ export function LabDivWorkspaceClient({
                       selectModuleTab('horarios_ponto');
                       setPendingQrDirection('entrada');
                     }}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--md-sys-color-primary)] text-slate-950 text-xs font-black hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary,var(--on-accent-primary))] text-xs font-black hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[16px]">login</span>
                     <span>Entrada</span>
@@ -622,7 +622,7 @@ export function LabDivWorkspaceClient({
               <div
                 className={`lg:col-span-3 p-4 border flex flex-col justify-between gap-3 ${
                   isShow || isHs
-                    ? 'neon-border-yellow bg-surface rounded-none'
+                    ? 'neon-border-yellow bg-surface/85 backdrop-blur-md rounded-none'
                     : 'org-card rounded-2xl border-border-subtle bg-surface/90 backdrop-blur-xl'
                 }`}
               >
@@ -643,7 +643,7 @@ export function LabDivWorkspaceClient({
                 <button
                   type="button"
                   onClick={() => selectMacroView('studio')}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[var(--md-sys-color-secondary)] text-slate-950 text-xs font-black hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[var(--md-sys-color-secondary)] text-[var(--md-sys-color-on-secondary,var(--on-accent-secondary))] text-xs font-black hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
                   <span>Abrir HUB Studio</span>
@@ -656,7 +656,7 @@ export function LabDivWorkspaceClient({
               aria-label="Módulos da Gestão"
               className={`p-1.5 border flex flex-wrap items-center gap-2 ${
                 isShow || isHs
-                  ? 'border-border-subtle bg-surface rounded-none'
+                  ? 'border-border-subtle bg-surface/85 backdrop-blur-md rounded-none'
                   : 'rounded-2xl border-border-subtle bg-surface/90 backdrop-blur-xl shadow-md'
               }`}
             >

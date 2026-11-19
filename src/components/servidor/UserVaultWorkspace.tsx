@@ -2377,7 +2377,7 @@ export function UserVaultWorkspace({
           }
         }
       }}
-      className={`relative z-10 min-h-full flex flex-col p-4 md:p-8 ${selectedOrg ? 'bg-transparent' : 'bg-app'} space-y-6 pb-28 text-fg`}
+      className="relative z-10 min-h-full flex flex-col p-4 md:p-8 bg-transparent space-y-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8 text-fg"
     >
       {/* Faixa 1: Switch Macro [ Cofre | Organizações | Studio ] acima de tudo */}
       {!isEffectiveInline && (
@@ -2644,7 +2644,7 @@ export function UserVaultWorkspace({
                   onClick={() => handleSetLayoutMode('grid')}
                   className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     layoutMode === 'grid'
-                      ? 'bg-[var(--accent-primary)] text-white font-bold shadow-sm'
+                      ? 'bg-[var(--accent-primary)] text-[var(--on-accent-primary)] font-bold shadow-sm'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
                   }`}
                   title="Grade de Miniaturas (Alt+1)"
@@ -2657,7 +2657,7 @@ export function UserVaultWorkspace({
                   onClick={() => handleSetLayoutMode('list')}
                   className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     layoutMode === 'list'
-                      ? 'bg-[var(--accent-primary)] text-white font-bold shadow-sm'
+                      ? 'bg-[var(--accent-primary)] text-[var(--on-accent-primary)] font-bold shadow-sm'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
                   }`}
                   title="Lista Detalhada (Alt+2)"
@@ -2670,7 +2670,7 @@ export function UserVaultWorkspace({
                   onClick={() => handleSetLayoutMode('ide')}
                   className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     layoutMode === 'ide'
-                      ? 'bg-[var(--accent-primary)] text-white font-bold shadow-sm ring-1 ring-[#FFCC00]/50'
+                      ? 'bg-[var(--accent-primary)] text-[var(--on-accent-primary)] font-bold shadow-sm ring-1 ring-[#FFCC00]/50'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
                   }`}
                   title="Visualização IDE com Árvore Lateral e Abas (Alt+3)"
@@ -2683,7 +2683,7 @@ export function UserVaultWorkspace({
                   onClick={() => handleSetLayoutMode('timeline')}
                   className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     layoutMode === 'timeline'
-                      ? 'bg-[var(--accent-primary)] text-white font-bold shadow-sm'
+                      ? 'bg-[var(--accent-primary)] text-[var(--on-accent-primary)] font-bold shadow-sm'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
                   }`}
                   title="Fotos e Mídia em Linha do Tempo (Alt+4)"
@@ -2699,7 +2699,7 @@ export function UserVaultWorkspace({
                   onClick={handleTogglePreview}
                   className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     isPreviewOpen
-                      ? 'bg-[var(--accent-primary)] text-white font-bold shadow-sm'
+                      ? 'bg-[var(--accent-primary)] text-[var(--on-accent-primary)] font-bold shadow-sm'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
                   }`}
                   title={isPreviewOpen ? 'Ocultar Painel Lateral (Alt+P / Alt+B)' : 'Abrir Painel Lateral (Alt+P / Alt+B)'}

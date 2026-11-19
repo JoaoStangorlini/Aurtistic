@@ -12,6 +12,7 @@ import { clearStudioRenderCache } from '@/lib/studio/lut-processor';
 const MAX_HISTORY_SNAPSHOTS = 40;
 
 interface StudioContextValue {
+  organizationId?: string | null;
   orgSlug?: string | null;
   stage: StudioStage;
   setStage: (s: StudioStage) => void;
@@ -75,7 +76,7 @@ interface StudioContextValue {
 
 const StudioContext = createContext<StudioContextValue | null>(null);
 
-export function StudioProvider({ children, orgSlug }: { children: React.ReactNode; orgSlug?: string | null }) {
+export function StudioProvider({ children, organizationId, orgSlug }: { children: React.ReactNode; organizationId?: string | null; orgSlug?: string | null }) {
   const { tokens } = useOrganizationBrand();
   const [stage, setStage] = useState<StudioStage>('launcher');
   const [activeTab, setActiveTab] = useState<StudioActiveTab>('images');
@@ -310,10 +311,10 @@ export function StudioProvider({ children, orgSlug }: { children: React.ReactNod
     if (local.slides[0]) setActiveSlideId(local.slides[0].id);
     setSelectedLayerId(null);
     setStage('editor');
-    rehydrateStudioDraftAction(draft, slug).then((res) => {
+    rehydrateStudioDraftAction(draft, slug, organizationId || undefined).then((res) => {
       if (res?.ok && res.draft) setSlides(res.draft.slides);
     }).catch(() => {});
-  }, [orgSlug, tokens.themeId]);
+  }, [orgSlug, organizationId, tokens.themeId]);
 
   const loadTemplate = useCallback((tpl: StudioTemplate) => {
     clearStudioRenderCache();
@@ -324,8 +325,8 @@ export function StudioProvider({ children, orgSlug }: { children: React.ReactNod
     setSelectedLayerId(null);
     setStage('editor');
     const slug = orgSlug || tokens.themeId;
-    rehydrateStudioDraftAction({ id: tpl.id, slotIndex: 1, title: tpl.title, aspectRatio: tpl.aspectRatio, updatedAt: '', slides: tpl.slides }, slug).then((r) => { if (r?.ok && r.draft) setSlides(r.draft.slides); }).catch(() => {});
-  }, [orgSlug, tokens.themeId]);
+    rehydrateStudioDraftAction({ id: tpl.id, slotIndex: 1, title: tpl.title, aspectRatio: tpl.aspectRatio, updatedAt: '', slides: tpl.slides }, slug, organizationId || undefined).then((r) => { if (r?.ok && r.draft) setSlides(r.draft.slides); }).catch(() => {});
+  }, [orgSlug, organizationId, tokens.themeId]);
 
   const saveCurrentToDraftSlot = useCallback((slot: 1 | 2 | 3, title?: string) => {
     const newDraft: StudioDraft = {
@@ -372,7 +373,7 @@ export function StudioProvider({ children, orgSlug }: { children: React.ReactNod
   return (
     <StudioContext.Provider
       value={{
-        orgSlug, stage, setStage, activeTab, setActiveTab, aspectRatio, setAspectRatio, adaptFormatTo,
+        organizationId, orgSlug, stage, setStage, activeTab, setActiveTab, aspectRatio, setAspectRatio, adaptFormatTo,
         slides, activeSlideId, activeSlide, setActiveSlideId, selectedLayerId, selectedLayer, setSelectedLayerId,
         updateSlide, addSlide, removeSlide, addLayer, updateLayer, removeLayer, reorderLayers, duplicateLayerWithMaskOnTop,
         duplicateLayer, bringLayerForward, sendLayerBackward, centerLayerOnStage, toggleLayerLock, resetLayerTransform,

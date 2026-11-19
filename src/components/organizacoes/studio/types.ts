@@ -124,6 +124,13 @@ export interface StudioLayerBase {
   maskStrokes?: Array<{ x: number; y: number; r: number; mode: 'add' | 'erase' }>;
 }
 
+export interface StudioVaultRef {
+  scopeType: 'org' | 'user';
+  orgSlug?: string;
+  organizationId?: string;
+  relativePath: string;
+}
+
 export interface StudioImageLayer extends StudioLayerBase {
   type: 'image';
   src: string;
@@ -139,6 +146,7 @@ export interface StudioImageLayer extends StudioLayerBase {
   offsetX?: number;
   offsetY?: number;
   vaultRelativePath?: string;
+  vaultRef?: StudioVaultRef;
 }
 
 export interface StudioTextLayer extends StudioLayerBase {

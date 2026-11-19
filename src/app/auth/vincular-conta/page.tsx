@@ -55,12 +55,12 @@ export default async function VincularContaPage(props: {
   const isLabdivMember = Boolean(payload.isLabdiv);
 
   return (
-    <div className="min-h-screen bg-[#0C0F17] flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-app flex items-center justify-center p-4 relative overflow-hidden">
       {/* Luzes de Fundo com IDV LabDiv & Aurtistic */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#0F4780]/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#9D4EDD]/15 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="relative w-full max-w-lg bg-[#141824]/90 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] overflow-hidden">
+      <div className="relative w-full max-w-lg bg-surface/95 backdrop-blur-2xl border border-border-subtle rounded-3xl shadow-2xl overflow-hidden">
         {/* Barra Superior Gradiente Oficial Roxo -> Azul Metálico -> Dourado */}
         <div className="h-2 w-full bg-gradient-to-r from-[#8E24AA] via-[#1E3D9E] to-[#C7940E]" />
 
@@ -68,14 +68,14 @@ export default async function VincularContaPage(props: {
           {/* Cabeçalho de Conexão */}
           <div className="flex flex-col items-center text-center">
             <div className="flex items-center gap-3.5 mb-3">
-              <div className="p-2.5 rounded-2xl bg-black/50 border border-white/10 shadow-lg">
+              <div className="p-2.5 rounded-2xl bg-elevated border border-border-subtle shadow-lg">
                 <img src="/icone-HUBLabDiv.svg" alt="HUB LabDiv" className="w-9 h-9 object-contain" />
               </div>
               <span className="material-symbols-outlined text-fg/40 text-lg">link</span>
               <ThemedAurtisticLogo size="sm" iconOnly={true} />
             </div>
 
-            <span className="text-[10px] font-black uppercase tracking-widest text-[#FFCC00] bg-[#FFCC00]/10 px-2.5 py-0.5 rounded-full border border-[#FFCC00]/20">
+            <span className="text-[10px] font-black uppercase tracking-widest text-accent-secondary bg-accent-secondary/10 px-2.5 py-0.5 rounded-full border border-accent-secondary/25">
               Vincular Contas
             </span>
             <h1 className="text-xl md:text-2xl font-black text-fg mt-2 tracking-tight">
@@ -87,15 +87,15 @@ export default async function VincularContaPage(props: {
           </div>
 
           {urlError && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
-              <span className="material-symbols-outlined text-[16px] text-red-400">error</span>
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-xs flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px] text-red-500 dark:text-red-400">error</span>
               <span>{urlError}</span>
             </div>
           )}
 
           {/* Card do Usuário Autenticado no HUB */}
-          <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-full overflow-hidden bg-black/60 border border-[#FFCC00]/40 shrink-0 flex items-center justify-center">
+          <div className="p-3.5 rounded-2xl bg-elevated border border-border-subtle flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-full overflow-hidden bg-surface border border-accent-secondary/40 shrink-0 flex items-center justify-center">
               {payload.avatarUrl ? (
                 <img src={payload.avatarUrl} alt={displayName} className="w-full h-full object-cover" />
               ) : (
@@ -105,7 +105,7 @@ export default async function VincularContaPage(props: {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-bold text-fg truncate">{displayName}</p>
-                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-[#0F4780]/80 text-white border border-[#1F9FCF]/50">
+                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-[#0F4780] text-white border border-[#1F9FCF]/50">
                   {isLabdivMember ? 'LabDiv' : 'HUB'}
                 </span>
               </div>
@@ -114,7 +114,7 @@ export default async function VincularContaPage(props: {
           </div>
 
           {/* OPÇÃO 1: Vincular a Conta Existente */}
-          <div className="p-5 rounded-2xl bg-black/30 border border-accent-primary/30 space-y-4">
+          <div className="p-5 rounded-2xl bg-elevated/60 border border-accent-primary/30 space-y-4">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-[20px] text-accent-primary">person_add</span>
               <h2 className="text-sm font-bold text-fg">Vincular a uma conta existente do Aurtistic</h2>
@@ -137,7 +137,7 @@ export default async function VincularContaPage(props: {
                   type="text"
                   required
                   placeholder="Ex: stangorlini ou seu@email.com"
-                  className="w-full bg-[#0E1522] border border-white/10 focus:border-accent-primary text-fg px-3.5 py-2.5 rounded-xl text-xs outline-none transition-colors"
+                  className="w-full bg-surface border border-border-subtle focus:border-accent-primary text-fg px-3.5 py-2.5 rounded-xl text-xs outline-none transition-colors"
                 />
               </div>
 
@@ -151,13 +151,13 @@ export default async function VincularContaPage(props: {
                   type="password"
                   required
                   placeholder="••••••••"
-                  className="w-full bg-[#0E1522] border border-white/10 focus:border-accent-primary text-fg px-3.5 py-2.5 rounded-xl text-xs outline-none transition-colors"
+                  className="w-full bg-surface border border-border-subtle focus:border-accent-primary text-fg px-3.5 py-2.5 rounded-xl text-xs outline-none transition-colors"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3 bg-gradient-to-r from-[#8E24AA] via-[#1E3D9E] to-[#C7940E] text-fg font-black rounded-xl text-xs uppercase tracking-wider hover:opacity-95 active:scale-[0.99] transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3 bg-gradient-to-r from-[#8E24AA] via-[#1E3D9E] to-[#C7940E] text-white font-black rounded-xl text-xs uppercase tracking-wider hover:opacity-95 active:scale-[0.99] transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[18px]">link</span>
                 <span>Confirmar e Vincular Contas</span>
@@ -168,15 +168,15 @@ export default async function VincularContaPage(props: {
           {/* DIVISOR */}
           <div className="relative flex items-center justify-center">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/10" />
+              <div className="w-full border-t border-border-subtle" />
             </div>
-            <span className="relative px-3 bg-[#141824] text-[10px] font-bold text-fg/40 uppercase tracking-widest">
+            <span className="relative px-3 bg-surface text-[10px] font-bold text-fg/40 uppercase tracking-widest">
               ou
             </span>
           </div>
 
           {/* OPÇÃO 2: Criar Nova Conta a Partir do HUB */}
-          <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3 text-center">
+          <div className="p-4 rounded-2xl bg-elevated/40 border border-border-subtle space-y-3 text-center">
             <h3 className="text-xs font-bold text-fg">Novo por aqui?</h3>
             <p className="text-[11px] text-fg/50 leading-relaxed max-w-sm mx-auto">
               Se você não possui uma conta anterior no Aurtistic, crie um novo perfil autônomo com sua identidade institucional do HUB.
@@ -188,7 +188,7 @@ export default async function VincularContaPage(props: {
 
               <button
                 type="submit"
-                className="w-full py-2.5 px-4 bg-white/5 hover:bg-white/10 border border-white/10 text-fg/80 hover:text-fg font-bold rounded-xl text-xs uppercase tracking-wider transition-all cursor-pointer"
+                className="w-full py-2.5 px-4 bg-elevated hover:bg-surface-hover border border-border-subtle text-fg/80 hover:text-fg font-bold rounded-xl text-xs uppercase tracking-wider transition-all cursor-pointer"
               >
                 Criar Nova Conta no Aurtistic
               </button>

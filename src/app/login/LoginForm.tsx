@@ -27,7 +27,7 @@ export default function LoginForm({ next }: { next: string }) {
           type="email"
           autoComplete="email"
           required
-          className="w-full bg-[#131313] border border-border-subtle text-[#e5e2e1] px-4 py-3 rounded-lg focus:outline-none focus:border-[#FFCC00] transition-colors"
+          className="w-full bg-elevated border border-border-subtle text-fg px-4 py-3 rounded-lg focus:outline-none focus:border-accent-secondary transition-colors"
           placeholder="seu@email.com"
         />
       </div>
@@ -41,7 +41,7 @@ export default function LoginForm({ next }: { next: string }) {
           type="password"
           autoComplete="current-password"
           required
-          className="w-full bg-[#131313] border border-border-subtle text-[#e5e2e1] px-4 py-3 rounded-lg focus:outline-none focus:border-[#FFCC00] transition-colors"
+          className="w-full bg-elevated border border-border-subtle text-fg px-4 py-3 rounded-lg focus:outline-none focus:border-accent-secondary transition-colors"
           placeholder="••••••••"
         />
       </div>
@@ -49,7 +49,7 @@ export default function LoginForm({ next }: { next: string }) {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full mt-4 bg-[#FFCC00] text-[#121212] font-bold py-3 rounded-lg hover:bg-[#e6b800] transition-colors focus:ring-4 focus:ring-[#FFCC00]/20 disabled:opacity-50"
+        className="w-full mt-4 bg-accent-secondary text-on-accent-secondary font-bold py-3 rounded-lg hover:opacity-90 transition-opacity focus:ring-4 focus:ring-accent-secondary/20 disabled:opacity-50"
       >
         {isSubmitting ? 'Entrando...' : 'Entrar'}
       </button>

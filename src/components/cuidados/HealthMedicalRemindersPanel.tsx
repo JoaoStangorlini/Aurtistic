@@ -157,14 +157,14 @@ export function HealthMedicalRemindersPanel() {
   if (!isLoaded) return null;
 
   return (
-    <div className="space-y-4 pt-3 border-t border-[var(--border-subtle,#2D2D2D)]">
+    <div className="space-y-4 pt-3 border-t border-[var(--border-subtle)]">
       {/* Aviso LGPD / Confinamento Local */}
-      <div className="flex items-start gap-2.5 p-3 rounded-xl bg-teal-500/10 border border-teal-500/20 text-xs text-teal-200">
+      <div className="flex items-start gap-2.5 p-3 rounded-xl bg-teal-500/10 border border-teal-500/20 text-xs text-teal-800 dark:text-teal-200">
         <span className="material-symbols-outlined text-[18px] text-teal-400 shrink-0 mt-0.5">
           verified_user
         </span>
         <div>
-          <span className="font-bold text-teal-300">Privacidade Médica & LGPD: </span>
+          <span className="font-bold text-teal-700 dark:text-teal-300">Privacidade Médica & LGPD: </span>
           Estes registros ficam salvos <strong>exclusivamente neste dispositivo</strong>. Nenhuma
           informação clínica ou de consultas é transmitida para a nuvem sem seu consentimento explícito.
         </div>
@@ -174,14 +174,14 @@ export function HealthMedicalRemindersPanel() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-[20px] text-teal-400">medical_services</span>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary,#F5F5F5)]">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--fg)]">
             Consultas, Exames & Saúde Preventiva
           </h3>
         </div>
         <button
           type="button"
           onClick={() => setIsFormOpen((prev) => !prev)}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-teal-500/20 text-teal-300 hover:bg-teal-500/30 border border-teal-500/40 transition-colors"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-teal-500/20 text-teal-700 dark:text-teal-300 hover:bg-teal-500/30 border border-teal-500/40 transition-colors"
         >
           <span className="material-symbols-outlined text-[16px]">
             {isFormOpen ? 'expand_less' : 'add'}
@@ -192,7 +192,7 @@ export function HealthMedicalRemindersPanel() {
 
       {/* Sugestões Rápidas (Chips de 1 clique) */}
       <div className="space-y-1.5">
-        <span className="text-[10px] font-bold text-[var(--text-muted,#8E8E8E)] uppercase block">
+        <span className="text-[10px] font-bold text-[var(--fg-muted)] uppercase block">
           Sugestões Rápidas:
         </span>
         <div className="flex flex-wrap gap-1.5">
@@ -201,7 +201,7 @@ export function HealthMedicalRemindersPanel() {
               key={chip.title}
               type="button"
               onClick={() => handleApplyChip(chip)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[var(--surface-secondary,#242424)] hover:bg-[var(--surface-hover,#2D2D2D)] border border-[var(--border-subtle,#2D2D2D)] hover:border-teal-500/50 text-[var(--text-secondary,#B3B3B3)] hover:text-white transition-all cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] border border-[var(--border-subtle)] hover:border-teal-500/50 text-[var(--fg-secondary)] hover:text-fg transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[14px] text-teal-400">{chip.icon}</span>
               <span>{chip.title}</span>
@@ -214,7 +214,7 @@ export function HealthMedicalRemindersPanel() {
       {isFormOpen && (
         <form
           onSubmit={handleAddItem}
-          className="p-3.5 rounded-xl bg-[var(--surface-secondary,#242424)] border border-[var(--border-subtle,#2D2D2D)] space-y-3 animate-in fade-in duration-150"
+          className="p-3.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] space-y-3 animate-in fade-in duration-150"
         >
           <div className="flex gap-2">
             <button
@@ -222,8 +222,8 @@ export function HealthMedicalRemindersPanel() {
               onClick={() => setItemType('consulta')}
               className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
                 itemType === 'consulta'
-                  ? 'bg-teal-500/20 border-teal-500/50 text-teal-300'
-                  : 'bg-[var(--surface-primary,#1A1A1A)] border-[var(--border-subtle,#2D2D2D)] text-[var(--text-muted,#8E8E8E)]'
+                  ? 'bg-teal-500/20 border-teal-500/50 text-teal-700 dark:text-teal-300'
+                  : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--fg-muted)]'
               }`}
             >
               Consulta Médica
@@ -233,8 +233,8 @@ export function HealthMedicalRemindersPanel() {
               onClick={() => setItemType('exame')}
               className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
                 itemType === 'exame'
-                  ? 'bg-teal-500/20 border-teal-500/50 text-teal-300'
-                  : 'bg-[var(--surface-primary,#1A1A1A)] border-[var(--border-subtle,#2D2D2D)] text-[var(--text-muted,#8E8E8E)]'
+                  ? 'bg-teal-500/20 border-teal-500/50 text-teal-700 dark:text-teal-300'
+                  : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--fg-muted)]'
               }`}
             >
               Exame Laboratorial
@@ -243,7 +243,7 @@ export function HealthMedicalRemindersPanel() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
-              <label className="text-[10px] font-bold text-[var(--text-muted,#8E8E8E)] uppercase block mb-1">
+              <label className="text-[10px] font-bold text-[var(--fg-muted)] uppercase block mb-1">
                 Especialidade ou Nome do Exame *
               </label>
               <input
@@ -252,11 +252,11 @@ export function HealthMedicalRemindersPanel() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Ex: Oftalmologista, Hemograma..."
-                className="w-full px-3 py-1.5 rounded-lg bg-[var(--surface-primary,#1A1A1A)] border border-[var(--border-subtle,#2D2D2D)] text-xs text-[var(--text-primary,#F5F5F5)] focus:border-teal-500 focus:outline-none"
+                className="w-full px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--fg)] focus:border-teal-500 focus:outline-none"
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-[var(--text-muted,#8E8E8E)] uppercase block mb-1">
+              <label className="text-[10px] font-bold text-[var(--fg-muted)] uppercase block mb-1">
                 Profissional, Clínica ou Laboratório
               </label>
               <input
@@ -264,25 +264,25 @@ export function HealthMedicalRemindersPanel() {
                 value={professionalOrLab}
                 onChange={(e) => setProfessionalOrLab(e.target.value)}
                 placeholder="Ex: Dr. Silva, Lab Central..."
-                className="w-full px-3 py-1.5 rounded-lg bg-[var(--surface-primary,#1A1A1A)] border border-[var(--border-subtle,#2D2D2D)] text-xs text-[var(--text-primary,#F5F5F5)] focus:border-teal-500 focus:outline-none"
+                className="w-full px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--fg)] focus:border-teal-500 focus:outline-none"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
-              <label className="text-[10px] font-bold text-[var(--text-muted,#8E8E8E)] uppercase block mb-1">
+              <label className="text-[10px] font-bold text-[var(--fg-muted)] uppercase block mb-1">
                 Data Agendada (Deixe vazio para &quot;Para Agendar&quot;)
               </label>
               <input
                 type="date"
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg bg-[var(--surface-primary,#1A1A1A)] border border-[var(--border-subtle,#2D2D2D)] text-xs text-[var(--text-primary,#F5F5F5)] focus:border-teal-500 focus:outline-none"
+                className="w-full px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--fg)] focus:border-teal-500 focus:outline-none"
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-[var(--text-muted,#8E8E8E)] uppercase block mb-1">
+              <label className="text-[10px] font-bold text-[var(--fg-muted)] uppercase block mb-1">
                 Instruções ou Observações
               </label>
               <input
@@ -290,7 +290,7 @@ export function HealthMedicalRemindersPanel() {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Ex: Jejum de 8h, levar receitas anteriores..."
-                className="w-full px-3 py-1.5 rounded-lg bg-[var(--surface-primary,#1A1A1A)] border border-[var(--border-subtle,#2D2D2D)] text-xs text-[var(--text-primary,#F5F5F5)] focus:border-teal-500 focus:outline-none"
+                className="w-full px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--fg)] focus:border-teal-500 focus:outline-none"
               />
             </div>
           </div>
@@ -299,7 +299,7 @@ export function HealthMedicalRemindersPanel() {
             <button
               type="button"
               onClick={() => setIsFormOpen(false)}
-              className="px-3 py-1.5 rounded-lg text-xs text-[var(--text-muted,#8E8E8E)] hover:text-white"
+              className="px-3 py-1.5 rounded-lg text-xs text-[var(--fg-muted)] hover:text-fg"
             >
               Cancelar
             </button>
@@ -316,43 +316,43 @@ export function HealthMedicalRemindersPanel() {
       {/* Grid com os 3 Sub-Painéis Padronizados */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {/* Sub-painel 1: Para Agendar */}
-        <div className="p-3 rounded-xl bg-[var(--surface-secondary,#242424)] border border-[var(--border-subtle,#2D2D2D)] flex flex-col">
-          <div className="flex items-center justify-between pb-2 border-b border-[var(--border-subtle,#2D2D2D)] mb-2">
+        <div className="p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex flex-col">
+          <div className="flex items-center justify-between pb-2 border-b border-[var(--border-subtle)] mb-2">
             <div className="flex items-center gap-1.5">
               <span className="material-symbols-outlined text-[16px] text-amber-400">event_busy</span>
-              <span className="text-xs font-bold text-[var(--text-primary,#F5F5F5)]">Para Agendar</span>
+              <span className="text-xs font-bold text-[var(--fg)]">Para Agendar</span>
             </div>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-amber-300">
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300">
               {toScheduleItems.length}
             </span>
           </div>
 
           <div className="space-y-2 flex-1">
             {toScheduleItems.length === 0 ? (
-              <p className="text-[11px] text-[var(--text-muted,#8E8E8E)] italic py-2 text-center">
+              <p className="text-[11px] text-[var(--fg-muted)] italic py-2 text-center">
                 Nenhum item pendente de agendamento.
               </p>
             ) : (
               toScheduleItems.map((it) => (
                 <div
                   key={it.id}
-                  className="p-2 rounded-lg bg-[var(--surface-primary,#1A1A1A)] border border-[var(--border-subtle,#2D2D2D)] text-xs space-y-1"
+                  className="p-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs space-y-1"
                 >
                   <div className="flex items-start justify-between gap-1">
-                    <span className="font-bold text-[var(--text-primary,#F5F5F5)]">{it.title}</span>
+                    <span className="font-bold text-[var(--fg)]">{it.title}</span>
                     <button
                       type="button"
                       onClick={() => handleDeleteItem(it.id)}
-                      className="text-[var(--text-muted,#8E8E8E)] hover:text-rose-400"
+                      className="text-[var(--fg-muted)] hover:text-rose-400"
                       title="Excluir"
                     >
                       <span className="material-symbols-outlined text-[14px]">close</span>
                     </button>
                   </div>
                   {it.professionalOrLab && (
-                    <p className="text-[11px] text-[var(--text-muted,#8E8E8E)]">{it.professionalOrLab}</p>
+                    <p className="text-[11px] text-[var(--fg-muted)]">{it.professionalOrLab}</p>
                   )}
-                  {it.notes && <p className="text-[10px] text-amber-300/80 italic">{it.notes}</p>}
+                  {it.notes && <p className="text-[10px] text-amber-700/90 dark:text-amber-700 dark:text-amber-300/80 italic">{it.notes}</p>}
                 </div>
               ))
             )}
@@ -360,34 +360,34 @@ export function HealthMedicalRemindersPanel() {
         </div>
 
         {/* Sub-painel 2: Daqui a X dias */}
-        <div className="p-3 rounded-xl bg-[var(--surface-secondary,#242424)] border border-[var(--border-subtle,#2D2D2D)] flex flex-col">
-          <div className="flex items-center justify-between pb-2 border-b border-[var(--border-subtle,#2D2D2D)] mb-2">
+        <div className="p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex flex-col">
+          <div className="flex items-center justify-between pb-2 border-b border-[var(--border-subtle)] mb-2">
             <div className="flex items-center gap-1.5">
               <span className="material-symbols-outlined text-[16px] text-teal-400">schedule</span>
-              <span className="text-xs font-bold text-[var(--text-primary,#F5F5F5)]">Daqui a X dias</span>
+              <span className="text-xs font-bold text-[var(--fg)]">Daqui a X dias</span>
             </div>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-teal-300">
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-700 dark:text-teal-300">
               {upcomingItems.length}
             </span>
           </div>
 
           <div className="space-y-2 flex-1">
             {upcomingItems.length === 0 ? (
-              <p className="text-[11px] text-[var(--text-muted,#8E8E8E)] italic py-2 text-center">
+              <p className="text-[11px] text-[var(--fg-muted)] italic py-2 text-center">
                 Nenhuma data futura definida.
               </p>
             ) : (
               upcomingItems.map(({ item: it, daysUntil }) => (
                 <div
                   key={it.id}
-                  className="p-2 rounded-lg bg-[var(--surface-primary,#1A1A1A)] border border-[var(--border-subtle,#2D2D2D)] text-xs space-y-1.5"
+                  className="p-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs space-y-1.5"
                 >
                   <div className="flex items-start justify-between gap-1">
-                    <span className="font-bold text-[var(--text-primary,#F5F5F5)]">{it.title}</span>
+                    <span className="font-bold text-[var(--fg)]">{it.title}</span>
                     <button
                       type="button"
                       onClick={() => handleDeleteItem(it.id)}
-                      className="text-[var(--text-muted,#8E8E8E)] hover:text-rose-400"
+                      className="text-[var(--fg-muted)] hover:text-rose-400"
                       title="Excluir"
                     >
                       <span className="material-symbols-outlined text-[14px]">close</span>
@@ -397,10 +397,10 @@ export function HealthMedicalRemindersPanel() {
                     <span
                       className={`font-mono font-bold px-1.5 py-0.5 rounded text-[10px] ${
                         daysUntil < 0
-                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                          ? 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30'
                           : daysUntil === 0
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                          : 'bg-teal-500/20 text-teal-300'
+                          ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30'
+                          : 'bg-teal-500/20 text-teal-700 dark:text-teal-300'
                       }`}
                     >
                       {daysUntil < 0
@@ -409,18 +409,18 @@ export function HealthMedicalRemindersPanel() {
                         ? 'É hoje!'
                         : `Daqui a ${daysUntil} dias`}
                     </span>
-                    <span className="text-[var(--text-muted,#8E8E8E)] font-mono text-[10px]">
+                    <span className="text-[var(--fg-muted)] font-mono text-[10px]">
                       {it.scheduledDate}
                     </span>
                   </div>
                   {it.professionalOrLab && (
-                    <p className="text-[11px] text-[var(--text-muted,#8E8E8E)]">{it.professionalOrLab}</p>
+                    <p className="text-[11px] text-[var(--fg-muted)]">{it.professionalOrLab}</p>
                   )}
                   {/* Botão de Transição de Status: Mover para Últimas */}
                   <button
                     type="button"
                     onClick={() => handleMarkAsDone(it.id)}
-                    className="w-full flex items-center justify-center gap-1.5 px-2 py-1 rounded bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 text-[11px] font-bold transition-colors cursor-pointer"
+                    className="w-full flex items-center justify-center gap-1.5 px-2 py-1 rounded bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-700 dark:text-teal-300 text-[11px] font-bold transition-colors cursor-pointer"
                     title="Marcar como realizado e mover para Últimas Consultas/Exames"
                   >
                     <span className="material-symbols-outlined text-[14px]">check_circle</span>
@@ -433,36 +433,36 @@ export function HealthMedicalRemindersPanel() {
         </div>
 
         {/* Sub-painel 3: Últimas Consultas / Últimos Exames */}
-        <div className="p-3 rounded-xl bg-[var(--surface-secondary,#242424)] border border-[var(--border-subtle,#2D2D2D)] flex flex-col">
-          <div className="flex items-center justify-between pb-2 border-b border-[var(--border-subtle,#2D2D2D)] mb-2">
+        <div className="p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex flex-col">
+          <div className="flex items-center justify-between pb-2 border-b border-[var(--border-subtle)] mb-2">
             <div className="flex items-center gap-1.5">
               <span className="material-symbols-outlined text-[16px] text-emerald-400">history</span>
-              <span className="text-xs font-bold text-[var(--text-primary,#F5F5F5)]">
+              <span className="text-xs font-bold text-[var(--fg)]">
                 Últimas Consultas / Últimos Exames
               </span>
             </div>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-emerald-300">
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
               {pastDoneItems.length}
             </span>
           </div>
 
           <div className="space-y-2 flex-1">
             {pastDoneItems.length === 0 ? (
-              <p className="text-[11px] text-[var(--text-muted,#8E8E8E)] italic py-2 text-center">
+              <p className="text-[11px] text-[var(--fg-muted)] italic py-2 text-center">
                 Nenhum histórico registrado ainda.
               </p>
             ) : (
               pastDoneItems.map((it) => (
                 <div
                   key={it.id}
-                  className="p-2 rounded-lg bg-[var(--surface-primary,#1A1A1A)] border border-[var(--border-subtle,#2D2D2D)] text-xs space-y-1"
+                  className="p-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs space-y-1"
                 >
                   <div className="flex items-start justify-between gap-1">
-                    <span className="font-bold text-[var(--text-primary,#F5F5F5)]">{it.title}</span>
+                    <span className="font-bold text-[var(--fg)]">{it.title}</span>
                     <button
                       type="button"
                       onClick={() => handleDeleteItem(it.id)}
-                      className="text-[var(--text-muted,#8E8E8E)] hover:text-rose-400"
+                      className="text-[var(--fg-muted)] hover:text-rose-400"
                       title="Excluir"
                     >
                       <span className="material-symbols-outlined text-[14px]">close</span>
@@ -473,10 +473,10 @@ export function HealthMedicalRemindersPanel() {
                       <span className="material-symbols-outlined text-[12px]">done_all</span>
                       <span>Realizado</span>
                     </span>
-                    <span className="font-mono text-[var(--text-muted,#8E8E8E)]">{it.lastDoneDate}</span>
+                    <span className="font-mono text-[var(--fg-muted)]">{it.lastDoneDate}</span>
                   </div>
                   {it.professionalOrLab && (
-                    <p className="text-[11px] text-[var(--text-muted,#8E8E8E)]">{it.professionalOrLab}</p>
+                    <p className="text-[11px] text-[var(--fg-muted)]">{it.professionalOrLab}</p>
                   )}
                 </div>
               ))

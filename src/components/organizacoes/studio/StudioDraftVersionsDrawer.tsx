@@ -93,7 +93,7 @@ export function StudioDraftVersionsDrawer({ isOpen, onClose }: StudioDraftVersio
                 {draft ? (
                   <>
                     <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-600 dark:text-amber-300 font-mono text-[10px] font-bold">
+                      <span className="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-600 dark:text-amber-700 dark:text-amber-300 font-mono text-[10px] font-bold">
                         SLOT {slot} • {draft.aspectRatio}
                       </span>
                       <span className="text-[10px] text-fg-muted font-mono">
@@ -138,11 +138,11 @@ export function StudioDraftVersionsDrawer({ isOpen, onClose }: StudioDraftVersio
         {comparingDraft && (
           <div className="p-3 rounded-2xl bg-surface border border-amber-400/40 space-y-2 text-xs">
             <div className="flex items-center justify-between">
-              <span className="font-bold text-amber-300 flex items-center gap-1">
+              <span className="font-bold text-amber-700 dark:text-amber-300 flex items-center gap-1">
                 <span className="material-symbols-outlined text-[15px]">compare</span>
                 <span>Comparação Visual (Lado a Lado)</span>
               </span>
-              <button type="button" onClick={() => setComparingDraft(null)} className="text-slate-400 hover:text-white">✕</button>
+              <button type="button" onClick={() => setComparingDraft(null)} className="text-fg-muted hover:text-fg">✕</button>
             </div>
             <div className="grid grid-cols-2 gap-2 text-[10px]">
               <div className="p-2 rounded-xl bg-surface-hover border border-border-subtle flex flex-col items-center gap-1.5">
@@ -155,7 +155,7 @@ export function StudioDraftVersionsDrawer({ isOpen, onClose }: StudioDraftVersio
                 <span className="text-fg truncate block max-w-full">{activeSlide.title}</span>
               </div>
               <div className="p-2 rounded-xl bg-amber-400/10 border border-amber-400/30 flex flex-col items-center gap-1.5">
-                <span className="text-amber-600 dark:text-amber-300 font-bold block text-center">SLOT {comparingDraft.slotIndex}</span>
+                <span className="text-amber-600 dark:text-amber-700 dark:text-amber-300 font-bold block text-center">SLOT {comparingDraft.slotIndex}</span>
                 {comparePreview ? (
                   <img src={comparePreview} alt="Versão Salva" className="w-full h-24 object-contain rounded-lg border border-border-subtle bg-surface" />
                 ) : (

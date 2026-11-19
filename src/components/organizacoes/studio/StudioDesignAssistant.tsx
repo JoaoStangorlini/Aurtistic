@@ -81,30 +81,30 @@ export function StudioDesignAssistant({ activeOverlay, onToggleOverlay }: Studio
   const isAa = measuredContrast >= 4.5;
 
   return (
-    <div className="space-y-3.5 p-3.5 rounded-2xl bg-white/5 border border-white/10 text-xs">
-      <div className="flex items-center justify-between border-b border-white/10 pb-2">
+    <div className="space-y-3.5 p-3.5 rounded-2xl bg-elevated/60 border border-border-subtle text-xs">
+      <div className="flex items-center justify-between border-b border-border-subtle pb-2">
         <div className="flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-[18px] text-amber-300">smart_toy</span>
-          <h3 className="font-bold text-white uppercase tracking-wider text-[11px]">Assistente WCAG & Design</h3>
+          <span className="material-symbols-outlined text-[18px] text-amber-700 dark:text-amber-300">smart_toy</span>
+          <h3 className="font-bold text-fg uppercase tracking-wider text-[11px]">Assistente WCAG & Design</h3>
         </div>
-        <span className={`px-2 py-0.5 rounded-md font-mono text-[10px] font-bold ${isAaa ? 'bg-emerald-500/20 text-emerald-300' : isAa ? 'bg-amber-500/20 text-amber-300' : 'bg-red-500/20 text-red-300'}`}>
+        <span className={`px-2 py-0.5 rounded-md font-mono text-[10px] font-bold ${isAaa ? 'bg-emerald-500/20 text-emerald-300' : isAa ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300' : 'bg-red-500/20 text-red-300'}`}>
           {isAaa ? 'WCAG AAA (7:1)' : isAa ? 'WCAG AA (4.5:1)' : 'Abaixo do Padrão'}
         </span>
       </div>
 
       {/* Contraste Amostrado Real dos Pixels */}
-      <div className="p-2.5 rounded-xl bg-black/40 border border-white/10 space-y-2">
+      <div className="p-2.5 rounded-xl bg-elevated/70 border border-border-subtle space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-slate-300 text-[11px]">Contraste Real Amostrado</span>
-          <span className="font-mono text-amber-300 font-bold text-xs">{measuredContrast}:1</span>
+          <span className="text-fg-secondary text-[11px]">Contraste Real Amostrado</span>
+          <span className="font-mono text-amber-700 dark:text-amber-300 font-bold text-xs">{measuredContrast}:1</span>
         </div>
-        <p className="text-[10px] text-slate-400">
+        <p className="text-[10px] text-fg-muted">
           Amostragem direta dos pixels do Canvas sob o texto selecionado (exigência mínima de 7:1 para AAA).
         </p>
         <button
           type="button"
           onClick={handleAutoAdjustContrast}
-          className="w-full py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
+          className="w-full py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-700 dark:text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
         >
           <span className="material-symbols-outlined text-[15px]">auto_fix_high</span>
           <span>Auto-Ajustar para 7:1 (AAA)</span>
@@ -116,7 +116,7 @@ export function StudioDesignAssistant({ activeOverlay, onToggleOverlay }: Studio
         <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-400/25 space-y-1.5">
           <div className="flex items-start gap-1.5">
             <span className="material-symbols-outlined text-[15px] text-blue-400 shrink-0 mt-0.5">lightbulb</span>
-            <p className="text-[10px] text-blue-200">
+            <p className="text-[10px] text-blue-700 dark:text-blue-200">
               {selectedLayer && Math.abs(selectedLayer.x + selectedLayer.width / 2 - 0.5) < 0.04
                 ? '🎯 Camada perfeitamente centralizada no eixo horizontal.'
                 : (activeSlide.globalFilters.temperature ?? 0) > 15
@@ -128,7 +128,7 @@ export function StudioDesignAssistant({ activeOverlay, onToggleOverlay }: Studio
             <button
               type="button"
               onClick={() => setDismissedTip(true)}
-              className="text-[9px] text-slate-300 hover:text-white cursor-pointer font-semibold"
+              className="text-[9px] text-fg-secondary hover:text-fg cursor-pointer font-semibold"
             >
               Entendi
             </button>
@@ -138,7 +138,7 @@ export function StudioDesignAssistant({ activeOverlay, onToggleOverlay }: Studio
                 setHideTipsForever(true);
                 try { localStorage.setItem('aurtistic_studio_hide_tips', 'true'); } catch {}
               }}
-              className="text-[9px] text-slate-400 hover:text-slate-200 cursor-pointer"
+              className="text-[9px] text-fg-muted hover:text-fg cursor-pointer"
             >
               Não mostrar mais
             </button>
@@ -148,7 +148,7 @@ export function StudioDesignAssistant({ activeOverlay, onToggleOverlay }: Studio
 
       {/* Overlays de Composição */}
       <div>
-        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+        <label className="text-[10px] font-bold text-fg-muted uppercase tracking-wider block mb-1">
           Guias de Composição Fotográfica
         </label>
         <div className="grid grid-cols-3 gap-1 text-[10px] font-bold">
@@ -177,11 +177,11 @@ export function StudioDesignAssistant({ activeOverlay, onToggleOverlay }: Studio
       </div>
 
       {/* Mini-Guia Educativo */}
-      <div className="pt-1 border-t border-white/10">
+      <div className="pt-1 border-t border-border-subtle">
         <button
           type="button"
           onClick={() => setTipsOpen(!tipsOpen)}
-          className="w-full flex items-center justify-between text-[11px] font-bold text-slate-300 hover:text-white"
+          className="w-full flex items-center justify-between text-[11px] font-bold text-fg-secondary hover:text-fg"
         >
           <span className="flex items-center gap-1">
             <span className="material-symbols-outlined text-[15px] text-[#FFCC00]">school</span>
@@ -191,7 +191,7 @@ export function StudioDesignAssistant({ activeOverlay, onToggleOverlay }: Studio
         </button>
 
         {tipsOpen && (
-          <div className="mt-2 p-2 rounded-xl bg-white/5 space-y-1.5 text-[10px] text-slate-300">
+          <div className="mt-2 p-2 rounded-xl bg-elevated/60 space-y-1.5 text-[10px] text-fg-secondary">
             <p>💡 <strong>Temperatura:</strong> Cores quentes (&gt; 20) destacam chamadas para ação. Cores frias transmitem profundidade científica.</p>
             <p>📸 <strong>Regra dos Terços:</strong> Posicione pontos de interesse nas 4 interseções para leitura dinâmica.</p>
           </div>

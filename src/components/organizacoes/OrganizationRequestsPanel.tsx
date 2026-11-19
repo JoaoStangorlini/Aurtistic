@@ -198,7 +198,7 @@ export function OrganizationRequestsPanel({
           <button
             type="button"
             onClick={() => setIsFormOpen((prev) => !prev)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--md-sys-color-secondary)] text-slate-950 font-black text-xs hover:brightness-110 active:scale-[0.98] transition-all shadow-sm self-start sm:self-auto cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--md-sys-color-secondary)] text-[var(--md-sys-color-on-secondary,var(--on-accent-secondary))] font-black text-xs hover:brightness-110 active:scale-[0.98] transition-all shadow-sm self-start sm:self-auto cursor-pointer"
           >
             <span className="material-symbols-outlined text-[16px]">
               {isFormOpen ? 'close' : 'add'}
@@ -215,7 +215,7 @@ export function OrganizationRequestsPanel({
           onClick={() => setActiveHubMode('all')}
           className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-[0.98] ${
             activeHubMode === 'all'
-              ? 'bg-[var(--md-sys-color-primary)] text-slate-950 shadow-sm'
+              ? 'bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary,var(--on-accent-primary))] shadow-sm'
               : 'bg-app border border-border-subtle text-fg-muted hover:text-fg'
           }`}
         >
@@ -231,7 +231,7 @@ export function OrganizationRequestsPanel({
           }}
           className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-[0.98] ${
             activeHubMode === 'sugestao'
-              ? 'bg-[var(--md-sys-color-primary)] text-slate-950 shadow-sm'
+              ? 'bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary,var(--on-accent-primary))] shadow-sm'
               : 'bg-app border border-border-subtle text-fg-muted hover:text-fg'
           }`}
         >
@@ -247,7 +247,7 @@ export function OrganizationRequestsPanel({
           }}
           className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-[0.98] ${
             activeHubMode === 'pedido'
-              ? 'bg-[var(--md-sys-color-secondary)] text-slate-950 shadow-sm'
+              ? 'bg-[var(--md-sys-color-secondary)] text-[var(--md-sys-color-on-secondary,var(--on-accent-secondary))] shadow-sm'
               : 'bg-app border border-border-subtle text-fg-muted hover:text-fg'
           }`}
         >

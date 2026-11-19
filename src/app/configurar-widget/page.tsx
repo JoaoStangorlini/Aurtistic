@@ -21,7 +21,7 @@ export default async function ConfigurarWidgetPage() {
     .order('created_at', { ascending: false });
 
   return (
-    <main className="min-h-full bg-app p-4 md:p-8">
+    <main className="min-h-full bg-transparent p-4 md:p-8">
       <WidgetConfigClient 
         userId={user.id} 
         tasks={tasks || []} 

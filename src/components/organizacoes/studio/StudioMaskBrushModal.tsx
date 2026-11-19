@@ -136,34 +136,34 @@ export function StudioMaskBrushModal() {
         </div>
 
         {/* Toolbar de Formas e Modos */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white/5 p-2.5 rounded-xl border border-white/10 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 bg-elevated/60 p-2.5 rounded-xl border border-border-subtle text-xs">
           <div className="flex items-center gap-1.5">
             <button
               type="button" onClick={() => setBrushMode('add')}
-              className={`px-2.5 py-1 rounded-lg font-bold transition-all ${brushMode === 'add' ? 'bg-red-500 text-white' : 'bg-white/10 text-slate-300'}`}
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all ${brushMode === 'add' ? 'bg-red-500 text-white' : 'bg-elevated text-fg-secondary'}`}
             >
               Pintar (Vermelho)
             </button>
             <button
               type="button" onClick={() => setBrushMode('erase')}
-              className={`px-2.5 py-1 rounded-lg font-bold transition-all ${brushMode === 'erase' ? 'bg-red-500 text-white' : 'bg-white/10 text-slate-300'}`}
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all ${brushMode === 'erase' ? 'bg-red-500 text-white' : 'bg-elevated text-fg-secondary'}`}
             >
               Borracha
             </button>
-            <button type="button" onClick={handleInvertMask} className="px-2.5 py-1 rounded-lg bg-amber-400/20 text-amber-300 font-semibold hover:bg-amber-400/30">
+            <button type="button" onClick={handleInvertMask} className="px-2.5 py-1 rounded-lg bg-amber-400/20 text-amber-700 dark:text-amber-300 font-semibold hover:bg-amber-400/30">
               Inverter
             </button>
-            <button type="button" onClick={() => { const c = canvasRef.current; if (c) c.getContext('2d')?.clearRect(0, 0, c.width, c.height); }} className="px-2 py-1 rounded-lg bg-white/10 text-slate-400 hover:text-white">
+            <button type="button" onClick={() => { const c = canvasRef.current; if (c) c.getContext('2d')?.clearRect(0, 0, c.width, c.height); }} className="px-2 py-1 rounded-lg bg-elevated text-fg-muted hover:text-fg">
               Limpar
             </button>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-slate-400">Forma:</span>
+            <span className="text-fg-muted">Forma:</span>
             {(['freehand', 'circle', 'rect', 'ellipse', 'hexagon'] as BrushShape[]).map((s) => (
               <button
                 key={s} type="button" onClick={() => setBrushShape(s)}
-                className={`px-2 py-0.5 rounded text-[11px] font-bold ${brushShape === s ? 'bg-[#FFCC00] text-black' : 'bg-white/10 text-slate-400'}`}
+                className={`px-2 py-0.5 rounded text-[11px] font-bold ${brushShape === s ? 'bg-[#FFCC00] text-black' : 'bg-elevated text-fg-muted'}`}
               >
                 {s === 'freehand' ? 'Livre' : s === 'circle' ? 'Círculo' : s === 'rect' ? 'Ret' : s === 'ellipse' ? 'Elipse' : 'Hex'}
               </button>
@@ -171,27 +171,27 @@ export function StudioMaskBrushModal() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-slate-400">Tamanho:</span>
+            <span className="text-fg-muted">Tamanho:</span>
             <input type="range" min={5} max={200} value={brushSize} onChange={(e) => setBrushSize(Number(e.target.value))} className="w-20 cursor-pointer" />
-            <span className="font-mono text-white text-[11px]">{brushSize}px</span>
+            <span className="font-mono text-fg text-[11px]">{brushSize}px</span>
           </div>
         </div>
 
         {/* Toggle de Recorte vs Edição Seletiva */}
         <div className="flex items-center gap-4 text-xs px-1">
-          <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+          <label className="flex items-center gap-2 text-fg-secondary cursor-pointer">
             <input type="radio" name="maskType" checked={isCutout} onChange={() => setIsCutout(true)} className="accent-red-500" />
             <span>Recorte Total (Cutout / Transparência ao redor)</span>
           </label>
-          <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+          <label className="flex items-center gap-2 text-fg-secondary cursor-pointer">
             <input type="radio" name="maskType" checked={!isCutout} onChange={() => setIsCutout(false)} className="accent-red-500" />
             <span>Edição Seletiva (Aplica filtros da Aba 2 só nesta área)</span>
           </label>
         </div>
 
         {/* Visualizador com Overlay Vermelho rgba(255, 0, 0, 0.4) */}
-        <div className="relative w-full aspect-square max-h-[360px] rounded-2xl overflow-hidden bg-black/70 border border-white/10 flex items-center justify-center">
-          <img src={targetLayer.src} alt="Preview" className="absolute inset-0 w-full h-full object-contain pointer-events-none opacity-80" />
+        <div className="relative w-full aspect-square max-h-[360px] rounded-2xl overflow-hidden bg-black/70 border border-border-subtle flex items-center justify-center">
+          <img src={targetLayer.src} alt="Preview" crossOrigin="anonymous" className="absolute inset-0 w-full h-full object-contain pointer-events-none opacity-80" />
           <canvas
             ref={canvasRef} width={800} height={800}
             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
@@ -202,9 +202,9 @@ export function StudioMaskBrushModal() {
         </div>
 
         <div className="flex items-center justify-between pt-1">
-          <span className="text-[11px] text-slate-400">Áreas pintadas recebem a máscara com precisão offscreen.</span>
+          <span className="text-[11px] text-fg-muted">Áreas pintadas recebem a máscara com precisão offscreen.</span>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setMaskModalLayerId(null)} className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-300 hover:bg-white/10">Cancelar</button>
+            <button type="button" onClick={() => setMaskModalLayerId(null)} className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-fg-secondary hover:bg-elevated">Cancelar</button>
             <button type="button" onClick={handleSaveMask} className="px-4 py-1.5 rounded-xl text-xs font-bold bg-[#FFCC00] text-black hover:bg-[#FFD633] shadow-md cursor-pointer">Salvar Máscara</button>
           </div>
         </div>

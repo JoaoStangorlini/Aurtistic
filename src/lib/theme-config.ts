@@ -15,6 +15,8 @@ export type ThemePaletteId =
 export interface ThemePreferences {
   mode: ThemeMode;
   palette: ThemePaletteId;
+  overrideOrgTheme?: boolean;
+  updatedAt?: string;
 }
 
 export interface PaletteDefinition {
@@ -44,6 +46,7 @@ export const THEME_STORAGE_KEY = 'aurtistic_theme_v1';
 export const DEFAULT_THEME_PREFERENCES: ThemePreferences = {
   mode: 'system',
   palette: 'purple-gold',
+  overrideOrgTheme: false,
 };
 
 export const THEME_PALETTES: Record<ThemePaletteId, PaletteDefinition> = {
@@ -177,21 +180,21 @@ export const THEME_PALETTES: Record<ThemePaletteId, PaletteDefinition> = {
     id: 'show-da-fisica',
     name: 'Show de Física',
     primary: {
-      dark: '#0066FF',
-      light: '#0052CC',
-      onDark: '#FFFFFF',
+      dark: '#00D4FF',
+      light: '#002FFE',
+      onDark: '#040714',
       onLight: '#FFFFFF',
     },
     secondary: {
-      dark: '#FF1E56',
-      light: '#E11D48',
-      textLight: '#BE123C',
-      onDark: '#FFFFFF',
-      onLight: '#FFFFFF',
+      dark: '#FFE600',
+      light: '#FFCC00',
+      textLight: '#B45309',
+      onDark: '#040714',
+      onLight: '#040714',
     },
     preview: {
-      primary: '#0066FF',
-      secondary: '#FF1E56',
+      primary: '#00D4FF',
+      secondary: '#FFE600',
     },
   },
   hs: {
@@ -232,5 +235,5 @@ export const ORG_PALETTE_LIST = ORG_PALETTE_IDS.map((id) => THEME_PALETTES[id]);
  * Previne Hydration Mismatch e elimina 100% do FOUC (Flash of Unstyled Content).
  */
 export function buildThemeInitScript(): string {
-  return `(function(){try{var k='${THEME_STORAGE_KEY}';var raw=localStorage.getItem(k);var p=null;if(raw){try{p=JSON.parse(raw)}catch(e){}}var m=(p&&p.mode)?p.mode:'system';var pal=(p&&p.palette)?p.palette:'';if(!pal){var ck=document.cookie.match(/(?:^|; )aurtistic_palette=([^;]*)/);if(ck){pal=decodeURIComponent(ck[1]);}}if(!pal){pal='purple-gold';}var valid=['purple-gold','blue-red','pink-green','cyan-amber','emerald-violet','labdiv','show-da-fisica','hs'];if(valid.indexOf(pal)===-1)pal='purple-gold';var res=m;if(m==='system'){var mql=window.matchMedia('(prefers-color-scheme: dark)');res=mql.matches?'dark':'light'}else if(m!=='dark'&&m!=='light'){res='dark'}var d=document.documentElement;d.setAttribute('data-theme-mode',res);d.setAttribute('data-theme-palette',pal);d.style.colorScheme=res}catch(e){}})();`;
+  return `(function(){try{var k='${THEME_STORAGE_KEY}';var raw=localStorage.getItem(k);var p=null;if(raw){try{p=JSON.parse(raw)}catch(e){}}var m=(p&&p.mode)?p.mode:'';if(!m){var cm=document.cookie.match(/(?:^|; )aurtistic_mode=([^;]*)/);if(cm){m=decodeURIComponent(cm[1]);}}if(!m){m='system';}var pal=(p&&p.palette)?p.palette:'';if(!pal){var ck=document.cookie.match(/(?:^|; )aurtistic_palette=([^;]*)/);if(ck){pal=decodeURIComponent(ck[1]);}}if(!pal){pal='purple-gold';}var cov=document.cookie.match(/(?:^|; )aurtistic_override_org=([^;]*)/);var ov=(p&&typeof p.overrideOrgTheme==='boolean')?p.overrideOrgTheme:(cov?decodeURIComponent(cov[1])==='1':false);var valid=['purple-gold','blue-red','pink-green','cyan-amber','emerald-violet','labdiv','show-da-fisica','hs'];if(valid.indexOf(pal)===-1)pal='purple-gold';var res=m;if(m==='system'){var mql=window.matchMedia('(prefers-color-scheme: dark)');res=mql.matches?'dark':'light'}else if(m!=='dark'&&m!=='light'){res='dark'}var d=document.documentElement;d.setAttribute('data-theme-mode',res);d.setAttribute('data-theme-palette',pal);d.setAttribute('data-override-org',ov?'1':'0');d.style.colorScheme=res}catch(e){}})();`;
 }

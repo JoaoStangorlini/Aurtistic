@@ -363,7 +363,7 @@ export function OrganizationScheduleAttendancePanel({
             onClick={() => setScannerDirection('entrada')}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 ${
               !isCheckedIn
-                ? 'bg-[var(--md-sys-color-primary)] text-slate-950 shadow-md hover:brightness-110'
+                ? 'bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary,var(--on-accent-primary))] shadow-md hover:brightness-110'
                 : 'bg-[var(--md-sys-color-primary)]/15 text-[var(--md-sys-color-primary)] border border-[var(--md-sys-color-primary)]/40 hover:bg-[var(--md-sys-color-primary)]/25'
             }`}
           >
@@ -409,7 +409,7 @@ export function OrganizationScheduleAttendancePanel({
           onClick={() => setActiveTab('horarios')}
           className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-[0.98] ${
             activeTab === 'horarios'
-              ? 'bg-[var(--md-sys-color-primary)] text-slate-950 shadow-sm'
+              ? 'bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary,var(--on-accent-primary))] shadow-sm'
               : 'text-fg-muted hover:text-fg hover:bg-surface'
           }`}
         >
@@ -422,7 +422,7 @@ export function OrganizationScheduleAttendancePanel({
           onClick={() => setActiveTab('ponto')}
           className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-[0.98] ${
             activeTab === 'ponto'
-              ? 'bg-[var(--md-sys-color-primary)] text-slate-950 shadow-sm'
+              ? 'bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary,var(--on-accent-primary))] shadow-sm'
               : 'text-fg-muted hover:text-fg hover:bg-surface'
           }`}
         >
@@ -435,7 +435,7 @@ export function OrganizationScheduleAttendancePanel({
           onClick={() => setActiveTab('escalas')}
           className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-[0.98] ${
             activeTab === 'escalas'
-              ? 'bg-[var(--md-sys-color-primary)] text-slate-950 shadow-sm'
+              ? 'bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary,var(--on-accent-primary))] shadow-sm'
               : 'text-fg-muted hover:text-fg hover:bg-surface'
           }`}
         >
@@ -708,7 +708,7 @@ export function OrganizationScheduleAttendancePanel({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[var(--md-sys-color-primary)] text-slate-950"
+                  className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary,var(--on-accent-primary))]"
                 >
                   Salvar Plantão
                 </button>
@@ -797,7 +797,7 @@ export function OrganizationScheduleAttendancePanel({
                 onClick={() => setScannerDirection('entrada')}
                 className={`py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
                   scannerDirection === 'entrada'
-                    ? 'bg-[var(--md-sys-color-primary)] text-slate-950'
+                    ? 'bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary,var(--on-accent-primary))]'
                     : 'text-fg-muted hover:text-fg'
                 }`}
               >

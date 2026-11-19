@@ -236,7 +236,7 @@ export function OrganizationGoalsPanel({
         <button
           type="button"
           onClick={() => setIsNewGoalOpen((prev) => !prev)}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--md-sys-color-secondary)] text-slate-950 text-xs font-black hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer self-start sm:self-auto"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--md-sys-color-secondary)] text-[var(--md-sys-color-on-secondary,var(--on-accent-secondary))] text-xs font-black hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer self-start sm:self-auto"
         >
           <span className="material-symbols-outlined text-[16px]">
             {isNewGoalOpen ? 'close' : 'add'}
@@ -304,7 +304,7 @@ export function OrganizationGoalsPanel({
             </button>
             <button
               type="submit"
-              className="px-4 py-1.5 rounded-xl text-xs font-black bg-[var(--md-sys-color-secondary)] text-slate-950 hover:brightness-110 cursor-pointer"
+              className="px-4 py-1.5 rounded-xl text-xs font-black bg-[var(--md-sys-color-secondary)] text-[var(--md-sys-color-on-secondary,var(--on-accent-secondary))] hover:brightness-110 cursor-pointer"
             >
               Criar Meta
             </button>
@@ -322,7 +322,7 @@ export function OrganizationGoalsPanel({
           }}
           className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             selectedAxisFilter === 'all'
-              ? 'bg-[var(--md-sys-color-primary)] text-slate-950 shadow-sm'
+              ? 'bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary,var(--on-accent-primary))] shadow-sm'
               : 'bg-app border border-border-subtle text-fg-muted hover:text-fg'
           }`}
         >
@@ -336,7 +336,7 @@ export function OrganizationGoalsPanel({
           }}
           className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             selectedAxisFilter === 'global'
-              ? 'bg-[var(--md-sys-color-secondary)] text-slate-950 shadow-sm'
+              ? 'bg-[var(--md-sys-color-secondary)] text-[var(--md-sys-color-on-secondary,var(--on-accent-secondary))] shadow-sm'
               : 'bg-app border border-border-subtle text-fg-muted hover:text-fg'
           }`}
         >
@@ -352,7 +352,7 @@ export function OrganizationGoalsPanel({
             }}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               selectedAxisFilter === sub.id
-                ? 'bg-[var(--md-sys-color-primary)] text-slate-950 shadow-sm'
+                ? 'bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary,var(--on-accent-primary))] shadow-sm'
                 : 'bg-app border border-border-subtle text-fg-muted hover:text-fg'
             }`}
           >
@@ -458,7 +458,7 @@ export function OrganizationGoalsPanel({
                       type="button"
                       disabled={creatingGoalId === g.id || !(taskDraftByGoal[g.id] || '').trim()}
                       onClick={() => handleAddTaskToGoal(g)}
-                      className="px-3 py-1.5 rounded-xl bg-[var(--md-sys-color-primary)] text-slate-950 text-xs font-black disabled:opacity-40 cursor-pointer"
+                      className="px-3 py-1.5 rounded-xl bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary,var(--on-accent-primary))] text-xs font-black disabled:opacity-40 cursor-pointer"
                     >
                       {creatingGoalId === g.id ? '...' : 'Adicionar'}
                     </button>

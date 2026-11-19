@@ -7,6 +7,7 @@ interface MatrixCodeRainProps {
   className?: string;
   opacity?: number;
   speed?: number;
+  paused?: boolean;
 }
 
 /**
@@ -16,9 +17,15 @@ interface MatrixCodeRainProps {
 export function MatrixCodeRain({
   className = '',
   opacity = 0.45,
-  speed = 36,
+  speed = 40,
+  paused = false,
 }: MatrixCodeRainProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const pausedRef = useRef(paused);
+
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -63,13 +70,10 @@ export function MatrixCodeRain({
       attributeFilter: ['data-theme-mode'],
     });
 
-    const draw = (currentTime: number) => {
-      if (currentTime - lastTime < speed) {
-        animationFrameId = requestAnimationFrame(draw);
-        return;
-      }
-      lastTime = currentTime;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const effectiveSpeed = Math.max(34, speed);
 
+    const drawFrame = () => {
       const light = isLightMode();
       ctx.fillStyle = light ? 'rgba(248, 250, 252, 0.16)' : 'rgba(3, 8, 5, 0.16)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -107,15 +111,44 @@ export function MatrixCodeRain({
         }
         drops[i]++;
       }
+    };
 
+    const draw = (currentTime: number) => {
+      if (document.hidden || pausedRef.current || reducedMotion) {
+        animationFrameId = 0;
+        return;
+      }
+      if (currentTime - lastTime >= effectiveSpeed) {
+        lastTime = currentTime;
+        drawFrame();
+      }
       animationFrameId = requestAnimationFrame(draw);
     };
 
-    animationFrameId = requestAnimationFrame(draw);
+    const startOrStopLoop = () => {
+      if (document.hidden || pausedRef.current || reducedMotion) {
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = 0;
+        }
+      } else if (!animationFrameId) {
+        lastTime = 0;
+        animationFrameId = requestAnimationFrame(draw);
+      }
+    };
+
+    drawFrame();
+    if (!reducedMotion && !pausedRef.current && !document.hidden) {
+      animationFrameId = requestAnimationFrame(draw);
+    }
+
+    const onVisibilityChange = () => startOrStopLoop();
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
-      cancelAnimationFrame(animationFrameId);
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', resize);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       observer.disconnect();
     };
   }, [speed]);

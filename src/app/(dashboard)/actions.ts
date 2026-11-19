@@ -794,7 +794,35 @@ export async function updateAdvancedConfig(advancedSettings: any) {
   if (error) throw new Error(error.message);
 }
 
-export async function updateThemePreferencesAction(theme: { mode: string; palette: string }) {
+export async function updateThemePreferencesAction(theme: {
+  mode: string;
+  palette: string;
+  overrideOrgTheme?: boolean;
+}) {
+  const validModes = new Set(['system', 'light', 'dark']);
+  const validPalettes = new Set([
+    'purple-gold',
+    'blue-red',
+    'pink-green',
+    'cyan-amber',
+    'emerald-violet',
+    'labdiv',
+    'show-da-fisica',
+    'hs',
+  ]);
+  const safeMode = validModes.has(theme.mode) ? theme.mode : 'system';
+  const safePalette = validPalettes.has(theme.palette) ? theme.palette : 'purple-gold';
+  const safeOverride = Boolean(theme.overrideOrgTheme);
+
+  try {
+    const { cookies } = await import('next/headers');
+    const cookieStore = await cookies();
+    const cookieOpts = { path: '/', maxAge: 31536000, sameSite: 'lax' as const };
+    cookieStore.set('aurtistic_mode', safeMode, cookieOpts);
+    cookieStore.set('aurtistic_palette', safePalette, cookieOpts);
+    cookieStore.set('aurtistic_override_org', safeOverride ? '1' : '0', cookieOpts);
+  } catch {}
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: 'Não autenticado' };
@@ -804,19 +832,19 @@ export async function updateThemePreferencesAction(theme: { mode: string; palett
       .from('user_profiles')
       .select('features_config')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     const features_config = profile?.features_config || {};
     features_config.theme = {
-      mode: theme.mode,
-      palette: theme.palette,
+      mode: safeMode,
+      palette: safePalette,
+      overrideOrgTheme: safeOverride,
       updated_at: new Date().toISOString(),
     };
 
     const { error } = await supabase
       .from('user_profiles')
-      .update({ features_config })
-      .eq('id', user.id);
+      .upsert({ id: user.id, features_config }, { onConflict: 'id' });
 
     if (error) throw error;
     return { ok: true };

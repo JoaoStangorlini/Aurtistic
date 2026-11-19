@@ -1123,7 +1123,7 @@ export function AurtisticGalleryGrid({
               }}
               className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
                 deviceCategoryFilter === 'all'
-                  ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm'
+                  ? 'bg-[var(--accent-primary)] text-on-accent-primary font-bold shadow-sm'
                   : 'text-fg-secondary hover:text-fg'
               }`}
             >
@@ -1137,7 +1137,7 @@ export function AurtisticGalleryGrid({
               }}
               className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
                 deviceCategoryFilter === 'camera'
-                  ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm'
+                  ? 'bg-[var(--accent-primary)] text-on-accent-primary font-bold shadow-sm'
                   : 'text-fg-secondary hover:text-fg'
               }`}
             >
@@ -1152,7 +1152,7 @@ export function AurtisticGalleryGrid({
               }}
               className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
                 deviceCategoryFilter === 'mobile'
-                  ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm'
+                  ? 'bg-[var(--accent-primary)] text-on-accent-primary font-bold shadow-sm'
                   : 'text-fg-secondary hover:text-fg'
               }`}
             >
@@ -1213,7 +1213,7 @@ export function AurtisticGalleryGrid({
               onClick={() => setSortOrder('newest')}
               className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors ${
                 sortOrder === 'newest'
-                  ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm'
+                  ? 'bg-[var(--accent-primary)] text-on-accent-primary font-bold shadow-sm'
                   : 'text-fg-secondary hover:text-fg'
               }`}
               title="Mais recentes primeiro (Data EXIF)"
@@ -1226,7 +1226,7 @@ export function AurtisticGalleryGrid({
               onClick={() => setSortOrder('oldest')}
               className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors ${
                 sortOrder === 'oldest'
-                  ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] font-bold shadow-sm'
+                  ? 'bg-[var(--accent-primary)] text-on-accent-primary font-bold shadow-sm'
                   : 'text-fg-secondary hover:text-fg'
               }`}
               title="Mais antigas primeiro (Data EXIF)"

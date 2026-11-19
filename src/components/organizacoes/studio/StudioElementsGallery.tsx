@@ -11,7 +11,7 @@ import { StudioVaultBrowserModal, type VaultBrowserSelectedItem } from './Studio
 const SCIENTIFIC_SYMBOLS = ['∑', '∫', '∇', '⊕', 'ħ', 'λ', 'π', 'Δ', 'α', 'β', 'γ', 'Ω', 'μ', 'σ', '≈', '≠', '±', '∞'];
 
 export function StudioElementsGallery() {
-  const { addLayer, selectedLayer, updateLayer, orgSlug } = useStudio();
+  const { addLayer, selectedLayer, updateLayer, orgSlug, organizationId } = useStudio();
   const { tokens } = useOrganizationBrand();
   const [styleMode, setStyleMode] = useState<'idv' | 'neutral'>('idv');
   const [isVaultOpen, setIsVaultOpen] = useState(false);
@@ -405,6 +405,8 @@ export function StudioElementsGallery() {
         onClose={() => setIsVaultOpen(false)}
         onUploadClick={() => setIsVaultOpen(false)}
         orgSlug={orgSlug || tokens.themeId}
+        organizationId={organizationId || undefined}
+        orgDisplayName={tokens.displayName || tokens.themeId?.toUpperCase() || 'Org'}
         onSelect={(item: VaultBrowserSelectedItem) => {
           if (selectedShape) {
             updateLayer(selectedShape.id, {
