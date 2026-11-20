@@ -589,51 +589,51 @@ export default function CurriculoClient({
         </div>
       ) : (
         /* VISUAL PREVIEW / VIEW MODE */
-        <main className="pt-10 pb-16 px-6 max-w-4xl mx-auto space-y-16 relative z-10">
+        <main className="pt-8 sm:pt-10 pb-16 px-4 sm:px-6 max-w-4xl mx-auto space-y-12 sm:space-y-16 relative z-10 overflow-x-hidden">
           {/* Header */}
-          <section className="space-y-6 border-b border-border-subtle pb-12" data-tour="curriculo-header">
-            <div>
-              <h1 className="text-5xl font-['Bukra'] font-black text-fg leading-tight">
-                {cvData.name.split(' ').slice(0, 2).join(' ')} <span className="text-[#FFCC00]">{cvData.name.split(' ').slice(2).join(' ')}</span>
+          <section className="space-y-5 border-b border-border-subtle pb-10 min-w-0" data-tour="curriculo-header">
+            <div className="min-w-0">
+              <h1 className="text-3xl sm:text-5xl font-['Bukra'] font-black text-fg leading-tight break-words">
+                {cvData.name.split(' ').slice(0, 2).join(' ')} <span className="text-amber-600 dark:text-[#FFCC00]">{cvData.name.split(' ').slice(2).join(' ')}</span>
               </h1>
-              <p className="text-xl text-fg-secondary mt-4">{cvData.role}</p>
+              <p className="text-base sm:text-xl text-fg-secondary mt-3 break-words">{cvData.role}</p>
             </div>
             
-            <div className="flex flex-wrap gap-x-8 gap-y-4 pt-4 text-sm">
+            <div className="flex flex-wrap gap-x-6 gap-y-3 pt-2 text-xs sm:text-sm min-w-0">
               {cvData.phone && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[#FFCC00] font-bold">Telefone:</span>
-                  <span>{cvData.phone}</span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-amber-700 dark:text-[#FFCC00] font-bold shrink-0">Telefone:</span>
+                  <span className="break-words">{cvData.phone}</span>
                 </div>
               )}
               {cvData.email && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[#FFCC00] font-bold">E-mail:</span>
-                  <a href={`mailto:${cvData.email}`} className="hover:text-fg transition-colors underline">{cvData.email}</a>
+                <div className="flex items-center gap-1.5 min-w-0 max-w-full">
+                  <span className="text-amber-700 dark:text-[#FFCC00] font-bold shrink-0">E-mail:</span>
+                  <a href={`mailto:${cvData.email}`} className="hover:text-fg transition-colors underline break-all min-w-0">{cvData.email}</a>
                 </div>
               )}
               {cvData.address && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[#FFCC00] font-bold">Endereço:</span>
-                  <span>{cvData.address}</span>
+                <div className="flex items-center gap-1.5 min-w-0 max-w-full">
+                  <span className="text-amber-700 dark:text-[#FFCC00] font-bold shrink-0">Endereço:</span>
+                  <span className="break-words min-w-0">{cvData.address}</span>
                 </div>
               )}
               {cvData.github && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[#FFCC00] font-bold">GitHub:</span>
-                  <a href={`https://github.com${cvData.github.startsWith('/') ? '' : '/'}${cvData.github}`} target="_blank" rel="noreferrer" className="hover:text-fg transition-colors underline">{cvData.github}</a>
+                <div className="flex items-center gap-1.5 min-w-0 max-w-full">
+                  <span className="text-amber-700 dark:text-[#FFCC00] font-bold shrink-0">GitHub:</span>
+                  <a href={`https://github.com${cvData.github.startsWith('/') ? '' : '/'}${cvData.github}`} target="_blank" rel="noreferrer" className="hover:text-fg transition-colors underline break-all min-w-0">{cvData.github}</a>
                 </div>
               )}
               {cvData.linkedin && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[#FFCC00] font-bold">LinkedIn:</span>
-                  <a href={`https://linkedin.com${cvData.linkedin.startsWith('/') ? '' : '/in/'}${cvData.linkedin}`} target="_blank" rel="noreferrer" className="hover:text-fg transition-colors underline">{cvData.linkedin}</a>
+                <div className="flex items-center gap-1.5 min-w-0 max-w-full">
+                  <span className="text-amber-700 dark:text-[#FFCC00] font-bold shrink-0">LinkedIn:</span>
+                  <a href={`https://linkedin.com${cvData.linkedin.startsWith('/') ? '' : '/in/'}${cvData.linkedin}`} target="_blank" rel="noreferrer" className="hover:text-fg transition-colors underline break-all min-w-0">{cvData.linkedin}</a>
                 </div>
               )}
               {cvData.instagram && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[#FFCC00] font-bold">Instagram:</span>
-                  <a href={`https://instagram.com/${cvData.instagram.replace('@', '')}`} target="_blank" rel="noreferrer" className="hover:text-fg transition-colors underline">{cvData.instagram}</a>
+                <div className="flex items-center gap-1.5 min-w-0 max-w-full">
+                  <span className="text-amber-700 dark:text-[#FFCC00] font-bold shrink-0">Instagram:</span>
+                  <a href={`https://instagram.com/${cvData.instagram.replace('@', '')}`} target="_blank" rel="noreferrer" className="hover:text-fg transition-colors underline break-all min-w-0">{cvData.instagram}</a>
                 </div>
               )}
             </div>
@@ -696,9 +696,9 @@ export default function CurriculoClient({
           {cvData.skills && cvData.skills.length > 0 && (
             <section className="space-y-6">
               <h2 className="text-3xl font-['Bukra'] font-bold text-fg border-l-4 border-[#FFCC00] pl-4">Habilidades</h2>
-              <div className="flex flex-wrap gap-2.5">
+              <div className="flex flex-wrap gap-2">
                 {cvData.skills.map((skill, idx) => (
-                  <span key={idx} className="px-4 py-1.5 bg-surface border border-border-subtle hover:border-[#FFCC00] text-fg rounded-full text-xs font-semibold tracking-wide transition-colors">
+                  <span key={idx} className="px-3.5 py-1.5 bg-surface border border-border-subtle hover:border-[#FFCC00] text-fg rounded-full text-xs font-semibold tracking-wide transition-colors break-words max-w-full">
                     {skill}
                   </span>
                 ))}

@@ -36,6 +36,7 @@ import { saveTask } from '@/app/(dashboard)/actions';
 import { JoinOrganizationModal } from './JoinOrganizationModal';
 import { CreateOrganizationModal } from './CreateOrganizationModal';
 import { OrganizationBrandProvider, useOrganizationBrand } from './OrganizationBrandProvider';
+import { useTheme } from '@/components/theme/ThemeProvider';
 
 export interface LabDivWorkspaceClientProps {
   organization: Organization;
@@ -130,6 +131,8 @@ export function LabDivWorkspaceClient({
     }
   };
   const { tokens } = useOrganizationBrand();
+  const { setIsStudioActive } = useTheme();
+  const [studioStage, setStudioStage] = useState<'launcher' | 'editor' | 'publish'>('launcher');
   const searchParams = useSearchParams();
   const queryView = searchParams?.get('view');
   const userSwitchedRef = React.useRef(false);
@@ -139,6 +142,12 @@ export function LabDivWorkspaceClient({
   const [studioVisited, setStudioVisited] = useState(
     queryView === 'studio' || initialView === 'studio'
   );
+  const isStudioEditorFull = activeMacroView === 'studio' && studioStage === 'editor';
+
+  useEffect(() => {
+    setIsStudioActive(isStudioEditorFull);
+    return () => setIsStudioActive(false);
+  }, [isStudioEditorFull, setIsStudioActive]);
 
   // Sincronização reativa da aba Studio vs Equipe quando initialView ou query param ?view mudar
   useEffect(() => {
@@ -303,8 +312,15 @@ export function LabDivWorkspaceClient({
 
   return (
     <OrganizationBrandProvider orgSlug={currentOrg.slug} brandConfig={currentOrg.brand_config}>
-      <div {...swipeHandlers} className="relative z-10 min-h-full flex flex-col p-4 md:p-8 space-y-6 text-fg">
-      {isDbMigrationPending && (
+      <div
+        {...swipeHandlers}
+        className={
+          isStudioEditorFull
+            ? 'relative z-10 flex-1 min-h-0 flex flex-col overflow-hidden p-1 sm:p-2 text-fg'
+            : 'relative z-10 min-h-full flex flex-col p-4 md:p-8 space-y-6 text-fg'
+        }
+      >
+      {isDbMigrationPending && !isStudioEditorFull && (
         <div className="bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs shadow-md">
           <div className="flex items-center gap-2.5">
             <span className="material-symbols-outlined text-amber-400 text-[24px]">database</span>
@@ -318,8 +334,8 @@ export function LabDivWorkspaceClient({
         </div>
       )}
 
-      {/* Faixa 1: Switch Macro M3 [ Cofre | Organizações | Studio ] acima de tudo */}
-      {!isEmbed && (
+      {/* Faixa 1: Switch Macro M3 [ Cofre | Organizações | Studio ] acima de tudo (oculta no editor do Studio) */}
+      {!isEmbed && !isStudioEditorFull && (
         <div className="flex flex-col items-center gap-1.5 shrink-0">
           <div className="inline-flex items-center p-1 bg-surface rounded-2xl border border-border-subtle shadow-md gap-1">
             <Link
@@ -415,7 +431,8 @@ export function LabDivWorkspaceClient({
         </div>
       )}
 
-      {/* Faixa 2: Card Fixo Idêntico — Logo + Switch de Conta (Organização/Pessoal) + Ação no canto direito */}
+      {/* Faixa 2: Card Fixo Idêntico (oculto no editor do Studio) */}
+      {!isStudioEditorFull && (
       <div data-tour="org-view-mode" className="relative shrink-0 flex flex-wrap items-center justify-between gap-4 bg-surface border border-border-subtle rounded-2xl p-4 shadow-lg z-20">
         <div className="flex items-center gap-3.5 min-w-0">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/30 overflow-hidden p-1.5 shadow-inner">
@@ -470,9 +487,10 @@ export function LabDivWorkspaceClient({
           </button>
         )}
       </div>
+      )}
 
       {activeMacroView === 'studio' ? (
-        <OrganizationPostStudio organizationId={currentOrg.id} orgSlug={currentOrg.slug} />
+        <OrganizationPostStudio organizationId={currentOrg.id} orgSlug={currentOrg.slug} onStageChange={setStudioStage} />
       ) : (
       <div className="space-y-6">
       {/* Bento Grid Operacional (Nível 1 - 8px Grid) + Navigation Bar M3 (Seleção Única - 5 Módulos) */}
@@ -525,129 +543,43 @@ export function LabDivWorkspaceClient({
 
         return (
           <div className="space-y-4">
-            {/* Bento Grid Superior (3 Blocos Simétricos) */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              {/* Bloco 1: Identidade Operacional & Bateria Cognitiva */}
-              <div
-                className={`lg:col-span-6 p-4 border flex flex-col justify-between gap-4 ${
-                  isShow || isHs
-                    ? 'neon-border-green bg-surface/85 backdrop-blur-md rounded-none'
-                    : 'org-card rounded-2xl border-border-subtle bg-surface/90 backdrop-blur-xl'
-                }`}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--md-sys-color-primary)] block">
-                      ● {opsTag}
-                    </span>
-                    <h2 className="text-lg sm:text-xl font-black uppercase tracking-wider mt-1">
-                      {isShow ? (
-                        <>
-                          <span className="neon-text-red">BASTIDORES</span> ·{' '}
-                          <span className="neon-text-blue">GESTÃO</span> ·{' '}
-                          <span className="neon-text-green">OPERAÇÃO</span>
-                        </>
-                      ) : (
-                        <span>BASTIDORES · GESTÃO · OPERAÇÃO</span>
-                      )}
-                    </h2>
-                  </div>
-                </div>
+            {/* Bloco Superior Dinâmico: Identidade da Organização Ativa & Bateria Cognitiva */}
+            <div
+              className={`p-4 border flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 ${
+                isShow || isHs
+                  ? 'neon-border-green bg-surface/85 backdrop-blur-md rounded-none'
+                  : 'org-card rounded-2xl border-border-subtle bg-surface/90 backdrop-blur-xl'
+              }`}
+            >
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--md-sys-color-primary)] block">
+                  ● {opsTag}
+                </span>
+                <h2 className="text-lg sm:text-xl font-black uppercase tracking-wider mt-1">
+                  {isShow ? (
+                    <>
+                      <span className="neon-text-red">{currentOrg.name}</span> ·{' '}
+                      <span className="neon-text-blue">GESTÃO</span> ·{' '}
+                      <span className="neon-text-green">OPERAÇÃO</span>
+                    </>
+                  ) : (
+                    <span>{currentOrg.name} · GESTÃO · OPERAÇÃO</span>
+                  )}
+                </h2>
+                <p className="text-xs text-fg-muted mt-1">
+                  {isShow
+                    ? 'Coordenação de experimentos, turnos de monitores e apresentações do Show de Física.'
+                    : isHs
+                      ? 'Oficina aberta, inventário de bancada e turnos colaborativos do Hackerspace.'
+                      : `Painel operacional, metas e acervos integrados de ${currentOrg.name}.`}
+                </p>
+              </div>
+              <div className="w-full lg:w-[360px] shrink-0">
                 <MemberCapacityQuickSelector
                   organizationId={currentOrg.id}
                   initialCapacity={myMember?.cognitive_capacity || 'normal'}
                   initialNote={myMember?.capacity_note || ''}
                 />
-              </div>
-
-              {/* Bloco 2: Marcador de Ponto QR Direto (Entrada vs Saída) */}
-              <div
-                className={`lg:col-span-3 p-4 border flex flex-col justify-between gap-3 ${
-                  isShow || isHs
-                    ? 'neon-border-blue bg-surface/85 backdrop-blur-md rounded-none'
-                    : 'org-card rounded-2xl border-border-subtle bg-surface/90 backdrop-blur-xl'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-fg flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[18px] text-[var(--md-sys-color-primary)]">
-                      qr_code_scanner
-                    </span>
-                    Ponto QR
-                  </span>
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
-                      isCheckedIn
-                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
-                        : 'bg-app text-fg-muted border-border-subtle'
-                    }`}
-                  >
-                    {isCheckedIn ? 'Em Turno' : 'Fora'}
-                  </span>
-                </div>
-                <p className="text-[11px] text-fg-muted">
-                  Escaneie o QR Code na entrada e na saída para registrar seu turno.
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      selectModuleTab('horarios_ponto');
-                      setPendingQrDirection('entrada');
-                    }}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary,var(--on-accent-primary))] text-xs font-black hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">login</span>
-                    <span>Entrada</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      selectModuleTab('horarios_ponto');
-                      setPendingQrDirection('saida');
-                    }}
-                    style={{
-                      backgroundColor: 'var(--md-sys-color-tertiary)',
-                      color: isHs ? '#040714' : '#ffffff',
-                    }}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">logout</span>
-                    <span>Saída</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Bloco 3: Atalho HUB Studio */}
-              <div
-                className={`lg:col-span-3 p-4 border flex flex-col justify-between gap-3 ${
-                  isShow || isHs
-                    ? 'neon-border-yellow bg-surface/85 backdrop-blur-md rounded-none'
-                    : 'org-card rounded-2xl border-border-subtle bg-surface/90 backdrop-blur-xl'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-fg flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[18px] text-[var(--md-sys-color-secondary)]">
-                      palette
-                    </span>
-                    HUB Studio
-                  </span>
-                  <span className="text-[10px] font-mono uppercase text-[var(--md-sys-color-secondary)]">
-                    Aurtistic + HUB
-                  </span>
-                </div>
-                <p className="text-[11px] text-fg-muted">
-                  Crie artes, carrosséis e comunicados com a identidade de {currentOrg.name}.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => selectMacroView('studio')}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[var(--md-sys-color-secondary)] text-[var(--md-sys-color-on-secondary,var(--on-accent-secondary))] text-xs font-black hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-                  <span>Abrir HUB Studio</span>
-                </button>
               </div>
             </div>
 

@@ -69,10 +69,12 @@ function SlideThumbnail({
 }
 
 export function StudioCarouselStrip() {
-  const { slides, activeSlideId, setActiveSlideId, addSlide, removeSlide, aspectRatio } = useStudio();
+  const { slides, activeSlideId, setActiveSlideId, addSlide, duplicateSlide, removeSlide, aspectRatio } = useStudio();
   const dims = ASPECT_DIMENSIONS[aspectRatio];
   const thumbH = 72;
   const thumbW = Math.max(40, Math.round(thumbH * (dims.width / dims.height)));
+
+  if (slides.length <= 1) return null;
 
   return (
     <div className="w-full flex items-center gap-3 overflow-x-auto py-2 px-2 scrollbar-thin border-b border-border-subtle bg-surface/60 rounded-2xl">
@@ -103,6 +105,15 @@ export function StudioCarouselStrip() {
                 <span className="absolute bottom-0.5 left-0.5 text-[9px] font-black font-mono text-white bg-black/60 rounded px-1 leading-tight z-10">
                   {idx + 1}
                 </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); duplicateSlide(slide.id); }}
+                title="Duplicar Tela"
+                className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-[#FFCC00] text-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:brightness-110 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[12px]">content_copy</span>
               </button>
 
               {slides.length > 1 && (

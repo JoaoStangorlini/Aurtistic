@@ -165,6 +165,7 @@ export function AurtisticGalleryGrid({
   // Filtros de Pesquisa e Metadados
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Filtros Avançados de Dispositivo e Ordenação Temporal
@@ -724,8 +725,8 @@ export function AurtisticGalleryGrid({
             </button>
           )}
 
-          {/* Botão de Editar Portfólio (Pastas, Ordem e Equipamentos) */}
-          {isOwner && (
+          {/* Botão de Editar Portfólio (exibido apenas se não houver botão pai) */}
+          {isOwner && !onToggleEditPortfolio && (
             <button
               type="button"
               onClick={handleToggleEditMode}
@@ -1107,8 +1108,31 @@ export function AurtisticGalleryGrid({
         </div>
       </div>
 
-      {/* 3.1 FILTROS AVANÇADOS: DISPOSITIVO (CÂMERAS / CELULARES), EQUIPAMENTO E ORDENAÇÃO TEMPORAL */}
-      <div className="bg-surface/80 border border-border-subtle p-2.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
+      {/* 3.1 Botão de expandir filtros no Mobile (inicia recolhido) + Filtros Avançados */}
+      <div className="sm:hidden flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setMobileFiltersOpen((v) => !v)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface border border-border-subtle text-xs font-bold text-fg cursor-pointer"
+        >
+          <span className="material-symbols-outlined text-[16px]">tune</span>
+          <span>Filtros</span>
+          {(deviceCategoryFilter !== 'all' || selectedDeviceName !== 'all' || selectedLensName !== 'all' || onlyFavorites || searchQuery.trim() !== '') && (
+            <span className="px-1.5 py-0.5 rounded-full bg-[#FFCC00] text-black text-[10px] font-black">
+              {[
+                deviceCategoryFilter !== 'all',
+                selectedDeviceName !== 'all',
+                selectedLensName !== 'all',
+                onlyFavorites,
+                searchQuery.trim() !== '',
+              ].filter(Boolean).length}
+            </span>
+          )}
+          <span className="material-symbols-outlined text-[16px]">{mobileFiltersOpen ? 'expand_less' : 'expand_more'}</span>
+        </button>
+      </div>
+
+      <div className={`${mobileFiltersOpen ? 'flex' : 'hidden'} sm:flex bg-surface/80 border border-border-subtle p-2.5 rounded-2xl flex-wrap items-center justify-between gap-3 text-xs`}>
         {/* Esquerda: Filtro de Dispositivo (Todas / Câmeras / Celulares) */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-mono font-bold text-fg-muted uppercase">
@@ -1377,13 +1401,10 @@ export function AurtisticGalleryGrid({
                   </div>
                 </div>
 
-                {/* Grid dos Itens da Seção */}
+                {/* Grid Masonry em colunas flex determinísticas */}
                 {!isCollapsed && (
-                  <div className={`p-4 grid gap-4 ${gridColClass}`}>
-                    {groupItems.map((item) => {
-                      const globalIndex = filteredItems.indexOf(item);
-                      return renderPhotoCard(item, globalIndex);
-                    })}
+                  <div className="p-4">
+                    {renderMasonryItems(groupItems)}
                   </div>
                 )}
               </div>
@@ -1391,10 +1412,8 @@ export function AurtisticGalleryGrid({
           })}
         </div>
       ) : (
-        /* Modo Fluxo Contínuo / Diretão (Álbum Completo) */
-        <div className={`grid gap-4 ${gridColClass}`}>
-          {filteredItems.map((item, index) => renderPhotoCard(item, index))}
-        </div>
+        /* Modo Fluxo Contínuo / Diretão (Masonry em colunas flex determinísticas) */
+        renderMasonryItems(filteredItems)
       )}
       </div>
 
@@ -1414,6 +1433,29 @@ export function AurtisticGalleryGrid({
       )}
     </div>
   );
+
+  // Renderizador Masonry determinístico em colunas flex (preserva ordem visual sem colapso CSS columns)
+  function renderMasonryItems(list: PhotoInspectItem[]) {
+    const colCount = Math.max(1, gridCols);
+    const buckets: { item: PhotoInspectItem; globalIndex: number }[][] = Array.from(
+      { length: colCount },
+      () => []
+    );
+    list.forEach((item, idx) => {
+      const globalIndex = filteredItems.indexOf(item);
+      buckets[idx % colCount].push({ item, globalIndex: globalIndex >= 0 ? globalIndex : idx });
+    });
+
+    return (
+      <div className="flex flex-col sm:flex-row gap-4 items-start">
+        {buckets.map((col, colIdx) => (
+          <div key={colIdx} className="flex-1 min-w-0 w-full flex flex-col gap-4">
+            {col.map(({ item, globalIndex }) => renderPhotoCard(item, globalIndex))}
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   // Renderizador do Card Passe-Partout de Cada Fotografia
   function renderPhotoCard(item: PhotoInspectItem, index: number) {
@@ -1449,8 +1491,8 @@ export function AurtisticGalleryGrid({
             : 'border-border-subtle hover:border-[#FFCC00]'
         }`}
       >
-        {/* Moldura Passe-Partout Respirável (object-contain sem cortes forçados) */}
-        <div className="w-full aspect-[4/3] bg-app/80 dark:bg-[#101010] p-3 flex items-center justify-center relative overflow-hidden">
+        {/* Moldura Passe-Partout em Proporção Natural (sem cortes forçados em caixas rígidas) */}
+        <div className="w-full bg-app/80 dark:bg-[#101010] p-2.5 flex items-center justify-center relative overflow-hidden">
           {/* Badge de Oculto (apenas visível para o dono) */}
           {isItemHidden && (
             <div className="absolute top-2 left-2 z-10 bg-amber-500/80 backdrop-blur-sm px-2 py-0.5 rounded-md text-[10px] font-bold text-black flex items-center gap-1 shadow-md">
@@ -1464,7 +1506,7 @@ export function AurtisticGalleryGrid({
             src={thumb}
             alt={item.title || item.filename}
             loading="lazy"
-            className="max-h-full max-w-full object-contain rounded-lg transition-transform duration-500 group-hover:scale-[1.03]"
+            className="w-full h-auto object-contain rounded-lg transition-transform duration-500 group-hover:scale-[1.02]"
             onError={(e) => {
               const target = e.currentTarget;
               if (!target.dataset.fallback) {

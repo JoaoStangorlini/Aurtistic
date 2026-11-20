@@ -7,6 +7,19 @@ import { useOrganizationBrand } from '../OrganizationBrandProvider';
 import type { StudioShapeLayer, StudioShapeType, StudioTextLayer } from './types';
 import { StudioProColorPicker } from './StudioProColorPicker';
 import { StudioVaultBrowserModal, type VaultBrowserSelectedItem } from './StudioVaultBrowserModal';
+import { StudioLiveSlider } from './StudioLiveSlider';
+import { StudioHelpTooltip } from './StudioHelpTooltip';
+
+type ElementsSubTab = 'shapes' | 'stickers' | 'badges' | 'qr';
+
+const ELEMENTS_SUBTABS: { id: ElementsSubTab; label: string; icon: string; helpKey: string }[] = [
+  { id: 'shapes', label: 'Formas', icon: 'category', helpKey: 'elements.shapes' },
+  { id: 'stickers', label: 'Símbolos', icon: 'science', helpKey: 'elements.stickers' },
+  { id: 'badges', label: 'Tags', icon: 'sell', helpKey: 'elements.badges' },
+  { id: 'qr', label: 'Frame & Borda', icon: 'filter_frames', helpKey: 'elements.qr' },
+];
+
+const QUICK_TAGS = ['AO VIVO', 'NOVO EVENTO', 'INSCRIÇÕES ABERTAS', 'ENTRADA GRATUITA', 'IFUSP', 'CIÊNCIA NA PRÁTICA'];
 
 const SCIENTIFIC_SYMBOLS = ['∑', '∫', '∇', '⊕', 'ħ', 'λ', 'π', 'Δ', 'α', 'β', 'γ', 'Ω', 'μ', 'σ', '≈', '≠', '±', '∞'];
 
@@ -14,6 +27,7 @@ export function StudioElementsGallery() {
   const { addLayer, selectedLayer, updateLayer, orgSlug, organizationId } = useStudio();
   const { tokens } = useOrganizationBrand();
   const [styleMode, setStyleMode] = useState<'idv' | 'neutral'>('idv');
+  const [subTab, setSubTab] = useState<ElementsSubTab>('shapes');
   const [isVaultOpen, setIsVaultOpen] = useState(false);
   const [showBorderPicker, setShowBorderPicker] = useState(false);
 
@@ -101,10 +115,32 @@ export function StudioElementsGallery() {
         </div>
       </div>
 
-      {/* Formas Geométricas Básicas com Visual Previews */}
-      <div>
-        <label className="text-[10px] font-bold text-fg-muted uppercase tracking-wider block mb-1.5">
-          Formas Geométricas
+      {/* 4 Subperfis Enxutos (sticky no topo ao rolar) */}
+      <div className="sticky top-0 z-10 bg-surface/95 backdrop-blur-md pt-0.5 pb-1 -mx-1 px-1 flex items-center gap-1 overflow-x-auto no-scrollbar">
+        {ELEMENTS_SUBTABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setSubTab(t.id)}
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+              subTab === t.id
+                ? 'bg-[#FFCC00] text-black shadow-xs'
+                : 'bg-surface-hover/60 text-fg-secondary hover:text-fg border border-border-subtle'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[14px]">{t.icon}</span>
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Formas Geométricas Básicas & Setas */}
+      {subTab === 'shapes' && (
+      <div className="space-y-3">
+        <div>
+        <label className="text-[10px] font-bold text-fg-muted uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
+          <span>Formas Geométricas</span>
+          <StudioHelpTooltip helpKey="elements.shapes" />
         </label>
         <div className="grid grid-cols-4 gap-2 text-[10px] font-bold text-center">
           <button
@@ -210,9 +246,15 @@ export function StudioElementsGallery() {
       </div>
 
       {/* Ciência & Física com Previews Vetoriais */}
-      <div>
-        <label className="text-[10px] font-bold text-fg-muted uppercase tracking-wider block mb-1.5">
-          Ciência & Física (Átomos, Ondas e Lentes)
+      </div>
+      )}
+
+      {subTab === 'stickers' && (
+      <div className="space-y-3">
+        <div>
+        <label className="text-[10px] font-bold text-fg-muted uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
+          <span>Ciência & Física (Átomos, Ondas e Lentes)</span>
+          <StudioHelpTooltip helpKey="elements.stickers" />
         </label>
         <div className="grid grid-cols-3 gap-2 text-[10px] font-bold text-center">
           <button
@@ -274,7 +316,68 @@ export function StudioElementsGallery() {
       </div>
 
       {/* Submenus 16 & 17: Foto Dentro da Forma (Frame Clip) + Borda + Zoom/Pan Interno */}
-      {selectedShape && (
+      </div>
+      )}
+
+      {subTab === 'badges' && (
+        <div className="space-y-2.5">
+          <label className="text-[10px] font-bold text-fg-muted uppercase tracking-wider flex items-center gap-1.5">
+            <span>Etiquetas & Tags Rápidas</span>
+            <StudioHelpTooltip helpKey="elements.badges" />
+          </label>
+          <div className="grid grid-cols-2 gap-1.5">
+            {QUICK_TAGS.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() =>
+                  addLayer({
+                    id: `tag-${Date.now()}`,
+                    type: 'text',
+                    name: `Tag ${tag}`,
+                    textKind: 'callout',
+                    text: tag,
+                    fontFamily: tokens.fontDisplay,
+                    fontSize: 22,
+                    color: '#ffffff',
+                    align: 'center',
+                    bold: true,
+                    italic: false,
+                    uppercase: true,
+                    lineHeight: 1.1,
+                    letterSpacing: 1,
+                    pillBgColor: activeColor,
+                    pillBgOpacity: 95,
+                    visible: true,
+                    locked: false,
+                    opacity: 1,
+                    x: 0.25,
+                    y: 0.12,
+                    width: 0.5,
+                    height: 0.08,
+                    rotation: 0,
+                  })
+                }
+                className="px-2.5 py-2 rounded-xl bg-surface-hover/60 border border-border-subtle hover:border-[#FFCC00] text-[10px] font-black tracking-wide text-fg truncate cursor-pointer"
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {subTab === 'qr' && !selectedShape && (
+        <div className="p-4 rounded-xl border border-dashed border-border-subtle text-center text-[11px] text-fg-muted space-y-1">
+          <div className="flex items-center justify-center gap-1 font-bold text-fg-secondary">
+            <span>Frame Clip & Contorno de Forma</span>
+            <StudioHelpTooltip helpKey="elements.qr" />
+          </div>
+          <p>Adicione ou selecione uma forma na aba &ldquo;Formas&rdquo; para encaixar uma foto dentro dela ou ajustar a borda.</p>
+        </div>
+      )}
+
+      {subTab === 'qr' && selectedShape && (
         <div className="pt-3 border-t border-border-subtle space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-wider text-amber-500">
@@ -319,13 +422,14 @@ export function StudioElementsGallery() {
                 <span>Cor da Borda</span>
               </button>
             </div>
-            <input
-              type="range"
+            <StudioLiveSlider
+              id="shape-stroke-width"
+              label="Espessura da Borda"
+              value={selectedShape.strokeWidth ?? 0}
               min={0}
               max={40}
-              value={selectedShape.strokeWidth ?? 0}
-              onChange={(e) => updateLayer(selectedShape.id, { strokeWidth: Number(e.target.value) })}
-              className="w-full studio-range-slider"
+              unit="px"
+              onChange={(val) => updateLayer(selectedShape.id, { strokeWidth: val })}
             />
             {showBorderPicker && (
               <StudioProColorPicker
@@ -342,58 +446,49 @@ export function StudioElementsGallery() {
               <span className="text-[10px] font-bold text-fg-muted uppercase block">
                 Submenu 17 • Ajuste Interno no Frame
               </span>
-              <div>
-                <div className="flex justify-between text-[10px]">
-                  <span>Zoom Interno</span>
-                  <span className="font-mono font-bold">{selectedShape.frameClip.zoom.toFixed(2)}x</span>
-                </div>
-                <input
-                  type="range"
-                  min={1}
-                  max={3}
-                  step={0.05}
-                  value={selectedShape.frameClip.zoom}
-                  onChange={(e) =>
+              <StudioLiveSlider
+                id="shape-frame-zoom"
+                label="Zoom Interno"
+                value={Number(selectedShape.frameClip.zoom.toFixed(2))}
+                min={1}
+                max={3}
+                step={0.05}
+                unit="x"
+                onChange={(val) =>
+                  updateLayer(selectedShape.id, {
+                    frameClip: { ...selectedShape.frameClip!, zoom: val },
+                  })
+                }
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <StudioLiveSlider
+                  id="shape-frame-pan-x"
+                  label="Pan X (%)"
+                  value={Math.round(selectedShape.frameClip.panX * 100)}
+                  min={-50}
+                  max={50}
+                  step={2}
+                  unit="%"
+                  onChange={(val) =>
                     updateLayer(selectedShape.id, {
-                      frameClip: { ...selectedShape.frameClip!, zoom: Number(e.target.value) },
+                      frameClip: { ...selectedShape.frameClip!, panX: Number((val / 100).toFixed(2)) },
                     })
                   }
-                  className="w-full studio-range-slider"
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <span className="text-[10px] text-fg-muted block">Pan X: {Math.round(selectedShape.frameClip.panX * 100)}%</span>
-                  <input
-                    type="range"
-                    min={-0.5}
-                    max={0.5}
-                    step={0.02}
-                    value={selectedShape.frameClip.panX}
-                    onChange={(e) =>
-                      updateLayer(selectedShape.id, {
-                        frameClip: { ...selectedShape.frameClip!, panX: Number(e.target.value) },
-                      })
-                    }
-                    className="w-full studio-range-slider"
-                  />
-                </div>
-                <div>
-                  <span className="text-[10px] text-fg-muted block">Pan Y: {Math.round(selectedShape.frameClip.panY * 100)}%</span>
-                  <input
-                    type="range"
-                    min={-0.5}
-                    max={0.5}
-                    step={0.02}
-                    value={selectedShape.frameClip.panY}
-                    onChange={(e) =>
-                      updateLayer(selectedShape.id, {
-                        frameClip: { ...selectedShape.frameClip!, panY: Number(e.target.value) },
-                      })
-                    }
-                    className="w-full studio-range-slider"
-                  />
-                </div>
+                <StudioLiveSlider
+                  id="shape-frame-pan-y"
+                  label="Pan Y (%)"
+                  value={Math.round(selectedShape.frameClip.panY * 100)}
+                  min={-50}
+                  max={50}
+                  step={2}
+                  unit="%"
+                  onChange={(val) =>
+                    updateLayer(selectedShape.id, {
+                      frameClip: { ...selectedShape.frameClip!, panY: Number((val / 100).toFixed(2)) },
+                    })
+                  }
+                />
               </div>
             </div>
           )}

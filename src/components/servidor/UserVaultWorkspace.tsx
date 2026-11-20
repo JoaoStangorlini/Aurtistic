@@ -68,6 +68,15 @@ import { OrganizationMaterialSelector } from '@/components/organizacoes/Organiza
 import { OrganizationBrandProvider } from '@/components/organizacoes/OrganizationBrandProvider';
 import { syncHubOrganizationsAction } from '@/app/(dashboard)/organizacoes/actions';
 import { VaultPreviewPanel } from './VaultPreviewPanel';
+import { VaultSortControl } from './VaultSortControl';
+import {
+  DEFAULT_VAULT_SORT,
+  loadVaultSortPreference,
+  saveVaultSortPreference,
+  sortVaultFolders,
+  sortVaultFiles,
+  type VaultSortPreference,
+} from '@/lib/vault-sorting';
 import {
   VaultContextMenu,
   type FolderCustomMeta,
@@ -269,6 +278,16 @@ export function UserVaultWorkspace({
   });
   const [folders, setFolders] = useState<EdgeVaultEntry[]>([]);
   const [files, setFiles] = useState<EdgeVaultEntry[]>([]);
+  const [sortPref, setSortPref] = useState<VaultSortPreference>(DEFAULT_VAULT_SORT);
+
+  useEffect(() => {
+    setSortPref(loadVaultSortPreference());
+  }, []);
+
+  const handleSortChange = useCallback((next: VaultSortPreference) => {
+    setSortPref(next);
+    saveVaultSortPreference(next);
+  }, []);
   const [usedBytes, setUsedBytes] = useState(profile.used_bytes || 0);
   const [isEdgeOnline, setIsEdgeOnline] = useState<boolean | null>(null);
   const [isHdConnected, setIsHdConnected] = useState<boolean | null>(null);
@@ -536,6 +555,7 @@ export function UserVaultWorkspace({
   // Modos de Layout e Painel de Inspeção Estilo VS Code
   const [layoutMode, setLayoutMode] = useState<VaultLayoutMode>(getInitialVaultLayout);
   const [isPreviewOpen, setIsPreviewOpen] = useState(getInitialPreviewOpen);
+  const [isQuotaCollapsed, setIsQuotaCollapsed] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<EdgeVaultEntry | null>(null);
   const [openIdeTabs, setOpenIdeTabs] = useState<EdgeVaultEntry[]>([]);
   const [activeIdeTabPath, setActiveIdeTabPath] = useState<string | null>(null);
@@ -731,6 +751,18 @@ export function UserVaultWorkspace({
     });
   };
 
+  const sortedFolders = useMemo(() => sortVaultFolders(folders, sortPref), [folders, sortPref]);
+  const sortedFiles = useMemo(() => {
+    const enriched = files.map((f) => {
+      const idx = indexedMap.get(f.relativePath);
+      return {
+        ...f,
+        capturedAt: idx?.captured_at || null,
+      };
+    });
+    return sortVaultFiles(enriched, sortPref);
+  }, [files, indexedMap, sortPref]);
+
   const handleItemSelect = (path: string, e: React.MouseEvent) => {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
@@ -746,7 +778,7 @@ export function UserVaultWorkspace({
       lastSelectedPathRef.current = path;
     } else if (e.shiftKey && lastSelectedPathRef.current) {
       e.preventDefault();
-      const allPaths = [...folders.map((f) => f.relativePath), ...files.map((f) => f.relativePath)];
+      const allPaths = [...sortedFolders.map((f) => f.relativePath), ...sortedFiles.map((f) => f.relativePath)];
       const lastIdx = allPaths.indexOf(lastSelectedPathRef.current);
       const currIdx = allPaths.indexOf(path);
       if (lastIdx !== -1 && currIdx !== -1) {
@@ -2450,20 +2482,35 @@ export function UserVaultWorkspace({
           />
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setBoostTargetScope(selectedOrgId ? 'org' : 'personal');
-            setIsBoostModalOpen(true);
-          }}
-          className="flex items-center gap-1.5 rounded-xl border border-accent-primary/40 bg-accent-primary/10 px-3.5 py-2 text-xs font-bold text-accent-primary hover:bg-accent-primary/20 transition-colors cursor-pointer shadow-sm"
-        >
-          <span className="material-symbols-outlined text-[16px]">bolt</span>
-          <span>Pedir Boost</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsQuotaCollapsed((prev) => !prev)}
+            className="flex items-center gap-1 rounded-xl border border-border-subtle bg-surface px-2.5 py-2 text-xs font-bold text-fg-secondary hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
+            title={isQuotaCollapsed ? 'Mostrar barra de armazenamento' : 'Recolher cabeçalho de armazenamento'}
+          >
+            <span className="material-symbols-outlined text-[16px]">
+              {isQuotaCollapsed ? 'expand_more' : 'expand_less'}
+            </span>
+            <span className="hidden sm:inline">{isQuotaCollapsed ? 'Espaço' : 'Recolher'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setBoostTargetScope(selectedOrgId ? 'org' : 'personal');
+              setIsBoostModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 rounded-xl border border-accent-primary/40 bg-accent-primary/10 px-3 sm:px-3.5 py-2 text-xs font-bold text-accent-primary hover:bg-accent-primary/20 transition-colors cursor-pointer shadow-sm"
+          >
+            <span className="material-symbols-outlined text-[16px]">bolt</span>
+            <span>Pedir Boost</span>
+          </button>
+        </div>
       </div>
 
-      {/* Topo: Cartão Calmo de Quota e Status do Servidor */}
+      {/* Topo: Cartão Calmo de Quota e Status do Servidor (recolhível com 1 toque) */}
+      {!isQuotaCollapsed && (
       <div data-tour="vault-quota-card" className="space-y-3">
         <StorageQuotaCard
           usedBytes={selectedOrg ? selectedOrg.usedBytes : usedBytes}
@@ -2496,6 +2543,7 @@ export function UserVaultWorkspace({
           </div>
         )}
       </div>
+      )}
 
       {/* Navegação de Abas do Espaço */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-3" data-tour="vault-tabs">
@@ -2637,12 +2685,12 @@ export function UserVaultWorkspace({
           <div className="relative z-30 bg-surface border border-border-subtle rounded-2xl p-3.5 sm:p-4 space-y-3">
             {/* Linha 1: Controles de Exibição e Ações Principais */}
             <div className="flex flex-wrap items-center justify-between gap-3" data-tour="vault-actions">
-              {/* Seletor de Layout (Grade / Lista / IDE / Fotos) + Toggle do Painel de Inspeção (Frente 2.2 e 5.2) */}
-              <div className="flex items-center gap-1 bg-app p-1 rounded-xl border border-border-subtle" data-tour="vault-layout-switcher">
+              {/* Seletor de Layout (Grade / Lista / IDE / Fotos / Painel) rolável no mobile 365px */}
+              <div className="flex items-center gap-1 bg-app p-1 rounded-xl border border-border-subtle overflow-x-auto no-scrollbar max-w-full" data-tour="vault-layout-switcher">
                 <button
                   type="button"
                   onClick={() => handleSetLayoutMode('grid')}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  className={`shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     layoutMode === 'grid'
                       ? 'bg-[var(--accent-primary)] text-[var(--on-accent-primary)] font-bold shadow-sm'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
@@ -2650,12 +2698,12 @@ export function UserVaultWorkspace({
                   title="Grade de Miniaturas (Alt+1)"
                 >
                   <span className="material-symbols-outlined text-[16px]">grid_view</span>
-                  <span className="hidden sm:inline">Grade</span>
+                  <span>Grade</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleSetLayoutMode('list')}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  className={`shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     layoutMode === 'list'
                       ? 'bg-[var(--accent-primary)] text-[var(--on-accent-primary)] font-bold shadow-sm'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
@@ -2663,12 +2711,12 @@ export function UserVaultWorkspace({
                   title="Lista Detalhada (Alt+2)"
                 >
                   <span className="material-symbols-outlined text-[16px]">view_list</span>
-                  <span className="hidden sm:inline">Lista</span>
+                  <span>Lista</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleSetLayoutMode('ide')}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  className={`shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     layoutMode === 'ide'
                       ? 'bg-[var(--accent-primary)] text-[var(--on-accent-primary)] font-bold shadow-sm ring-1 ring-[#FFCC00]/50'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
@@ -2681,7 +2729,7 @@ export function UserVaultWorkspace({
                 <button
                   type="button"
                   onClick={() => handleSetLayoutMode('timeline')}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  className={`shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     layoutMode === 'timeline'
                       ? 'bg-[var(--accent-primary)] text-[var(--on-accent-primary)] font-bold shadow-sm'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
@@ -2689,15 +2737,15 @@ export function UserVaultWorkspace({
                   title="Fotos e Mídia em Linha do Tempo (Alt+4)"
                 >
                   <span className="material-symbols-outlined text-[16px]">photo_library</span>
-                  <span className="hidden sm:inline">Fotos</span>
+                  <span>Fotos</span>
                 </button>
 
-                <div className="w-[1px] h-4 bg-border-subtle mx-0.5" />
+                <div className="w-[1px] h-4 bg-border-subtle mx-0.5 shrink-0" />
 
                 <button
                   type="button"
                   onClick={handleTogglePreview}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  className={`shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     isPreviewOpen
                       ? 'bg-[var(--accent-primary)] text-[var(--on-accent-primary)] font-bold shadow-sm'
                       : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
@@ -2705,12 +2753,15 @@ export function UserVaultWorkspace({
                   title={isPreviewOpen ? 'Ocultar Painel Lateral (Alt+P / Alt+B)' : 'Abrir Painel Lateral (Alt+P / Alt+B)'}
                 >
                   <span className="material-symbols-outlined text-[18px]">view_sidebar</span>
-                  <span className="hidden sm:inline">Painel</span>
+                  <span>Painel</span>
                 </button>
               </div>
 
-              {/* Ações da Pasta: Compartilhar, Baixar e Botão [+ Novo] */}
+              {/* Ações da Pasta: Ordenação, Compartilhar, Baixar e Botão [+ Novo] */}
               <div className="flex items-center gap-2 flex-wrap">
+                {layoutMode !== 'timeline' && (
+                  <VaultSortControl value={sortPref} onChange={handleSortChange} compact />
+                )}
                 {currentFolder && (
                   <>
                     <button
@@ -3289,7 +3340,7 @@ export function UserVaultWorkspace({
                       Pastas ({folders.length})
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                      {folders.map((folder) => {
+                      {sortedFolders.map((folder) => {
                         const folderPath = folder.relativePath || (folder as unknown as { path?: string })?.path || folder.name;
                         const isSelected = selectedPaths.has(folderPath);
                         const meta = folderMetaMap[folderPath];
@@ -3442,8 +3493,10 @@ export function UserVaultWorkspace({
                                 type="button"
                                 onClick={() => handleToggleFolderFavorite(folder)}
                                 title={isFavorite ? 'Remover dos Favoritos' : 'Favoritar Pasta'}
-                                className={`p-1.5 rounded-lg hover:bg-surface-hover transition-colors ${
-                                  isFavorite ? 'text-[#FFCC00]' : 'text-fg-muted hover:text-[#FFCC00]'
+                                className={`p-1.5 rounded-lg hover:bg-surface-hover transition-all cursor-pointer ${
+                                  isFavorite
+                                    ? 'opacity-100 text-[#FFCC00]'
+                                    : 'opacity-100 md:opacity-0 md:group-hover:opacity-100 text-fg-muted hover:text-[#FFCC00]'
                                 }`}
                               >
                                 <span className="material-symbols-outlined text-[17px]">
@@ -3461,7 +3514,11 @@ export function UserVaultWorkspace({
                                   })
                                 }
                                 title={folder.hasPin ? 'Remover PIN' : 'Proteger pasta com PIN'}
-                                className="p-1.5 rounded-lg hover:bg-surface-hover text-fg-secondary hover:text-[var(--accent-primary)] transition-colors"
+                                className={`p-1.5 rounded-lg hover:bg-surface-hover transition-all cursor-pointer ${
+                                  folder.hasPin
+                                    ? 'opacity-100 text-[var(--accent-primary)]'
+                                    : 'opacity-100 md:opacity-0 md:group-hover:opacity-100 text-fg-secondary hover:text-[var(--accent-primary)]'
+                                }`}
                               >
                                 <span className="material-symbols-outlined text-[17px]">
                                   {folder.hasPin ? 'lock' : 'enhanced_encryption'}
@@ -3501,6 +3558,65 @@ export function UserVaultWorkspace({
                   {loadingDir ? (
                     <div className="py-12 text-center text-sm text-fg-secondary">
                       Carregando arquivos do servidor...
+                    </div>
+                  ) : files.length === 0 && folders.length > 0 ? (
+                    <div
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+                      }}
+                      onDrop={async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (e.dataTransfer) {
+                          const items = await extractFilesFromDataTransfer(e.dataTransfer);
+                          if (items.length > 0) handleOpenUploadManager(items);
+                        }
+                      }}
+                      className="bg-surface border border-dashed border-border-subtle hover:border-[var(--accent-primary)]/60 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 transition-all"
+                    >
+                      <span className="text-xs text-fg-muted flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[16px] text-[var(--accent-primary)]">cloud_upload</span>
+                        <span>Arraste arquivos aqui ou adicione à pasta:</span>
+                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-2.5 py-1.5 rounded-lg bg-app hover:bg-surface-hover text-fg border border-border-subtle text-[11px] font-bold flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[15px] text-[var(--accent-secondary)]">upload_file</span>
+                          <span>Subir Arquivos</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => folderInputRef.current?.click()}
+                          className="px-2.5 py-1.5 rounded-lg bg-app hover:bg-surface-hover text-fg border border-border-subtle text-[11px] font-bold flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[15px] text-cyan-600 dark:text-[#00E5FF]">drive_folder_upload</span>
+                          <span>Subir Pasta</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => zipInputRef.current?.click()}
+                          className="px-2.5 py-1.5 rounded-lg bg-app hover:bg-surface-hover text-fg border border-border-subtle text-[11px] font-bold flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[15px] text-amber-600 dark:text-[#FFCC00]">folder_zip</span>
+                          <span>Subir .ZIP</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingNotePath(null);
+                            setNoteDrawerOpen(true);
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-app hover:bg-surface-hover text-fg border border-border-subtle text-[11px] font-bold flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[15px] text-accent-primary">edit_note</span>
+                          <span>Nova Nota .md</span>
+                        </button>
+                      </div>
                     </div>
                   ) : files.length === 0 ? (
                     <div
@@ -3603,7 +3719,7 @@ export function UserVaultWorkspace({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border-subtle">
-                          {files.map((file) => {
+                          {sortedFiles.map((file) => {
                             const indexRow = indexedMap.get(file.relativePath);
                             const isSelected = selectedPaths.has(file.relativePath) || selectedEntry?.relativePath === file.relativePath;
                             const isFavorite = Boolean(indexRow?.is_favorite);
@@ -3739,7 +3855,7 @@ export function UserVaultWorkspace({
                   ) : (
                     /* Visualização em Grade de Cards */
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                      {files.map((file) => {
+                      {sortedFiles.map((file) => {
                         const indexRow = indexedMap.get(file.relativePath);
                         const isImage = file.kind === 'image';
                         const isNote = file.kind === 'note';
@@ -3861,8 +3977,10 @@ export function UserVaultWorkspace({
                                   type="button"
                                   onClick={() => void handleToggleFileFavorite(file)}
                                   title={isFavorite ? 'Remover dos Favoritos' : 'Favoritar Arquivo'}
-                                  className={`p-1.5 rounded-lg bg-app/80 hover:bg-surface-hover border border-border-subtle transition-colors ${
-                                    isFavorite ? 'text-[#FFCC00]' : 'text-fg-secondary hover:text-[#FFCC00]'
+                                  className={`p-1.5 rounded-lg bg-app/80 hover:bg-surface-hover border border-border-subtle transition-all cursor-pointer ${
+                                    isFavorite
+                                      ? 'opacity-100 text-[#FFCC00]'
+                                      : 'opacity-100 md:opacity-0 md:group-hover:opacity-100 text-fg-secondary hover:text-[#FFCC00]'
                                   }`}
                                 >
                                   <span className="material-symbols-outlined text-[17px]">

@@ -96,9 +96,20 @@ export const DEFAULT_FILTERS: StudioLayerFilterConfig = {
   targetMaskAreaOnly: false, isCutoutMask: false,
 };
 
+export interface StudioLayerFolder {
+  id: string;
+  name: string;
+  color: string;
+  collapsed: boolean;
+  visible: boolean;
+  locked: boolean;
+  isGroup?: boolean;
+}
+
 export interface StudioLayerBase {
   id: string;
   name: string;
+  folderId?: string | null;
   visible: boolean;
   locked: boolean;
   opacity: number; // 0..1
@@ -131,10 +142,19 @@ export interface StudioVaultRef {
   relativePath: string;
 }
 
+export interface StudioMaskPresetConfig {
+  shape: 'none' | 'circle' | 'oval' | 'rounded' | 'hexagon' | 'star' | 'arch' | 'linear-fade' | 'radial-fade';
+  feather: number; // 0..80
+  invert?: boolean;
+  angle?: number; // 0..360 (linear-fade)
+  position?: number; // 10..90 (%)
+}
+
 export interface StudioImageLayer extends StudioLayerBase {
   type: 'image';
   src: string;
   resolvedUrl?: string; // URL hidratada em runtime (não persiste)
+  fallbackUrl?: string; // URL alternativa (ex.: miniatura pré-gerada caso o stream falhe)
   naturalWidth?: number;
   naturalHeight?: number;
   zoom: number; // 1..3
@@ -145,6 +165,7 @@ export interface StudioImageLayer extends StudioLayerBase {
   aspectFit?: 'cover' | 'contain' | 'custom';
   offsetX?: number;
   offsetY?: number;
+  maskPreset?: StudioMaskPresetConfig;
   vaultRelativePath?: string;
   vaultRef?: StudioVaultRef;
 }
@@ -224,12 +245,30 @@ export interface StudioLogoLayer extends StudioLayerBase {
   monochrome?: boolean;
 }
 
+export type StudioBrushKind = 'pen' | 'marker' | 'highlighter' | 'neon' | 'spray' | 'dashed' | 'eraser';
+
+export interface StudioBrushStroke {
+  id: string;
+  brush: StudioBrushKind;
+  color: string;
+  size: number; // px na escala canônica (1080px)
+  opacity: number; // 0..1
+  points: { x: number; y: number }[]; // normalizados 0..1 relativos à camada de desenho
+  seed?: number; // semente determinística para Spray
+}
+
+export interface StudioDrawingLayer extends StudioLayerBase {
+  type: 'drawing';
+  strokes: StudioBrushStroke[];
+}
+
 export type StudioLayer =
   | StudioImageLayer
   | StudioTextLayer
   | StudioShapeLayer
   | StudioMathLayer
-  | StudioLogoLayer;
+  | StudioLogoLayer
+  | StudioDrawingLayer;
 
 export type StudioGuideOverlayMode =
   | 'none'
@@ -247,6 +286,7 @@ export interface StudioSlide {
   backgroundGradient?: string;
   backgroundImageUrl?: string;
   globalFilters: StudioLayerFilterConfig;
+  folders?: StudioLayerFolder[];
   layers: StudioLayer[];
   showBrandBadge: boolean;
   brandBadgeText?: string;
@@ -275,7 +315,7 @@ export interface StudioTemplate {
 }
 
 export type StudioStage = 'launcher' | 'editor' | 'publish';
-export type StudioActiveTab = 'images' | 'edition' | 'texts' | 'layers';
+export type StudioActiveTab = 'images' | 'edition' | 'masks' | 'brush' | 'texts' | 'elements' | 'palette' | 'layers';
 
 export interface StudioPublishPayload {
   title: string;

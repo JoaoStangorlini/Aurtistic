@@ -822,17 +822,19 @@ function releaseThumbWorker() {
 
 async function generateThumbnailWebP(sourcePath, targetPath, maxDim = 640, format = 'webp') {
   const safeDim = Math.max(320, Math.min(1440, parseInt(maxDim, 10) || 640));
+  const isAvif = format === 'avif' || targetPath.endsWith('.avif');
+  const ext = isAvif ? '.avif' : '.webp';
+  const tmpTarget = `${targetPath}.tmp_${process.pid}_${Date.now()}_${crypto.randomBytes(3).toString('hex')}${ext}`;
   await acquireThumbWorker();
   try {
-    const isAvif = format === 'avif' || targetPath.endsWith('.avif');
     const imCmd = 'magick';
     const imFallback = 'convert';
 
     // Blindagem de memória e concorrência: 1 thread e 128 MB max para não disparar o LMK no Fire Stick
     const imLimits = ['-limit', 'thread', '1', '-limit', 'memory', '128MiB', '-limit', 'map', '256MiB'];
     const imArgs = isAvif
-      ? [...imLimits, sourcePath, '-auto-orient', '-thumbnail', `${safeDim}x>`, '-quality', '65', '-define', 'heic:speed=6', targetPath]
-      : [...imLimits, sourcePath, '-auto-orient', '-thumbnail', `${safeDim}x>`, '-quality', '72', '-define', 'webp:method=4', targetPath];
+      ? [...imLimits, sourcePath, '-auto-orient', '-thumbnail', `${safeDim}x${safeDim}>`, '-quality', '65', '-define', 'heic:speed=6', tmpTarget]
+      : [...imLimits, sourcePath, '-auto-orient', '-thumbnail', `${safeDim}x${safeDim}>`, '-quality', '72', '-define', 'webp:method=4', tmpTarget];
 
     // 1. Tenta ImageMagick v7 (magick) ou v6 (convert)
     let ok = await new Promise((resolve) => {
@@ -841,9 +843,12 @@ async function generateThumbnailWebP(sourcePath, targetPath, maxDim = 640, forma
         execFile(imFallback, imArgs, { timeout: 15000 }, (err2) => resolve(!err2));
       });
     });
-    if (ok && fs.existsSync(targetPath)) return true;
+    if (ok && fs.existsSync(tmpTarget)) {
+      await fs.promises.rename(tmpTarget, targetPath);
+      return true;
+    }
 
-    // 2. Fallback: Python PIL com exif_transpose
+    // 2. Fallback: Python PIL com exif_transpose (preserva proporção e orientação)
     const usePython = await new Promise((resolve) => {
       const pyCode = `
 import sys
@@ -861,16 +866,20 @@ try:
 except Exception:
     sys.exit(1)
 `;
-      execFile('python3', ['-c', pyCode, sourcePath, targetPath, String(safeDim)], { timeout: 15000 }, (err) => {
+      execFile('python3', ['-c', pyCode, sourcePath, tmpTarget, String(safeDim)], { timeout: 15000 }, (err) => {
         resolve(!err);
       });
     });
-    if (usePython && fs.existsSync(targetPath)) return true;
+    if (usePython && fs.existsSync(tmpTarget)) {
+      await fs.promises.rename(tmpTarget, targetPath);
+      return true;
+    }
 
     return false;
   } catch {
     return false;
   } finally {
+    await fs.promises.unlink(tmpTarget).catch(() => {});
     releaseThumbWorker();
   }
 }
@@ -2788,10 +2797,11 @@ app.post('/api/portfolio/reset', requireAdminSession, async (req, res) => {
   res.json({ success: true, count: 0, albums: [] });
 });
 
-function generatePhotoPlaceholderSvg(title = 'Fotografia', album = '') {
+function generatePhotoPlaceholderSvg(title = 'Fotografia', album = '', isOffline = !isExternalStorageMounted()) {
   const safeTitle = String(title).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const safeAlbum = String(album).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  const subtitle = safeAlbum ? `${safeAlbum} • HD USB Offline` : 'HD USB Offline • Reconecte o disco';
+  const statusText = isOffline ? 'HD USB Offline' : 'Miniatura indisponível';
+  const subtitle = safeAlbum ? `${safeAlbum} • ${statusText}` : (isOffline ? 'HD USB Offline • Reconecte o disco' : statusText);
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="100%" height="100%">
   <defs>
     <linearGradient id="svgBg" x1="0" y1="0" x2="1" y2="1">
@@ -7703,6 +7713,80 @@ app.options('/api/tenant/thumb', handleTenantMediaPreflight);
 app.get('/api/tenant/stream', tenantMediaCorsMiddleware, verifyTenantTicket, (req, res) => handleTenantStreamRequest(req, res, false));
 app.get('/api/tenant/download', tenantMediaCorsMiddleware, verifyTenantTicket, (req, res) => handleTenantStreamRequest(req, res, true));
 
+const TENANT_THUMB_QUEUE_CONCURRENCY = 2;
+const pendingTenantThumbJobs = new Map();
+const tenantThumbHighQueue = [];
+const tenantThumbLowQueue = [];
+let activeTenantThumbWorkers = 0;
+
+function isThumbnailableRasterImage(filePath) {
+  return /\.(jpe?g|png|webp|avif|gif|bmp|tiff?|heic)$/i.test(String(filePath || ''));
+}
+
+function drainTenantThumbQueue() {
+  while (
+    activeTenantThumbWorkers < TENANT_THUMB_QUEUE_CONCURRENCY &&
+    (tenantThumbHighQueue.length > 0 || tenantThumbLowQueue.length > 0)
+  ) {
+    const next = tenantThumbHighQueue.length > 0 ? tenantThumbHighQueue.shift() : tenantThumbLowQueue.shift();
+    if (!next) break;
+    activeTenantThumbWorkers += 1;
+    let timer = null;
+    const timeoutPromise = new Promise((_res, rej) => {
+      timer = setTimeout(() => rej(new Error('Timeout ao gerar miniatura')), next.timeoutMs || 20000);
+    });
+    Promise.race([Promise.resolve().then(() => next.task()), timeoutPromise])
+      .then((res) => {
+        if (timer) clearTimeout(timer);
+        next.resolve(res);
+      })
+      .catch((err) => {
+        if (timer) clearTimeout(timer);
+        next.reject(err);
+      })
+      .finally(() => {
+        activeTenantThumbWorkers = Math.max(0, activeTenantThumbWorkers - 1);
+        pendingTenantThumbJobs.delete(next.key);
+        drainTenantThumbQueue();
+      });
+  }
+}
+
+function enqueueTenantThumbnailJob(key, task, options = {}) {
+  if (pendingTenantThumbJobs.has(key)) {
+    return pendingTenantThumbJobs.get(key);
+  }
+  const priority = options.priority === 'high' ? 'high' : 'low';
+  const timeoutMs = options.timeoutMs || 20000;
+  const promise = new Promise((resolve, reject) => {
+    const job = { key, task, resolve, reject, timeoutMs };
+    if (priority === 'high') {
+      tenantThumbHighQueue.push(job);
+    } else {
+      tenantThumbLowQueue.push(job);
+    }
+    drainTenantThumbQueue();
+  });
+  pendingTenantThumbJobs.set(key, promise);
+  return promise;
+}
+
+function queueTenantImageThumbnail(pinNamespaceId, relPath, sourceFullPath, targetW = 480) {
+  if (!sourceFullPath || !isThumbnailableRasterImage(sourceFullPath)) return;
+  const nfcRel = String(relPath || '').normalize('NFC').replace(/\\/g, '/');
+  const tenantThumbKey = crypto
+    .createHash('md5')
+    .update(`${pinNamespaceId}:${nfcRel}`)
+    .digest('hex');
+  const tenantThumbPath = path.join(INTERNAL_THUMBS_DIR, `tthumb_${tenantThumbKey}.webp`);
+  if (fs.existsSync(tenantThumbPath)) return;
+  void enqueueTenantThumbnailJob(
+    `${tenantThumbKey}:${targetW}`,
+    () => generateThumbnailWebP(sourceFullPath, tenantThumbPath, targetW, 'webp'),
+    { priority: 'low', timeoutMs: 25000 }
+  ).catch(() => {});
+}
+
 // 11.5.3. GET /api/tenant/thumb — Miniatura ultra-rápida (reaproveita 100% dos 2.369 .avif + sig_index.json)
 app.get('/api/tenant/thumb', tenantMediaCorsMiddleware, verifyTenantTicket, async (req, res) => {
   applyTenantMediaCorsHeaders(req, res);
@@ -7713,7 +7797,13 @@ app.get('/api/tenant/thumb', tenantMediaCorsMiddleware, verifyTenantTicket, asyn
     assertPublicMediaPathAllowed(req, relPath);
     assertFolderPinUnlockedIfRequired(req, relPath);
 
-    const fullPath = req.tenant.resolveSafePath(relPath, { forWrite: false });
+    let fullPath = req.tenant.resolveSafePath(relPath, { forWrite: false });
+    if (!fs.existsSync(fullPath)) {
+      const fallbackFile = resolveResilientPhysicalFile(req.tenant.userRoot, relPath);
+      if (fallbackFile && fs.existsSync(fallbackFile)) {
+        fullPath = fallbackFile;
+      }
+    }
     const allowPortfolioPrebuilt =
       req.tenant.scopeType !== 'org' ||
       Boolean(req.tenant.allowedPrefix?.toLowerCase().startsWith('portfolio')) ||
@@ -7738,31 +7828,63 @@ app.get('/api/tenant/thumb', tenantMediaCorsMiddleware, verifyTenantTicket, asyn
       .createHash('md5')
       .update(`${req.tenant.pinNamespaceId}:${nfcRel}`)
       .digest('hex');
+    const forceRegen = req.query.force === '1' || req.query.force === 'true';
     const tenantThumbPath = path.join(INTERNAL_THUMBS_DIR, `tthumb_${tenantThumbKey}.webp`);
     if (fs.existsSync(tenantThumbPath)) {
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      res.setHeader('Content-Type', 'image/webp');
-      return fs.createReadStream(tenantThumbPath).pipe(res);
+      let validCached = false;
+      if (!forceRegen) {
+        try {
+          const st = fs.statSync(tenantThumbPath);
+          validCached = st.isFile() && st.size > 256;
+        } catch {}
+      }
+      if (validCached) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        res.setHeader('Content-Type', 'image/webp');
+        return fs.createReadStream(tenantThumbPath).pipe(res);
+      }
+      try { fs.unlinkSync(tenantThumbPath); } catch {}
     }
 
     if (!fs.existsSync(fullPath)) {
-      const baseName = path.basename(relPath, path.extname(relPath));
-      const safeAlbum = path.dirname(relPath).replace(/^Portfolio\/?/i, '');
-      res.setHeader('Content-Type', 'image/svg+xml');
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-      return res.send(generatePhotoPlaceholderSvg(baseName, safeAlbum));
+      if (!isExternalStorageMounted()) {
+        const baseName = path.basename(relPath, path.extname(relPath));
+        const safeAlbum = path.dirname(relPath).replace(/^Portfolio\/?/i, '');
+        res.setHeader('Content-Type', 'image/svg+xml');
+        return res.send(generatePhotoPlaceholderSvg(baseName, safeAlbum, true));
+      }
+      return res.status(404).json({ error: 'Miniatura indisponível: arquivo original não encontrado.' });
+    }
+
+    if (!isThumbnailableRasterImage(fullPath)) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      return res.status(415).json({ error: 'Tipo de arquivo sem suporte para miniatura raster.' });
     }
 
     const targetW = req.query.w ? Math.max(240, Math.min(1280, parseInt(req.query.w, 10) || 480)) : 480;
-    const generated = await generateThumbnailWebP(fullPath, tenantThumbPath, targetW, 'webp');
+    const generated = await enqueueTenantThumbnailJob(
+      `${tenantThumbKey}:${targetW}`,
+      () => generateThumbnailWebP(fullPath, tenantThumbPath, targetW, 'webp'),
+      { priority: 'high', timeoutMs: 20000 }
+    );
     if (generated && fs.existsSync(tenantThumbPath)) {
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      res.setHeader('Content-Type', 'image/webp');
-      return fs.createReadStream(tenantThumbPath).pipe(res);
+      let validGen = false;
+      try {
+        const st = fs.statSync(tenantThumbPath);
+        validGen = st.isFile() && st.size > 256;
+      } catch {}
+      if (validGen) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        res.setHeader('Content-Type', 'image/webp');
+        return fs.createReadStream(tenantThumbPath).pipe(res);
+      }
+      try { fs.unlinkSync(tenantThumbPath); } catch {}
     }
 
     return await streamFileWithRange(req, res, fullPath, { cacheControl: 'private, max-age=3600' });
   } catch (err) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     return res.status(err.statusCode || 500).json({ error: err.message });
   }
 });
@@ -7937,6 +8059,7 @@ app.post(
       if (isExactDuplicate) {
         // [DEDUPLICAÇÃO O(1)]: Descarte seguro do arquivo em staging sem reescrever no disco
         await fs.promises.unlink(stagedPath).catch(() => {});
+        queueTenantImageThumbnail(req.tenant.pinNamespaceId, relPath, targetPath, 480);
         const item = await buildTenantEntryDescriptorAsync(
           req.tenant.userId,
           targetPath,
@@ -7970,6 +8093,7 @@ app.post(
       await moveFileSafe(stagedPath, targetPath);
 
       const totalUsedBytes = await req.tenant.adjustUsedBytes(deltaBytes);
+      queueTenantImageThumbnail(req.tenant.pinNamespaceId, relPath, targetPath, 480);
       const item = await buildTenantEntryDescriptorAsync(
         req.tenant.userId,
         targetPath,

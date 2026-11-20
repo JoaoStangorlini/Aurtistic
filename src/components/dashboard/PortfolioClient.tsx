@@ -340,19 +340,14 @@ export default function PortfolioClient({
 
   return (
     <div className="min-h-full flex flex-col p-4 md:p-8 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8 bg-transparent text-fg font-['Open_Sans'] overflow-y-auto">
-      {/* Workspace Header */}
-      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0 border-b border-border-subtle/30 pb-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-black text-fg font-['Bukra'] tracking-tighter">
-              Aurtistic{' '}
-              <span className="text-[#FFCC00] text-lg font-bold font-sans align-middle ml-2">
-                creative manager
-              </span>
-            </h1>
-          </div>
-          <p className="text-sm text-fg-muted mt-1.5">
-            Vitrine unificada de fotografia autoral e projetos de engenharia & design.
+      {/* Workspace Header Compacto (sem título duplicado) */}
+      <div className="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0 border-b border-border-subtle/30 pb-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-black text-fg font-['Bukra'] tracking-tight truncate">
+            Portfólio &amp; Acervo
+          </h1>
+          <p className="text-xs sm:text-sm text-fg-muted mt-0.5">
+            Vitrine unificada de fotografia autoral, imprensa e projetos.
           </p>
         </div>
 
@@ -787,7 +782,8 @@ export default function PortfolioClient({
       )}
 
       {/* Seletor de Sub-Abas Dinâmico baseado em sectionsConfig */}
-      <div className="flex flex-wrap items-center gap-3 mb-8 border-b border-border-subtle pb-2" data-tour="portfolio-subtabs">
+      {/* 4 Seções em Abas Roláveis no Mobile (365px) */}
+      <div className="flex items-center gap-2 mb-6 border-b border-border-subtle pb-2 overflow-x-auto no-scrollbar max-w-full" data-tour="portfolio-subtabs">
         {visibleSections.map((sec: PortfolioSectionConfig) => {
           const count =
             sec.id === 'photos'
@@ -812,14 +808,14 @@ export default function PortfolioClient({
               key={sec.id}
               type="button"
               onClick={() => setActiveSubTab(sec.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+              className={`shrink-0 flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
                 activeSubTab === sec.id
                   ? 'bg-[#FFCC00] text-[#121212] shadow-lg shadow-[#FFCC00]/10'
                   : 'text-fg-secondary hover:text-fg bg-surface border border-border-subtle'
               }`}
             >
-              <span className="material-symbols-outlined text-[20px]">{icon}</span>
-              {sec.title} ({count})
+              <span className="material-symbols-outlined text-[18px]">{icon}</span>
+              <span>{sec.title} ({count})</span>
             </button>
           );
         })}

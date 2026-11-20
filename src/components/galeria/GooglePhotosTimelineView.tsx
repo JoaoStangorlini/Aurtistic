@@ -12,6 +12,14 @@ import {
 } from '@/app/(dashboard)/servidor/actions';
 import { getUserOrganizationsAction } from '@/app/(dashboard)/organizacoes/actions';
 import { SmartBackupSettingsModal } from './SmartBackupSettingsModal';
+import {
+  DEFAULT_VAULT_SORT,
+  loadVaultSortPreference,
+  saveVaultSortPreference,
+  sortVaultFiles,
+  type VaultSortPreference,
+} from '@/lib/vault-sorting';
+import { VaultSortControl } from '@/components/servidor/VaultSortControl';
 
 type TimelineFilter = 'all' | 'favorites' | 'camera' | 'mobile' | 'portfolio';
 
@@ -65,8 +73,19 @@ export function GooglePhotosTimelineView({
   const [exifLoading, setExifLoading] = useState(false);
   const [thumbFallbackIds, setThumbFallbackIds] = useState<Record<string, boolean>>({});
   const [brokenImageIds, setBrokenImageIds] = useState<Record<string, boolean>>({});
+  const [retrySeeds, setRetrySeeds] = useState<Record<string, number>>({});
   const [lightboxImgFailed, setLightboxImgFailed] = useState(false);
   const [aspectRatios, setAspectRatios] = useState<Record<string, number>>({});
+  const [sortPref, setSortPref] = useState<VaultSortPreference>(DEFAULT_VAULT_SORT);
+
+  useEffect(() => {
+    setSortPref(loadVaultSortPreference());
+  }, []);
+
+  const handleSortChange = (next: VaultSortPreference) => {
+    setSortPref(next);
+    saveVaultSortPreference(next);
+  };
 
   // Estado de Compartilhamento & Edição Rápida no Lightbox
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
@@ -161,8 +180,32 @@ export function GooglePhotosTimelineView({
     return () => observer.disconnect();
   }, [nextCursor, loadingMore, fetchPage]);
 
-  // Agrupamento cronológico por Dia / Mês estilo Google Fotos
+  // Agrupamento cronológico por Dia quando ordenado por Data; grade contínua para Nome/Tipo/Tamanho
   const groupedSections = useMemo(() => {
+    const sortedItems = sortVaultFiles(
+      displayItems.map((it) => ({ ...it, name: it.filename })),
+      sortPref
+    );
+
+    if (sortPref.field !== 'date') {
+      const labelMap = {
+        name: 'Ordenado por Nome',
+        type: 'Ordenado por Tipo',
+        size: 'Ordenado por Tamanho',
+      } as const;
+      return sortedItems.length > 0
+        ? [
+            {
+              key: `sorted-${sortPref.field}`,
+              label: `${labelMap[sortPref.field]} (${sortPref.direction === 'asc' ? '↑' : '↓'})`,
+              monthKey: 'sorted',
+              monthLabel: 'Todos',
+              items: sortedItems,
+            },
+          ]
+        : [];
+    }
+
     const groups: {
       key: string;
       label: string;
@@ -172,7 +215,7 @@ export function GooglePhotosTimelineView({
     }[] = [];
     const map = new Map<string, GalleryTimelineItem[]>();
 
-    for (const item of displayItems) {
+    for (const item of sortedItems) {
       const dt = new Date(item.captured_at);
       const valid = !isNaN(dt.getTime());
       const dayKey = valid
@@ -342,6 +385,7 @@ export function GooglePhotosTimelineView({
               </select>
             </div>
           )}
+          <VaultSortControl value={sortPref} onChange={handleSortChange} compact />
           {/* Seletor de Álbuns Específicos */}
           {availableAlbums.length > 0 && (
             <div className="flex items-center gap-2 bg-app px-3 py-1.5 rounded-xl border border-border-subtle">
@@ -435,7 +479,11 @@ export function GooglePhotosTimelineView({
                   {group.items.map((item) => {
                     const useFallback = Boolean(thumbFallbackIds[item.id]);
                     const isBroken = Boolean(brokenImageIds[item.id]);
-                    const imgSrc = useFallback ? item.signedStreamUrl : item.signedThumbUrl;
+                    const rawImgSrc = useFallback ? item.signedStreamUrl : item.signedThumbUrl;
+                    const seed = retrySeeds[item.id];
+                    const imgSrc = seed && rawImgSrc
+                      ? `${rawImgSrc}${rawImgSrc.includes('?') ? '&' : '?'}retry=${seed}`
+                      : rawImgSrc;
                     const ratio = aspectRatios[item.id];
                     return (
                       <button
@@ -452,9 +500,30 @@ export function GooglePhotosTimelineView({
                         }`}
                       >
                         {isBroken ? (
-                          <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-black/40 text-fg-muted">
-                            <span className="material-symbols-outlined text-[22px] opacity-60">broken_image</span>
-                            <span className="text-[9px] mt-1 line-clamp-2 break-all">{item.filename}</span>
+                          <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-black/40 text-fg-muted gap-1">
+                            <span className="material-symbols-outlined text-[20px] opacity-60">image_not_supported</span>
+                            <span className="text-[9px] line-clamp-1 break-all">{item.filename}</span>
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRetrySeeds((prev) => ({ ...prev, [item.id]: Date.now() }));
+                                setBrokenImageIds((prev) => ({ ...prev, [item.id]: false }));
+                                setThumbFallbackIds((prev) => ({ ...prev, [item.id]: false }));
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.stopPropagation();
+                                  setRetrySeeds((prev) => ({ ...prev, [item.id]: Date.now() }));
+                                  setBrokenImageIds((prev) => ({ ...prev, [item.id]: false }));
+                                  setThumbFallbackIds((prev) => ({ ...prev, [item.id]: false }));
+                                }
+                              }}
+                              className="px-2 py-0.5 rounded bg-white/15 hover:bg-[#FFCC00] hover:text-black text-[9px] font-bold transition-colors"
+                            >
+                              Tentar de novo
+                            </span>
                           </div>
                         ) : (
                           <img
@@ -528,9 +597,16 @@ export function GooglePhotosTimelineView({
           >
             <div className="md:col-span-8 bg-black flex items-center justify-center max-h-[75vh] min-h-[280px]">
               {lightboxImgFailed ? (
-                <div className="flex flex-col items-center justify-center p-6 text-center text-fg-muted">
-                  <span className="material-symbols-outlined text-[42px] opacity-60">broken_image</span>
-                  <p className="text-xs mt-2">Não foi possível carregar a pré-visualização desta mídia.</p>
+                <div className="flex flex-col items-center justify-center p-6 text-center text-fg-muted gap-2.5">
+                  <span className="material-symbols-outlined text-[42px] opacity-60">image_not_supported</span>
+                  <p className="text-xs">Miniatura ou mídia indisponível no momento.</p>
+                  <button
+                    type="button"
+                    onClick={() => setLightboxImgFailed(false)}
+                    className="px-3 py-1.5 rounded-xl bg-[#FFCC00] text-black text-xs font-bold hover:brightness-110 cursor-pointer"
+                  >
+                    Tentar novamente
+                  </button>
                 </div>
               ) : (
                 <img

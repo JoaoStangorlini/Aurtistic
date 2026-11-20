@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { StudioHelpTooltip } from './StudioHelpTooltip';
 
 const EVENT_VARIABLES = ['DATA', 'HORARIO', 'LOCAL', 'PALESTRANTE'];
 
@@ -26,8 +27,9 @@ export function StudioTextPresetsSection({
     <div className="space-y-2.5">
       {/* 4 Presets de Diagramação Rápida */}
       <div>
-        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-          Diagramação Rápida (1 Clique)
+        <label className="text-[10px] font-bold text-fg-muted uppercase tracking-wider flex items-center gap-1.5 mb-1">
+          <span>Diagramação Rápida (1 Clique)</span>
+          <StudioHelpTooltip helpKey="text.presets" />
         </label>
         <div className="grid grid-cols-2 gap-1.5 text-[10px] font-semibold">
           <button
@@ -62,18 +64,21 @@ export function StudioTextPresetsSection({
       </div>
 
       {/* Preenchimento de Eventos em Lote */}
-      <div className="border-t border-white/10 pt-1.5">
-        <button
-          type="button"
-          onClick={() => setShowReplacer(!showReplacer)}
-          className="w-full flex items-center justify-between text-[11px] font-bold text-slate-300 hover:text-white cursor-pointer"
-        >
-          <span className="flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-[14px] text-amber-300">event_note</span>
-            <span>Preenchimento de Eventos em Lote</span>
-          </span>
-          <span className="material-symbols-outlined text-[15px]">{showReplacer ? 'expand_less' : 'expand_more'}</span>
-        </button>
+      <div className="border-t border-border-subtle pt-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => setShowReplacer(!showReplacer)}
+            className="flex-1 flex items-center justify-between text-[11px] font-bold text-fg-secondary hover:text-fg cursor-pointer"
+          >
+            <span className="flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[14px] text-amber-500">event_note</span>
+              <span>Preenchimento de Eventos em Lote</span>
+            </span>
+            <span className="material-symbols-outlined text-[15px]">{showReplacer ? 'expand_less' : 'expand_more'}</span>
+          </button>
+          <StudioHelpTooltip helpKey="text.batchFill" />
+        </div>
 
         {showReplacer && (
           <div className="mt-2 p-2 rounded-xl bg-white/5 space-y-2 text-xs border border-white/10">

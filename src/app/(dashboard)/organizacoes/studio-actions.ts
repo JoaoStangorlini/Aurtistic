@@ -438,6 +438,137 @@ function stripVaultAccents(str: string): string {
     .toLowerCase();
 }
 
+function splitVaultSegments(rel: string): string[] {
+  return String(rel || '')
+    .replace(/\\/g, '/')
+    .split('/')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function escapeVaultLikePattern(val: string): string {
+  return String(val || '').replace(/[\\%_]/g, (m) => `\\${m}`);
+}
+
+function buildVaultBreadcrumbs(rootLabel: string, cleanFolder: string): { name: string; path: string }[] {
+  const segs = splitVaultSegments(cleanFolder);
+  return [
+    { name: rootLabel, path: '' },
+    ...segs.map((seg, i, arr) => ({
+      name: seg,
+      path: arr.slice(0, i + 1).join('/'),
+    })),
+  ];
+}
+
+interface ResolvedStudioShortcutMeta {
+  scRel: string;
+  name: string;
+  ownerUserId: string;
+  targetRelPath: string;
+  targetOrgSlug?: string;
+  targetOrgId?: string;
+  shortcutOwner: string;
+  shortcutType: string;
+}
+
+function matchShortcutBySegments(
+  cleanPath: string,
+  shortcuts: ResolvedStudioShortcutMeta[]
+): { shortcut: ResolvedStudioShortcutMeta; subRel: string } | null {
+  const pathSegs = splitVaultSegments(cleanPath);
+  if (pathSegs.length === 0 || shortcuts.length === 0) return null;
+  const normPathSegs = pathSegs.map(stripVaultAccents);
+
+  const sorted = [...shortcuts].sort(
+    (a, b) => splitVaultSegments(b.scRel).length - splitVaultSegments(a.scRel).length
+  );
+
+  for (const sc of sorted) {
+    const scSegs = splitVaultSegments(sc.scRel).map(stripVaultAccents);
+    if (scSegs.length === 0 || pathSegs.length < scSegs.length) continue;
+    let matched = true;
+    for (let i = 0; i < scSegs.length; i++) {
+      if (normPathSegs[i] !== scSegs[i]) {
+        matched = false;
+        break;
+      }
+    }
+    if (matched) {
+      return {
+        shortcut: sc,
+        subRel: pathSegs.slice(scSegs.length).join('/'),
+      };
+    }
+  }
+  return null;
+}
+
+async function loadOrgShortcutsForStudio(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgId?: string
+): Promise<ResolvedStudioShortcutMeta[]> {
+  if (!orgId) return [];
+  const list: ResolvedStudioShortcutMeta[] = [];
+  try {
+    const { data: shortcutRows } = await supabase
+      .from('user_files_index')
+      .select('user_id, relative_path, filename, exif_data')
+      .eq('organization_id', orgId)
+      .or('mime_type.eq."inode/directory+shortcut",exif_data->>isShortcut.eq.true')
+      .limit(60);
+
+    for (const sc of shortcutRows || []) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const exif = ((sc as any).exif_data || {}) as Record<string, unknown>;
+      const targetRel = splitVaultSegments(String(exif.shortcutTarget || '')).join('/');
+      const ownerUserId = String(exif.ownerUserId || exif.targetUserId || sc.user_id || '');
+      const targetOrgSlug = normalizeVaultSlug(
+        typeof exif.targetOrgSlug === 'string' ? exif.targetOrgSlug : undefined
+      );
+      const targetOrgId = typeof exif.targetOrgId === 'string' && exif.targetOrgId ? exif.targetOrgId : undefined;
+      const scName = String(sc.filename || splitVaultSegments(String(sc.relative_path || '')).pop() || 'Atalho');
+      const scRel = splitVaultSegments(String(sc.relative_path || scName)).join('/');
+
+      if (scRel && ((targetOrgSlug || targetOrgId) || (ownerUserId && targetRel))) {
+        list.push({
+          scRel,
+          name: scName,
+          ownerUserId,
+          targetRelPath: targetRel,
+          targetOrgSlug,
+          targetOrgId,
+          shortcutOwner: String(exif.shortcutOwner || 'Membro'),
+          shortcutType: String(exif.shortcutType || (targetOrgSlug || targetOrgId ? 'org_folder' : 'personal_folder')),
+        });
+      }
+    }
+  } catch {}
+  return list;
+}
+
+async function resolveOwnerStorageRole(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  ownerUserId: string,
+  cache?: Map<string, 'admin' | 'member'>
+): Promise<'admin' | 'member'> {
+  if (!ownerUserId) return 'member';
+  const cached = cache?.get(ownerUserId);
+  if (cached) return cached;
+  try {
+    const { data } = await supabase
+      .from('user_storage_profiles')
+      .select('storage_role')
+      .eq('user_id', ownerUserId)
+      .maybeSingle();
+    const role: 'admin' | 'member' = data?.storage_role === 'admin' ? 'admin' : 'member';
+    cache?.set(ownerUserId, role);
+    return role;
+  } catch {
+    return 'member';
+  }
+}
+
 export async function listVaultFolderAction(input: {
   folder: string;
   scopeType: 'org' | 'user';
@@ -450,13 +581,16 @@ export async function listVaultFolderAction(input: {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const rootLabel = input.scopeType === 'org' ? 'Cofre da Organização' : 'Cofre Pessoal';
+  const cleanFolder = splitVaultSegments(String(input.folder || '')).join('/');
+  const fallbackBreadcrumbs = buildVaultBreadcrumbs(rootLabel, cleanFolder);
+
   if (!user) {
-    return { ok: false, folders: [], files: [], breadcrumbs: [], error: 'Não autenticado.' };
+    return { ok: false, folders: [], files: [], breadcrumbs: fallbackBreadcrumbs, error: 'Não autenticado.' };
   }
 
   try {
     const edgeBase = resolveClientEdgeServerUrl();
-    const cleanFolder = String(input.folder || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
     let resolvedOrgSlug = input.scopeType === 'org' ? normalizeVaultSlug(input.orgSlug) : undefined;
     let resolvedOrgId = input.scopeType === 'org' ? input.organizationId : undefined;
 
@@ -485,7 +619,7 @@ export async function listVaultFolderAction(input: {
             ok: false,
             folders: [],
             files: [],
-            breadcrumbs: [],
+            breadcrumbs: fallbackBreadcrumbs,
             error: 'Acesso negado ao cofre desta organização.',
           };
         }
@@ -493,134 +627,322 @@ export async function listVaultFolderAction(input: {
     }
 
     // 2. Busca atalhos da organização no Supabase (híbrido: disco + Supabase)
-    interface ResolvedShortcutMeta {
-      scRel: string;
-      name: string;
-      ownerUserId: string;
-      targetRelPath: string;
-      shortcutOwner: string;
-      shortcutType: string;
-    }
-    const supabaseShortcuts: ResolvedShortcutMeta[] = [];
-    if (input.scopeType === 'org' && resolvedOrgId) {
-      try {
-        const { data: shortcutRows } = await supabase
-          .from('user_files_index')
-          .select('user_id, relative_path, filename, exif_data')
-          .eq('organization_id', resolvedOrgId)
-          .eq('mime_type', 'inode/directory+shortcut')
-          .limit(40);
+    const supabaseShortcuts =
+      input.scopeType === 'org' && resolvedOrgId
+        ? await loadOrgShortcutsForStudio(supabase, resolvedOrgId)
+        : [];
 
-        for (const sc of shortcutRows || []) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const exif = ((sc as any).exif_data || {}) as Record<string, unknown>;
-          const targetRel = String(exif.shortcutTarget || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-          const ownerUserId = String(exif.ownerUserId || exif.targetUserId || sc.user_id || '');
-          const scName = String(sc.filename || sc.relative_path?.split('/').pop() || 'Atalho');
-          const scRel = String(sc.relative_path || scName).replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-          if (ownerUserId && targetRel && !exif.targetOrgSlug) {
-            supabaseShortcuts.push({
-              scRel,
-              name: scName,
-              ownerUserId,
-              targetRelPath: targetRel,
-              shortcutOwner: String(exif.shortcutOwner || 'Membro'),
-              shortcutType: String(exif.shortcutType || 'personal_folder'),
-            });
-          }
-        }
-      } catch {}
-    }
-
-    // 3. Verifica se estamos navegando dentro de um atalho (org -> pasta pessoal)
-    const activeShortcut =
+    // 3. Verifica se estamos navegando dentro de um atalho (org -> pessoal ou org -> org)
+    const shortcutMatch =
       input.scopeType === 'org' && cleanFolder
-        ? supabaseShortcuts.find((sc) => {
-            const normFolder = stripVaultAccents(cleanFolder);
-            const normSc = stripVaultAccents(sc.scRel);
-            return normFolder === normSc || normFolder.startsWith(`${normSc}/`);
-          })
-        : undefined;
+        ? matchShortcutBySegments(cleanFolder, supabaseShortcuts)
+        : null;
 
-    if (activeShortcut) {
-      const subRel = cleanFolder.slice(activeShortcut.scRel.length).replace(/^\/+/, '');
-      const targetPhysicalFolder = subRel
-        ? `${activeShortcut.targetRelPath}/${subRel}`
-        : activeShortcut.targetRelPath;
+    if (shortcutMatch) {
+      const { shortcut: activeShortcut, subRel } = shortcutMatch;
+      const isOrgTarget = Boolean(activeShortcut.targetOrgSlug || activeShortcut.targetOrgId);
 
-      const signed = signEdgeTenantTicket({
-        userId: activeShortcut.ownerUserId,
-        scopeType: 'user',
-        role: 'member',
-        purpose: 'share',
-        allowedPrefix: activeShortcut.targetRelPath,
-        allowedPathPrefix: activeShortcut.targetRelPath,
-        readOnly: true,
-        allowDownload: false,
-        ttlMs: 10 * 60 * 1000,
-      });
+      if (isOrgTarget) {
+        let targetOrgId = activeShortcut.targetOrgId;
+        let targetOrgSlug = activeShortcut.targetOrgSlug;
+        if (!targetOrgId && targetOrgSlug) {
+          const { data: tOrg } = await supabase
+            .from('organizations')
+            .select('id, slug')
+            .eq('slug', targetOrgSlug)
+            .maybeSingle();
+          targetOrgId = tOrg?.id;
+          targetOrgSlug = normalizeVaultSlug(tOrg?.slug) || targetOrgSlug;
+        }
+        if (!targetOrgId) {
+          return {
+            ok: false,
+            folders: [],
+            files: [],
+            breadcrumbs: fallbackBreadcrumbs,
+            error: 'Organização de destino do atalho não encontrada.',
+          };
+        }
+        const { data: tMember } = await supabase
+          .from('organization_members')
+          .select('id')
+          .eq('organization_id', targetOrgId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (!tMember) {
+          return {
+            ok: false,
+            folders: [],
+            files: [],
+            breadcrumbs: fallbackBreadcrumbs,
+            error: 'Sem permissão para acessar a organização de destino deste atalho.',
+          };
+        }
 
-      const params = new URLSearchParams({ folder: targetPhysicalFolder, ticket: signed.ticket });
-      const res = await fetch(`${edgeBase}/api/tenant/list?${params.toString()}`, {
-        cache: 'no-store',
-      });
+        const rootPrefix = activeShortcut.targetRelPath;
+        const targetPhysicalFolder = [rootPrefix, subRel].filter(Boolean).join('/');
+        const signed = signEdgeTenantTicket({
+          userId: user.id,
+          scopeType: 'org',
+          orgSlug: targetOrgSlug,
+          organizationId: targetOrgId,
+          role: 'member',
+          purpose: 'share',
+          ...(rootPrefix ? { allowedPrefix: rootPrefix, allowedPathPrefix: rootPrefix } : {}),
+          readOnly: true,
+          allowDownload: false,
+          ttlMs: 10 * 60 * 1000,
+        });
 
-      if (!res.ok) {
+        const params = new URLSearchParams({ folder: targetPhysicalFolder, ticket: signed.ticket });
+        const res = await fetch(`${edgeBase}/api/tenant/list?${params.toString()}`, {
+          cache: 'no-store',
+        });
+
+        if (res.ok) {
+          const json = (await res.json()) as {
+            folders?: (VaultFolderEntry & { relativePath?: string })[];
+            files?: { name: string; path?: string; relativePath?: string; kind?: string; mimeType?: string; sizeBytes?: number }[];
+          };
+          const folders: VaultFolderEntry[] = (json.folders || []).map((f) => ({
+            ...f,
+            path: [activeShortcut.scRel, subRel, f.name].filter(Boolean).join('/'),
+          }));
+          const files: VaultFileEntry[] = (json.files || []).map((f) => {
+            const physicalFilePath = f.path || f.relativePath || [targetPhysicalFolder, f.name].filter(Boolean).join('/');
+            const virtualFilePath = [activeShortcut.scRel, subRel, f.name].filter(Boolean).join('/');
+            const isImg = f.kind === 'image' || /\.(jpe?g|png|webp|avif|gif|bmp|tiff?)$/i.test(f.name);
+            const fileSigned = signEdgeTenantTicket({
+              userId: user.id,
+              scopeType: 'org',
+              orgSlug: targetOrgSlug,
+              organizationId: targetOrgId,
+              role: 'member',
+              purpose: 'share',
+              ...(rootPrefix ? { allowedPrefix: rootPrefix, allowedPathPrefix: rootPrefix } : {}),
+              allowedPaths: [physicalFilePath],
+              readOnly: true,
+              allowDownload: false,
+              ttlMs: 2 * 60 * 60 * 1000,
+            });
+            return {
+              name: f.name,
+              path: virtualFilePath,
+              kind: isImg ? 'image' : (f.kind || 'file'),
+              mimeType: f.mimeType,
+              sizeBytes: f.sizeBytes,
+              thumbUrl: isImg ? buildTenantThumbUrl(physicalFilePath, fileSigned.ticket) : null,
+              streamUrl: buildTenantStreamUrl(physicalFilePath, fileSigned.ticket, { download: false }),
+            };
+          });
+          return { ok: true, folders, files, breadcrumbs: fallbackBreadcrumbs };
+        }
         return {
           ok: false,
           folders: [],
           files: [],
-          breadcrumbs: [],
+          breadcrumbs: fallbackBreadcrumbs,
           error: `Servidor retornou ${res.status}`,
         };
       }
 
-      const json = (await res.json()) as {
+      // Atalho Org -> Pasta Pessoal do Membro (suporta ponte Portfolio/ e fallback seguro)
+      const ownerRole = await resolveOwnerStorageRole(supabase, activeShortcut.ownerUserId);
+      const baseCandidate = activeShortcut.targetRelPath;
+      const rootPrefixCandidates = [baseCandidate];
+      if (!/^porti?folio(\/|$)/i.test(baseCandidate)) {
+        rootPrefixCandidates.push(`Portfolio/${baseCandidate}`);
+      }
+
+      interface EdgeListResponse {
         folders?: (VaultFolderEntry & { relativePath?: string })[];
         files?: { name: string; path?: string; relativePath?: string; kind?: string; mimeType?: string; sizeBytes?: number }[];
-      };
+      }
+      let resolvedRootPrefix = baseCandidate;
+      let resolvedPhysicalFolder = [baseCandidate, subRel].filter(Boolean).join('/');
+      let edgeJson: EdgeListResponse | null = null;
+      let lastStatus = 404;
 
-      const folders: VaultFolderEntry[] = (json.folders || []).map((f) => ({
-        ...f,
-        path: [activeShortcut.scRel, subRel, f.name].filter(Boolean).join('/'),
-      }));
-
-      const files: VaultFileEntry[] = (json.files || []).map((f) => {
-        const physicalFilePath = f.path || f.relativePath || [targetPhysicalFolder, f.name].filter(Boolean).join('/');
-        const virtualFilePath = [activeShortcut.scRel, subRel, f.name].filter(Boolean).join('/');
-        const isImg = f.kind === 'image' || /\.(jpe?g|png|webp|avif|gif|bmp|tiff?)$/i.test(f.name);
-        const fileSigned = signEdgeTenantTicket({
+      for (const rootCandidate of rootPrefixCandidates) {
+        const physicalCandidate = [rootCandidate, subRel].filter(Boolean).join('/');
+        const signed = signEdgeTenantTicket({
           userId: activeShortcut.ownerUserId,
           scopeType: 'user',
-          role: 'member',
+          role: ownerRole,
           purpose: 'share',
-          allowedPrefix: activeShortcut.targetRelPath,
-          allowedPathPrefix: activeShortcut.targetRelPath,
-          allowedPaths: [physicalFilePath],
+          allowedPrefix: rootCandidate,
+          allowedPathPrefix: rootCandidate,
           readOnly: true,
           allowDownload: false,
-          ttlMs: 2 * 60 * 60 * 1000,
+          ttlMs: 10 * 60 * 1000,
         });
-        return {
-          name: f.name,
-          path: virtualFilePath,
-          kind: isImg ? 'image' : (f.kind || 'file'),
-          mimeType: f.mimeType,
-          sizeBytes: f.sizeBytes,
-          thumbUrl: isImg ? buildTenantThumbUrl(physicalFilePath, fileSigned.ticket) : null,
-          streamUrl: buildTenantStreamUrl(physicalFilePath, fileSigned.ticket, { download: false }),
-        };
-      });
+        const params = new URLSearchParams({ folder: physicalCandidate, ticket: signed.ticket });
+        const res = await fetch(`${edgeBase}/api/tenant/list?${params.toString()}`, {
+          cache: 'no-store',
+        });
+        lastStatus = res.status;
+        if (res.ok) {
+          edgeJson = (await res.json()) as EdgeListResponse;
+          resolvedRootPrefix = rootCandidate;
+          resolvedPhysicalFolder = physicalCandidate;
+          break;
+        }
+        if (res.status !== 404) {
+          return {
+            ok: false,
+            folders: [],
+            files: [],
+            breadcrumbs: fallbackBreadcrumbs,
+            error: `Servidor retornou ${res.status}`,
+          };
+        }
+      }
 
-      const breadcrumbs = [
-        { name: 'Cofre da Organização', path: '' },
-        ...cleanFolder.split('/').map((seg, i, arr) => ({
-          name: seg,
-          path: arr.slice(0, i + 1).join('/'),
-        })),
-      ];
+      if (edgeJson) {
+        const folders: VaultFolderEntry[] = (edgeJson.folders || []).map((f) => ({
+          ...f,
+          path: [activeShortcut.scRel, subRel, f.name].filter(Boolean).join('/'),
+        }));
 
-      return { ok: true, folders, files, breadcrumbs };
+        const files: VaultFileEntry[] = (edgeJson.files || []).map((f) => {
+          const physicalFilePath = f.path || f.relativePath || [resolvedPhysicalFolder, f.name].filter(Boolean).join('/');
+          const virtualFilePath = [activeShortcut.scRel, subRel, f.name].filter(Boolean).join('/');
+          const isImg = f.kind === 'image' || /\.(jpe?g|png|webp|avif|gif|bmp|tiff?)$/i.test(f.name);
+          const fileSigned = signEdgeTenantTicket({
+            userId: activeShortcut.ownerUserId,
+            scopeType: 'user',
+            role: ownerRole,
+            purpose: 'share',
+            allowedPrefix: resolvedRootPrefix,
+            allowedPathPrefix: resolvedRootPrefix,
+            allowedPaths: [physicalFilePath],
+            readOnly: true,
+            allowDownload: false,
+            ttlMs: 2 * 60 * 60 * 1000,
+          });
+          return {
+            name: f.name,
+            path: virtualFilePath,
+            kind: isImg ? 'image' : (f.kind || 'file'),
+            mimeType: f.mimeType,
+            sizeBytes: f.sizeBytes,
+            thumbUrl: isImg ? buildTenantThumbUrl(physicalFilePath, fileSigned.ticket) : null,
+            streamUrl: buildTenantStreamUrl(physicalFilePath, fileSigned.ticket, { download: false }),
+          };
+        });
+
+        return { ok: true, folders, files, breadcrumbs: fallbackBreadcrumbs };
+      }
+
+      // Rede de segurança (404 no Edge): consulta estritamente dentro do prefixo alvo em user_files_index
+      if (lastStatus === 404) {
+        const prefixFilters = rootPrefixCandidates.map(
+          (p) => `relative_path.ilike.${escapeVaultLikePattern(p)}/%`
+        );
+        const { data: idxRows } = await supabase
+          .from('user_files_index')
+          .select('relative_path, filename, mime_type, size_bytes, is_directory')
+          .eq('user_id', activeShortcut.ownerUserId)
+          .is('organization_id', null)
+          .or(prefixFilters.join(','))
+          .limit(400);
+
+        if (idxRows && idxRows.length > 0) {
+          const subSegs = splitVaultSegments(subRel).map(stripVaultAccents);
+          const rootNormVariants = rootPrefixCandidates.map((p) => splitVaultSegments(p).map(stripVaultAccents));
+          const folderSet = new Map<string, VaultFolderEntry>();
+          const fileList: VaultFileEntry[] = [];
+
+          for (const row of idxRows) {
+            const rawRel = splitVaultSegments(String(row.relative_path || '')).join('/');
+            const relSegs = splitVaultSegments(rawRel);
+            const normSegs = relSegs.map(stripVaultAccents);
+
+            // Validação estrita em memória: o caminho precisa começar exatamente com um dos prefixos permitidos
+            const matchedRootIdx = rootNormVariants.findIndex(
+              (rSegs) =>
+                normSegs.length > rSegs.length &&
+                rSegs.every((s, idx) => normSegs[idx] === s)
+            );
+            if (matchedRootIdx < 0) continue;
+
+            const matchedRootPrefix = rootPrefixCandidates[matchedRootIdx];
+            const matchedRootSegLen = rootNormVariants[matchedRootIdx].length;
+            const afterRootSegs = relSegs.slice(matchedRootSegLen);
+            const afterRootNorm = normSegs.slice(matchedRootSegLen);
+
+            if (
+              afterRootNorm.length <= subSegs.length ||
+              !subSegs.every((s, idx) => afterRootNorm[idx] === s)
+            ) {
+              continue;
+            }
+
+            const remainderSegs = afterRootSegs.slice(subSegs.length);
+            if (remainderSegs.length === 0) continue;
+
+            if (remainderSegs.length > 1 || row.is_directory) {
+              const childFolderName = remainderSegs[0];
+              const folderKey = stripVaultAccents(childFolderName);
+              if (!folderSet.has(folderKey)) {
+                folderSet.set(folderKey, {
+                  name: childFolderName,
+                  path: [activeShortcut.scRel, subRel, childFolderName].filter(Boolean).join('/'),
+                });
+              }
+              continue;
+            }
+
+            const fname = row.filename || remainderSegs[0];
+            const isImg =
+              String(row.mime_type || '').startsWith('image/') ||
+              /\.(jpe?g|png|webp|avif|gif|bmp|tiff?)$/i.test(fname);
+            const virtualFilePath = [activeShortcut.scRel, subRel, fname].filter(Boolean).join('/');
+            const dedupKey = stripVaultAccents(virtualFilePath);
+            if (fileList.some((existing) => stripVaultAccents(existing.path) === dedupKey)) {
+              continue;
+            }
+            const fileSigned = signEdgeTenantTicket({
+              userId: activeShortcut.ownerUserId,
+              scopeType: 'user',
+              role: ownerRole,
+              purpose: 'share',
+              allowedPrefix: matchedRootPrefix,
+              allowedPathPrefix: matchedRootPrefix,
+              allowedPaths: [rawRel],
+              readOnly: true,
+              allowDownload: false,
+              ttlMs: 2 * 60 * 60 * 1000,
+            });
+            fileList.push({
+              name: fname,
+              path: virtualFilePath,
+              kind: isImg ? 'image' : 'file',
+              mimeType: row.mime_type || undefined,
+              sizeBytes: row.size_bytes || undefined,
+              thumbUrl: isImg ? buildTenantThumbUrl(rawRel, fileSigned.ticket) : null,
+              streamUrl: buildTenantStreamUrl(rawRel, fileSigned.ticket, { download: false }),
+            });
+          }
+
+          if (folderSet.size > 0 || fileList.length > 0) {
+            return {
+              ok: true,
+              folders: Array.from(folderSet.values()),
+              files: fileList,
+              breadcrumbs: fallbackBreadcrumbs,
+            };
+          }
+        }
+      }
+
+      return {
+        ok: false,
+        folders: [],
+        files: [],
+        breadcrumbs: fallbackBreadcrumbs,
+        error: `Servidor retornou ${lastStatus}`,
+      };
     }
 
     // 4. Listagem padrão (Org raiz/subpasta ou Cofre Pessoal)
@@ -646,7 +968,7 @@ export async function listVaultFolderAction(input: {
         ok: false,
         folders: [],
         files: [],
-        breadcrumbs: [],
+        breadcrumbs: fallbackBreadcrumbs,
         error: `Servidor retornou ${res.status}`,
       };
     }
@@ -666,7 +988,8 @@ export async function listVaultFolderAction(input: {
     if (input.scopeType === 'org' && supabaseShortcuts.length > 0) {
       const existingNames = new Set(folders.map((f) => stripVaultAccents(f.name)));
       for (const sc of supabaseShortcuts) {
-        const scParent = sc.scRel.includes('/') ? sc.scRel.slice(0, sc.scRel.lastIndexOf('/')) : '';
+        const scSegs = splitVaultSegments(sc.scRel);
+        const scParent = scSegs.slice(0, -1).join('/');
         if (stripVaultAccents(scParent) === stripVaultAccents(cleanFolder) && !existingNames.has(stripVaultAccents(sc.name))) {
           folders.push({
             name: sc.name,
@@ -707,18 +1030,9 @@ export async function listVaultFolderAction(input: {
       };
     });
 
-    const rootLabel = input.scopeType === 'org' ? 'Cofre da Organização' : 'Cofre Pessoal';
     const rawBreadcrumbs = json.breadcrumbs && json.breadcrumbs.length > 0
       ? json.breadcrumbs.map((b, idx) => (idx === 0 ? { ...b, name: rootLabel } : b))
-      : [
-          { name: rootLabel, path: '' },
-          ...(cleanFolder
-            ? cleanFolder.split('/').map((seg, i, arr) => ({
-                name: seg,
-                path: arr.slice(0, i + 1).join('/'),
-              }))
-            : []),
-        ];
+      : fallbackBreadcrumbs;
 
     return {
       ok: true,
@@ -731,7 +1045,7 @@ export async function listVaultFolderAction(input: {
       ok: false,
       folders: [],
       files: [],
-      breadcrumbs: [],
+      breadcrumbs: fallbackBreadcrumbs,
       error: err instanceof Error ? err.message : 'Erro ao listar pasta.',
     };
   }
@@ -764,6 +1078,23 @@ export async function rehydrateStudioDraftAction(
     }
 
     const verifiedOrgIds = new Set<string>();
+    const orgIdBySlugCache = new Map<string, string>();
+    const ownerRoleCache = new Map<string, 'admin' | 'member'>();
+    const shortcutsByOrgCache = new Map<string, ResolvedStudioShortcutMeta[]>();
+
+    const resolveOrgIdBySlug = async (slug?: string): Promise<string | undefined> => {
+      const norm = normalizeVaultSlug(slug);
+      if (!norm) return undefined;
+      if (orgIdBySlugCache.has(norm)) return orgIdBySlugCache.get(norm);
+      const { data: orgRow } = await supabase
+        .from('organizations')
+        .select('id')
+        .eq('slug', norm)
+        .maybeSingle();
+      if (orgRow?.id) orgIdBySlugCache.set(norm, orgRow.id);
+      return orgRow?.id;
+    };
+
     const checkOrgMembership = async (orgIdToCheck?: string): Promise<boolean> => {
       if (!orgIdToCheck) return false;
       if (verifiedOrgIds.has(orgIdToCheck)) return true;
@@ -780,30 +1111,14 @@ export async function rehydrateStudioDraftAction(
       return false;
     };
 
-    const hasMainOrgAccess = resolvedOrgId ? await checkOrgMembership(resolvedOrgId) : false;
-
-    // Pré-carrega atalhos da org caso alguma camada referencie um caminho virtual de atalho
-    const scMap: { scRel: string; ownerUserId: string; targetRelPath: string }[] = [];
-    if (resolvedOrgId && hasMainOrgAccess) {
-      try {
-        const { data: scRows } = await supabase
-          .from('user_files_index')
-          .select('user_id, relative_path, filename, exif_data')
-          .eq('organization_id', resolvedOrgId)
-          .eq('mime_type', 'inode/directory+shortcut')
-          .limit(40);
-        for (const sc of scRows || []) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const exif = ((sc as any).exif_data || {}) as Record<string, unknown>;
-          const targetRelPath = String(exif.shortcutTarget || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-          const ownerUserId = String(exif.ownerUserId || exif.targetUserId || sc.user_id || '');
-          const scRel = String(sc.relative_path || sc.filename || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-          if (ownerUserId && targetRelPath && scRel && !exif.targetOrgSlug) {
-            scMap.push({ scRel, ownerUserId, targetRelPath });
-          }
-        }
-      } catch {}
-    }
+    const getShortcutsForOrg = async (orgIdToLoad?: string): Promise<ResolvedStudioShortcutMeta[]> => {
+      if (!orgIdToLoad) return [];
+      const cached = shortcutsByOrgCache.get(orgIdToLoad);
+      if (cached) return cached;
+      const loaded = await loadOrgShortcutsForStudio(supabase, orgIdToLoad);
+      shortcutsByOrgCache.set(orgIdToLoad, loaded);
+      return loaded;
+    };
 
     const rehydratedSlides = await Promise.all(draft.slides.map(async (slide) => ({
       ...slide,
@@ -824,33 +1139,73 @@ export async function rehydrateStudioDraftAction(
           let targetOrgId = ref?.organizationId || resolvedOrgId;
           if (scopeType === 'org') {
             if (!targetOrgId && targetOrgSlug) {
-              const { data: orgRow } = await supabase
-                .from('organizations')
-                .select('id')
-                .eq('slug', targetOrgSlug)
-                .maybeSingle();
-              targetOrgId = orgRow?.id;
+              targetOrgId = await resolveOrgIdBySlug(targetOrgSlug);
             }
             if (!(await checkOrgMembership(targetOrgId))) {
               return img;
             }
           }
 
-          const matchedSc =
-            scopeType === 'org'
-              ? scMap.find((sc) => stripVaultAccents(relPath).startsWith(`${stripVaultAccents(sc.scRel)}/`))
-              : undefined;
+          const orgShortcuts = scopeType === 'org' ? await getShortcutsForOrg(targetOrgId) : [];
+          const scMatch = scopeType === 'org' ? matchShortcutBySegments(relPath, orgShortcuts) : null;
 
-          if (matchedSc) {
-            const subRel = relPath.slice(matchedSc.scRel.length).replace(/^\/+/, '');
-            const physicalPath = subRel ? `${matchedSc.targetRelPath}/${subRel}` : matchedSc.targetRelPath;
+          if (scMatch) {
+            const { shortcut: matchedSc, subRel } = scMatch;
+            const isOrgTarget = Boolean(matchedSc.targetOrgSlug || matchedSc.targetOrgId);
+
+            if (isOrgTarget) {
+              const destOrgSlug = matchedSc.targetOrgSlug;
+              const destOrgId = matchedSc.targetOrgId || (await resolveOrgIdBySlug(destOrgSlug));
+              if (!(await checkOrgMembership(destOrgId))) {
+                return img;
+              }
+              const rootPrefix = matchedSc.targetRelPath;
+              const physicalPath = [rootPrefix, subRel].filter(Boolean).join('/');
+              const signed = signEdgeTenantTicket({
+                userId,
+                scopeType: 'org',
+                orgSlug: destOrgSlug,
+                organizationId: destOrgId,
+                role: 'member',
+                purpose: 'share',
+                ...(rootPrefix ? { allowedPrefix: rootPrefix, allowedPathPrefix: rootPrefix } : {}),
+                allowedPaths: [physicalPath],
+                readOnly: true,
+                allowDownload: true,
+                ttlMs: 24 * 60 * 60 * 1000,
+              });
+              const streamUrl = buildTenantStreamUrl(physicalPath, signed.ticket);
+              return { ...img, resolvedUrl: streamUrl, src: streamUrl };
+            }
+
+            const ownerRole = await resolveOwnerStorageRole(supabase, matchedSc.ownerUserId, ownerRoleCache);
+            const baseCandidate = matchedSc.targetRelPath;
+            let resolvedPrefix = baseCandidate;
+            let physicalPath = [baseCandidate, subRel].filter(Boolean).join('/');
+
+            // Verifica se o arquivo no índice do dono está sob Portfolio/<targetRelPath>
+            if (!/^porti?folio(\/|$)/i.test(baseCandidate) && subRel) {
+              const portCandidate = `Portfolio/${physicalPath}`;
+              const { data: portRow } = await supabase
+                .from('user_files_index')
+                .select('relative_path')
+                .eq('user_id', matchedSc.ownerUserId)
+                .is('organization_id', null)
+                .eq('relative_path', portCandidate)
+                .maybeSingle();
+              if (portRow?.relative_path) {
+                resolvedPrefix = `Portfolio/${baseCandidate}`;
+                physicalPath = portCandidate;
+              }
+            }
+
             const signed = signEdgeTenantTicket({
               userId: matchedSc.ownerUserId,
               scopeType: 'user',
-              role: 'member',
+              role: ownerRole,
               purpose: 'share',
-              allowedPrefix: matchedSc.targetRelPath,
-              allowedPathPrefix: matchedSc.targetRelPath,
+              allowedPrefix: resolvedPrefix,
+              allowedPathPrefix: resolvedPrefix,
               allowedPaths: [physicalPath],
               readOnly: true,
               allowDownload: true,

@@ -2,6 +2,8 @@
 'use client';
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { StudioLiveSlider } from './StudioLiveSlider';
+import { useOptionalStudio } from './StudioContext';
 
 export interface StudioProColorPickerProps {
   color: string;
@@ -77,6 +79,7 @@ export function StudioProColorPicker({
 }: StudioProColorPickerProps) {
   const [rgb, setRgb] = useState<[number, number, number]>(() => hexToRgb(color));
   const [hexInput, setHexInput] = useState(color.toUpperCase());
+  const optionalStudio = useOptionalStudio();
   const [hsv, setHsv] = useState<[number, number, number]>(() => rgbToHsv(...hexToRgb(color)));
   const wheelCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isPickingWheel, setIsPickingWheel] = useState(false);
@@ -210,7 +213,8 @@ export function StudioProColorPicker({
           handleHexSubmit(result.sRGBHex);
         }
         return;
-      } catch {
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         // Usuário cancelou ou navegador bloqueou, segue para fallback
       }
     }
@@ -235,7 +239,11 @@ export function StudioProColorPicker({
         canvas.removeEventListener('click', onPick);
       };
       canvas.addEventListener('click', onPick, { once: true });
+      return;
     }
+
+    // 3. Fallback universal via palco principal do Studio
+    optionalStudio?.startEyedropper((pickedHex) => handleHexSubmit(pickedHex));
   };
 
   return (
@@ -273,20 +281,17 @@ export function StudioProColorPicker({
       </div>
 
       {/* Slider de Luminância / Brilho V do HSV */}
-      <div className="space-y-1">
-        <div className="flex justify-between text-[10px] text-fg-muted font-bold">
-          <span>Luminosidade</span>
-          <span>{Math.round(hsv[2] * 100)}%</span>
-        </div>
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={Math.round(hsv[2] * 100)}
-          onChange={(e) => handleBrightnessChange(Number(e.target.value))}
-          className="w-full accent-amber-500 cursor-pointer h-1.5 bg-surface-hover rounded-lg"
-        />
-      </div>
+      <StudioLiveSlider
+        id="color-picker-v"
+        label="Luminosidade"
+        value={Math.round(hsv[2] * 100)}
+        min={0}
+        max={100}
+        defaultValue={100}
+        unit="%"
+        transparentScrub={false}
+        onChange={(val) => handleBrightnessChange(val)}
+      />
 
       {/* Input HEX + Conta-gotas + Swatch Ativo */}
       <div className="flex items-center gap-2">

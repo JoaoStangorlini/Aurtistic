@@ -53,7 +53,7 @@ export const ORG_BRAND_PRESETS: Record<OrgBrandSlug, OrgBrandTokens> = {
     titleShadowCss: '0 0 10px rgba(0, 212, 255, 0.8), 0 0 25px rgba(255, 30, 86, 0.5), 0 0 45px rgba(0, 102, 255, 0.4)',
     borderStyleCss: '1.5px solid rgba(0, 212, 255, 0.5)',
     tricolorTitlePreset: true,
-    defaultPostTitle: '[r:SHOW] [b:DA] [g:FÍSICA]',
+    defaultPostTitle: '[r:SHOW] [b:DE] [g:FÍSICA]',
     defaultPostBody:
       'Você sabia que *Marie Curie* foi a primeira pessoa a ganhar *dois Prêmios Nobel* em campos diferentes?',
   },

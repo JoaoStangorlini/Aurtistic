@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   listVaultFolderAction,
   type VaultFolderEntry,
@@ -9,6 +10,15 @@ import {
 } from '@/app/(dashboard)/organizacoes/studio-actions';
 
 import type { StudioVaultRef } from './types';
+import {
+  DEFAULT_VAULT_SORT,
+  loadVaultSortPreference,
+  saveVaultSortPreference,
+  sortVaultFolders,
+  sortVaultFiles,
+  type VaultSortPreference,
+} from '@/lib/vault-sorting';
+import { VaultSortControl } from '@/components/servidor/VaultSortControl';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos
@@ -57,7 +67,17 @@ function FolderBrowser({
   const [breadcrumbs, setBreadcrumbs] = useState<{ name: string; path: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sortPref, setSortPref] = useState<VaultSortPreference>(DEFAULT_VAULT_SORT);
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    setSortPref(loadVaultSortPreference());
+  }, []);
+
+  const handleSortChange = (next: VaultSortPreference) => {
+    setSortPref(next);
+    saveVaultSortPreference(next);
+  };
 
   const loadFolder = useCallback(
     async (path: string) => {
@@ -75,7 +95,21 @@ function FolderBrowser({
           setError(res.error || 'Erro ao listar pasta.');
           setFolders([]);
           setFiles([]);
-          setBreadcrumbs([]);
+          if (res.breadcrumbs && res.breadcrumbs.length > 0) {
+            setBreadcrumbs(res.breadcrumbs);
+          } else {
+            const rootLabel = scopeType === 'org' ? (orgDisplayName || 'Cofre da Organização') : 'Cofre Pessoal';
+            const clean = path.replace(/^\/+|\/+$/g, '');
+            setBreadcrumbs([
+              { name: rootLabel, path: '' },
+              ...(clean
+                ? clean.split('/').map((seg, i, arr) => ({
+                  name: seg,
+                  path: arr.slice(0, i + 1).join('/'),
+                }))
+                : []),
+            ]);
+          }
         } else {
           setFolders(res.folders);
           setFiles(res.files);
@@ -98,65 +132,106 @@ function FolderBrowser({
     };
   }, [loadFolder]);
 
-  const imageFiles = files.filter(
-    (f) =>
-      f.kind === 'image' ||
-      /\.(jpe?g|png|webp|avif|gif|bmp|tiff?)$/i.test(f.name)
+  const sortedFolders = sortVaultFolders(folders, sortPref);
+  const imageFiles = sortVaultFiles(
+    files.filter(
+      (f) =>
+        f.kind === 'image' ||
+        /\.(jpe?g|png|webp|avif|gif|bmp|tiff?)$/i.test(f.name)
+    ),
+    sortPref
   );
 
   return (
-    <div className="flex flex-col gap-3 h-full">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-1 flex-wrap min-h-[24px]">
-        {breadcrumbs.map((bc, i) => (
-          <React.Fragment key={bc.path}>
-            {i > 0 && (
-              <span className="material-symbols-outlined text-[13px] text-slate-500">
-                chevron_right
-              </span>
-            )}
+    <div
+      className="flex flex-col gap-3 flex-1 min-h-0 h-full overflow-hidden"
+      style={{ flex: '1 1 0%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+    >
+      {/* Breadcrumb + Voltar + Ordenação (sempre visíveis no topo) */}
+      <div className="flex items-center justify-between gap-2 min-h-[28px] shrink-0">
+        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+          {currentPath && (
             <button
               type="button"
-              onClick={() => loadFolder(bc.path)}
-              className={`text-[11px] font-bold truncate max-w-[140px] transition-colors cursor-pointer ${
-                i === breadcrumbs.length - 1
+              onClick={() => {
+                const parent = currentPath.includes('/')
+                  ? currentPath.slice(0, currentPath.lastIndexOf('/'))
+                  : '';
+                loadFolder(parent);
+              }}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-hover border border-border-subtle text-[11px] font-bold text-fg hover:border-[#FFCC00] cursor-pointer shrink-0 mr-1"
+              title="Voltar para a pasta anterior"
+            >
+              <span className="material-symbols-outlined text-[14px]">arrow_back</span>
+              <span>Voltar</span>
+            </button>
+          )}
+          {breadcrumbs.map((bc, i) => (
+            <React.Fragment key={bc.path}>
+              {i > 0 && (
+                <span className="material-symbols-outlined text-[13px] text-slate-500">
+                  chevron_right
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => loadFolder(bc.path)}
+                className={`text-[11px] font-bold truncate max-w-[140px] transition-colors cursor-pointer ${i === breadcrumbs.length - 1
                   ? 'text-[#FFCC00]'
                   : 'text-slate-400 hover:text-white'
-              }`}
-              title={bc.name}
-            >
-              {bc.name || (scopeType === 'org' ? (orgDisplayName || 'Org') : 'Pessoal')}
-            </button>
-          </React.Fragment>
-        ))}
-        {loading && (
-          <span className="material-symbols-outlined text-[13px] text-slate-400 animate-spin ml-1">
-            progress_activity
-          </span>
-        )}
+                  }`}
+                title={bc.name}
+              >
+                {bc.name || (scopeType === 'org' ? (orgDisplayName || 'Org') : 'Pessoal')}
+              </button>
+            </React.Fragment>
+          ))}
+          {loading && (
+            <span className="material-symbols-outlined text-[13px] text-slate-400 animate-spin ml-1">
+              progress_activity
+            </span>
+          )}
+        </div>
+        <VaultSortControl value={sortPref} onChange={handleSortChange} compact />
       </div>
 
       {error && (
-        <div className="text-xs text-red-700 dark:text-red-300 bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
-          <span>{error}</span>
-          <button
-            type="button"
-            onClick={() => loadFolder(currentPath)}
-            className="px-2.5 py-1 rounded-lg bg-red-500/15 hover:bg-red-500/25 font-bold text-[11px] shrink-0 cursor-pointer"
-          >
-            Tentar novamente
-          </button>
+        <div className="text-xs text-red-700 dark:text-red-300 bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+          <span className="min-w-0 flex-1">{error}</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {currentPath && (
+              <button
+                type="button"
+                onClick={() => {
+                  const parent = currentPath.includes('/')
+                    ? currentPath.slice(0, currentPath.lastIndexOf('/'))
+                    : '';
+                  loadFolder(parent);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-surface hover:bg-surface-hover border border-border-subtle text-fg font-bold text-[11px] cursor-pointer"
+              >
+                Voltar
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => loadFolder(currentPath)}
+              className="px-2.5 py-1 rounded-lg bg-red-500/15 hover:bg-red-500/25 font-bold text-[11px] cursor-pointer"
+            >
+              Tentar novamente
+            </button>
+          </div>
         </div>
       )}
 
       {/* Pastas */}
       {folders.length > 0 && (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1.5 shrink-0">
           <span className="text-[10px] font-bold uppercase tracking-widest text-fg-muted">
-            Pastas
+            Pastas ({folders.length})
           </span>
-          <div className="grid grid-cols-2 gap-1.5">
-            {folders.map((f) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-[160px] overflow-y-auto pr-1 scrollbar-thin">
+            {sortedFolders.map((f) => (
               <button
                 key={f.path}
                 type="button"
@@ -188,65 +263,87 @@ function FolderBrowser({
         </div>
       )}
 
-      {/* Arquivos de imagem (com proporções reais) */}
+      {/* Arquivos de imagem */}
       {!loading && (
-        <div className="flex flex-col gap-1 flex-1 overflow-hidden">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-fg-muted">
-            Imagens ({imageFiles.length})
-          </span>
+        <div
+          className="flex flex-col gap-2 flex-1 min-h-0 overflow-hidden"
+          style={{ flex: '1 1 0%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        >
+          <div className="flex items-center justify-between shrink-0">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-fg-muted">
+              Imagens ({imageFiles.length})
+            </span>
+          </div>
           {imageFiles.length === 0 && folders.length === 0 && !error && (
-            <div className="flex flex-col items-center justify-center h-36 text-xs text-fg-muted gap-2 bg-surface-hover/30 rounded-2xl border border-dashed border-border-subtle p-4">
-              <span className="material-symbols-outlined text-[32px] text-fg-muted/60">
+            <div className="flex flex-col items-center justify-center flex-1 text-xs text-fg-muted gap-2 bg-surface-hover/30 rounded-2xl border border-dashed border-border-subtle p-6">
+              <span className="material-symbols-outlined text-[36px] text-fg-muted/60">
                 image_not_supported
               </span>
               <span>Nenhuma imagem encontrada nesta pasta.</span>
             </div>
           )}
           {imageFiles.length > 0 && (
-            <div className="columns-2 sm:columns-3 gap-2 space-y-2 overflow-y-auto pr-1 max-h-[320px] scrollbar-thin">
-              {imageFiles.map((file) => (
-                <button
-                  key={file.path}
-                  type="button"
-                  onClick={() =>
-                    onSelect({
-                      name: file.name,
-                      relativePath: file.path,
-                      streamUrl: file.streamUrl,
-                      thumbUrl: file.thumbUrl,
-                      vaultRef: {
-                        scopeType,
-                        orgSlug: scopeType === 'org' ? orgSlug : undefined,
-                        organizationId: scopeType === 'org' ? organizationId : undefined,
+            <div
+              className="overflow-y-auto pr-1 flex-1 min-h-0 scrollbar-thin"
+              style={{ flex: '1 1 0%', minHeight: 0, overflowY: 'auto' }}
+            >
+              <div style={{ columnWidth: '175px', columnGap: '12px' }}>
+                {imageFiles.map((file, idx) => (
+                  <button
+                    key={`${file.path}-${idx}`}
+                    type="button"
+                    onClick={() =>
+                      onSelect({
+                        name: file.name,
                         relativePath: file.path,
-                      },
-                    })
-                  }
-                  className="group relative w-full break-inside-avoid rounded-xl overflow-hidden border border-border-subtle hover:border-[#FFCC00] bg-surface/70 text-left transition-all cursor-pointer shadow-xs block"
-                >
-                  {file.thumbUrl ? (
-                    <img
-                      src={file.thumbUrl}
-                      alt={file.name}
-                      crossOrigin="anonymous"
-                      className="w-full h-auto object-contain block max-h-48 bg-black/5 dark:bg-black/30 group-hover:scale-102 transition-transform"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-full h-24 flex items-center justify-center bg-surface-hover">
-                      <span className="material-symbols-outlined text-[24px] text-fg-muted">
-                        image
+                        streamUrl: file.streamUrl,
+                        thumbUrl: file.thumbUrl,
+                        vaultRef: {
+                          scopeType,
+                          orgSlug: scopeType === 'org' ? orgSlug : undefined,
+                          organizationId: scopeType === 'org' ? organizationId : undefined,
+                          relativePath: file.path,
+                        },
+                      })
+                    }
+                    style={{
+                      display: 'inline-block',
+                      width: '100%',
+                      marginBottom: '12px',
+                      breakInside: 'avoid',
+                    }}
+                    className="group relative rounded-2xl overflow-hidden border border-border-subtle hover:border-[#FFCC00] bg-surface/80 text-left transition-all cursor-pointer shadow-sm hover:shadow-md align-top"
+                  >
+                    {file.thumbUrl ? (
+                      <div className="w-full bg-black/25 overflow-hidden">
+                        <img
+                          src={file.thumbUrl}
+                          alt={file.name}
+                          crossOrigin="anonymous"
+                          style={{ width: '100%', height: 'auto', display: 'block' }}
+                          className="group-hover:scale-105 transition-transform duration-200"
+                          loading="lazy"
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className="w-full flex items-center justify-center bg-surface-hover"
+                        style={{ aspectRatio: '4 / 3' }}
+                      >
+                        <span className="material-symbols-outlined text-[28px] text-fg-muted">
+                          image
+                        </span>
+                      </div>
+                    )}
+                    <div className="px-2.5 py-2 bg-surface/95 border-t border-border-subtle flex items-center justify-between gap-1.5">
+                      <p className="text-[11px] font-bold text-fg truncate">{file.name}</p>
+                      <span className="material-symbols-outlined text-[15px] text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        add_circle
                       </span>
                     </div>
-                  )}
-                  <div className="p-1.5 bg-surface/90 border-t border-border-subtle flex items-center justify-between gap-1">
-                    <p className="text-[10px] font-bold text-fg truncate">{file.name}</p>
-                    <span className="material-symbols-outlined text-[13px] text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                      check_circle
-                    </span>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -270,7 +367,19 @@ export function StudioVaultBrowserModal({
 }: StudioVaultBrowserModalProps) {
   const [mode, setMode] = useState<ScopeMode>('org');
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen || typeof document === 'undefined') return null;
 
   const tabs: { id: ScopeMode; label: string; icon: string; disabled?: boolean }[] = [
     {
@@ -283,35 +392,48 @@ export function StudioVaultBrowserModal({
     { id: 'upload', label: 'Upload Local', icon: 'upload_file' },
   ];
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in"
+      className="fixed inset-0 z-[130] flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Selecionar imagem do Cofre"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-surface border border-border-subtle rounded-3xl p-5 w-full max-w-2xl shadow-2xl flex flex-col gap-4 max-h-[88vh] text-fg">
+      <div
+        className="bg-surface border border-border-subtle rounded-3xl p-4 sm:p-6 w-full max-w-5xl shadow-2xl flex flex-col gap-4 text-fg overflow-hidden"
+        style={{ height: '86vh', maxHeight: '86dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border-subtle pb-3 shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[20px] text-amber-500 dark:text-[#FFCC00]">
+          <div className="flex items-center gap-2.5">
+            <span className="material-symbols-outlined text-[22px] text-amber-500 dark:text-[#FFCC00]">
               photo_library
             </span>
-            <h3 className="text-sm font-bold text-fg uppercase tracking-wider">
-              Selecionar Imagem
-            </h3>
+            <div>
+              <h3 className="text-sm font-black text-fg uppercase tracking-wider leading-tight">
+                Selecionar Imagem do Cofre
+              </h3>
+              <p className="text-[11px] text-fg-muted">
+                Navegue pelas pastas e clique em uma foto para inserir no palco
+              </p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-fg-muted hover:text-fg transition-colors cursor-pointer"
+            aria-label="Fechar modal do cofre"
+            className="p-1.5 rounded-xl bg-surface-hover/60 text-fg-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[18px]">close</span>
+            <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
 
         {/* Tabs de Modo */}
-        <div className="flex gap-1.5 shrink-0">
+        <div className="flex gap-2 shrink-0">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -325,22 +447,24 @@ export function StudioVaultBrowserModal({
                   setMode(tab.id);
                 }
               }}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                mode === tab.id && tab.id !== 'upload'
-                  ? 'bg-[#FFCC00] text-black shadow-md'
-                  : tab.id === 'upload'
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${mode === tab.id && tab.id !== 'upload'
+                ? 'bg-[#FFCC00] text-black shadow-md'
+                : tab.id === 'upload'
                   ? 'border border-border-subtle bg-surface-hover/70 text-fg hover:bg-surface-hover'
                   : 'border border-border-subtle bg-surface-hover/40 text-fg-secondary hover:bg-surface-hover hover:text-fg'
-              }`}
+                }`}
             >
-              <span className="material-symbols-outlined text-[15px]">{tab.icon}</span>
+              <span className="material-symbols-outlined text-[16px]">{tab.icon}</span>
               <span className="truncate">{tab.label}</span>
             </button>
           ))}
         </div>
 
         {/* Conteúdo */}
-        <div className="flex-1 overflow-hidden min-h-[300px]">
+        <div
+          className="flex-1 min-h-0 overflow-hidden"
+          style={{ flex: '1 1 0%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        >
           {mode === 'org' && (
             <FolderBrowser
               key={`org-${orgSlug}`}
@@ -367,6 +491,7 @@ export function StudioVaultBrowserModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

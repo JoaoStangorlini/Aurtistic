@@ -57,105 +57,125 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
         </p>
       </div>
 
-      {/* Accordion Triplo Expansível (Zero Cards Dentro de Cards Desnecessários) */}
-      <div className="space-y-3">
-        {/* 1. Meus Rascunhos */}
-        <div className="rounded-2xl border border-border-subtle bg-surface/80 backdrop-blur-md overflow-hidden shadow-sm transition-all">
-          <button
-            type="button"
-            onClick={() => toggleSection('drafts')}
-            className={`w-full flex items-center justify-between p-4 text-left font-bold transition-colors cursor-pointer ${
-              activeSection === 'drafts'
-                ? 'bg-surface-hover/80 text-fg'
-                : 'hover:bg-surface-hover/40 text-fg-secondary hover:text-fg'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[22px] text-amber-500 dark:text-[#FFCC00]">
+      {/* Seção Aberta: Começar do Zero (4 Formatos) + Meus Rascunhos Compactos */}
+      <div className="space-y-4">
+        {/* 1. Começar do Zero — 4 Formatos já abertos em grade compacta */}
+        <div className="rounded-2xl border border-border-subtle bg-surface/85 backdrop-blur-md p-3.5 sm:p-4 shadow-sm space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[20px] text-emerald-500">crop_free</span>
+              <div>
+                <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-fg">
+                  Nova Arte em Branco
+                </h2>
+                <p className="text-[10px] text-fg-muted hidden sm:block">
+                  Escolha uma proporção para abrir o editor
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+            {(['1:1', '4:5', '9:16', '16:9'] as AspectRatioKey[]).map((aspect) => {
+              const dim = ASPECT_DIMENSIONS[aspect];
+              return (
+                <button
+                  key={aspect}
+                  type="button"
+                  onClick={() => handleActionWithSlotCheck(() => resetToBlank(aspect))}
+                  className="p-2.5 sm:p-3 rounded-xl border border-border-subtle bg-surface-hover/60 hover:border-[#FFCC00] hover:bg-surface-hover transition-all flex sm:flex-col items-center sm:justify-center gap-2.5 sm:gap-1.5 cursor-pointer shadow-xs group text-left sm:text-center"
+                >
+                  <div
+                    className="border-2 border-border-subtle group-hover:border-[#FFCC00] rounded-xs transition-colors shrink-0"
+                    style={{
+                      width: aspect === '16:9' ? 28 : aspect === '9:16' ? 16 : 22,
+                      height: aspect === '16:9' ? 16 : aspect === '9:16' ? 28 : aspect === '4:5' ? 26 : 22,
+                    }}
+                  />
+                  <div className="min-w-0">
+                    <span className="text-xs font-bold text-fg block truncate">{dim.label}</span>
+                    <span className="text-[10px] font-mono text-fg-muted">{aspect}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 2. Meus Rascunhos — Compacto no mobile (sem 3 caixas vazias gigantes) */}
+        <div className="rounded-2xl border border-border-subtle bg-surface/85 backdrop-blur-md p-3.5 sm:p-4 shadow-sm space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[20px] text-amber-500 dark:text-[#FFCC00]">
                 drafts
               </span>
               <div>
-                <span className="text-sm font-black uppercase tracking-wider block">
+                <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-fg">
                   Meus Rascunhos
-                </span>
-                <span className="text-[11px] font-normal text-fg-muted">
-                  {drafts.length} de 3 slots ativos ocupados
-                </span>
+                </h2>
+                <p className="text-[10px] text-fg-muted">
+                  {drafts.length} de 3 slots salvos
+                </p>
               </div>
             </div>
-            <span
-              className={`material-symbols-outlined text-[20px] text-fg-muted transition-transform duration-200 ${
-                activeSection === 'drafts' ? 'rotate-180 text-amber-500' : ''
-              }`}
-            >
-              expand_more
-            </span>
-          </button>
-
-          {activeSection === 'drafts' && (
-            <div className="p-4 pt-1 border-t border-border-subtle grid grid-cols-1 sm:grid-cols-3 gap-3 animate-in fade-in">
+          </div>
+          {drafts.length === 0 ? (
+            <div className="p-3 rounded-xl border border-dashed border-border-subtle text-center text-[11px] text-fg-muted">
+              Nenhum rascunho salvo ainda. Crie uma nova arte acima ou escolha um modelo abaixo.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {([1, 2, 3] as const).map((slot) => {
                 const draft = drafts.find((d) => d.slotIndex === slot);
+                if (!draft) return null;
                 return (
-                  <div
+                  <button
                     key={slot}
-                    onClick={() => draft && loadDraft(draft)}
-                    className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between min-h-[130px] ${
-                      draft
-                        ? 'border-border-subtle bg-surface-hover/60 hover:border-[#FFCC00] hover:bg-surface-hover cursor-pointer shadow-xs'
-                        : 'border-dashed border-border-subtle bg-transparent text-fg-muted'
-                    }`}
+                    type="button"
+                    onClick={() => loadDraft(draft)}
+                    className="p-3 rounded-xl border border-border-subtle bg-surface-hover/60 hover:border-[#FFCC00] hover:bg-surface-hover transition-all flex flex-col justify-between gap-2 text-left cursor-pointer shadow-xs"
                   >
                     <div>
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="font-mono font-bold text-amber-600 dark:text-amber-700 dark:text-amber-300 text-[10px]">
+                      <div className="flex items-center justify-between text-xs mb-0.5">
+                        <span className="font-mono font-bold text-amber-600 dark:text-amber-300 text-[10px]">
                           SLOT {slot}
                         </span>
-                        {draft && (
-                          <span className="text-[10px] text-fg-muted font-mono">
-                            {draft.aspectRatio}
-                          </span>
-                        )}
+                        <span className="text-[10px] text-fg-muted font-mono">
+                          {draft.aspectRatio}
+                        </span>
                       </div>
-                      <h3 className="text-xs font-bold text-fg truncate">
-                        {draft ? draft.title : 'Slot Vazio'}
-                      </h3>
+                      <h3 className="text-xs font-bold text-fg truncate">{draft.title}</h3>
                     </div>
-                    {draft ? (
-                      <div className="flex items-center justify-between pt-2.5 border-t border-border-subtle text-[11px] text-fg-muted">
-                        <span>{new Date(draft.updatedAt).toLocaleDateString('pt-BR')}</span>
-                        <span className="text-amber-500 dark:text-[#FFCC00] font-bold">Continuar →</span>
-                      </div>
-                    ) : (
-                      <span className="text-[10px] text-fg-muted">Pronto para novo post</span>
-                    )}
-                  </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-border-subtle text-[10px] text-fg-muted w-full">
+                      <span>{new Date(draft.updatedAt).toLocaleDateString('pt-BR')}</span>
+                      <span className="text-amber-600 dark:text-[#FFCC00] font-bold">Continuar →</span>
+                    </div>
+                  </button>
                 );
               })}
             </div>
           )}
         </div>
 
-        {/* 2. Modelos da Organização */}
-        <div className="rounded-2xl border border-border-subtle bg-surface/80 backdrop-blur-md overflow-hidden shadow-sm transition-all">
+        {/* 3. Modelos da Organização */}
+        <div className="rounded-2xl border border-border-subtle bg-surface/85 backdrop-blur-md overflow-hidden shadow-sm transition-all">
           <button
             type="button"
             onClick={() => toggleSection('presets')}
-            className={`w-full flex items-center justify-between p-4 text-left font-bold transition-colors cursor-pointer ${
+            className={`w-full flex items-center justify-between p-3.5 sm:p-4 text-left font-bold transition-colors cursor-pointer ${
               activeSection === 'presets'
                 ? 'bg-surface-hover/80 text-fg'
                 : 'hover:bg-surface-hover/40 text-fg-secondary hover:text-fg'
             }`}
           >
-            <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[22px] text-blue-500">
+            <div className="flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-[20px] text-blue-500">
                 auto_awesome
               </span>
               <div>
-                <span className="text-sm font-black uppercase tracking-wider block">
+                <span className="text-xs sm:text-sm font-black uppercase tracking-wider block">
                   Modelos da Organização
                 </span>
-                <span className="text-[11px] font-normal text-fg-muted">
+                <span className="text-[10px] font-normal text-fg-muted">
                   Predefinições com a IDV oficial (@{effectiveSlug})
                 </span>
               </div>
@@ -170,12 +190,12 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
           </button>
 
           {activeSection === 'presets' && (
-            <div className="p-4 pt-1 border-t border-border-subtle grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in fade-in">
+            <div className="p-3.5 sm:p-4 pt-1 border-t border-border-subtle grid grid-cols-1 sm:grid-cols-2 gap-2.5 animate-in fade-in">
               {allTemplates.map((tpl) => (
                 <div
                   key={tpl.id}
                   onClick={() => handleActionWithSlotCheck(() => loadTemplate(tpl))}
-                  className="p-3.5 rounded-xl border border-border-subtle bg-surface-hover/60 hover:border-[#FFCC00] hover:bg-surface-hover transition-all cursor-pointer flex items-center justify-between gap-3 shadow-xs"
+                  className="p-3 rounded-xl border border-border-subtle bg-surface-hover/60 hover:border-[#FFCC00] hover:bg-surface-hover transition-all cursor-pointer flex items-center justify-between gap-3 shadow-xs"
                 >
                   <div className="min-w-0">
                     <span className="text-[10px] font-mono text-fg-muted">{tpl.aspectRatio}</span>
@@ -190,68 +210,6 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
                   </button>
                 </div>
               ))}
-            </div>
-          )}
-        </div>
-
-        {/* 3. Começar do Zero (Tela em Branco) */}
-        <div className="rounded-2xl border border-border-subtle bg-surface/80 backdrop-blur-md overflow-hidden shadow-sm transition-all">
-          <button
-            type="button"
-            onClick={() => toggleSection('new')}
-            className={`w-full flex items-center justify-between p-4 text-left font-bold transition-colors cursor-pointer ${
-              activeSection === 'new'
-                ? 'bg-surface-hover/80 text-fg'
-                : 'hover:bg-surface-hover/40 text-fg-secondary hover:text-fg'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[22px] text-emerald-500">
-                crop_free
-              </span>
-              <div>
-                <span className="text-sm font-black uppercase tracking-wider block">
-                  Começar do Zero (Tela em Branco)
-                </span>
-                <span className="text-[11px] font-normal text-fg-muted">
-                  Escolha uma proporção padrão para iniciar
-                </span>
-              </div>
-            </div>
-            <span
-              className={`material-symbols-outlined text-[20px] text-fg-muted transition-transform duration-200 ${
-                activeSection === 'new' ? 'rotate-180 text-emerald-500' : ''
-              }`}
-            >
-              expand_more
-            </span>
-          </button>
-
-          {activeSection === 'new' && (
-            <div className="p-4 pt-1 border-t border-border-subtle grid grid-cols-2 sm:grid-cols-4 gap-3 animate-in fade-in">
-              {(['1:1', '4:5', '9:16', '16:9'] as AspectRatioKey[]).map((aspect) => {
-                const dim = ASPECT_DIMENSIONS[aspect];
-                return (
-                  <button
-                    key={aspect}
-                    type="button"
-                    onClick={() => handleActionWithSlotCheck(() => resetToBlank(aspect))}
-                    className="p-3.5 rounded-xl border border-border-subtle bg-surface-hover/60 hover:border-[#FFCC00] hover:bg-surface-hover transition-all flex flex-col items-center justify-center gap-2 cursor-pointer shadow-xs group"
-                  >
-                    <div
-                      className="border-2 border-border-subtle group-hover:border-[#FFCC00] rounded-xs transition-colors"
-                      style={{
-                        width: aspect === '16:9' ? 36 : aspect === '9:16' ? 20 : 26,
-                        height: aspect === '16:9' ? 20 : aspect === '9:16' ? 36 : aspect === '4:5' ? 32 : 26,
-                      }}
-                    />
-                    <div className="text-center">
-                      <span className="text-xs font-bold text-fg block">{dim.label}</span>
-                      <span className="text-[9px] font-mono text-fg-muted">{aspect}</span>
-                    </div>
-                  </button>
-                );
-              })}
             </div>
           )}
         </div>

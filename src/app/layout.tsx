@@ -48,6 +48,7 @@ import { GlobalAudioDock } from "@/components/media/GlobalAudioDock";
 import { issueUserStorageSession } from "@/lib/edge-ticket";
 import { buildThemeInitScript, type ThemeMode, type ThemePaletteId, type ThemePreferences } from "@/lib/theme-config";
 import { ThemeProvider, ThemedTopLoader } from "@/components/theme/ThemeProvider";
+import { AppViewportShell, MainShell } from "@/components/theme/MainShell";
 import { GlobalOrgThemeBackdrop } from "@/components/theme/GlobalOrgThemeBackdrop";
 import { CoachMarksProvider } from "@/components/onboarding/CoachMarksProvider";
 import { FirstTimeOnboardingModal } from "@/components/onboarding/FirstTimeOnboardingModal";
@@ -197,10 +198,12 @@ export default async function RootLayout({
                   <Suspense fallback={null}>
                     <GlobalHighlighter />
                   </Suspense>
-                  <Navbar initialRole={userRole} initialTargetHref={targetHref} />
-                  <main className="relative z-10 flex-1 flex flex-col overflow-y-auto overflow-x-hidden bg-transparent">
-                    {children}
-                  </main>
+                  <AppViewportShell>
+                    <Navbar initialRole={userRole} initialTargetHref={targetHref} />
+                    <MainShell>
+                      {children}
+                    </MainShell>
+                  </AppViewportShell>
                   {Boolean(onboardingUserId) && (
                     <FirstTimeOnboardingModal userId={onboardingUserId} hasConfiguredModules={hasConfiguredModules} />
                   )}

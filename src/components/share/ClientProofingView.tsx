@@ -1,9 +1,17 @@
 // Este programa é um software livre (Licença AGPLv3)
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import type { UserFileIndexRow } from '@/types';
 import { buildTenantThumbUrl, buildTenantStreamUrl, formatStorageBytes } from '@/lib/edge-urls';
+import {
+  DEFAULT_VAULT_SORT,
+  loadVaultSortPreference,
+  saveVaultSortPreference,
+  sortVaultFiles,
+  type VaultSortPreference,
+} from '@/lib/vault-sorting';
+import { VaultSortControl } from '@/components/servidor/VaultSortControl';
 import {
   verifySharePinAction,
   refreshShareTicketAction,
@@ -15,6 +23,173 @@ export interface ProofingPhotoItem extends UserFileIndexRow {
   itemTicket?: string;
   signedThumbUrl?: string;
   signedStreamUrl?: string;
+}
+
+function ProofingMasonryCard({
+  item,
+  index,
+  isSelected,
+  mode,
+  isSubmitted,
+  serverUrl,
+  onInspect,
+  onToggleSelect,
+}: {
+  item: ProofingPhotoItem;
+  index: number;
+  isSelected: boolean;
+  mode: 'view' | 'proofing' | 'upload_only';
+  isSubmitted: boolean;
+  serverUrl?: string;
+  onInspect: (idx: number) => void;
+  onToggleSelect: (path: string) => void;
+}) {
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const [retrySeed, setRetrySeed] = useState(0);
+
+  const baseThumbUrl =
+    item.signedThumbUrl ||
+    buildTenantThumbUrl(item.relative_path, item.itemTicket || '', { serverUrl });
+  const fallbackStreamUrl =
+    item.signedStreamUrl ||
+    buildTenantStreamUrl(item.relative_path, item.itemTicket || '', { serverUrl });
+
+  const thumbUrl =
+    retryAttempt >= 2
+      ? fallbackStreamUrl
+      : retryAttempt === 1
+        ? `${baseThumbUrl}${baseThumbUrl.includes('?') ? '&' : '?'}retry=${retrySeed}&force=1`
+        : baseThumbUrl;
+
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img && img.complete) {
+      if (img.naturalWidth > 0) {
+        setLoaded(true);
+        setFailed(false);
+      } else {
+        setFailed(true);
+        setLoaded(false);
+      }
+    }
+  }, [thumbUrl]);
+
+  return (
+    <div
+      className={`w-full block group relative bg-surface rounded-2xl overflow-hidden border transition-all duration-300 ${
+        isSelected
+          ? 'border-[#FFCC00] shadow-lg shadow-[#FFCC00]/10 ring-1 ring-[#FFCC00]'
+          : 'border-border-subtle hover:border-[#4A4A4A]'
+      }`}
+    >
+      <div
+        onClick={failed ? undefined : () => onInspect(index)}
+        className={`relative w-full bg-surface-hover/40 overflow-hidden ${
+          failed ? '' : 'cursor-pointer'
+        } ${!loaded && !failed ? 'min-h-[160px]' : ''}`}
+      >
+        {!loaded && !failed && (
+          <div className="absolute inset-0 bg-surface-hover animate-pulse" />
+        )}
+        {failed ? (
+          <div className="relative z-20 w-full py-12 px-4 flex flex-col items-center justify-center text-center gap-2 text-fg-muted">
+            <span className="material-symbols-outlined text-[32px] opacity-60">image_not_supported</span>
+            <span className="text-xs">Miniatura indisponível</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setFailed(false);
+                setLoaded(false);
+                setRetryAttempt((n) => n + 1);
+                setRetrySeed(Date.now());
+              }}
+              className="relative z-20 px-3 py-1.5 rounded-lg bg-[#FFCC00] text-black text-[11px] font-bold hover:brightness-110 cursor-pointer"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        ) : (
+          <img
+            key={`${item.relative_path}-${retryAttempt}`}
+            ref={imgRef}
+            src={thumbUrl}
+            alt={item.title || item.filename}
+            loading="lazy"
+            decoding="async"
+            onLoad={() => {
+              setLoaded(true);
+              setFailed(false);
+            }}
+            onError={() => {
+              setFailed(true);
+              setLoaded(false);
+            }}
+            className={`w-full h-auto block object-contain transition-all duration-300 group-hover:scale-[1.01] ${
+              loaded ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+        )}
+
+        {!failed && (
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+            <span className="px-3 py-1.5 bg-app/80 backdrop-blur-md rounded-full text-xs font-bold text-fg flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px]">visibility</span>
+              Ver Detalhes
+            </span>
+          </div>
+        )}
+
+        {mode === 'proofing' && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSelect(item.relative_path);
+            }}
+            disabled={isSubmitted}
+            aria-label={isSelected ? 'Desmarcar foto' : 'Aprovar foto'}
+            className={`absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+              isSelected
+                ? 'bg-[#FFCC00] text-[#121212] shadow-md shadow-[#FFCC00]/30 scale-105'
+                : 'bg-app/70 text-fg-secondary hover:text-fg hover:bg-app'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[20px]">check</span>
+          </button>
+        )}
+      </div>
+
+      <div className="p-3 bg-surface flex items-center justify-between gap-2 border-t border-border-subtle">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-fg truncate">
+            {item.title || item.filename}
+          </p>
+          <p className="text-[11px] text-fg-muted font-mono">
+            {formatStorageBytes(item.size_bytes)}
+          </p>
+        </div>
+
+        {mode === 'proofing' && (
+          <button
+            type="button"
+            onClick={() => onToggleSelect(item.relative_path)}
+            disabled={isSubmitted}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
+              isSelected
+                ? 'bg-[#FFCC00]/20 text-[#FFCC00] hover:bg-[#FFCC00]/30'
+                : 'bg-surface-hover text-fg-secondary hover:text-fg'
+            }`}
+          >
+            {isSelected ? 'Aprovada' : 'Aprovar'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export interface ClientProofingViewProps {
@@ -61,9 +236,35 @@ export function ClientProofingView({
   );
   const [activeFilter, setActiveFilter] = useState<'all' | 'selected'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortPref, setSortPref] = useState<VaultSortPreference>(DEFAULT_VAULT_SORT);
+  const [loadedThumbs, setLoadedThumbs] = useState<Record<string, boolean>>({});
+  const [failedThumbs, setFailedThumbs] = useState<Record<string, boolean>>({});
+  const [retrySeeds, setRetrySeeds] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    setSortPref(loadVaultSortPreference());
+  }, []);
+
+  const handleSortChange = (next: VaultSortPreference) => {
+    setSortPref(next);
+    saveVaultSortPreference(next);
+  };
 
   // Lightbox / Inspeção
   const [inspectIndex, setInspectIndex] = useState<number | null>(null);
+  const [masonryCols, setMasonryCols] = useState<1 | 2 | 3>(3);
+
+  useEffect(() => {
+    const syncCols = () => {
+      if (typeof window === 'undefined') return;
+      if (window.innerWidth >= 1024) setMasonryCols(3);
+      else if (window.innerWidth >= 640) setMasonryCols(2);
+      else setMasonryCols(1);
+    };
+    syncCols();
+    window.addEventListener('resize', syncCols);
+    return () => window.removeEventListener('resize', syncCols);
+  }, []);
 
   // Modal de Submissão
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
@@ -212,9 +413,9 @@ export function ClientProofingView({
     }
   };
 
-  // Itens filtrados para exibição
+  // Itens filtrados e ordenados para exibição
   const displayedFiles = useMemo(() => {
-    return files.filter((item) => {
+    const filtered = files.filter((item) => {
       if (activeFilter === 'selected' && !selectedPaths.has(item.relative_path)) {
         return false;
       }
@@ -226,7 +427,15 @@ export function ClientProofingView({
       }
       return true;
     });
-  }, [files, activeFilter, selectedPaths, searchQuery]);
+    return sortVaultFiles(
+      filtered.map((f) => ({
+        ...f,
+        name: f.title || f.filename,
+        mimeType: f.mime_type || undefined,
+      })),
+      sortPref
+    );
+  }, [files, activeFilter, selectedPaths, searchQuery, sortPref]);
 
   // Navegação no Lightbox
   const currentInspectItem = inspectIndex !== null ? displayedFiles[inspectIndex] : null;
@@ -370,7 +579,12 @@ export function ClientProofingView({
               />
             ) : (
               <div className="w-10 h-10 rounded-full bg-surface border border-border-subtle flex items-center justify-center text-[#FFCC00] font-bold text-sm">
-                {creatorName.slice(0, 2).toUpperCase()}
+                {creatorName
+                  .split(/\s+/)
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((w) => w[0]?.toUpperCase() || '')
+                  .join('') || 'AC'}
               </div>
             )}
             <div>
@@ -465,7 +679,11 @@ export function ClientProofingView({
                   type="button"
                   onClick={() => setIsSubmitModalOpen(true)}
                   disabled={selectedPaths.size === 0}
-                  className="px-4 py-2 bg-[#FFCC00] hover:bg-[#e6b800] disabled:opacity-40 text-[#121212] font-bold rounded-xl text-xs transition-all flex items-center gap-2 shadow-md shadow-[#FFCC00]/10"
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                    selectedPaths.size === 0
+                      ? 'bg-surface-hover text-fg-muted border border-border-subtle cursor-not-allowed'
+                      : 'bg-[#FFCC00] hover:bg-[#e6b800] text-[#121212] shadow-md shadow-[#FFCC00]/10 cursor-pointer'
+                  }`}
                 >
                   <span className="material-symbols-outlined text-[18px]">send</span>
                   Enviar Seleção ({selectedPaths.size})
@@ -507,19 +725,22 @@ export function ClientProofingView({
 
       {/* Conteúdo Principal: Grid Passe-Partout Sem Cortes */}
       <main className="max-w-7xl mx-auto px-4 sm:px-8 py-8 space-y-6">
-        {/* Barra de Busca de Arquivos */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="relative max-w-sm w-full">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted text-[18px]">
-              search
-            </span>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por nome do arquivo..."
-              className="w-full bg-surface border border-border-subtle focus:border-[#FFCC00] rounded-xl pl-9 pr-4 py-2 text-xs text-fg focus:outline-none transition-colors"
-            />
+        {/* Barra de Busca + Ordenação de Arquivos */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 flex-1 min-w-[240px]">
+            <div className="relative max-w-sm w-full">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted text-[18px]">
+                search
+              </span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar por nome do arquivo..."
+                className="w-full bg-surface border border-border-subtle focus:border-[#FFCC00] rounded-xl pl-9 pr-4 py-2 text-xs text-fg focus:outline-none transition-colors"
+              />
+            </div>
+            <VaultSortControl value={sortPref} onChange={handleSortChange} compact />
           </div>
 
           <div className="text-xs text-fg-muted">
@@ -527,7 +748,7 @@ export function ClientProofingView({
           </div>
         </div>
 
-        {/* Grade de Fotos */}
+        {/* Grade Masonry em Proporção Real */}
         {displayedFiles.length === 0 ? (
           <div className="p-16 text-center bg-surface border border-border-subtle rounded-2xl space-y-3">
             <span className="material-symbols-outlined text-[48px] text-fg-muted">
@@ -541,94 +762,27 @@ export function ClientProofingView({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-            {displayedFiles.map((item, index) => {
-              const isSelected = selectedPaths.has(item.relative_path);
-              const thumbUrl =
-                item.signedThumbUrl ||
-                buildTenantThumbUrl(item.relative_path, item.itemTicket || '', { serverUrl });
-
-              return (
-                <div
-                  key={item.relative_path}
-                  className={`group relative bg-surface rounded-2xl overflow-hidden border transition-all duration-300 flex flex-col ${
-                    isSelected
-                      ? 'border-[#FFCC00] shadow-lg shadow-[#FFCC00]/10 ring-1 ring-[#FFCC00]'
-                      : 'border-border-subtle hover:border-[#4A4A4A]'
-                  }`}
-                >
-                  {/* Passe-Partout 4:3 Box com object-contain */}
-                  <div
-                    onClick={() => setInspectIndex(index)}
-                    className="relative w-full aspect-[4/3] bg-[#101010] flex items-center justify-center p-2.5 cursor-pointer overflow-hidden"
-                  >
-                    <img
-                      src={thumbUrl}
-                      alt={item.title || item.filename}
-                      loading="lazy"
-                      className="max-w-full max-h-full w-auto h-auto object-contain transition-transform duration-300 group-hover:scale-[1.02]"
+          <div className="flex items-start gap-5">
+            {Array.from({ length: masonryCols }, (_, colIdx) => (
+              <div key={colIdx} className="flex-1 min-w-0 flex flex-col gap-5">
+                {displayedFiles.map((item, index) => {
+                  if (index % masonryCols !== colIdx) return null;
+                  return (
+                    <ProofingMasonryCard
+                      key={item.relative_path}
+                      item={item}
+                      index={index}
+                      isSelected={selectedPaths.has(item.relative_path)}
+                      mode={mode}
+                      isSubmitted={isSubmitted}
+                      serverUrl={serverUrl}
+                      onInspect={setInspectIndex}
+                      onToggleSelect={toggleSelectPhoto}
                     />
-
-                    {/* Botão de Inspeção Rápida */}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                      <span className="px-3 py-1.5 bg-app/80 backdrop-blur-md rounded-full text-xs font-bold text-fg flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-[16px]">visibility</span>
-                        Ver Detalhes
-                      </span>
-                    </div>
-
-                    {/* Badge de Seleção Superior (Apenas em modo proofing) */}
-                    {mode === 'proofing' && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleSelectPhoto(item.relative_path);
-                        }}
-                        disabled={isSubmitted}
-                        aria-label={isSelected ? 'Desmarcar foto' : 'Aprovar foto'}
-                        className={`absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center transition-all ${
-                          isSelected
-                            ? 'bg-[#FFCC00] text-[#121212] shadow-md shadow-[#FFCC00]/30 scale-105'
-                            : 'bg-app/70 text-fg-secondary hover:text-fg hover:bg-app'
-                        }`}
-                      >
-                        <span className="material-symbols-outlined text-[20px]">
-                          {isSelected ? 'check' : 'check'}
-                        </span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Rodapé do Card com Nome e Ação */}
-                  <div className="p-3 bg-surface flex items-center justify-between gap-2 border-t border-border-subtle">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-fg truncate">
-                        {item.title || item.filename}
-                      </p>
-                      <p className="text-[11px] text-fg-muted font-mono">
-                        {formatStorageBytes(item.size_bytes)}
-                      </p>
-                    </div>
-
-                    {mode === 'proofing' && (
-                      <button
-                        type="button"
-                        onClick={() => toggleSelectPhoto(item.relative_path)}
-                        disabled={isSubmitted}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
-                          isSelected
-                            ? 'bg-[#FFCC00]/20 text-[#FFCC00] hover:bg-[#FFCC00]/30'
-                            : 'bg-surface-hover text-fg-secondary hover:text-fg'
-                        }`}
-                      >
-                        {isSelected ? 'Aprovada' : 'Aprovar'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            ))}
           </div>
         )}
       </main>
@@ -676,7 +830,7 @@ export function ClientProofingView({
           </header>
 
           {/* Área Central da Imagem Full-Res */}
-          <div className="flex-1 relative flex items-center justify-center p-4 select-none">
+          <div className="flex-1 min-h-0 overflow-hidden relative flex items-center justify-center p-4 select-none">
             {/* Botão Anterior */}
             {inspectIndex > 0 && (
               <button

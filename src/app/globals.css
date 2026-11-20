@@ -1,6 +1,7 @@
 /* Este programa é um software livre (Licença AGPLv3) */
 @import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block");
 @import "tailwindcss";
+@custom-variant dark (&:where([data-theme-mode="dark"], [data-theme-mode="dark"] *));
 
 .material-symbols-outlined {
   font-family: 'Material Symbols Outlined' !important;
@@ -321,6 +322,7 @@
     --accent-primary-hover: #002FFE;
     --accent-primary-text: #00D4FF;
     --on-accent-primary: #040714;
+    --gradient-brand: linear-gradient(135deg, #00B8E6 0%, #38BDF8 100%);
 
     --accent-secondary: #FFE600;
     --accent-secondary-hover: #FFD000;
@@ -349,6 +351,7 @@
     --accent-primary-hover: #0052CC;
     --accent-primary-text: #002FFE;
     --on-accent-primary: #FFFFFF;
+    --gradient-brand: linear-gradient(135deg, #002FFE 0%, #2563EB 100%);
 
     --accent-secondary: #FFCC00;
     --accent-secondary-hover: #E6B800;
@@ -727,6 +730,18 @@ html[data-theme-palette="purple-gold"][data-theme-mode="light"] .text-\[\#9d4edd
 
 .animate-indeterminate {
   animation: indeterminateProgress 1.4s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Ocultação limpa de irmãos durante arraste de slider (estilo Xiaomi/Lightroom) sem armadilha de herança */
+[data-scrubbing="true"] *:not([data-active-slider="true"]):not([data-active-slider="true"] *):not(:has([data-active-slider="true"])) {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+[data-scrubbing="true"] *:has([data-active-slider="true"]) {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
 }
 
 /* Mapeamento dinâmico de degradês legados para respeitar a paleta ativa */

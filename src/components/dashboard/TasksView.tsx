@@ -1746,19 +1746,27 @@ export function TasksView({
               </button>
             </div>
 
-            {/* Seletor se tiver mais de uma organização */}
+            {/* Seletor em pílulas se tiver mais de uma organização (zero <select> nativo) */}
             {activeScope === 'organization' && organizations.length > 1 && (
-              <select
-                value={activeOrgId || organizations[0]?.id}
-                onChange={(e) => setActiveOrgId(e.target.value)}
-                className="bg-surface border border-border-subtle text-fg text-xs font-bold rounded-lg px-2.5 py-1.5 outline-none focus:border-[var(--accent-primary)] cursor-pointer"
-              >
-                {organizations.map((org) => (
-                  <option key={org.id} value={org.id}>
-                    {org.name}
-                  </option>
-                ))}
-              </select>
+              <div className="inline-flex flex-wrap items-center gap-1 p-1 bg-app rounded-xl border border-border-subtle">
+                {organizations.map((org) => {
+                  const isActiveOrg = (activeOrgId || organizations[0]?.id) === org.id;
+                  return (
+                    <button
+                      key={org.id}
+                      type="button"
+                      onClick={() => setActiveOrgId(org.id)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        isActiveOrg
+                          ? 'bg-[var(--accent-primary)] text-[var(--on-accent-primary)] shadow-xs'
+                          : 'text-fg-secondary hover:text-fg hover:bg-surface-hover'
+                      }`}
+                    >
+                      {org.name}
+                    </button>
+                  );
+                })}
+              </div>
             )}
 
             {/* Ações rápidas de organização (Entrar / Criar) */}
@@ -2587,7 +2595,7 @@ export function TasksView({
                       onDrop={sortBy === 'manual' ? (e) => handleDrop(e, task.id) : undefined}
                       onDragEnd={sortBy === 'manual' ? () => setDropTargetId(null) : undefined}
                       onClick={(e) => handleRowClick(e, task.id)}
-                      className={`transition-colors group ${selectedTasks.has(task.id) ? 'bg-accent-primary/10' : 'hover:bg-surface-hover'} ${draggedTaskId === task.id ? 'opacity-50' : ''} ${dropTargetId === task.id ? (dropPosition === 'top' ? 'border-t-2 border-accent-primary' : 'border-b-2 border-accent-primary') : 'border-b border-border-subtle hover:border-accent-primary'}`}
+                      className={`transition-colors group ${selectedTasks.has(task.id) ? 'bg-accent-primary/10' : 'even:bg-surface-hover/30 hover:bg-surface-hover'} ${draggedTaskId === task.id ? 'opacity-50' : ''} ${dropTargetId === task.id ? (dropPosition === 'top' ? 'border-t-2 border-accent-primary' : 'border-b-2 border-accent-primary') : 'border-b border-border-subtle hover:border-accent-primary'}`}
                     >
                       {/* Check + Ação unificados em 64px (Frente 2.7.5) */}
                       <td className="py-2.5 px-2 w-[64px] text-center shrink-0">
@@ -2786,7 +2794,7 @@ export function TasksView({
                     <span className={`material-symbols-outlined text-fg-muted text-[18px] mt-0.5 ${sortBy === 'manual' ? 'cursor-grab' : 'cursor-not-allowed'}`} title={sortBy !== 'manual' ? 'Mude para ordenação Manual para arrastar' : 'Arrastar'}>drag_indicator</span>
                   )}
                   <div>
-                    <h3 className="text-sm font-bold text-white mb-1">
+                    <h3 className="text-sm font-bold text-fg mb-1">
                       <div className="flex items-center gap-2">
                         <HighlightedText text={task.nome} highlight={searchTerm} />
                         {(task as any).custom_fields?.foto_url && (
@@ -2828,23 +2836,11 @@ export function TasksView({
 
                 <div className="mt-1 pl-6 pr-2">
                   <div className="flex justify-between items-center text-center mb-1 gap-1">
-                    <div className="flex-1 flex justify-center items-center gap-1">
-                      <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Status</span>
-                      <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Estágio atual.")}><span className="material-symbols-outlined text-[6px] text-fg-muted">help</span></div>
-                    </div>
-                    <div className="flex-1 flex justify-center items-center gap-1">
-                      <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Prio</span>
-                      <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Nível de urgência.")}><span className="material-symbols-outlined text-[6px] text-fg-muted">help</span></div>
-                    </div>
-                    <div className="flex-1 flex justify-center items-center gap-1">
-                      <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Categ</span>
-                      <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Tipo de ação.")}><span className="material-symbols-outlined text-[6px] text-fg-muted">help</span></div>
-                    </div>
+                    <span className="flex-1 text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Status</span>
+                    <span className="flex-1 text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Prio</span>
+                    <span className="flex-1 text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Categ</span>
                     {visibleExtraCols.includes("responsavel") && <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider flex-1 truncate">Resp</span>}
-                    <div className="flex-1 flex justify-center items-center gap-1">
-                      <span className="text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Dim</span>
-                      <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleTooltipClick(e, "Área da vida.")}><span className="material-symbols-outlined text-[6px] text-fg-muted">help</span></div>
-                    </div>
+                    <span className="flex-1 text-[9px] text-fg-muted font-semibold uppercase tracking-wider truncate">Dim</span>
                   </div>
                   <div className="flex justify-between items-center text-center gap-1">
                     <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'status')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="status" value={task.status} customColor={getColColor('status', task.status)} /></div></div>

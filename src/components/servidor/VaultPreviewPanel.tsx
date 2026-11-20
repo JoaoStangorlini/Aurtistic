@@ -225,15 +225,23 @@ export function VaultPreviewPanel({
   };
 
   return (
-    <aside
-      data-tour="vault-preview-pane"
-      style={isDetached ? undefined : { width: `${panelWidth}px` }}
-      className={
-        isDetached
-          ? 'fixed bottom-6 right-6 z-[95] w-96 sm:w-[420px] max-w-[90vw] h-[580px] max-h-[82vh] bg-surface/95 backdrop-blur-xl border border-[var(--accent-primary)]/50 rounded-2xl shadow-[0_16px_50px_rgba(0,0,0,0.6)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200'
-          : 'bg-surface border-l border-border-subtle flex flex-col shrink-0 h-full overflow-hidden shadow-lg z-20 animate-in slide-in-from-right duration-200'
-      }
-    >
+    <>
+      {!isDetached && (
+        <div
+          className="md:hidden fixed inset-0 z-[105] bg-black/60 backdrop-blur-xs"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        data-tour="vault-preview-pane"
+        style={isDetached ? undefined : { ['--vault-panel-w' as string]: `${panelWidth}px` }}
+        className={
+          isDetached
+            ? 'fixed bottom-6 right-6 z-[106] w-96 sm:w-[420px] max-w-[90vw] h-[580px] max-h-[82dvh] bg-surface/95 backdrop-blur-xl border border-[var(--accent-primary)]/50 rounded-2xl shadow-[0_16px_50px_rgba(0,0,0,0.6)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200'
+            : 'fixed inset-x-0 bottom-0 z-[106] max-h-[82dvh] rounded-t-3xl border-t border-border-subtle pb-[env(safe-area-inset-bottom)] shadow-2xl md:static md:inset-auto md:z-20 md:max-h-none md:rounded-none md:border-t-0 md:border-l md:pb-0 md:w-[var(--vault-panel-w)] bg-surface flex flex-col shrink-0 md:h-full overflow-hidden md:shadow-lg animate-in slide-in-from-bottom md:slide-in-from-right duration-200'
+        }
+      >
       {/* Topo do Painel de Visualização */}
       <div className={`h-10 px-4 py-2 border-b border-border-subtle flex items-center justify-between ${isDetached ? 'bg-elevated/80 select-none cursor-move' : 'bg-elevated/60'}`}>
         <div className="flex items-center gap-2 min-w-0">
@@ -637,5 +645,6 @@ export function VaultPreviewPanel({
         </div>
       )}
     </aside>
+    </>
   );
 }

@@ -33,7 +33,7 @@ export function OrganizationBrandProvider({
   children,
   className = '',
 }: OrganizationBrandProviderProps) {
-  const { setActiveOrgPalette, overrideOrgTheme, resolvedMode } = useTheme();
+  const { setActiveOrgPalette, overrideOrgTheme, resolvedMode, isStudioActive } = useTheme();
   const isLight = resolvedMode === 'light';
 
   const baseTokens = useMemo(
@@ -66,14 +66,25 @@ export function OrganizationBrandProvider({
     };
   }, [tokens.themeId, setActiveOrgPalette]);
 
+  const studioFlexStyle = isStudioActive
+    ? ({ flex: '1 1 0%', minHeight: 0, display: 'flex', flexDirection: 'column' } as React.CSSProperties)
+    : undefined;
+
   return (
     <OrganizationBrandContext.Provider value={{ tokens }}>
       <div
         data-org-brand={overrideOrgTheme ? undefined : tokens.themeId}
         data-theme-mode={resolvedMode}
-        className={`relative min-h-full overflow-x-hidden transition-colors duration-300 ${className}`}
+        style={studioFlexStyle}
+        className={`relative overflow-x-hidden transition-colors duration-300 ${isStudioActive ? 'flex-1 min-h-0 flex flex-col overflow-hidden' : 'min-h-full'
+          } ${className}`}
       >
-        <div className="relative z-10">{children}</div>
+        <div
+          style={studioFlexStyle}
+          className={isStudioActive ? 'relative z-10 flex-1 min-h-0 flex flex-col overflow-hidden' : 'relative z-10'}
+        >
+          {children}
+        </div>
       </div>
     </OrganizationBrandContext.Provider>
   );

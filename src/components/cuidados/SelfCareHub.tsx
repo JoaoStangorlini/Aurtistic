@@ -134,7 +134,7 @@ export function SelfCareHub() {
       className="mb-4 rounded-2xl border border-border-subtle bg-surface p-3 sm:p-4 shadow-sm transition-all"
     >
       {/* Topo do Hub de Cuidados: Barra Compacta & Expansível */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3">
         <button
           type="button"
           onClick={toggleExpanded}
@@ -176,13 +176,13 @@ export function SelfCareHub() {
                       {configs.filter((c) => c.enabled).length} ativos
                     </span>
                     {configs.some((c) => c.key === 'hydration' && c.enabled) && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 flex items-center gap-1">
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-500/20 flex items-center gap-1">
                         <span className="material-symbols-outlined text-[11px]">water_drop</span>
                         {waterCount}/{waterGoal}
                       </span>
                     )}
                     {configs.some((c) => c.key === 'nutrition_meals' && c.enabled) && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-orange-500/10 text-orange-300 border border-orange-500/20 flex items-center gap-1">
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-orange-500/10 text-orange-700 dark:text-orange-300 border border-orange-500/20 flex items-center gap-1">
                         <span className="material-symbols-outlined text-[11px]">soup_kitchen</span>
                         {mealsCount}/{mealsGoal}
                       </span>

@@ -464,7 +464,12 @@ export function OrganizationScheduleAttendancePanel({
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="sm:hidden flex items-center justify-end gap-1 text-[10px] font-medium text-fg-muted mb-1">
+            <span>Deslize SEG–SÁB</span>
+            <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+          </div>
+
+          <div className="overflow-x-auto pb-2 -mx-1 px-1">
             <div className="min-w-[640px] grid grid-cols-[120px_repeat(6,minmax(0,1fr))] gap-2">
               <div className="p-2 text-[11px] font-bold uppercase tracking-wider text-fg-muted flex items-end">
                 Período

@@ -3,6 +3,7 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useStudio } from './StudioContext';
+import { StudioLiveSlider } from './StudioLiveSlider';
 import type { StudioImageLayer } from './types';
 
 type BrushShape = 'freehand' | 'circle' | 'rect' | 'ellipse' | 'hexagon';
@@ -10,6 +11,7 @@ type BrushShape = 'freehand' | 'circle' | 'rect' | 'ellipse' | 'hexagon';
 export function StudioMaskBrushModal() {
   const { maskModalLayerId, setMaskModalLayerId, activeSlide, updateLayer } = useStudio();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const [brushSize, setBrushSize] = useState(36);
   const [brushMode, setBrushMode] = useState<'add' | 'erase'>('add');
   const [brushShape, setBrushShape] = useState<BrushShape>('freehand');
@@ -33,13 +35,13 @@ export function StudioMaskBrushModal() {
     setIsCutout(targetLayer.filters?.isCutoutMask !== false);
   }, [targetLayer]);
 
-  const getCanvasCoords = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const getCanvasCoords = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
     return {
-      x: (e.clientX - rect.left) * (canvas.width / rect.width),
-      y: (e.clientY - rect.top) * (canvas.height / rect.height),
+      x: (e.clientX - rect.left) * (canvas.width / Math.max(1, rect.width)),
+      y: (e.clientY - rect.top) * (canvas.height / Math.max(1, rect.height)),
     };
   }, []);
 
@@ -64,34 +66,52 @@ export function StudioMaskBrushModal() {
     ctx.fill();
   }, []);
 
-  const drawPoint = useCallback((x: number, y: number) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+  const drawStrokeSegment = useCallback(
+    (from: { x: number; y: number } | null, to: { x: number; y: number }) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    ctx.save();
-    if (brushMode === 'erase') {
-      ctx.globalCompositeOperation = 'destination-out';
-      drawShape(ctx, x, y, brushSize / 2, brushShape);
-    } else {
-      ctx.globalCompositeOperation = 'source-over';
+      ctx.save();
+      ctx.globalCompositeOperation = brushMode === 'erase' ? 'destination-out' : 'source-over';
       ctx.fillStyle = '#ffffff';
-      drawShape(ctx, x, y, brushSize / 2, brushShape);
-    }
-    ctx.restore();
-  }, [brushMode, brushSize, brushShape, drawShape]);
+      ctx.strokeStyle = '#ffffff';
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (brushShape === 'freehand' && from) {
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = brushSize;
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.stroke();
+      } else {
+        drawShape(ctx, to.x, to.y, brushSize / 2, brushShape);
+      }
+      ctx.restore();
+    },
+    [brushMode, brushSize, brushShape, drawShape]
+  );
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
     setIsDrawing(true);
-    const { x, y } = getCanvasCoords(e);
-    drawPoint(x, y);
+    const pt = getCanvasCoords(e);
+    lastPointRef.current = pt;
+    drawStrokeSegment(null, pt);
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
-    const { x, y } = getCanvasCoords(e);
-    drawPoint(x, y);
+    const pt = getCanvasCoords(e);
+    drawStrokeSegment(lastPointRef.current, pt);
+    lastPointRef.current = pt;
+  };
+
+  const handlePointerUp = () => {
+    setIsDrawing(false);
+    lastPointRef.current = null;
   };
 
   const handleInvertMask = () => {
@@ -170,10 +190,18 @@ export function StudioMaskBrushModal() {
             ))}
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-fg-muted">Tamanho:</span>
-            <input type="range" min={5} max={200} value={brushSize} onChange={(e) => setBrushSize(Number(e.target.value))} className="w-20 cursor-pointer" />
-            <span className="font-mono text-fg text-[11px]">{brushSize}px</span>
+          <div className="w-40">
+            <StudioLiveSlider
+              id="mask-brush-size"
+              label="Tamanho Pincel"
+              value={brushSize}
+              min={5}
+              max={200}
+              defaultValue={28}
+              unit="px"
+              transparentScrub={false}
+              onChange={(val) => setBrushSize(val)}
+            />
           </div>
         </div>
 
@@ -193,10 +221,14 @@ export function StudioMaskBrushModal() {
         <div className="relative w-full aspect-square max-h-[360px] rounded-2xl overflow-hidden bg-black/70 border border-border-subtle flex items-center justify-center">
           <img src={targetLayer.src} alt="Preview" crossOrigin="anonymous" className="absolute inset-0 w-full h-full object-contain pointer-events-none opacity-80" />
           <canvas
-            ref={canvasRef} width={800} height={800}
-            onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
-            onMouseUp={() => setIsDrawing(false)} onMouseLeave={() => setIsDrawing(false)}
-            className="absolute inset-0 w-full h-full cursor-crosshair"
+            ref={canvasRef}
+            width={800}
+            height={800}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            className="absolute inset-0 w-full h-full cursor-crosshair touch-none"
             style={{ mixBlendMode: 'screen', filter: 'drop-shadow(0 0 2px rgba(255,0,0,0.8))', opacity: 0.85 }}
           />
         </div>

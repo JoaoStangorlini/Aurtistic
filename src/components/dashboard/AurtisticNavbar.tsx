@@ -16,7 +16,7 @@ import { ModulesConfig, getInitialModulesConfig } from '@/lib/modules-config';
 import { AurtisticSpotlightModal } from './AurtisticSpotlightModal';
 
 export default function AurtisticNavbar() {
-  const { resolvedMode, paletteDef } = useTheme();
+  const { resolvedMode, paletteDef, isStudioActive } = useTheme();
   const { startTour } = useCoachMarks();
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -345,12 +345,13 @@ export default function AurtisticNavbar() {
           <button
             type="button"
             onClick={() => setIsSpotlightOpen(true)}
-            className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border-subtle bg-surface hover:border-[var(--accent-primary)] text-fg-muted hover:text-fg text-xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full border border-border-subtle bg-surface hover:border-[var(--accent-primary)] text-fg-muted hover:text-fg text-xs transition-colors cursor-pointer shrink-0"
             title="Busca Global (Ctrl+K ou /)"
+            aria-label="Abrir busca global"
           >
             <span className="material-symbols-outlined text-[16px]">search</span>
             <span className="hidden md:inline">Buscar</span>
-            <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-app border border-border-subtle">
+            <kbd className="hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded bg-app border border-border-subtle">
               Ctrl+K
             </kbd>
           </button>
@@ -516,7 +517,8 @@ export default function AurtisticNavbar() {
       />
     </header>
 
-      {/* Mobile Bottom Floating Pill Nav (Enxuto & Agrupado nos 4 Destinos Diretos) */}
+      {/* Mobile Bottom Floating Pill Nav (Enxuto & Agrupado nos 4 Destinos Diretos — oculto no Studio) */}
+      {!isStudioActive && (
       <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[99]" data-tour="nav-tabs">
         <div className="bg-surface/95 backdrop-blur-xl border border-border-subtle rounded-full p-1.5 flex items-center gap-1 shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
           {/* 1. Tarefas */}
@@ -615,6 +617,7 @@ export default function AurtisticNavbar() {
           )}
         </div>
       </div>
+      )}
     </>
   );
 }

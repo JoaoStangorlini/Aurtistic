@@ -72,9 +72,9 @@ export function MemberCapacityQuickSelector({
           type="button"
           disabled={isSaving}
           onClick={() => handleSelect('normal')}
-          className={`py-1.5 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 border transition-all ${
+          className={`py-1.5 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 border transition-all cursor-pointer ${
             capacity === 'normal'
-              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm'
+              ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40 shadow-sm'
               : 'bg-app text-fg-secondary border-border-subtle hover:border-emerald-500/30'
           }`}
           title="Pronto para tarefas de alta densidade cognitiva"
@@ -87,9 +87,9 @@ export function MemberCapacityQuickSelector({
           type="button"
           disabled={isSaving}
           onClick={() => handleSelect('reduced')}
-          className={`py-1.5 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 border transition-all ${
+          className={`py-1.5 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 border transition-all cursor-pointer ${
             capacity === 'reduced'
-              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
+              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40 shadow-sm'
               : 'bg-app text-fg-secondary border-border-subtle hover:border-amber-500/30'
           }`}
           title="Fadiga sensorial / atenção reduzida: priorizar tarefas leves"
@@ -102,9 +102,9 @@ export function MemberCapacityQuickSelector({
           type="button"
           disabled={isSaving}
           onClick={() => handleSelect('depleted')}
-          className={`py-1.5 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 border transition-all ${
+          className={`py-1.5 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 border transition-all cursor-pointer ${
             capacity === 'depleted'
-              ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 shadow-sm'
+              ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/40 shadow-sm'
               : 'bg-app text-fg-secondary border-border-subtle hover:border-rose-500/30'
           }`}
           title="Esgotamento / sobrecarga: evitar novas atribuições hoje"
@@ -126,7 +126,7 @@ export function MemberCapacityQuickSelector({
           <button
             type="button"
             onClick={handleSaveNote}
-            className="px-2.5 py-1 bg-[var(--accent-secondary)] text-[#121212] font-bold rounded-lg text-[10px]"
+            className="px-2.5 py-1 bg-[var(--accent-secondary)] text-[var(--on-accent-secondary)] font-bold rounded-lg text-[10px] cursor-pointer"
           >
             OK
           </button>
@@ -137,7 +137,7 @@ export function MemberCapacityQuickSelector({
           <button
             type="button"
             onClick={() => setIsEditingNote(true)}
-            className="text-[var(--accent-secondary)] hover:underline shrink-0 ml-1 font-semibold"
+            className="text-amber-700 dark:text-[var(--accent-secondary)] hover:underline shrink-0 ml-1 font-semibold cursor-pointer"
           >
             {note ? 'Editar' : '+ Nota'}
           </button>

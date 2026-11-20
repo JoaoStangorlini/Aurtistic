@@ -1,13 +1,16 @@
 // Este programa é um software livre (Licença AGPLv3)
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { StudioProvider, useStudio } from './StudioContext';
+import { useTheme } from '@/components/theme/ThemeProvider';
+import type { StudioStage } from './types';
 
 export interface OrganizationPostStudioProps {
   organizationId?: string | null;
   orgSlug?: string | null;
+  onStageChange?: (stage: StudioStage) => void;
 }
 
 const StudioLauncherView = dynamic(
@@ -39,8 +42,12 @@ const StudioPublishModal = dynamic(
   { ssr: false }
 );
 
-function StudioStageRouter({ orgSlug }: { orgSlug?: string | null }) {
+function StudioStageRouter({ orgSlug, onStageChange }: { orgSlug?: string | null; onStageChange?: (stage: StudioStage) => void }) {
   const { stage } = useStudio();
+
+  useEffect(() => {
+    onStageChange?.(stage);
+  }, [stage, onStageChange]);
 
   if (stage === 'launcher') {
     return <StudioLauncherView orgSlug={orgSlug} />;
@@ -54,11 +61,19 @@ function StudioStageRouter({ orgSlug }: { orgSlug?: string | null }) {
   );
 }
 
-export function OrganizationPostStudio({ organizationId, orgSlug }: OrganizationPostStudioProps) {
+export function OrganizationPostStudio({ organizationId, orgSlug, onStageChange }: OrganizationPostStudioProps) {
+  const { setIsStudioActive } = useTheme();
+
+  useEffect(() => {
+    return () => {
+      setIsStudioActive(false);
+    };
+  }, [setIsStudioActive]);
+
   return (
     <StudioProvider organizationId={organizationId} orgSlug={orgSlug}>
-      <div className="text-fg">
-        <StudioStageRouter orgSlug={orgSlug} />
+      <div className="text-fg flex-1 min-h-0 flex flex-col">
+        <StudioStageRouter orgSlug={orgSlug} onStageChange={onStageChange} />
       </div>
     </StudioProvider>
   );
