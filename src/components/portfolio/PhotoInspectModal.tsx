@@ -214,7 +214,15 @@ export function PhotoInspectModal({
 
           {/* Download Original */}
           <a
-            href={streamUrl}
+            href={(() => {
+              try {
+                const u = new URL(streamUrl, typeof window !== 'undefined' ? window.location.origin : 'https://aurtistic.local');
+                u.searchParams.set('download', '1');
+                return streamUrl.startsWith('http') ? u.toString() : `${u.pathname}${u.search}${u.hash}`;
+              } catch {
+                return streamUrl;
+              }
+            })()}
             download={currentItem.filename}
             title="Baixar Fotografia Original"
             className="p-2 bg-surface hover:bg-surface-hover text-fg-secondary hover:text-[#FFCC00] rounded-lg transition-colors"

@@ -64,18 +64,23 @@ export function CoachMarksProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const nextStep = useCallback(() => {
+    let willFinish = false;
     setCurrentStepIndex((prev) => {
       if (prev + 1 >= tour.steps.length) {
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('aurtistic:close-self-care-if-temporary'));
-          window.dispatchEvent(new CustomEvent('aurtistic:close-quick-filters-if-temporary'));
-          window.dispatchEvent(new CustomEvent('aurtistic:close-quick-links-if-temporary'));
-        }
-        setIsActive(false);
+        willFinish = true;
         return 0;
       }
       return prev + 1;
     });
+    // Side-effects fora do updater funcional do React (garantindo pureza do render)
+    if (willFinish) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('aurtistic:close-self-care-if-temporary'));
+        window.dispatchEvent(new CustomEvent('aurtistic:close-quick-filters-if-temporary'));
+        window.dispatchEvent(new CustomEvent('aurtistic:close-quick-links-if-temporary'));
+      }
+      setIsActive(false);
+    }
   }, [tour.steps.length]);
 
   const prevStep = useCallback(() => {
@@ -83,6 +88,16 @@ export function CoachMarksProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const currentStep = isActive && tour.steps[currentStepIndex] ? tour.steps[currentStepIndex] : null;
+
+  // Suporte a pending-tour armazenado em sessionStorage (ex: pós-redirecionamento ou tour pendente)
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const pendingTour = sessionStorage.getItem('aurtistic_pending_tour');
+    if (pendingTour) {
+      sessionStorage.removeItem('aurtistic_pending_tour');
+      startTour();
+    }
+  }, [startTour]);
 
   // Auto-Abertura Dinâmica de Painéis para o Spotlight
   React.useEffect(() => {
@@ -98,6 +113,12 @@ export function CoachMarksProvider({ children }: { children: ReactNode }) {
       window.dispatchEvent(new CustomEvent('aurtistic:ensure-quick-filters-open', { detail: { isTour: true } }));
     } else {
       window.dispatchEvent(new CustomEvent('aurtistic:close-quick-filters-if-temporary'));
+    }
+
+    if (currentStep.id === 'quick-links-hub' || currentStep.id === 'quick-links') {
+      window.dispatchEvent(new CustomEvent('aurtistic:ensure-quick-links-open', { detail: { isTour: true } }));
+    } else {
+      window.dispatchEvent(new CustomEvent('aurtistic:close-quick-links-if-temporary'));
     }
 
     if (currentStep.id === 'vault-preview-pane') {

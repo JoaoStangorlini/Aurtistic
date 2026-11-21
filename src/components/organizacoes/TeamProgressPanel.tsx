@@ -25,6 +25,20 @@ export interface TeamProgressPanelProps {
   onAssignAllToMe?: () => Promise<void>;
 }
 
+export function isTaskCompletedStatus(status?: string | null): boolean {
+  if (!status) return false;
+  const s = status.trim().toLowerCase();
+  return (
+    s === 'completa' ||
+    s === 'concluída' ||
+    s === 'concluida' ||
+    s === 'concluído' ||
+    s === 'concluido' ||
+    s === 'pronto' ||
+    s === 'done'
+  );
+}
+
 export function TeamProgressPanel({
   organization,
   subteams,
@@ -51,22 +65,55 @@ export function TeamProgressPanel({
     onSelectSubteamFilter?.(next === 'all' ? null : next);
   };
 
-  // Filtra tarefas da organização ativa
+  const getCanonicalMemberName = (m: OrganizationMember): string => {
+    if (m.user_id === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e') {
+      return (m as any).display_name || 'Stangorlini';
+    }
+    return (m as any).display_name || ((m as any).username && (m as any).username !== 'joao' ? (m as any).username : '') || m.full_name;
+  };
+
+  // Membros agrupados por subequipe da organização ativa + "Sem subequipe"
+  const groupedMembers = useMemo(() => {
+    const list: Array<{ subteam: OrganizationSubteam | null; items: OrganizationMember[] }> = [];
+
+    const relevantSubteams = activeSubteamTab === 'all'
+      ? subteams
+      : subteams.filter((s) => s.id === activeSubteamTab);
+
+    for (const sub of relevantSubteams) {
+      const subMems = members.filter((m) => m.subteam_id === sub.id);
+      if (subMems.length > 0 || activeSubteamTab !== 'all') {
+        list.push({ subteam: sub, items: subMems });
+      }
+    }
+
+    if (activeSubteamTab === 'all') {
+      const unassignedMems = members.filter(
+        (m) => !m.subteam_id || !subteams.some((s) => s.id === m.subteam_id)
+      );
+      if (unassignedMems.length > 0) {
+        list.push({ subteam: null, items: unassignedMems });
+      }
+    }
+
+    return list;
+  }, [members, subteams, activeSubteamTab]);
+
+  // Filtra tarefas da organização ativa (HUB/LabDiv restrito exclusivamente à org labdiv)
+  const isLabDivOrg = organization.id === '1ab41410-0000-4000-8000-000000000001' || organization.slug === 'labdiv' || organization.name?.toLowerCase().includes('labdiv');
   const orgTasks = useMemo(() => {
-    return tasks.filter(
-      (t) =>
-        t.organization_id === organization.id ||
-        t.dimensao === 'HUB' ||
-        t.dimensao === 'LabDiv' ||
-        (organization.name && t.dimensao === organization.name)
-    );
-  }, [tasks, organization.id, organization.name]);
+    return tasks.filter((t) => {
+      if (t.organization_id === organization.id) return true;
+      if (isLabDivOrg && (t.dimensao === 'HUB' || t.dimensao === 'LabDiv' || t.dimensao === 'labdiv')) return true;
+      return Boolean(organization.name && t.dimensao === organization.name);
+    });
+  }, [tasks, organization.id, organization.name, isLabDivOrg]);
 
   // Estatísticas gerais
   const stats = useMemo(() => {
     const total = orgTasks.length;
-    const completed = orgTasks.filter((t) => t.status === 'Concluído').length;
-    const inProgress = orgTasks.filter((t) => t.status === 'Em Andamento').length;
+    const completed = orgTasks.filter((t) => isTaskCompletedStatus(t.status)).length;
+    const inProgress = orgTasks.filter((t) => (t.status || '').toLowerCase().includes('andamento')).length;
     const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
     return { total, completed, inProgress, percent };
   }, [orgTasks]);
@@ -78,7 +125,7 @@ export function TeamProgressPanel({
         (t) => t.subteam_id === sub.id || (t.assigned_subteam_ids || []).includes(sub.id)
       );
       const subTotal = subTasks.length;
-      const subDone = subTasks.filter((t) => ['Concluído', 'completa', 'concluída'].includes(t.status)).length;
+      const subDone = subTasks.filter((t) => isTaskCompletedStatus(t.status)).length;
       const percent = subTotal > 0 ? Math.round((subDone / subTotal) * 100) : 0;
       return {
         ...sub,
@@ -92,7 +139,7 @@ export function TeamProgressPanel({
   // Tarefas sem responsável na organização ou na subequipe selecionada
   const unassignedTasks = useMemo(() => {
     return orgTasks.filter((t) => {
-      const isDone = t.status === 'Concluído' || t.status === 'done';
+      const isDone = isTaskCompletedStatus(t.status);
       if (isDone) return false;
       const hasAssignee =
         (t.assigned_member_ids && t.assigned_member_ids.length > 0) ||
@@ -249,103 +296,118 @@ export function TeamProgressPanel({
         </div>
       </div>
 
-      {/* Grid de Membros e Bateria Cognitiva */}
-      <div data-tour="org-members-section">
-        <h3 className="text-xs font-bold text-fg-secondary uppercase tracking-wider mb-3">
-          Membros da Equipe & Bateria Cognitiva
+      {/* Grid de Membros e Bateria Cognitiva agrupados por Subequipe */}
+      <div data-tour="org-members-section" className="space-y-4">
+        <h3 className="text-xs font-bold text-fg-secondary uppercase tracking-wider">
+          Membros da Equipe & Bateria Cognitiva (por Subequipe)
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {members.map((m) => {
-            const isSelected = selectedMemberId === m.id;
-            const capIcon =
-              m.cognitive_capacity === 'normal'
-                ? '🟢'
-                : m.cognitive_capacity === 'reduced'
-                  ? '🟡'
-                  : '🔴';
 
-            const memberTasks = orgTasks.filter(
-              (t) =>
-                (t.assigned_member_ids && t.assigned_member_ids.includes(m.id)) ||
-                (m.user_id && t.user_id === m.user_id) ||
-                (t.responsavel && t.responsavel.toLowerCase().includes(m.full_name.toLowerCase()))
-            );
+        {groupedMembers.map((group, gIdx) => (
+          <div key={group.subteam?.id || `unassigned_${gIdx}`} className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-teal-300">
+              <span className="material-symbols-outlined text-[16px]">
+                {group.subteam ? 'groups' : 'person_off'}
+              </span>
+              <span>{group.subteam ? group.subteam.name : 'Sem Subequipe'}</span>
+              <span className="text-[10px] text-fg-muted font-normal">
+                ({group.items.length} {group.items.length === 1 ? 'membro' : 'membros'})
+              </span>
+            </div>
 
-            const isCompleted = (status?: string | null) => {
-              const s = (status || '').toLowerCase();
-              return s === 'concluído' || s === 'concluido' || s === 'completa' || s === 'done';
-            };
-            const isInProgress = (status?: string | null) => {
-              const s = (status || '').toLowerCase();
-              return s === 'em andamento' || s === 'andamento' || s === 'fazendo';
-            };
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {group.items.map((m) => {
+                const isSelected = selectedMemberId === m.id;
+                const capIcon =
+                  m.cognitive_capacity === 'normal'
+                    ? '🟢'
+                    : m.cognitive_capacity === 'reduced'
+                      ? '🟡'
+                      : '🔴';
 
-            const now = Date.now();
-            const completedCount = memberTasks.filter((t) => isCompleted(t.status)).length;
-            const inProgressCount = memberTasks.filter((t) => isInProgress(t.status)).length;
-            const overdueCount = memberTasks.filter(
-              (t) => !isCompleted(t.status) && t.prazo && new Date(t.prazo).getTime() < now
-            ).length;
-            const pendingCount = Math.max(0, memberTasks.length - completedCount - inProgressCount);
+                const canonicalName = getCanonicalMemberName(m);
 
-            return (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() =>
-                  onSelectMemberFilter?.(isSelected ? null : m.id)
-                }
-                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between cursor-pointer gap-2 ${
-                  isSelected
-                    ? 'bg-[var(--accent-secondary)]/15 border-[var(--accent-secondary)] shadow-sm'
-                    : 'bg-app border-border-subtle hover:border-[var(--accent-primary)]/50'
-                }`}
-                title={m.capacity_note ? `Nota: ${m.capacity_note}` : m.full_name}
-              >
-                <div className="flex items-center justify-between gap-1">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-7 h-7 rounded-full bg-surface border border-border-subtle flex items-center justify-center text-[11px] font-bold text-fg shrink-0">
-                      {m.full_name.slice(0, 1).toUpperCase()}
-                    </div>
-                    <div className="min-w-0">
-                      <span className="text-xs font-bold text-fg block truncate">
-                        {m.full_name}
+                const memberTasks = orgTasks.filter(
+                  (t) =>
+                    (t.assigned_member_ids && t.assigned_member_ids.includes(m.id)) ||
+                    (m.user_id && t.user_id === m.user_id) ||
+                    (t.responsavel && t.responsavel.toLowerCase().includes(m.full_name.toLowerCase())) ||
+                    (t.responsavel && t.responsavel.toLowerCase().includes(canonicalName.toLowerCase()))
+                );
+
+                const isCompleted = isTaskCompletedStatus;
+                const isInProgress = (status?: string | null) => {
+                  const s = (status || '').toLowerCase();
+                  return s === 'em andamento' || s === 'andamento' || s === 'fazendo';
+                };
+
+                const now = Date.now();
+                const completedCount = memberTasks.filter((t) => isCompleted(t.status)).length;
+                const inProgressCount = memberTasks.filter((t) => isInProgress(t.status)).length;
+                const overdueCount = memberTasks.filter(
+                  (t) => !isCompleted(t.status) && t.prazo && new Date(t.prazo).getTime() < now
+                ).length;
+                const pendingCount = Math.max(0, memberTasks.length - completedCount - inProgressCount);
+
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() =>
+                      onSelectMemberFilter?.(isSelected ? null : m.id)
+                    }
+                    className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between cursor-pointer gap-2 ${
+                      isSelected
+                        ? 'bg-[var(--accent-secondary)]/15 border-[var(--accent-secondary)] shadow-sm'
+                        : 'bg-app border-border-subtle hover:border-[var(--accent-primary)]/50'
+                    }`}
+                    title={m.capacity_note ? `Nota: ${m.capacity_note}` : canonicalName}
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-7 h-7 rounded-full bg-surface border border-border-subtle flex items-center justify-center text-[11px] font-bold text-fg shrink-0">
+                          {canonicalName.slice(0, 1).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-xs font-bold text-fg block truncate">
+                            {canonicalName}
+                          </span>
+                          {m.is_placeholder && (
+                            <span className="text-[10px] text-amber-400 font-mono block">
+                              (placeholder)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-xs shrink-0" title={`Capacidade: ${m.cognitive_capacity}`}>
+                        {capIcon}
                       </span>
-                      {m.is_placeholder && (
-                        <span className="text-[10px] text-amber-400 font-mono block">
-                          (placeholder)
-                        </span>
-                      )}
                     </div>
-                  </div>
-                  <span className="text-xs shrink-0" title={`Capacidade: ${m.cognitive_capacity}`}>
-                    {capIcon}
-                  </span>
-                </div>
 
-                {/* Cards de Carga por Membro: Concluídas, Em Andamento, Pendentes, Atrasadas */}
-                <div className="grid grid-cols-4 gap-1 text-center pt-2 border-t border-border-subtle text-[10px]">
-                  <div className="p-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 font-semibold" title="Concluídas">
-                    <span className="block text-[9px] opacity-75">🟢 Feito</span>
-                    <span>{completedCount}</span>
-                  </div>
-                  <div className="p-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300 font-semibold" title="Em Andamento">
-                    <span className="block text-[9px] opacity-75">🟡 Andam.</span>
-                    <span>{inProgressCount}</span>
-                  </div>
-                  <div className="p-1 rounded bg-white/5 border border-white/10 text-white/70 font-semibold" title="Pendentes">
-                    <span className="block text-[9px] opacity-75">⚪ Pend.</span>
-                    <span>{pendingCount}</span>
-                  </div>
-                  <div className={`p-1 rounded font-semibold ${overdueCount > 0 ? 'bg-rose-500/15 border border-rose-500/30 text-rose-300' : 'bg-white/5 border border-white/10 text-white/40'}`} title="Atrasadas">
-                    <span className="block text-[9px] opacity-75">🔴 Atraso</span>
-                    <span>{overdueCount}</span>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+                    {/* Cards de Carga por Membro: Concluídas, Em Andamento, Pendentes, Atrasadas */}
+                    <div className="grid grid-cols-4 gap-1 text-center pt-2 border-t border-border-subtle text-[10px]">
+                      <div className="p-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 font-semibold" title="Concluídas">
+                        <span className="block text-[9px] opacity-75">🟢 Feito</span>
+                        <span>{completedCount}</span>
+                      </div>
+                      <div className="p-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300 font-semibold" title="Em Andamento">
+                        <span className="block text-[9px] opacity-75">🟡 Andam.</span>
+                        <span>{inProgressCount}</span>
+                      </div>
+                      <div className="p-1 rounded bg-white/5 border border-white/10 text-white/70 font-semibold" title="Pendentes">
+                        <span className="block text-[9px] opacity-75">⚪ Pend.</span>
+                        <span>{pendingCount}</span>
+                      </div>
+                      <div className={`p-1 rounded font-semibold ${overdueCount > 0 ? 'bg-rose-500/15 border border-rose-500/30 text-rose-300' : 'bg-white/5 border border-white/10 text-white/40'}`} title="Atrasadas">
+                        <span className="block text-[9px] opacity-75">🔴 Atraso</span>
+                        <span>{overdueCount}</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Seção 1: Fila de Tarefas Sem Responsável (Abertas na Categoria - Expansível) */}

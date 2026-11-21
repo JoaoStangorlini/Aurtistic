@@ -183,7 +183,12 @@ export function ThemeProvider({
     metaThemeColor.setAttribute('content', themeBg);
 
     // Atualiza dinamicamente o Favicon, Apple Touch Icon e Manifest da aba com base na paleta efetiva
-    const iconHref = `/icons/icon-${effectivePalette}.png`;
+    const ORG_FAVICON_MAP: Record<string, string> = {
+      labdiv: '/icons/icon-cyan-amber.png',
+      'show-da-fisica': '/icons/icon-blue-red.png',
+      hackerspace: '/icons/icon-emerald-violet.png',
+    };
+    const iconHref = ORG_FAVICON_MAP[effectivePalette] || `/icons/icon-${effectivePalette}.png`;
     const iconRels = ['icon', 'shortcut icon', 'apple-touch-icon'];
     iconRels.forEach((rel) => {
       let linkEl = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
@@ -244,35 +249,29 @@ export function ThemeProvider({
 
   const setThemeMode = useCallback(
     (mode: ThemeMode) => {
-      setPreferences((prev) => {
-        const next: ThemePreferences = { ...prev, mode, updatedAt: new Date().toISOString() };
-        persistPreferences(next);
-        return next;
-      });
+      const next: ThemePreferences = { ...preferences, mode, updatedAt: new Date().toISOString() };
+      setPreferences(next);
+      persistPreferences(next);
     },
-    [persistPreferences]
+    [preferences, persistPreferences]
   );
 
   const setThemePalette = useCallback(
     (palette: ThemePaletteId) => {
-      setPreferences((prev) => {
-        const next: ThemePreferences = { ...prev, palette, updatedAt: new Date().toISOString() };
-        persistPreferences(next);
-        return next;
-      });
+      const next: ThemePreferences = { ...preferences, palette, updatedAt: new Date().toISOString() };
+      setPreferences(next);
+      persistPreferences(next);
     },
-    [persistPreferences]
+    [preferences, persistPreferences]
   );
 
   const setOverrideOrgTheme = useCallback(
     (overrideOrgTheme: boolean) => {
-      setPreferences((prev) => {
-        const next: ThemePreferences = { ...prev, overrideOrgTheme, updatedAt: new Date().toISOString() };
-        persistPreferences(next);
-        return next;
-      });
+      const next: ThemePreferences = { ...preferences, overrideOrgTheme, updatedAt: new Date().toISOString() };
+      setPreferences(next);
+      persistPreferences(next);
     },
-    [persistPreferences]
+    [preferences, persistPreferences]
   );
 
   const contextValue = useMemo(

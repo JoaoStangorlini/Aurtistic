@@ -251,7 +251,6 @@ export async function issueOrganizationVaultSession(
         } catch {}
 
         const email = (user?.email || '').toLowerCase().trim();
-        const username = (user?.user_metadata?.username || '').toLowerCase().trim();
         const isConfirmedGlobalAdmin =
           isProfileAdmin ||
           userId === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e' ||
@@ -261,11 +260,7 @@ export async function issueOrganizationVaultSession(
           email === 'joaostangorlini@usp.br' ||
           email === 'joao@aurtistic.com' ||
           email === 'hublabdiv@gmail.com' ||
-          username === 'joaostangorlini' ||
-          username === 'joao' ||
-          username === 'hublabdiv' ||
-          user?.app_metadata?.role === 'admin' ||
-          user?.user_metadata?.role === 'admin';
+          user?.app_metadata?.role === 'admin';
 
         if (isConfirmedGlobalAdmin) {
           allowFallback = true;
@@ -333,6 +328,7 @@ export async function issueOrganizationVaultSession(
     scopeType: 'org',
     organizationId: org.id,
     orgSlug: org.slug,
+    allowedOrgSlugs: [org.slug],
     readOnly: !canWrite,
     unlockedPins: options?.unlockedPins,
     ttlMs: VAULT_TICKET_TTL_MS,
@@ -486,7 +482,9 @@ export function signEdgeTenantTicket(options: SignEdgeTicketOptions): SignedEdge
     ...(options.orgSlug || (options.organizationId && DEFAULT_ECOSYSTEM_ORGS_BY_ID[options.organizationId]?.slug)
       ? { orgSlug: options.orgSlug || DEFAULT_ECOSYSTEM_ORGS_BY_ID[options.organizationId!]?.slug }
       : {}),
-    ...(options.allowedOrgSlugs?.length ? { allowedOrgSlugs: options.allowedOrgSlugs } : {}),
+    allowedOrgSlugs: Array.isArray(options.allowedOrgSlugs)
+      ? options.allowedOrgSlugs.map((s) => String(s).trim().toLowerCase()).filter(Boolean)
+      : [],
     ...(resolvedAllowedPrefix ? { allowedPrefix: resolvedAllowedPrefix } : {}),
     ...(normalizedAllowedPaths ? { allowedPaths: normalizedAllowedPaths } : {}),
     ...(isReadOnly ? { readOnly: true } : {}),
@@ -526,9 +524,18 @@ export function attachSignedPublicMediaUrls<T extends Pick<UserFileIndexRow, 'us
     ttlMs?: number;
     omitFullUrls?: boolean;
     useSharedPrefix?: string;
+    orgContext?: { organizationId: string; orgSlug: string } | null;
   }
 ): Array<T & { signedThumbUrl: string; signedStreamUrl: string; itemTicket: string }> {
   const serverUrl = getEdgeStorageServerUrl();
+  const orgScopeFields = options?.orgContext?.organizationId && options?.orgContext?.orgSlug
+    ? {
+        scopeType: 'org' as const,
+        organizationId: options.orgContext.organizationId,
+        orgSlug: options.orgContext.orgSlug,
+        allowedOrgSlugs: [options.orgContext.orgSlug],
+      }
+    : {};
 
   // Otimização: se useSharedPrefix for passado (ex: 'Portfolio'), assina 1 ticket único
   // para o lote todo, economizando CPU HMAC e payload
@@ -539,6 +546,7 @@ export function attachSignedPublicMediaUrls<T extends Pick<UserFileIndexRow, 'us
     if (sameUser) {
       const signed = signEdgeTenantTicket({
         userId: firstUserId,
+        ...orgScopeFields,
         purpose: 'public_media',
         allowedPrefix: options.useSharedPrefix,
         readOnly: true,
@@ -554,6 +562,7 @@ export function attachSignedPublicMediaUrls<T extends Pick<UserFileIndexRow, 'us
       sharedTicket ||
       signEdgeTenantTicket({
         userId: item.user_id,
+        ...orgScopeFields,
         purpose: 'public_media',
         allowedPaths: [item.relative_path],
         readOnly: true,

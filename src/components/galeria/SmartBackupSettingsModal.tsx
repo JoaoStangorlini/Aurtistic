@@ -29,7 +29,7 @@ export function saveSmartBackupPreferences(prefs: SmartBackupPreferences) {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
-  } catch {}
+  } catch { }
 }
 
 interface SmartBackupSettingsModalProps {
@@ -66,13 +66,13 @@ export function SmartBackupSettingsModal({
           wifiOnly: prefs.wifiOnly,
         });
       }
-    } catch {}
+    } catch { }
 
     onSaved?.(prefs);
     onClose();
   };
 
-  const policies: { id: PostBackupStoragePolicy; title: string; desc: string }[] = [
+  const policies: { id: PostBackupStoragePolicy; title: string; desc: string; nativeOnly?: boolean }[] = [
     {
       id: 'keep_original',
       title: 'A) Manter foto original no aparelho',
@@ -81,12 +81,14 @@ export function SmartBackupSettingsModal({
     {
       id: 'delete_local',
       title: 'B) Apagar do aparelho após backup verificado',
-      desc: 'Remove o arquivo local somente após ACK do servidor com tamanho e SHA-256 validados.',
+      desc: 'Disponível no app Android nativo: remove o arquivo local somente após validação SHA-256 no servidor.',
+      nativeOnly: true,
     },
     {
       id: 'replace_compressed',
       title: 'C) Substituir local por versão comprimida leve (Anti-Loop)',
-      desc: 'Mantém 100% original no servidor Edge e troca a cópia local por versão ~180 KB assinada para nunca sobrescrever o original.',
+      desc: 'Disponível no app Android nativo: mantém original no Edge e cria proxy assinado no aparelho.',
+      nativeOnly: true,
     },
   ];
 
@@ -143,28 +145,43 @@ export function SmartBackupSettingsModal({
           <div className="text-xs font-bold uppercase tracking-wider text-fg-muted">
             Política Pós-Backup Verificado (SHA-256)
           </div>
-          {policies.map((pol) => (
-            <label
-              key={pol.id}
-              className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-                prefs.postBackupPolicy === pol.id
-                  ? 'border-teal-500 bg-teal-500/10'
-                  : 'border-border-subtle bg-app hover:border-border-strong'
-              }`}
-            >
-              <input
-                type="radio"
-                name="postBackupPolicy"
-                checked={prefs.postBackupPolicy === pol.id}
-                onChange={() => setPrefs((p) => ({ ...p, postBackupPolicy: pol.id }))}
-                className="mt-1"
-              />
-              <div>
-                <div className="text-xs font-bold text-white">{pol.title}</div>
-                <div className="text-[11px] text-fg-muted mt-0.5">{pol.desc}</div>
-              </div>
-            </label>
-          ))}
+          {policies.map((pol) => {
+            const isNative = typeof window !== 'undefined' && Boolean((window as any).Capacitor?.isNativePlatform?.());
+            const isDisabled = Boolean(pol.nativeOnly && !isNative);
+
+            return (
+              <label
+                key={pol.id}
+                className={`flex items-start gap-3 p-3 rounded-xl border transition-colors ${
+                  isDisabled
+                    ? 'opacity-50 cursor-not-allowed border-border-subtle bg-app'
+                    : prefs.postBackupPolicy === pol.id
+                    ? 'border-teal-500 bg-teal-500/10 cursor-pointer'
+                    : 'border-border-subtle bg-app hover:border-border-strong cursor-pointer'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="postBackupPolicy"
+                  disabled={isDisabled}
+                  checked={prefs.postBackupPolicy === pol.id}
+                  onChange={() => !isDisabled && setPrefs((p) => ({ ...p, postBackupPolicy: pol.id }))}
+                  className="mt-1"
+                />
+                <div>
+                  <div className="text-xs font-bold text-white flex items-center gap-2">
+                    <span>{pol.title}</span>
+                    {isDisabled && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                        App Android Nativo
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-fg-muted mt-0.5">{pol.desc}</div>
+                </div>
+              </label>
+            );
+          })}
         </div>
 
         <div className="flex justify-end gap-3 pt-2">

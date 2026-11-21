@@ -60,6 +60,11 @@ export function GooglePhotosTimelineView({
   }, [organizationId]);
   const [userOrgs, setUserOrgs] = useState<{ id: string; name: string; slug: string }[]>([]);
   const [selectedAlbum, setSelectedAlbum] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    setSelectedAlbum(null);
+  }, [selectedOrgId]);
   const [availableAlbums, setAvailableAlbums] = useState<{ name: string; count: number }[]>([]);
   const [items, setItems] = useState<GalleryTimelineItem[]>([]);
   const [nextCursor, setNextCursor] = useState<GalleryTimelineCursor | null>(null);
@@ -153,7 +158,7 @@ export function GooglePhotosTimelineView({
         setLoadingMore(false);
       }
     },
-    [filter, selectedOrgId, selectedAlbum]
+    [filter, selectedOrgId, selectedAlbum, sortPref]
   );
 
   useEffect(() => {

@@ -112,7 +112,7 @@ export default function AurtisticWorkspaceClient({
   // Toggle active feature
   const handleToggleFeature = (feature: string) => {
     if (activeFeatures.includes(feature)) {
-      if (feature === 'tasks' && activeFeatures.length === 1) {
+      if (activeFeatures.length === 1) {
         alert("Você deve manter pelo menos uma ferramenta ativa.");
         return;
       }
@@ -140,23 +140,31 @@ export default function AurtisticWorkspaceClient({
 
   // Save workspace preferences
   const handleSaveConfig = async () => {
+    if (activeFeatures.length === 0) {
+      alert("Mantenha pelo menos uma ferramenta ativa no seu espaço.");
+      return;
+    }
     setIsSaving(true);
     try {
-      const updatedConfig = {
+      const updatedPatch = {
         active: activeFeatures,
         order: featuresOrder,
         layout_style: featuresConfig.layout_style || 'default',
         labels,
         custom_links: customLinks
       };
-      await saveUserProfileData({ features_config: updatedConfig }).catch(() => console.log('Offline: profile update queued'));
-      await saveProfileToCache({ ...profile, features_config: updatedConfig });
-      setProfile({ ...profile, features_config: updatedConfig });
+      await saveUserProfileData({ features_config: updatedPatch });
+      const mergedFeatures = {
+        ...(profile?.features_config || {}),
+        ...updatedPatch,
+      };
+      await saveProfileToCache({ ...profile, features_config: mergedFeatures });
+      setProfile({ ...profile, features_config: mergedFeatures });
       setShowConfig(false);
       // Reload page to update Navbar
       window.location.reload();
     } catch (e) {
-      alert("Erro ao salvar configurações: " + String(e));
+      alert("Erro ao salvar configurações: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setIsSaving(false);
     }
@@ -334,12 +342,16 @@ export default function AurtisticWorkspaceClient({
       {activeFeatures.includes('tasks') ? (
         <div className="space-y-4">
           {/* Bento Grid M3 de Cuidados & Links Rápidos (8px grid) */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-            {advancedSettings.show_quick_links !== false && (
-              <AurtisticQuickLinks initialLinks={profile?.quick_links || []} userId={userId} />
-            )}
-            <SelfCareHub />
-          </div>
+          {(advancedSettings.show_quick_links !== false || profile?.features_config?.modules?.selfCare !== false) && (
+            <div className={`grid grid-cols-1 ${advancedSettings.show_quick_links !== false && profile?.features_config?.modules?.selfCare !== false ? 'xl:grid-cols-2' : ''} gap-4 items-start`}>
+              {advancedSettings.show_quick_links !== false && (
+                <AurtisticQuickLinks initialLinks={profile?.quick_links || []} userId={userId} />
+              )}
+              {profile?.features_config?.modules?.selfCare !== false && (
+                <SelfCareHub />
+              )}
+            </div>
+          )}
 
           <TasksView 
             initialTasks={getCurrentTasks()} 

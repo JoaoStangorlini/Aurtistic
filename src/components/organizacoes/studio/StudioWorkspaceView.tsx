@@ -53,6 +53,7 @@ export function StudioWorkspaceView() {
     pasteClipboardLayers,
     updateLayer,
     reorderLayers,
+    moveLayerStep,
     setSelectedLayerId,
     setSelectedLayerIds,
     activeSlide,
@@ -143,9 +144,7 @@ export function StudioWorkspaceView() {
     },
     onReorderLayer: (up) => {
       if (!selectedLayer) return;
-      const idx = activeSlide.layers.findIndex((l) => l.id === selectedLayer.id);
-      if (up && idx < activeSlide.layers.length - 1) reorderLayers(idx, idx + 1);
-      else if (!up && idx > 0) reorderLayers(idx, idx - 1);
+      moveLayerStep(selectedLayer.id, up ? 'up' : 'down');
     },
     onSaveDraft: () => saveCurrentToDraftSlot(activeDraftSlot || 1),
     onClearSelection: () => setSelectedLayerId(null),
@@ -285,12 +284,12 @@ export function StudioWorkspaceView() {
 
           <button
             type="button"
-            onClick={addSlide}
-            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-xl border border-border-subtle bg-app text-[11px] font-bold text-fg-secondary hover:text-fg hover:border-[#FFCC00]/60 transition-all cursor-pointer shrink-0"
+            onClick={() => addSlide()}
+            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-xl border border-border-subtle bg-app text-[11px] font-bold text-fg-secondary hover:text-fg hover:border-accent-primary transition-all cursor-pointer shrink-0"
             title="Adicionar Novo Slide ao Carrossel"
           >
             <span className="material-symbols-outlined text-[15px]">add</span>
-            <span className="hidden xs:inline">Slide</span>
+            <span className="hidden sm:inline">Tela</span>
           </button>
         </div>
 

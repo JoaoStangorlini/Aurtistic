@@ -147,7 +147,13 @@ export function StudioTextPanel() {
       const parts = newVal.match(/[^.!?]+[.!?]+/g) || [newVal.slice(0, 150), newVal.slice(150)];
       if (parts.length > 1) {
         updateLayer(selectedTextLayer.id, { text: parts[0].trim() });
-        for (let i = 1; i < Math.min(parts.length, 4); i++) { addSlide(); }
+        for (let i = 1; i < Math.min(parts.length, 4); i++) {
+          addSlide([{
+            ...selectedTextLayer,
+            id: `text-${crypto.randomUUID()}`,
+            text: parts[i].trim(),
+          }]);
+        }
         return;
       }
     }

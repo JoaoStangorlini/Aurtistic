@@ -93,6 +93,10 @@
     --org-primary: var(--accent-primary);
     --org-secondary: var(--accent-secondary);
     --org-tertiary: #F14343;
+
+    --radius-card: 1rem;
+    --radius-panel: 0.75rem;
+    --radius-control: 0.5rem;
   }
 
   /* Modo Claro */
@@ -338,6 +342,16 @@
     --org-primary: #00D4FF;
     --org-secondary: #FFE600;
     --org-tertiary: #FF1E56;
+
+    --radius-sm: 0px;
+    --radius-md: 0px;
+    --radius-lg: 0px;
+    --radius-xl: 0px;
+    --radius-2xl: 0px;
+    --radius-3xl: 0px;
+    --radius-card: 0px;
+    --radius-panel: 0px;
+    --radius-control: 0px;
   }
   html[data-theme-palette="show-da-fisica"][data-theme-mode="light"] {
     --bg-app: #F8FAFC;
@@ -573,9 +587,85 @@
 }
 
 /* =====================================================================
+   IDENTIDADE VISUAL DOS CARDS POR ORGANIZAÇÃO (.org-card)
+   ===================================================================== */
+/* LabDiv: destaque colorido no topo + borda ciano oficial */
+html[data-theme-palette="labdiv"] .org-card,
+[data-org-brand="labdiv"] .org-card {
+  position: relative;
+  border-color: rgba(31, 159, 207, 0.45) !important;
+  box-shadow: 0 8px 28px -12px rgba(31, 159, 207, 0.25);
+}
+html[data-theme-palette="labdiv"] .org-card::before,
+[data-org-brand="labdiv"] .org-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+  background: linear-gradient(90deg, #1F9FCF 0%, #FFCC00 50%, #F14343 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Show de Física: cards quadrados (bordas retas) e neon nas cores da marca (nunca branco) */
+html[data-theme-palette="show-da-fisica"] .org-card,
+[data-org-brand="show-da-fisica"] .org-card {
+  border-radius: 0 !important;
+  background-color: rgba(6, 10, 20, 0.94) !important;
+  border: 1.5px solid #00D4FF !important;
+  box-shadow: 0 0 16px rgba(0, 212, 255, 0.22), inset 0 0 12px rgba(0, 47, 254, 0.12) !important;
+}
+html[data-theme-palette="show-da-fisica"] .org-card:nth-of-type(3n + 1),
+[data-org-brand="show-da-fisica"] .org-card:nth-of-type(3n + 1) {
+  border-color: #01F300 !important;
+  box-shadow: 0 0 16px rgba(1, 243, 0, 0.22), inset 0 0 12px rgba(1, 243, 0, 0.08) !important;
+}
+html[data-theme-palette="show-da-fisica"] .org-card:nth-of-type(3n + 3),
+[data-org-brand="show-da-fisica"] .org-card:nth-of-type(3n + 3) {
+  border-color: #F60011 !important;
+  box-shadow: 0 0 16px rgba(246, 0, 17, 0.22), inset 0 0 12px rgba(246, 0, 17, 0.08) !important;
+}
+html[data-theme-palette="show-da-fisica"][data-theme-mode="light"] .org-card,
+[data-org-brand="show-da-fisica"][data-theme-mode="light"] .org-card {
+  background-color: #F4F7FF !important;
+  border-color: #002FFE !important;
+  box-shadow: 0 4px 16px rgba(0, 47, 254, 0.10) !important;
+}
+
+/* Hackerspace: borda verde terminal */
+html[data-theme-palette="hs"] .org-card,
+[data-org-brand="hs"] .org-card {
+  background-color: rgba(8, 16, 12, 0.94) !important;
+  border: 1px solid rgba(0, 255, 102, 0.48) !important;
+  box-shadow: 0 0 16px rgba(0, 255, 102, 0.12), inset 0 0 10px rgba(0, 255, 102, 0.05) !important;
+}
+html[data-theme-palette="hs"][data-theme-mode="light"] .org-card,
+[data-org-brand="hs"][data-theme-mode="light"] .org-card {
+  background-color: #FFFFFF !important;
+  border-color: rgba(5, 150, 105, 0.45) !important;
+  box-shadow: 0 4px 16px rgba(5, 150, 105, 0.10) !important;
+}
+
+/* =====================================================================
    CÂMARA ESCURA PARA FOTOGRAFIA & DOCK DO STUDIO (PRESERVAÇÃO ÓPTICA)
    ===================================================================== */
 [data-darkroom="true"],
+.studio-dock-dark {
+  color-scheme: dark;
+  --radius-sm: 0.125rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  --radius-card: 1rem;
+  --radius-panel: 0.75rem;
+  --radius-control: 0.5rem;
+}
 .studio-dock-dark {
   color-scheme: dark !important;
   --bg-app: #0A0A0A !important;
@@ -827,4 +917,47 @@ html:not([data-theme-palette="purple-gold"]) .from-\[\#FFCC00\].to-\[\#9D4EDD\] 
 }
 .studio-range-slider::-moz-range-thumb:hover {
   transform: scale(1.2);
+}
+
+@layer components {
+  .org-task-checkbox {
+    border-radius: var(--radius-control, 0.5rem);
+    border: 1.5px solid var(--border-strong);
+    background-color: var(--bg-surface);
+    color: var(--on-accent-primary);
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .org-task-checkbox[data-checked="true"],
+  .org-task-checkbox[data-indeterminate="true"] {
+    background-color: var(--accent-primary);
+    border-color: var(--accent-primary);
+  }
+  html[data-theme-palette="show-da-fisica"] .org-task-checkbox[data-checked="true"],
+  html[data-theme-palette="show-da-fisica"] .org-task-checkbox[data-indeterminate="true"] {
+    box-shadow: 0 0 8px color-mix(in srgb, var(--accent-primary) 45%, transparent);
+  }
+  html[data-theme-palette="labdiv"] .org-task-checkbox[data-checked="true"],
+  html[data-theme-palette="labdiv"] .org-task-checkbox[data-indeterminate="true"] {
+    background-color: #00E5FF;
+    border-color: #FFCC00;
+    color: #07090E;
+  }
+  html[data-theme-palette="hs"] .org-task-checkbox[data-checked="true"],
+  html[data-theme-palette="hs"] .org-task-checkbox[data-indeterminate="true"] {
+    background-color: #00FF66;
+    border-color: #00FF66;
+    color: #041008;
+  }
+  html[data-theme-palette="aurtistic"] .org-task-checkbox[data-checked="true"],
+  html[data-theme-palette="aurtistic"] .org-task-checkbox[data-indeterminate="true"] {
+    border-radius: 0.375rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

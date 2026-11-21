@@ -22,11 +22,11 @@ export function useTenantTicketRefresh(
   const unlockedPins = options?.unlockedPins;
   const readOnly = options?.readOnly;
 
-  const refreshTicket = useCallback(async () => {
+  const refreshTicket = useCallback(async (overrideUnlockedPins?: string[]) => {
     try {
       const res = await refreshTenantTicketAction({
         purpose,
-        unlockedPins,
+        unlockedPins: overrideUnlockedPins || unlockedPins,
         readOnly,
       });
       if (res.ok) {

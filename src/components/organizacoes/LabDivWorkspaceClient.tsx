@@ -867,7 +867,7 @@ export function LabDivWorkspaceClient({
       <OrganizationAdminModal
         isOpen={isAdminModalOpen}
         onClose={() => setIsAdminModalOpen(false)}
-        organization={organization}
+        organization={currentOrg}
         subteams={subteams}
         members={members}
         tasks={tasks}
@@ -880,7 +880,8 @@ export function LabDivWorkspaceClient({
       <OrganizationPlaybooksModal
         isOpen={isPlaybooksOpen}
         onClose={() => setIsPlaybooksOpen(false)}
-        organizationId={organization.id}
+        organizationId={currentOrg.id}
+        currentOrg={currentOrg}
         subteams={subteams}
       />
 

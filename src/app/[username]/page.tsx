@@ -35,7 +35,31 @@ export default async function SharedProfilePage({ params }: PageProps) {
 
   const userId = resolved.userId as string;
   const publicSlug = (resolved.publicSlug as string) || username;
-  const userProfile = signPressClippingsMediaUrls(resolved.userProfile, userId);
+  const rawFeatures = (resolved.userProfile?.features_config || {}) as Record<string, unknown>;
+  const safeFeatures: Record<string, unknown> = {};
+  for (const key of [
+    'active',
+    'order',
+    'layout_style',
+    'labels',
+    'custom_links',
+    'theme',
+    'portfolio_sections',
+    'hidden_photo_ids',
+    'hidden_photo_folders',
+    'press_clippings',
+    'instagram_embeds',
+    'gallery_iframe_url',
+    'portfolio_album_order',
+    'portfolio_subfolder_order',
+  ]) {
+    if (key in rawFeatures) safeFeatures[key] = rawFeatures[key];
+  }
+  const sanitizedProfile = {
+    ...resolved.userProfile,
+    features_config: safeFeatures,
+  };
+  const userProfile = signPressClippingsMediaUrls(sanitizedProfile, userId);
   const creatorPalette = userProfile?.features_config?.theme?.palette;
 
   const {

@@ -129,6 +129,7 @@ export const parseICSFile = (icsText: string): ParsedICSEvent[] => {
     if (summary || dtstart) {
       const formatICSDateToIso = (icsDateStr: string): string | null => {
         if (!icsDateStr) return null;
+        const isUtc = icsDateStr.endsWith('Z');
         const clean = icsDateStr.replace(/[^0-9T]/g, '');
         if (clean.length >= 8) {
           const yyyy = clean.substring(0, 4);
@@ -137,7 +138,11 @@ export const parseICSFile = (icsText: string): ParsedICSEvent[] => {
           if (clean.includes('T') && clean.length >= 13) {
             const hh = clean.substring(9, 11);
             const min = clean.substring(11, 13);
-            return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+            const ss = clean.length >= 15 ? clean.substring(13, 15) : '00';
+            if (isUtc) {
+              return new Date(Date.UTC(+yyyy, +mm - 1, +dd, +hh, +min, +ss)).toISOString();
+            }
+            return `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`;
           }
           return `${yyyy}-${mm}-${dd}`;
         }

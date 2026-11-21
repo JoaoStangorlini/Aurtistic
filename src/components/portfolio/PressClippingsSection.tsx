@@ -167,7 +167,10 @@ export function PressClippingsSection({
         ? sorted.map((c) => (c.id === editingId ? nextItem : c))
         : [...sorted, nextItem];
 
-      await onSaveClippings(nextList.map((item, idx) => ({ ...item, displayOrder: idx })));
+      const stripSigned = (arr: PressClippingItem[]) =>
+        arr.map(({ signedPhysicalPageUrl: _p, signedOriginalPhotoUrl: _o, ...rest }) => rest);
+
+      await onSaveClippings(stripSigned(nextList.map((item, idx) => ({ ...item, displayOrder: idx }))));
       setIsModalOpen(false);
     } finally {
       setSaving(false);
@@ -178,7 +181,7 @@ export function PressClippingsSection({
     if (!confirm('Remover este recorte de jornal do portfólio?')) return;
     const nextList = sorted
       .filter((c) => c.id !== id)
-      .map((item, idx) => ({ ...item, displayOrder: idx }));
+      .map(({ signedPhysicalPageUrl: _p, signedOriginalPhotoUrl: _o, ...rest }, idx) => ({ ...rest, displayOrder: idx }));
     await onSaveClippings(nextList);
   };
 
@@ -188,7 +191,7 @@ export function PressClippingsSection({
     const next = [...sorted];
     const [moved] = next.splice(index, 1);
     next.splice(targetIdx, 0, moved);
-    await onSaveClippings(next.map((item, idx) => ({ ...item, displayOrder: idx })));
+    await onSaveClippings(next.map(({ signedPhysicalPageUrl: _p, signedOriginalPhotoUrl: _o, ...rest }, idx) => ({ ...rest, displayOrder: idx })));
   };
 
   return (

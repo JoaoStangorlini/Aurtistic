@@ -235,6 +235,15 @@ export function LiveMeetingSplitWorkspace({
         throw new Error(errorData.error || 'Falha na sintetização da ata.');
       }
 
+      // Sincroniza a ata publicada antes de abrir o modal de revisão
+      const analyzeData = await res.json().catch(() => null);
+      if (analyzeData?.meeting?.published_ata_markdown) {
+        setMeeting((prev) => ({
+          ...prev,
+          published_ata_markdown: analyzeData.meeting.published_ata_markdown,
+        }));
+      }
+
       // 4. Abre modal de aprovação/revisão
       setShowReviewModal(true);
       onMeetingFinished?.();

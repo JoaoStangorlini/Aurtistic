@@ -89,7 +89,7 @@ export function HealthMedicalRemindersPanel() {
           // Data já ultrapassou: candidato a mover para histórico
           upcoming.push({ item: it, daysUntil: days });
         }
-      } else {
+      } else if (!it.lastDoneDate) {
         toSchedule.push(it);
       }
 

@@ -101,6 +101,7 @@ export function TaskFormModal({
           ? task.assigned_subteam_ids
           : (task.subteam_id ? [task.subteam_id] : []),
         assigned_member_ids: task.assigned_member_ids || [],
+        custom_fields: task.custom_fields || {},
       });
 
       let fType = '';
@@ -149,6 +150,7 @@ export function TaskFormModal({
           ? defaultValues.assigned_subteam_ids
           : (defaultValues?.subteam_id ? [defaultValues.subteam_id] : []),
         assigned_member_ids: defaultValues?.assigned_member_ids || [],
+        custom_fields: defaultValues?.custom_fields || {},
       });
       setFreqType('');
       setFreqDetail('');
@@ -200,7 +202,9 @@ export function TaskFormModal({
   });
   const [isSubtasksOpen, setIsSubtasksOpen] = useState(() => (task?.subtasks?.length || 0) > 0);
   const [isMoreOptionsOpen, setIsMoreOptionsOpen] = useState(() => Boolean(task?.frequencia || (task?.custom_fields && Object.keys(task.custom_fields).length > 0)));
+  const isSubmittingRef = useRef(false);
 
+  // ⚠️ Early return DEVE vir DEPOIS de todos os hooks (Rules of Hooks)
   if (!isOpen) return null;
 
   const selectedSubteamIds = formData.assigned_subteam_ids || [];
@@ -216,8 +220,6 @@ export function TaskFormModal({
   const updateSubtask = (id: string, patch: Partial<Task>) => {
     setLocalSubtasks(prev => prev.map(st => (st.id === id ? { ...st, ...patch } : st)));
   };
-
-  const isSubmittingRef = useRef(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1308,6 +1310,20 @@ export function TaskFormModal({
           </div>
         </form>
       </div>
+
+      {/* Modal de Anexar Arquivos do Cofre (A28) */}
+      {isFilePickerOpen && (
+        <TaskFilePickerModal
+          isOpen={isFilePickerOpen}
+          onClose={() => setIsFilePickerOpen(false)}
+          taskId={formData.id || task?.id || ''}
+          taskTitle={formData.nome || task?.nome || 'Tarefa'}
+          ticket={activeTicket || vaultTicket || ''}
+          onLinkedUpdated={() => {
+            onFilesUpdated?.();
+          }}
+        />
+      )}
     </div>
   );
 }

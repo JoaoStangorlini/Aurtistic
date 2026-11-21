@@ -1,15 +1,11 @@
-# Active State — Aurtistic Studio Pro
-Atualizado em: 2026-11-19
+# Active State — Aurtistic
+Atualizado em: 2026-11-20T23:01Z
 
-## Estado Final Consolidado (13 Fases + Pacote 12 Itens Studio Pro & Cofre)
-- **Temas & UI Global:** `@custom-variant dark` vinculado a `[data-theme-mode="dark"]`, Navbar mobile (`365px`), Cofre com bottom sheet e Portfólio/Currículo responsivos.
-- **Cofre & Atalhos (Item 5):** `studio-actions.ts` com `.or('mime_type.eq."inode/directory+shortcut",exif_data->>isShortcut.eq.true')`, suporte `org → pessoal` e `org → org`, segmentos NFC/NFD, ponte `Portfolio/` + fallback `user_files_index` estrito ao prefixo com `allowedPrefix` obrigatório (Anti-IDOR) replicado em `rehydrateStudioDraftAction`; `StudioVaultBrowserModal` preserva `breadcrumbs` com botões `Voltar` e `Tentar novamente`.
-- **Studio Pro (Itens 1–4, 6–12):**
-  - Alças de seleção inline (`left/top` 0%/50%/100%), header `Editar` com `stopPropagation`, dock ancorado via `OrganizationBrandProvider` (`isStudioActive`), título `"SHOW DE FÍSICA"`, `StudioInstagramPreviewModal` com `flex-col md:flex-row`.
-  - Texto centralizado (`boxHeight` em `canvas-tokenized-text.ts`), altura inicial proporcional ao formato (`computeInitialTextBoxHeight`), auto-expansão anti-colisão, pivô único `[x+w/2, y+h/2]` (incluindo `StudioDesignAssistant.tsx`), haste inferior (`top: calc(100%+10px)`) com `atan2 - 90`.
-  - `Ctrl/Cmd+C` e `Ctrl/Cmd+V` cascateado (`pasteCountRef`, guarda `window.getSelection()`), 1 slider estilo Lightroom com faixa de chips em 1 clique (`StudioEditionPanel` e `StudioMaskPanel`), composição única `composePhotoFilters` + botão `Original` híbrido (clique/segurar `220ms`), barra superior `onWheel` + popover `Mais` sem aninhamento, Paleta compacta e `Cor Rápida` no botão direito (camadas + fundo + IDV + 1 Undo + clamp H/V).
-
-## Validação Final
-- `npm run verify:full` -> `✅ OK: TSC + Lint + Server.js + Testes + Build Next.js (0 erros)`
-- `npm run server:check` -> exit `0`
-- Testes unitários (`latex-canvas-renderer.test.mjs`, `stroke-simplify.test.mjs`) -> `9/9 pass`
+## Todas as 5 Ondas Concluídas e Validadas (0 Erros)
+- **Parte 1 (Fechamento Onda 4 & Passo 0):** `isIndeterminate` em `TasksView.tsx:2602` + regras explícitas `.org-task-checkbox` para todas as 4 paletas em `globals.css:922-955`; mesclagem + hidratação + remoção de `studio_default_template` via `p_patch` em `StudioLauncherView.tsx`; `?embed=1` movido para `useEffect` em `Navbar.tsx`.
+- **Parte 2 (Onda 5 — Criptografia AEAD `AURTENC2`):**
+  - `servidor/lib/vault-crypto.js` implementado com cabeçalho 76 B, chunks 64 KB AES-256-GCM, HKDF por dono físico, AAD autenticando cabeçalho, arquivo vazio `0 B` com 1 chunk autenticado, HTTP Range/Seek O(1) e recusa *fail-closed* (`503`) sem `VAULT_MASTER_KEY`.
+  - `servidor/server.js`: `computeFileSha256` lê `plaintextSha256` direto do cabeçalho `AURTENC2` (dedup `A18` O(1)) e varredura de `aurt-dec-*.tmp` no boot.
+  - `servidor/scripts/encrypt-vault-migration.js`: migração atômica sem seguir symlinks, pulando arquivos de controle e verificando `sha256_after === sha256_before`.
+  - `servidor/.env`: `VAULT_MASTER_KEY` gerada e `VAULT_ENCRYPTION_ENABLED=true` gravados com `chmod 600` (protegido por `.gitignore`).
+- **Validações (9/9 Verdes):** `verify:full` (0 erros), `vault-crypto.test.mjs` (5/5 PASS), `wave4_idv_and_a26.test.mjs` (8/8 PASS), `wave3_studio.test.mjs` (10/10 PASS), `wave2_workflows_and_tasks.test.mjs` (8/8 PASS), `verify_v4_orgs_meetings_and_security.mjs` (15/15 PASS), `verify_v4_architecture.mjs` (100% PASS), `latex-canvas-renderer` + `stroke-simplify` (9/9 PASS), `server:check` (0 erros).

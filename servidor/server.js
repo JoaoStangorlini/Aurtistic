@@ -44,14 +44,48 @@ try {
 }
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
+function computeFileSha256(filePath) {
+  return new Promise((resolve) => {
+    try {
+      const encHeader = vaultCrypto.readEncryptedHeaderSync(filePath);
+      if (encHeader && encHeader.plaintextSha256) {
+        return resolve(encHeader.plaintextSha256.toString('hex'));
+      }
+      const hash = crypto.createHash('sha256');
+      const stream = fs.createReadStream(filePath);
+      stream.on('data', (d) => hash.update(d));
+      stream.on('end', () => resolve(hash.digest('hex')));
+      stream.on('error', () => resolve(null));
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
 // ============================================================================
 // 1. CONFIGURAÇÃO DE DIRETÓRIOS E AMBIENTE (TERMUX EXT4 + HD USB FUSE)
 // ============================================================================
+const vaultCrypto = require('./lib/vault-crypto');
+const storagePool = require('./lib/storage-pool');
+let STORAGE_VOLUMES_POOL = [];
+
+// Varredura no boot removendo arquivos temporários órfãos de descriptografia (aurt-dec-*.tmp)
+try {
+  const osTmpDir = require('os').tmpdir();
+  for (const tmpName of fs.readdirSync(osTmpDir)) {
+    if (tmpName.startsWith('aurt-dec-') && tmpName.endsWith('.tmp')) {
+      try { fs.unlinkSync(path.join(osTmpDir, tmpName)); } catch {}
+    }
+  }
+} catch {}
 const PORT = Number(process.env.PORT) || 8080;
 const BIND_HOST = process.env.BIND_HOST || '127.0.0.1';
 
+// Cache global de bytes utilizados por namespace (definido no topo para evitar Temporal Dead Zone durante startup/hotplug)
+const tenantUsedBytesCache = new Map();
+
 function resolveActiveStorageDir() {
-  // 1. Caminhos conhecidos de HDs externos USB conectados via OTG no Fire Stick
+  // 1. Passada somente-leitura: prioriza diretórios JÁ existentes antes de criar qualquer pasta vazia
   const knownUsbCandidates = [
     process.env.STORAGE_DIR ? path.resolve(process.env.STORAGE_DIR) : null,
     '/storage/32AB-1915/Android/data/com.termux/files/hub_data',
@@ -64,20 +98,33 @@ function resolveActiveStorageDir() {
     }
   }
 
-  // 2. Se estiver no Fire Stick / Android, escaneia dinamicamente /storage por HDs USB reais
+  let discoveredMounts = [];
   try {
     if (fs.existsSync('/storage')) {
       const entries = fs.readdirSync('/storage', { withFileTypes: true });
-      for (const ent of entries) {
-        if (!ent.isDirectory() || ent.name === 'emulated' || ent.name === 'self') continue;
+      discoveredMounts = entries
+        .filter((ent) => ent.isDirectory() && ent.name !== 'emulated' && ent.name !== 'self')
+        .map((ent) => ent.name);
 
-        // Tenta o diretório privado do Termux no HD USB (permissão total de leitura e escrita sem SAF)
-        const candidateHub = path.join('/storage', ent.name, 'Android/data/com.termux/files/hub_data');
-        if (fs.existsSync(candidateHub)) {
-          return candidateHub;
+      // 1a passada (somente-leitura): verifica estruturas já existentes em qualquer HD USB montado
+      for (const mountName of discoveredMounts) {
+        const mountPath = path.join('/storage', mountName);
+        const existingChecks = [
+          path.join(mountPath, 'Android/data/com.termux/files/hub_data'),
+          path.join(mountPath, 'hub_data'),
+          path.join(mountPath, 'users'),
+          path.join(mountPath, 'portfolio'),
+        ];
+        if (fs.existsSync(existingChecks[0])) return existingChecks[0];
+        if (fs.existsSync(existingChecks[1])) return existingChecks[1];
+        if (fs.existsSync(existingChecks[2]) || fs.existsSync(existingChecks[3])) {
+          return mountPath;
         }
+      }
 
-        // Se o HD acabou de ser formatado, cria automaticamente a pasta do Termux no HD
+      // 2a passada: apenas se nenhuma estrutura pré-existente foi encontrada, inicializa em drive gravável
+      for (const mountName of discoveredMounts) {
+        const candidateHub = path.join('/storage', mountName, 'Android/data/com.termux/files/hub_data');
         try {
           fs.mkdirSync(candidateHub, { recursive: true });
           if (fs.existsSync(candidateHub)) {
@@ -86,11 +133,7 @@ function resolveActiveStorageDir() {
           }
         } catch {}
 
-        // Tenta pasta raiz hub_data
-        const candidateRoot = path.join('/storage', ent.name, 'hub_data');
-        if (fs.existsSync(candidateRoot)) {
-          return candidateRoot;
-        }
+        const candidateRoot = path.join('/storage', mountName, 'hub_data');
         try {
           fs.mkdirSync(candidateRoot, { recursive: true });
           if (fs.existsSync(candidateRoot)) {
@@ -98,16 +141,9 @@ function resolveActiveStorageDir() {
           }
         } catch {}
 
-        // Tenta pasta portfolio ou raiz do drive
-        const portDir = path.join('/storage', ent.name, 'portfolio');
-        if (fs.existsSync(portDir)) {
-          return path.join('/storage', ent.name);
-        }
-
-        // Se o drive estiver montado e acessível, usa o próprio ponto de montagem
         try {
-          fs.accessSync(path.join('/storage', ent.name), fs.constants.R_OK);
-          return path.join('/storage', ent.name);
+          fs.accessSync(path.join('/storage', mountName), fs.constants.R_OK);
+          return path.join('/storage', mountName);
         } catch {}
       }
     }
@@ -121,12 +157,120 @@ function resolveActiveStorageDir() {
 
 let STORAGE_DIR = resolveActiveStorageDir();
 
+function getTenantBaseDir(storageDir = STORAGE_DIR) {
+  const base = storageDir || STORAGE_DIR;
+  if (base && base.startsWith('/storage/')) {
+    if (base.endsWith('hub_data') && fs.existsSync(base)) {
+      return base;
+    }
+    const candidateHub = path.join(base, 'Android/data/com.termux/files/hub_data');
+    if (fs.existsSync(candidateHub)) {
+      return candidateHub;
+    }
+    const hubPath = path.join(base, 'hub_data');
+    try {
+      if (!fs.existsSync(hubPath)) fs.mkdirSync(hubPath, { recursive: true });
+      return hubPath;
+    } catch (e) {
+      console.warn(`[TenantBase] Não pôde criar hub_data em ${base}: ${e.message}`);
+    }
+  }
+  // Aceita qualquer STORAGE_DIR existente e gravável (Linux/desktop/Termux custom) antes de cair em __dirname/storage
+  if (base && fs.existsSync(base)) {
+    try {
+      fs.accessSync(base, fs.constants.W_OK);
+      return base;
+    } catch {}
+  }
+  const fallback = path.join(__dirname, 'storage');
+  try { fs.mkdirSync(fallback, { recursive: true }); } catch {}
+  return fallback;
+}
+
+function resolvePortfolioDir(storageDir = STORAGE_DIR) {
+  if (process.env.PORTFOLIO_DIR) {
+    const custom = path.resolve(process.env.PORTFOLIO_DIR);
+    try { fs.mkdirSync(custom, { recursive: true }); } catch {}
+    if (fs.existsSync(custom)) return custom;
+  }
+  const userImagensPortifolio = '/home/stangorlini/Imagens/Portifólio';
+  const userImagensPortfolio = '/home/stangorlini/Imagens/Portfolio';
+  if (fs.existsSync(userImagensPortifolio)) return userImagensPortifolio;
+  if (fs.existsSync(userImagensPortfolio)) return userImagensPortfolio;
+
+  const vaultPortAdmin = path.join(storageDir, 'users', 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e', 'Portfolio');
+  if (fs.existsSync(vaultPortAdmin)) return vaultPortAdmin;
+
+  const vaultPortI = path.join(storageDir, 'vault/Stangorlini/portifolio');
+  const vaultPortE = path.join(storageDir, 'vault/Stangorlini/portfolio');
+  if (fs.existsSync(vaultPortI)) return vaultPortI;
+  if (fs.existsSync(vaultPortE)) return vaultPortE;
+
+  const defaultPort = path.join(storageDir, 'portfolio');
+  try { fs.mkdirSync(defaultPort, { recursive: true }); } catch {}
+  return defaultPort;
+}
+
+const INTERNAL_DATA_DIR = path.resolve(process.env.INTERNAL_DATA_DIR || path.join(__dirname, 'data'));
+const INTERNAL_THUMBS_DIR = path.join(INTERNAL_DATA_DIR, 'thumbs');
+const SHARES_FILE_PATH = path.join(INTERNAL_DATA_DIR, 'shares.json');
+const shareManager = new ShareManager(SHARES_FILE_PATH);
+const trashManager = new TrashManager(STORAGE_DIR);
+let webdavServer = null;
+
+// Diretórios dinâmicos atualizados em syncDerivedStoragePaths() durante hotplug USB ou alterações admin
+let MEDIA_DIR = path.resolve(process.env.MEDIA_DIR || path.join(STORAGE_DIR, 'media'));
+let PORTFOLIO_DIR = resolvePortfolioDir(STORAGE_DIR);
+let PORTFOLIO_ORIGINALS_DIR = path.join(PORTFOLIO_DIR, 'originals');
+let PORTFOLIO_THUMBS_DIR = path.join(PORTFOLIO_DIR, 'thumbs');
+let PORTFOLIO_BACKUP_CATALOG = path.join(PORTFOLIO_DIR, 'catalog.json');
+let VAULT_DIR = path.resolve(process.env.VAULT_DIR || path.join(STORAGE_DIR, 'vault'));
+let VAULT_ROOT_DIR = STORAGE_DIR;
+let TENANT_BASE_DIR = getTenantBaseDir(STORAGE_DIR);
+let USERS_ROOT_DIR = path.join(TENANT_BASE_DIR, 'users');
+let ORGS_ROOT_DIR = path.join(TENANT_BASE_DIR, 'orgs');
+let TENANT_UPLOAD_STAGING_DIR = path.join(TENANT_BASE_DIR, 'tmp_tenant_uploads');
+let BETA_BACKUP_PATH = path.join(STORAGE_DIR, 'aurtistic_beta_list.json');
+
+function syncDerivedStoragePaths() {
+  MEDIA_DIR = path.resolve(process.env.MEDIA_DIR || path.join(STORAGE_DIR, 'media'));
+  PORTFOLIO_DIR = resolvePortfolioDir(STORAGE_DIR);
+  PORTFOLIO_ORIGINALS_DIR = path.join(PORTFOLIO_DIR, 'originals');
+  PORTFOLIO_THUMBS_DIR = path.join(PORTFOLIO_DIR, 'thumbs');
+  PORTFOLIO_BACKUP_CATALOG = path.join(PORTFOLIO_DIR, 'catalog.json');
+  VAULT_DIR = path.resolve(process.env.VAULT_DIR || path.join(STORAGE_DIR, 'vault'));
+  VAULT_ROOT_DIR = STORAGE_DIR;
+  TENANT_BASE_DIR = getTenantBaseDir(STORAGE_DIR);
+  USERS_ROOT_DIR = path.join(TENANT_BASE_DIR, 'users');
+  ORGS_ROOT_DIR = path.join(TENANT_BASE_DIR, 'orgs');
+  TENANT_UPLOAD_STAGING_DIR = path.join(TENANT_BASE_DIR, 'tmp_tenant_uploads');
+  BETA_BACKUP_PATH = path.join(STORAGE_DIR, 'aurtistic_beta_list.json');
+
+  for (const d of [USERS_ROOT_DIR, ORGS_ROOT_DIR, TENANT_UPLOAD_STAGING_DIR]) {
+    try {
+      if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+    } catch {}
+  }
+
+  try {
+    trashManager?.setBaseDir?.(STORAGE_DIR);
+  } catch {}
+  try {
+    webdavServer?.setRootDir?.(STORAGE_DIR);
+  } catch {}
+}
+
 function refreshStorageDir() {
   const detected = resolveActiveStorageDir();
   if (detected !== STORAGE_DIR) {
     console.log(`[StorageDiscovery] Ponto de montagem alterado: ${STORAGE_DIR} -> ${detected}`);
     STORAGE_DIR = detected;
+    syncDerivedStoragePaths();
+    if (tenantUsedBytesCache) {
+      tenantUsedBytesCache.clear();
+    }
   }
+  STORAGE_VOLUMES_POOL = storagePool.discoverStorageVolumes(STORAGE_DIR);
   return STORAGE_DIR;
 }
 
@@ -147,40 +291,6 @@ function isExternalStorageMounted() {
     current === path.join(__dirname, 'storage');
   return !isInternal && fs.existsSync(current);
 }
-const trashManager = new TrashManager(STORAGE_DIR);
-const INTERNAL_DATA_DIR = path.resolve(process.env.INTERNAL_DATA_DIR || path.join(__dirname, 'data'));
-const INTERNAL_THUMBS_DIR = path.join(INTERNAL_DATA_DIR, 'thumbs');
-const SHARES_FILE_PATH = path.join(INTERNAL_DATA_DIR, 'shares.json');
-const shareManager = new ShareManager(SHARES_FILE_PATH);
-
-function resolvePortfolioDir() {
-  if (process.env.PORTFOLIO_DIR) {
-    const custom = path.resolve(process.env.PORTFOLIO_DIR);
-    try { fs.mkdirSync(custom, { recursive: true }); } catch {}
-    if (fs.existsSync(custom)) return custom;
-  }
-  const userImagensPortifolio = '/home/stangorlini/Imagens/Portifólio';
-  const userImagensPortfolio = '/home/stangorlini/Imagens/Portfolio';
-  if (fs.existsSync(userImagensPortifolio)) return userImagensPortifolio;
-  if (fs.existsSync(userImagensPortfolio)) return userImagensPortfolio;
-
-  const vaultPortI = path.join(STORAGE_DIR, 'vault/Stangorlini/portifolio');
-  const vaultPortE = path.join(STORAGE_DIR, 'vault/Stangorlini/portfolio');
-  if (fs.existsSync(vaultPortI)) return vaultPortI;
-  if (fs.existsSync(vaultPortE)) return vaultPortE;
-
-  const defaultPort = path.join(STORAGE_DIR, 'portfolio');
-  try { fs.mkdirSync(defaultPort, { recursive: true }); } catch {}
-  return defaultPort;
-}
-
-// 3 Zonas Físicas (por padrão dentro de STORAGE_DIR, mas podem ser mapeadas para HDs diferentes)
-const MEDIA_DIR = path.resolve(process.env.MEDIA_DIR || path.join(STORAGE_DIR, 'media'));
-const PORTFOLIO_DIR = resolvePortfolioDir();
-const PORTFOLIO_ORIGINALS_DIR = path.join(PORTFOLIO_DIR, 'originals');
-const PORTFOLIO_THUMBS_DIR = path.join(PORTFOLIO_DIR, 'thumbs');
-const PORTFOLIO_BACKUP_CATALOG = path.join(PORTFOLIO_DIR, 'catalog.json');
-const VAULT_DIR = path.resolve(process.env.VAULT_DIR || path.join(STORAGE_DIR, 'vault'));
 
 function isPortfolioRelatedRelPath(p) {
   if (!p) return false;
@@ -1607,15 +1717,17 @@ async function syncPortfolioFromDiskAsync(options = {}) {
       } catch {}
     }
 
-    // Se nenhuma foto física for encontrada no disco:
-    // Se force for true ou se não existirem pastas de álbuns no disco, o catálogo é atualizado para 0 itens (acervo limpo)
+    // Proteção contra perda acidental do catálogo: só limpa catálogo existente se force === true E houver montagem externa válida
     if (newItems.length === 0) {
-      if (force || albumDirs.length === 0) {
-        console.log('[PortfolioSync] Acervo vazio no disco físico (0 fotos encontradas). Atualizando catálogo para 0 itens.');
+      if (force && isExternalStorageMounted()) {
+        console.log('[PortfolioSync] Limpeza explícita (force=true). Atualizando catálogo para 0 itens.');
         memoryCatalog.items = [];
         memoryCatalog.albums = [];
         memoryCatalog.subalbums = {};
         dirStatsCache.portfolio = { bytes: 0, count: 0 };
+        if (tenantUsedBytesCache) {
+          tenantUsedBytesCache.clear();
+        }
         await persistCatalog();
         return memoryCatalog;
       }
@@ -1656,6 +1768,9 @@ async function syncPortfolioFromDiskAsync(options = {}) {
       bytes: totalPortfolioBytes,
       count: newItems.length,
     };
+    if (tenantUsedBytesCache) {
+      tenantUsedBytesCache.clear();
+    }
   } catch (err) {
     console.warn('[PortfolioSync] Erro ao sincronizar pastas do disco:', err.message);
   } finally {
@@ -1757,7 +1872,12 @@ function startSmartHotplugMonitor() {
     if (isMountedNow && !lastUsbMountState) {
       console.log('[HotplugMonitor] Transição detectada em /proc/mounts (Desconectado -> Conectado)! Sincronizando portfólio...');
       lastUsbMountState = true;
+      refreshStorageDir();
+      if (tenantUsedBytesCache) {
+        tenantUsedBytesCache.clear();
+      }
       setTimeout(() => {
+        refreshStorageDir();
         syncPortfolioFromDiskAsync().catch((err) => {
           console.warn('[HotplugMonitor] Erro na sincronização pós-hotplug:', err.message);
         });
@@ -1765,6 +1885,10 @@ function startSmartHotplugMonitor() {
     } else if (!isMountedNow && lastUsbMountState) {
       console.log('[HotplugMonitor] HD USB desconectado. Servindo miniaturas do cache interno ext4.');
       lastUsbMountState = false;
+      refreshStorageDir();
+      if (tenantUsedBytesCache) {
+        tenantUsedBytesCache.clear();
+      }
     }
   }, 8000);
 }
@@ -2109,7 +2233,18 @@ async function streamFileWithRange(req, res, filePath, options = {}) {
     return res.status(404).json({ error: 'Arquivo não encontrado.' });
   }
 
-  const fileSize = st.size;
+  const encHdr = await vaultCrypto.readEncryptedHeader(filePath).catch(() => null);
+  const fileSize = encHdr ? encHdr.plaintextSize : st.size;
+  const ownerNs = req.tenant?.scopeType === 'org'
+    ? `org:${req.tenant.orgSlug}`
+    : `user:${req.tenant?.userId || 'default'}`;
+  if (encHdr) {
+    try {
+      vaultCrypto.getMasterKey();
+    } catch (keyErr) {
+      return res.status(503).json({ error: keyErr.message });
+    }
+  }
   const filename = path.basename(filePath);
   const mimeType = getMimeType(filename);
 
@@ -2153,7 +2288,9 @@ async function streamFileWithRange(req, res, filePath, options = {}) {
     res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
     res.setHeader('Content-Length', String(chunkLength));
 
-    const stream = fs.createReadStream(filePath, { start, end, highWaterMark: 64 * 1024 });
+    const stream = encHdr
+      ? vaultCrypto.createDecryptStream(filePath, ownerNs, start, end)
+      : fs.createReadStream(filePath, { start, end, highWaterMark: 64 * 1024 });
     req.on('close', () => stream.destroy());
     stream.on('error', () => {
       if (!res.headersSent) res.status(500).end();
@@ -2164,7 +2301,9 @@ async function streamFileWithRange(req, res, filePath, options = {}) {
 
   res.status(200);
   res.setHeader('Content-Length', String(fileSize));
-  const stream = fs.createReadStream(filePath, { highWaterMark: 64 * 1024 });
+  const stream = encHdr
+    ? vaultCrypto.createDecryptStream(filePath, ownerNs)
+    : fs.createReadStream(filePath, { highWaterMark: 64 * 1024 });
   req.on('close', () => stream.destroy());
   stream.on('error', () => {
     if (!res.headersSent) res.status(500).end();
@@ -2179,7 +2318,7 @@ async function streamFileWithRange(req, res, filePath, options = {}) {
 const app = express();
 app.disable('x-powered-by');
 
-const webdavServer = new WebdavServer(STORAGE_DIR, {
+webdavServer = new WebdavServer(STORAGE_DIR, {
   authenticate: (_user, pass) => pass === ADMIN_PASSWORD,
   trashManager,
 });
@@ -2348,8 +2487,6 @@ const uploadPortfolio = multer({
 });
 
 // Multer: Zona 2 (Cofre Pessoal / Vault com preservação de nome legível na raiz do HD)
-const VAULT_ROOT_DIR = STORAGE_DIR;
-
 const vaultStorage = multer.diskStorage({
   destination: (req, _file, cb) => {
     try {
@@ -2433,10 +2570,22 @@ app.post('/api/admin/set-portfolio-dir', async (req, res) => {
   }
   await fs.promises.writeFile(envPath, envContent, 'utf8');
 
-  // Aplica em runtime sem reiniciar — recarrega a variável e invalida catálogo
+  // Aplica em runtime sem reiniciar — recarrega caminhos derivados e ressincroniza catálogo
   process.env.PORTFOLIO_DIR = targetDir;
+  syncDerivedStoragePaths();
   try { await fs.promises.unlink(PORTFOLIO_BACKUP_CATALOG); } catch {}
-  memoryCatalog = null;
+  memoryCatalog = {
+    version: memoryCatalog?.version || 1,
+    updatedAt: new Date().toISOString(),
+    title: memoryCatalog?.title || DEFAULT_PORTFOLIO_TITLE,
+    subtitle: memoryCatalog?.subtitle || DEFAULT_PORTFOLIO_SUBTITLE,
+    accentTag: memoryCatalog?.accentTag || DEFAULT_PORTFOLIO_ACCENT_TAG,
+    settings: memoryCatalog?.settings || { albumOrder: [], subfolderOrder: {} },
+    albums: [],
+    subalbums: {},
+    items: [],
+  };
+  await syncPortfolioFromDiskAsync({ force: true }).catch(() => {});
 
   const fileCount = (await fs.promises.readdir(targetDir)).length;
   return res.json({ success: true, portfolioDir: targetDir, rootEntries: fileCount, envUpdated: true });
@@ -2631,7 +2780,7 @@ app.use(
     res.setHeader('X-Content-Type-Options', 'nosniff');
     next();
   },
-  express.static(MEDIA_DIR, { acceptRanges: true })
+  (req, res, next) => express.static(MEDIA_DIR, { acceptRanges: true })(req, res, next)
 );
 
 app.delete('/api/media/:filename', requireHubOrAdmin, async (req, res) => {
@@ -3128,7 +3277,7 @@ app.use(
     res.setHeader('X-Content-Type-Options', 'nosniff');
     next();
   },
-  express.static(PORTFOLIO_THUMBS_DIR, { acceptRanges: true })
+  (req, res, next) => express.static(PORTFOLIO_THUMBS_DIR, { acceptRanges: true })(req, res, next)
 );
 
 app.use(
@@ -3138,7 +3287,7 @@ app.use(
     res.setHeader('X-Content-Type-Options', 'nosniff');
     next();
   },
-  express.static(PORTFOLIO_ORIGINALS_DIR, { acceptRanges: true })
+  (req, res, next) => express.static(PORTFOLIO_ORIGINALS_DIR, { acceptRanges: true })(req, res, next)
 );
 
 // Sincronia 1:1 no Upload: cria a pasta física storage/portfolio/<albumName>/ e move com proteção EXDEV
@@ -5182,7 +5331,7 @@ app.post('/api/trash/restore', requireAdminSession, async (req, res) => {
     if (!id) return res.status(400).json({ error: 'ID da lixeira obrigatório.' });
     const result = await trashManager.restore(id);
     if (isPortfolioRelatedRelPath(result.originalRelPath)) {
-      syncPortfolioFromDiskAsync().catch(() => {});
+      syncPortfolioFromDiskAsync({ force: true }).catch(() => {});
     }
     return res.json({ success: true, result });
   } catch (err) {
@@ -5195,6 +5344,7 @@ app.delete('/api/trash/purge', requireAdminSession, async (req, res) => {
     const { id } = req.body || req.query || {};
     if (!id) return res.status(400).json({ error: 'ID da lixeira obrigatório.' });
     const ok = await trashManager.purge(id);
+    tenantUsedBytesCache.clear();
     return res.json({ success: ok });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -5204,6 +5354,7 @@ app.delete('/api/trash/purge', requireAdminSession, async (req, res) => {
 app.delete('/api/trash/empty', requireAdminSession, async (_req, res) => {
   try {
     const result = await trashManager.empty();
+    tenantUsedBytesCache.clear();
     return res.json(result);
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -6522,7 +6673,6 @@ app.delete('/api/hub-media/:filename', requireAdminSession, async (req, res) => 
 // 11B. LISTA DE ESPERA DO BETA — AURTISTIC (PERSISTÊNCIA EM DISCO)
 // ============================================================================
 const BETA_LIST_PATH = path.join(INTERNAL_DATA_DIR, 'aurtistic_beta_list.json');
-const BETA_BACKUP_PATH = path.join(STORAGE_DIR, 'aurtistic_beta_list.json');
 
 async function readBetaListSafe() {
   for (const p of [BETA_LIST_PATH, BETA_BACKUP_PATH]) {
@@ -6594,39 +6744,8 @@ app.get('/api/admin/beta-signups', requireAdminSession, async (_req, res) => {
 // - Ciclo completo de Lixeira (.trash) isolada por usuário
 // ============================================================================
 const PRIMARY_ADMIN_UUID = 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e';
-// Determine base directory for tenant roots. On FireStick USB storage the raw mount point (/storage/XXXX-XXXX) is read‑only for direct mkdir; we use the hub_data sub‑folder which Termux creates with full permissions.
-function getTenantBaseDir() {
-  // STORAGE_DIR is set earlier via env or discovery logic
-  const base = STORAGE_DIR;
-  if (base && base.startsWith('/storage/')) {
-    if (base.endsWith('hub_data') && fs.existsSync(base)) {
-      return base;
-    }
-    const candidateHub = path.join(base, 'Android/data/com.termux/files/hub_data');
-    if (fs.existsSync(candidateHub)) {
-      return candidateHub;
-    }
-    const hubPath = path.join(base, 'hub_data');
-    try {
-      if (!fs.existsSync(hubPath)) fs.mkdirSync(hubPath, { recursive: true });
-      return hubPath;
-    } catch (e) {
-      console.warn(`[TenantBase] Não pôde criar hub_data em ${base}: ${e.message}`);
-    }
-  }
-  // Fallback for dev or non‑USB mounts
-  const fallback = path.join(__dirname, 'storage');
-  try { fs.mkdirSync(fallback, { recursive: true }); } catch {}
-  return fallback;
-}
-
-// Roots for user and org tenants – use the writable base
-const TENANT_BASE_DIR = getTenantBaseDir();
-const USERS_ROOT_DIR = path.join(TENANT_BASE_DIR, 'users');
-const ORGS_ROOT_DIR  = path.join(TENANT_BASE_DIR, 'orgs');
 const DEFAULT_TENANT_SUBFOLDERS = [];
 const TENANT_PINS_FILE = path.join(INTERNAL_DATA_DIR, 'tenant_folder_pins.json');
-const TENANT_UPLOAD_STAGING_DIR = path.join(TENANT_BASE_DIR, 'tmp_tenant_uploads');
 
 for (const d of [USERS_ROOT_DIR, ORGS_ROOT_DIR, TENANT_UPLOAD_STAGING_DIR]) {
   try {
@@ -6745,7 +6864,8 @@ function walkCaseInsensitiveSubpath(baseDir, subPath) {
   return current;
 }
 
-function resolveResilientPhysicalFile(targetBase, remainder) {
+function resolveResilientPhysicalFile(targetBase, remainder, options = {}) {
+  const allowAdminPortfolioFallback = Boolean(options?.allowAdminPortfolioFallback);
   if (!remainder) return targetBase;
   const resolvedBase = path.resolve(targetBase);
   try {
@@ -6764,12 +6884,16 @@ function resolveResilientPhysicalFile(targetBase, remainder) {
     path.join(targetBase, 'originals'),
     path.join(targetBase, 'JPG'),
     path.join(targetBase, '11-04/JPG'),
-    PORTFOLIO_ORIGINALS_DIR,
-    path.join(PORTFOLIO_DIR, 'SHOW DE FISICA'),
-    path.join(PORTFOLIO_DIR, 'show da fisica'),
-    '/home/stangorlini/Imagens/show da fisica/11-04/JPG',
-    '/home/stangorlini/Imagens/show da fisica',
-    '/home/stangorlini/HUB LabDiv/public/show',
+    ...(allowAdminPortfolioFallback
+      ? [
+          PORTFOLIO_ORIGINALS_DIR,
+          path.join(PORTFOLIO_DIR, 'SHOW DE FISICA'),
+          path.join(PORTFOLIO_DIR, 'show da fisica'),
+          '/home/stangorlini/Imagens/show da fisica/11-04/JPG',
+          '/home/stangorlini/Imagens/show da fisica',
+          '/home/stangorlini/HUB LabDiv/public/show',
+        ]
+      : []),
   ];
 
   for (const sDir of subCandidateDirs) {
@@ -6779,7 +6903,7 @@ function resolveResilientPhysicalFile(targetBase, remainder) {
     }
   }
 
-  if (Array.isArray(memoryCatalog?.items)) {
+  if (allowAdminPortfolioFallback && Array.isArray(memoryCatalog?.items)) {
     const lowerBase = baseFile.toLowerCase();
     const item = memoryCatalog.items.find(
       (it) =>
@@ -6806,6 +6930,11 @@ function resolvePortAwareTargetDir(targetUserId, targetRelPath) {
   if (fs.existsSync(primary)) return primary;
   const walkedPrimary = clean ? walkCaseInsensitiveSubpath(userRoot, clean) : null;
   if (walkedPrimary && fs.existsSync(walkedPrimary)) return walkedPrimary;
+
+  // Isolamento A4: somente PRIMARY_ADMIN_UUID em subcaminhos de Portfolio pode resolver fallback do host/legacy
+  if (targetUserId !== PRIMARY_ADMIN_UUID || !isPortfolioRelatedRelPath(clean)) {
+    return primary;
+  }
 
   const legacySub = clean.replace(/^(portfolio|portifolio)\/?/i, '');
   const candidates = [
@@ -6909,8 +7038,7 @@ function resolveOrgPersonalShortcutTarget(rootDir, cleanRel, options = {}, _hop 
               if (
                 options.scopeType !== 'org' &&
                 options.role !== 'admin' &&
-                Array.isArray(options.allowedOrgSlugs) &&
-                !options.allowedOrgSlugs.includes(targetSlug)
+                (!Array.isArray(options.allowedOrgSlugs) || !options.allowedOrgSlugs.includes(targetSlug))
               ) {
                 const err = new Error('Sem permissão para acessar pasta desta organização.');
                 err.statusCode = 403;
@@ -6931,7 +7059,14 @@ function resolveOrgPersonalShortcutTarget(rootDir, cleanRel, options = {}, _hop 
               const nested = resolveOrgPersonalShortcutTarget(resolvedTargetBase, remainder, options, _hop + 1, _visited);
               if (nested) return nested;
             }
-            const finalPhysicalPath = remainder ? resolveResilientPhysicalFile(resolvedTargetBase, remainder) : resolvedTargetBase;
+            const allowFallbackForTarget = Boolean(
+              ownerUserId === PRIMARY_ADMIN_UUID || options.role === 'admin'
+            );
+            const finalPhysicalPath = remainder
+              ? resolveResilientPhysicalFile(resolvedTargetBase, remainder, {
+                  allowAdminPortfolioFallback: allowFallbackForTarget,
+                })
+              : resolvedTargetBase;
             const resolvedFinal = path.resolve(finalPhysicalPath);
             if (resolvedFinal !== resolvedTargetBase && !resolvedFinal.startsWith(resolvedTargetBase + path.sep)) {
               const err = new Error('Acesso fora do diretório do atalho bloqueado.');
@@ -6982,31 +7117,47 @@ function resolveTenantSafePath(userId, userRoot, relPath = '', options = { forWr
 
   const primaryTarget = cleanRel ? resolveSafeChildPath(userRoot, cleanRel) : userRoot;
 
+  if (!options.forWrite && cleanRel && !fs.existsSync(primaryTarget) && STORAGE_VOLUMES_POOL.length > 1) {
+    const nsSub = path.relative(STORAGE_DIR, userRoot);
+    const poolMatch = storagePool.resolveTenantFileAcrossVolumes(STORAGE_VOLUMES_POOL, nsSub, cleanRel);
+    if (poolMatch && poolMatch.filePath) {
+      return poolMatch.filePath;
+    }
+  }
+
   const isPortRel =
     cleanRel.toLowerCase() === 'portfolio' ||
     cleanRel.toLowerCase().startsWith('portfolio/') ||
     cleanRel.toLowerCase() === 'portifolio' ||
     cleanRel.toLowerCase().startsWith('portifolio/');
 
-  if (!options.forWrite && !fs.existsSync(primaryTarget)) {
+  if (
+    !options.forWrite &&
+    !fs.existsSync(primaryTarget) &&
+    scopeType !== 'org' &&
+    isPortRel &&
+    (userId === PRIMARY_ADMIN_UUID || role === 'admin')
+  ) {
     const legacySub = cleanRel.replace(/^(portfolio|portifolio)\/?/i, '');
-    
-    // Tenta resolução em PORTFOLIO_DIR e Imagens/Portifólio
-    const portCandidate = resolveResilientPhysicalFile(PORTFOLIO_DIR, legacySub);
+
+    // Tenta resolução exclusiva para o Portfólio Público do Admin
+    const portCandidate = resolveResilientPhysicalFile(PORTFOLIO_DIR, legacySub, {
+      allowAdminPortfolioFallback: true,
+    });
     if (portCandidate && fs.existsSync(portCandidate)) {
       return portCandidate;
     }
 
-    const imagensCandidate = resolveResilientPhysicalFile('/home/stangorlini/Imagens/Portifólio', legacySub);
+    const imagensCandidate = resolveResilientPhysicalFile('/home/stangorlini/Imagens/Portifólio', legacySub, {
+      allowAdminPortfolioFallback: true,
+    });
     if (imagensCandidate && fs.existsSync(imagensCandidate)) {
       return imagensCandidate;
     }
 
-    if (isPortRel && (userId === PRIMARY_ADMIN_UUID || role === 'admin')) {
-      const legacyTarget = legacySub ? resolveSafeChildPath(PORTFOLIO_DIR, legacySub) : PORTFOLIO_DIR;
-      if (fs.existsSync(legacyTarget)) {
-        return legacyTarget;
-      }
+    const legacyTarget = legacySub ? resolveSafeChildPath(PORTFOLIO_DIR, legacySub) : PORTFOLIO_DIR;
+    if (fs.existsSync(legacyTarget)) {
+      return legacyTarget;
     }
   }
 
@@ -7059,8 +7210,6 @@ function resolveTenantListingDirs(userId, userRoot, cleanRel, scopeType = 'user'
   return dirs;
 }
 
-const tenantUsedBytesCache = new Map();
-
 async function computeDirectoryBytesRecursive(dirPath, ignoreTopNames = new Set(['.trash'])) {
   if (!fs.existsSync(dirPath)) return 0;
   let total = 0;
@@ -7072,8 +7221,13 @@ async function computeDirectoryBytesRecursive(dirPath, ignoreTopNames = new Set(
       total += await computeDirectoryBytesRecursive(full, null);
     } else if (ent.isFile()) {
       try {
-        const st = await fs.promises.stat(full);
-        total += st.size;
+        const hdr = await vaultCrypto.readEncryptedHeader(full).catch(() => null);
+        if (hdr) {
+          total += hdr.plaintextSize;
+        } else {
+          const st = await fs.promises.stat(full);
+          total += st.size;
+        }
       } catch {}
     }
   }
@@ -7175,26 +7329,33 @@ function assertFolderPinUnlockedIfRequired(req, relPath) {
 function assertPublicMediaPathAllowed(req, normalizedRelPath) {
   const cleanRel = normalizeTenantRelPath(normalizedRelPath);
   const cleanNorm = stripAccentsLower(cleanRel);
-  if (req.tenant.purpose === 'public_media') {
-    if (req.tenant.allowedPrefix) {
-      const prefixNorm = stripAccentsLower(normalizeTenantRelPath(req.tenant.allowedPrefix));
-      if (cleanNorm !== prefixNorm && !cleanNorm.startsWith(`${prefixNorm}/`)) {
-        const err = new Error('Acesso negado: caminho fora da pasta autorizada para este ticket.');
-        err.statusCode = 403;
-        throw err;
-      }
-      return;
-    }
-    if (!req.tenant.allowedPathsNormSet || !req.tenant.allowedPathsNormSet.has(cleanNorm)) {
-      const err = new Error('Acesso negado: caminho não autorizado neste ticket público.');
+
+  if (req.tenant.purpose === 'share') {
+    const hasPrefix = Boolean(req.tenant.allowedPrefix);
+    const hasPaths = Boolean(req.tenant.allowedPathsNormSet && req.tenant.allowedPathsNormSet.size > 0);
+    if (!hasPrefix && !hasPaths) {
+      const err = new Error('Ticket share sem escopo explícito (allowedPrefix ou allowedPaths).');
       err.statusCode = 403;
       throw err;
     }
   }
+
   if (req.tenant.allowedPrefix) {
     const prefixNorm = stripAccentsLower(normalizeTenantRelPath(req.tenant.allowedPrefix));
     if (cleanNorm !== prefixNorm && !cleanNorm.startsWith(`${prefixNorm}/`)) {
-      const err = new Error('Acesso negado: caminho fora da pasta compartilhada.');
+      const err = new Error('Acesso negado: caminho fora da pasta compartilhada/autorizada.');
+      err.statusCode = 403;
+      throw err;
+    }
+    return;
+  }
+
+  if (
+    req.tenant.purpose === 'public_media' ||
+    (req.tenant.allowedPathsNormSet && req.tenant.allowedPathsNormSet.size > 0)
+  ) {
+    if (!req.tenant.allowedPathsNormSet || !req.tenant.allowedPathsNormSet.has(cleanNorm)) {
+      const err = new Error('Acesso negado: caminho não autorizado neste ticket.');
       err.statusCode = 403;
       throw err;
     }
@@ -7233,11 +7394,12 @@ async function buildTenantEntryDescriptorAsync(userId, fullPath, relPath, unlock
     }
   }
 
+  const hdr = !isDirectory ? await vaultCrypto.readEncryptedHeader(fullPath).catch(() => null) : null;
   return {
     name,
     relativePath: cleanRel,
     isDirectory,
-    sizeBytes: isDirectory ? 0 : st.size,
+    sizeBytes: isDirectory ? 0 : (hdr ? hdr.plaintextSize : st.size),
     mimeType: isDirectory ? 'inode/directory' : getMimeType(name),
     kind,
     modifiedAt: st.mtime.toISOString(),
@@ -7292,9 +7454,18 @@ async function verifyTenantTicket(req, res, next) {
       ? payload.allowedPaths.map((p) => normalizeTenantRelPath(p)).filter(Boolean)
       : [];
 
-    if (purpose === 'public_media' && allowedPathsArr.length === 0 && !payload.allowedPrefix) {
-      return res.status(403).json({ error: 'Ticket public_media sem allowedPaths ou allowedPrefix explícitos.' });
+    if ((purpose === 'public_media' || purpose === 'share') && allowedPathsArr.length === 0 && !payload.allowedPrefix) {
+      return res.status(403).json({ error: `Ticket ${purpose} sem allowedPaths ou allowedPrefix explícitos.` });
     }
+
+    const reqStorageDir = STORAGE_DIR;
+    const reqBaseDir = getTenantBaseDir(reqStorageDir);
+    const reqUsersRootDir = path.join(reqBaseDir, 'users');
+    const reqOrgsRootDir = path.join(reqBaseDir, 'orgs');
+    try {
+      if (!fs.existsSync(reqUsersRootDir)) fs.mkdirSync(reqUsersRootDir, { recursive: true });
+      if (!fs.existsSync(reqOrgsRootDir)) fs.mkdirSync(reqOrgsRootDir, { recursive: true });
+    } catch {}
 
     const scopeType = payload.scopeType === 'org' ? 'org' : 'user';
     let userRoot;
@@ -7307,6 +7478,7 @@ async function verifyTenantTicket(req, res, next) {
           '1ab41410-0000-4000-8000-000000000001': 'labdiv',
           '1ab41410-0000-4000-8000-000000000002': 'show-da-fisica',
           '1ab41410-0000-4000-8000-000000000003': 'hs',
+          '1ab41410-0000-4000-8000-000000000004': 'profis',
         };
         cleanOrgSlug = KNOWN_ORGS[payload.organizationId] || '';
       }
@@ -7319,13 +7491,16 @@ async function verifyTenantTicket(req, res, next) {
       if (!/^[a-z0-9][a-z0-9_-]{1,62}$/.test(cleanOrgSlug)) {
         return res.status(400).json({ error: 'Slug de organização inválido no ticket.' });
       }
-      userRoot = resolveSafeChildPath(ORGS_ROOT_DIR, cleanOrgSlug);
+      userRoot = resolveSafeChildPath(reqOrgsRootDir, cleanOrgSlug);
       if (!fs.existsSync(userRoot)) {
         await fs.promises.mkdir(userRoot, { recursive: true });
       }
       pinNamespaceId = `org:${cleanOrgSlug}`;
     } else {
-      userRoot = await ensureTenantRootProvisioned(userId);
+      userRoot = resolveSafeChildPath(reqUsersRootDir, userId);
+      if (!fs.existsSync(userRoot)) {
+        await fs.promises.mkdir(userRoot, { recursive: true });
+      }
     }
 
     const unlockedPinsSet = new Set(
@@ -7356,6 +7531,8 @@ async function verifyTenantTicket(req, res, next) {
       readOnly: Boolean(payload.readOnly || purpose === 'public_media'),
       allowDownload: payload.allowDownload !== false,
       unlockedPinsSet,
+      storageDir: reqStorageDir,
+      baseDir: reqBaseDir,
       userRoot,
       resolveSafePath: (relPath, opts) => resolveTenantSafePath(userId, userRoot, relPath, opts, scopeType, payload.role, allowedOrgSlugs),
       resolveListingDirs: (cleanRel) => resolveTenantListingDirs(userId, userRoot, cleanRel, scopeType, payload.role, allowedOrgSlugs),
@@ -7453,9 +7630,12 @@ async function resolveExistingPrebuiltThumbnail(relPath, fullPath, scopeType = '
 // 11.5.1. GET /api/tenant/list — Listagem com Merge Deduplicado p/ PRIMARY_ADMIN_UUID
 app.get('/api/tenant/list', verifyTenantTicket, async (req, res) => {
   try {
-    if (req.tenant.purpose === 'public_media') {
+    if (
+      req.tenant.purpose === 'public_media' ||
+      (req.tenant.allowedPathsNormSet && req.tenant.allowedPathsNormSet.size > 0 && !req.tenant.allowedPrefix)
+    ) {
       return res.status(403).json({
-        error: 'Listagem de diretórios bloqueada para tickets de escopo public_media.',
+        error: 'Listagem de diretórios bloqueada para este ticket.',
       });
     }
 
@@ -7463,7 +7643,7 @@ app.get('/api/tenant/list', verifyTenantTicket, async (req, res) => {
     const cleanRel = normalizeTenantRelPath(rawFolder);
     const effectiveRel = cleanRel || (req.tenant.allowedPrefix ? normalizeTenantRelPath(req.tenant.allowedPrefix) : '');
 
-    if (req.tenant.allowedPrefix) {
+    if (req.tenant.purpose === 'share' || req.tenant.allowedPrefix) {
       assertPublicMediaPathAllowed(req, effectiveRel);
     }
 
@@ -7498,6 +7678,16 @@ app.get('/api/tenant/list', verifyTenantTicket, async (req, res) => {
       req.tenant.role,
       req.tenant.allowedOrgSlugs
     );
+    if (STORAGE_VOLUMES_POOL.length > 1) {
+      const nsSub = path.relative(STORAGE_DIR, req.tenant.userRoot);
+      for (const vol of STORAGE_VOLUMES_POOL) {
+        if (!vol.online || path.resolve(vol.rootDir) === path.resolve(STORAGE_DIR)) continue;
+        const extraDir = effectiveRel ? path.join(vol.tenantBaseDir, nsSub, effectiveRel) : path.join(vol.tenantBaseDir, nsSub);
+        if (fs.existsSync(extraDir) && !dirTargets.some((t) => path.resolve(t.dirPath) === path.resolve(extraDir))) {
+          dirTargets.push({ dirPath: extraDir, isLegacyBridge: false });
+        }
+      }
+    }
     if (dirTargets.length === 0) {
       return res.status(404).json({ error: 'Pasta não encontrada.' });
     }
@@ -7663,7 +7853,13 @@ async function handleTenantStreamRequest(req, res, forceDownload = false) {
 
     let fullPath = req.tenant.resolveSafePath(relPath, { forWrite: false });
     if (!fs.existsSync(fullPath)) {
-      const fallbackFile = resolveResilientPhysicalFile(req.tenant.userRoot, relPath);
+      const allowAdminPortfolioFallback =
+        req.tenant.scopeType !== 'org' &&
+        isPortfolioRelatedRelPath(relPath) &&
+        (req.tenant.userId === PRIMARY_ADMIN_UUID || req.tenant.role === 'admin');
+      const fallbackFile = resolveResilientPhysicalFile(req.tenant.userRoot, relPath, {
+        allowAdminPortfolioFallback,
+      });
       if (fallbackFile && fs.existsSync(fallbackFile)) {
         fullPath = fallbackFile;
       } else if (process.platform !== 'android' && !fs.existsSync('/storage/31E0-19FD')) {
@@ -7799,22 +7995,26 @@ app.get('/api/tenant/thumb', tenantMediaCorsMiddleware, verifyTenantTicket, asyn
 
     let fullPath = req.tenant.resolveSafePath(relPath, { forWrite: false });
     if (!fs.existsSync(fullPath)) {
-      const fallbackFile = resolveResilientPhysicalFile(req.tenant.userRoot, relPath);
+      const allowAdminPortfolioFallback =
+        req.tenant.scopeType !== 'org' &&
+        isPortfolioRelatedRelPath(relPath) &&
+        (req.tenant.userId === PRIMARY_ADMIN_UUID || req.tenant.role === 'admin');
+      const fallbackFile = resolveResilientPhysicalFile(req.tenant.userRoot, relPath, {
+        allowAdminPortfolioFallback,
+      });
       if (fallbackFile && fs.existsSync(fallbackFile)) {
         fullPath = fallbackFile;
       }
     }
     const allowPortfolioPrebuilt =
-      req.tenant.scopeType !== 'org' ||
-      Boolean(req.tenant.allowedPrefix?.toLowerCase().startsWith('portfolio')) ||
-      relPath.toLowerCase().includes('portfolio');
+      req.tenant.scopeType !== 'org' &&
+      isPortfolioRelatedRelPath(relPath) &&
+      (req.tenant.userId === PRIMARY_ADMIN_UUID || req.tenant.role === 'admin');
 
-    // 1. Reaproveita imediatamente miniaturas .avif / .webp pré-existentes no cache ext4 (Zero-Touch no USB)
-    const prebuilt = await resolveExistingPrebuiltThumbnail(
-      relPath,
-      fullPath,
-      allowPortfolioPrebuilt ? 'user' : req.tenant.scopeType
-    );
+    // 1. Reaproveita imediatamente miniaturas .avif / .webp pré-existentes no cache ext4 exclusivamente para o admin
+    const prebuilt = allowPortfolioPrebuilt
+      ? await resolveExistingPrebuiltThumbnail(relPath, fullPath, 'user')
+      : null;
     if (prebuilt && fs.existsSync(prebuilt.path)) {
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
       res.setHeader('Content-Type', prebuilt.mimeType);
@@ -7830,15 +8030,35 @@ app.get('/api/tenant/thumb', tenantMediaCorsMiddleware, verifyTenantTicket, asyn
       .digest('hex');
     const forceRegen = req.query.force === '1' || req.query.force === 'true';
     const tenantThumbPath = path.join(INTERNAL_THUMBS_DIR, `tthumb_${tenantThumbKey}.webp`);
+    const thumbOwnerNs = req.tenant.scopeType === 'org'
+      ? `org:${req.tenant.orgSlug}`
+      : `user:${req.tenant.userId}`;
     if (fs.existsSync(tenantThumbPath)) {
       let validCached = false;
+      let cachedEncHdr = null;
       if (!forceRegen) {
         try {
-          const st = fs.statSync(tenantThumbPath);
-          validCached = st.isFile() && st.size > 256;
+          cachedEncHdr = await vaultCrypto.readEncryptedHeader(tenantThumbPath).catch(() => null);
+          if (cachedEncHdr) {
+            validCached = cachedEncHdr.plaintextSize > 256;
+          } else {
+            const st = fs.statSync(tenantThumbPath);
+            validCached = st.isFile() && st.size > 256;
+          }
         } catch {}
       }
       if (validCached) {
+        if (cachedEncHdr) {
+          try {
+            vaultCrypto.getMasterKey();
+          } catch (keyErr) {
+            return res.status(503).json({ error: keyErr.message });
+          }
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          res.setHeader('Content-Type', 'image/webp');
+          res.setHeader('Content-Length', String(cachedEncHdr.plaintextSize));
+          return vaultCrypto.createDecryptStream(tenantThumbPath, thumbOwnerNs).pipe(res);
+        }
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         res.setHeader('Content-Type', 'image/webp');
         return fs.createReadStream(tenantThumbPath).pipe(res);
@@ -7863,12 +8083,53 @@ app.get('/api/tenant/thumb', tenantMediaCorsMiddleware, verifyTenantTicket, asyn
     }
 
     const targetW = req.query.w ? Math.max(240, Math.min(1280, parseInt(req.query.w, 10) || 480)) : 480;
-    const generated = await enqueueTenantThumbnailJob(
-      `${tenantThumbKey}:${targetW}`,
-      () => generateThumbnailWebP(fullPath, tenantThumbPath, targetW, 'webp'),
-      { priority: 'high', timeoutMs: 20000 }
-    );
+    const srcEncHdr = await vaultCrypto.readEncryptedHeader(fullPath).catch(() => null);
+    let generated = false;
+    if (srcEncHdr) {
+      try {
+        vaultCrypto.getMasterKey();
+      } catch (keyErr) {
+        return res.status(503).json({ error: keyErr.message });
+      }
+      const decTmpPath = path.join(os.tmpdir(), `aurt-dec-${crypto.randomUUID()}${path.extname(fullPath)}`);
+      const plainThumbTmp = path.join(os.tmpdir(), `aurt-dec-thumb-${crypto.randomUUID()}.webp`);
+      try {
+        await new Promise((resolve, reject) => {
+          const out = fs.createWriteStream(decTmpPath, { mode: 0o600 });
+          const decStream = vaultCrypto.createDecryptStream(fullPath, thumbOwnerNs);
+          decStream.on('error', reject);
+          out.on('error', reject);
+          out.on('finish', resolve);
+          decStream.pipe(out);
+        });
+        const ok = await enqueueTenantThumbnailJob(
+          `${tenantThumbKey}:${targetW}`,
+          () => generateThumbnailWebP(decTmpPath, plainThumbTmp, targetW, 'webp'),
+          { priority: 'high', timeoutMs: 20000 }
+        );
+        if (ok && fs.existsSync(plainThumbTmp)) {
+          await vaultCrypto.encryptFileAtomic(plainThumbTmp, tenantThumbPath, thumbOwnerNs);
+          generated = true;
+        }
+      } finally {
+        await fs.promises.unlink(decTmpPath).catch(() => {});
+        await fs.promises.unlink(plainThumbTmp).catch(() => {});
+      }
+    } else {
+      generated = await enqueueTenantThumbnailJob(
+        `${tenantThumbKey}:${targetW}`,
+        () => generateThumbnailWebP(fullPath, tenantThumbPath, targetW, 'webp'),
+        { priority: 'high', timeoutMs: 20000 }
+      );
+    }
     if (generated && fs.existsSync(tenantThumbPath)) {
+      const genEncHdr = await vaultCrypto.readEncryptedHeader(tenantThumbPath).catch(() => null);
+      if (genEncHdr && genEncHdr.plaintextSize > 256) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        res.setHeader('Content-Type', 'image/webp');
+        res.setHeader('Content-Length', String(genEncHdr.plaintextSize));
+        return vaultCrypto.createDecryptStream(tenantThumbPath, thumbOwnerNs).pipe(res);
+      }
       let validGen = false;
       try {
         const st = fs.statSync(tenantThumbPath);
@@ -7941,8 +8202,13 @@ app.post('/api/tenant/note', verifyTenantTicket, async (req, res) => {
 
     let prevBytes = 0;
     try {
-      const prevStat = await fs.promises.stat(targetPath);
-      if (prevStat.isFile()) prevBytes = prevStat.size;
+      const prevHdr = await vaultCrypto.readEncryptedHeader(targetPath).catch(() => null);
+      if (prevHdr) {
+        prevBytes = prevHdr.plaintextSize;
+      } else {
+        const prevStat = await fs.promises.stat(targetPath);
+        if (prevStat.isFile()) prevBytes = prevStat.size;
+      }
     } catch {}
 
     const deltaBytes = newBytes - prevBytes;
@@ -7957,7 +8223,21 @@ app.post('/api/tenant/note', verifyTenantTicket, async (req, res) => {
     }
 
     await fs.promises.mkdir(path.dirname(targetPath), { recursive: true });
-    await atomicWriteFile(targetPath, content, 'utf8');
+    if (vaultCrypto.isEncryptionEnabled()) {
+      try {
+        const ownerNs = req.tenant.scopeType === 'org'
+          ? `org:${req.tenant.orgSlug}`
+          : `user:${req.tenant.userId}`;
+        await vaultCrypto.encryptBufferToFile(Buffer.from(content, 'utf8'), targetPath, ownerNs);
+      } catch (cryptoErr) {
+        if (cryptoErr?.statusCode === 503 || cryptoErr?.code === 'VAULT_KEY_MISSING' || cryptoErr?.code === 'VAULT_KEY_INVALID') {
+          return res.status(503).json({ error: cryptoErr.message });
+        }
+        throw cryptoErr;
+      }
+    } else {
+      await atomicWriteFile(targetPath, content, 'utf8');
+    }
 
     const totalUsedBytes = await req.tenant.adjustUsedBytes(deltaBytes);
     const item = await buildTenantEntryDescriptorAsync(
@@ -8051,7 +8331,14 @@ app.post(
         if (prevStat.isFile()) {
           prevBytes = prevStat.size;
           if (prevBytes === req.file.size) {
-            isExactDuplicate = true;
+            // Deduplicação estrita via hash SHA-256 do plaintext (nunca apenas por tamanho em bytes)
+            const [stagedHash, targetHash] = await Promise.all([
+              computeFileSha256(stagedPath),
+              computeFileSha256(targetPath),
+            ]);
+            if (stagedHash && targetHash && stagedHash === targetHash) {
+              isExactDuplicate = true;
+            }
           }
         }
       } catch {}
@@ -8090,7 +8377,23 @@ app.post(
       }
 
       await fs.promises.mkdir(path.dirname(targetPath), { recursive: true });
-      await moveFileSafe(stagedPath, targetPath);
+      if (vaultCrypto.isEncryptionEnabled() && !isPortfolioRelatedRelPath(relPath)) {
+        try {
+          const ownerNs = req.tenant.scopeType === 'org'
+            ? `org:${req.tenant.orgSlug}`
+            : `user:${req.tenant.userId}`;
+          await vaultCrypto.encryptFileAtomic(stagedPath, targetPath, ownerNs);
+          await fs.promises.unlink(stagedPath).catch(() => {});
+        } catch (cryptoErr) {
+          await fs.promises.unlink(stagedPath).catch(() => {});
+          if (cryptoErr?.statusCode === 503 || cryptoErr?.code === 'VAULT_KEY_MISSING' || cryptoErr?.code === 'VAULT_KEY_INVALID') {
+            return res.status(503).json({ error: cryptoErr.message });
+          }
+          throw cryptoErr;
+        }
+      } else {
+        await moveFileSafe(stagedPath, targetPath);
+      }
 
       const totalUsedBytes = await req.tenant.adjustUsedBytes(deltaBytes);
       queueTenantImageThumbnail(req.tenant.pinNamespaceId, relPath, targetPath, 480);
@@ -8214,8 +8517,7 @@ app.post('/api/tenant/shortcut', verifyTenantTicket, async (req, res) => {
       }
       if (
         req.tenant.role !== 'admin' &&
-        Array.isArray(req.tenant.allowedOrgSlugs) &&
-        !req.tenant.allowedOrgSlugs.includes(rawTargetOrgSlug)
+        (!Array.isArray(req.tenant.allowedOrgSlugs) || !req.tenant.allowedOrgSlugs.includes(rawTargetOrgSlug))
       ) {
         return res.status(403).json({ error: 'Sem permissão para criar atalho apontando para esta organização.' });
       }
@@ -8349,6 +8651,9 @@ app.post('/api/tenant/rename', verifyTenantTicket, async (req, res) => {
     if (DEFAULT_TENANT_SUBFOLDERS.includes(oldRel)) {
       return res.status(400).json({ error: 'As 4 pastas raiz padrão não podem ser renomeadas.' });
     }
+    if (newRel === oldRel || newRel.startsWith(oldRel + '/')) {
+      return res.status(400).json({ error: 'Não é possível mover uma pasta para dentro de si mesma ou de seus subdiretórios.' });
+    }
 
     assertFolderPinUnlockedIfRequired(req, oldRel);
     assertFolderPinUnlockedIfRequired(req, newRel);
@@ -8364,7 +8669,7 @@ app.post('/api/tenant/rename', verifyTenantTicket, async (req, res) => {
     if (st.isDirectory()) {
       await renameDirectorySafeFAT32(srcFull, destFull);
     } else {
-      await moveFileSafe(srcFull, destFull);
+      await storagePool.moveAcrossVolumesOrRename(srcFull, destFull);
     }
 
     const totalUsedBytes = await req.tenant.getUsedBytes();
@@ -8755,20 +9060,24 @@ app.get('/api/tenant/zip', verifyTenantTicket, async (req, res) => {
     if (req.tenant.purpose === 'public_media' || req.tenant.allowDownload === false) {
       return res.status(403).json({ error: 'Download não autorizado para este ticket.' });
     }
+    if (req.tenant.purpose === 'share' && !req.tenant.allowedPrefix) {
+      return res.status(403).json({ error: 'Download ZIP de ticket share exige allowedPrefix explícito.' });
+    }
     const folderRel = normalizeTenantRelPath(req.query.folder || '');
     const effectiveRel = folderRel || (req.tenant.allowedPrefix ? normalizeTenantRelPath(req.tenant.allowedPrefix) : '');
-    if (req.tenant.allowedPrefix) {
+    if (req.tenant.purpose === 'share' || req.tenant.allowedPrefix) {
       assertPublicMediaPathAllowed(req, effectiveRel);
     }
     assertFolderPinUnlockedIfRequired(req, effectiveRel);
 
     const targetDir = req.tenant.resolveSafePath(effectiveRel, { forWrite: false });
 
-    // Suporte a download seletivo via ?files= (JSON ou lista separada por vírgula)
+    // Suporte a download seletivo via ?files= ou ?paths= (JSON ou lista separada por vírgula)
     let filterSet = null;
-    if (req.query.files) {
+    const rawFilter = req.query.files || req.query.paths;
+    if (rawFilter) {
       try {
-        const rawParam = String(req.query.files).trim();
+        const rawParam = String(rawFilter).trim();
         const parsedArr = rawParam.startsWith('[') ? JSON.parse(rawParam) : rawParam.split(',');
         if (Array.isArray(parsedArr) && parsedArr.length > 0) {
           filterSet = new Set(
@@ -8780,6 +9089,15 @@ app.get('/api/tenant/zip', verifyTenantTicket, async (req, res) => {
       } catch {}
     }
 
+    const isPathAllowedFn = (subRel) => {
+      const fullRel = effectiveRel ? `${effectiveRel}/${subRel}` : subRel;
+      const lockInfo = isTenantPathPinProtected(req.tenant.userId, fullRel);
+      if (lockInfo && !req.tenant.unlockedPinsSet?.has(lockInfo.lockedScope)) {
+        return false;
+      }
+      return true;
+    };
+
     const zipLabel =
       filterSet && filterSet.size > 0
         ? `${path.basename(folderRel || 'selecao')}_selecionadas.zip`
@@ -8787,7 +9105,7 @@ app.get('/api/tenant/zip', verifyTenantTicket, async (req, res) => {
           ? `${path.basename(folderRel)}.zip`
           : 'meus-arquivos.zip';
 
-    return await streamDirectoryAsZip(targetDir, req, res, zipLabel, filterSet);
+    return await streamDirectoryAsZip(targetDir, req, res, zipLabel, filterSet, isPathAllowedFn);
   } catch (err) {
     return res.status(err.statusCode || 500).json({ error: err.message });
   }
@@ -8878,20 +9196,28 @@ app.get('/api/tenant/telemetry', verifyTenantTicket, async (req, res) => {
       }
     } catch {}
 
-    const adminUsedBytes = await getTenantUsedBytes(PRIMARY_ADMIN_UUID, req.tenant.userRoot);
+    const tenantUsedBytes = await req.tenant.getUsedBytes();
+    if (!STORAGE_VOLUMES_POOL || STORAGE_VOLUMES_POOL.length === 0) {
+      STORAGE_VOLUMES_POOL = storagePool.discoverStorageVolumes(STORAGE_DIR);
+    }
+    const poolTelemetry = storagePool.getAggregatedTelemetry(STORAGE_VOLUMES_POOL);
 
     return res.json({
       status: 'ok',
       uptime: Math.floor(process.uptime()),
       device: 'FireTV-Termux',
       version: '4.1.0-multi-tenant',
-      hdConnected: fs.existsSync(STORAGE_DIR),
+      hdConnected: isExternalStorageMounted(),
+      volumes: poolTelemetry.volumes,
+      degraded: poolTelemetry.degraded,
+      aggregatedTotalBytes: poolTelemetry.totalBytes,
+      aggregatedFreeBytes: poolTelemetry.freeBytes,
       cpuLoadPercent,
       ramUsedMb: Math.round(usedMem / (1024 * 1024)),
       ramTotalMb: Math.round(totalMem / (1024 * 1024)),
       tempCelsius,
-      diskUsedBytes: adminUsedBytes,
-      storageDir: STORAGE_DIR,
+      diskUsedBytes: tenantUsedBytes,
+      storageDir: req.tenant.storageDir || STORAGE_DIR,
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });

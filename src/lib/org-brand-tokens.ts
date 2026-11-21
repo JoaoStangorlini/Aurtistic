@@ -29,7 +29,7 @@ export interface OrgBrandTokens {
   defaultPostBody: string;
 }
 
-export const ORG_BRAND_PRESETS: Record<OrgBrandSlug, OrgBrandTokens> = {
+export const ORG_BRAND_PRESETS: Record<string, OrgBrandTokens> = {
   'show-da-fisica': {
     themeId: 'show-da-fisica',
     displayName: 'Show de Física',
@@ -113,11 +113,13 @@ export const ORG_BRAND_PRESETS: Record<OrgBrandSlug, OrgBrandTokens> = {
   },
 };
 
-export function normalizeOrgBrandSlug(slugOrName?: string | null): OrgBrandSlug {
+export function normalizeOrgBrandSlug(slugOrName?: string | null): string {
   const raw = (slugOrName || '').toLowerCase().trim();
+  if (!raw) return 'labdiv';
   if (raw.includes('show') || raw === 'sdf') return 'show-da-fisica';
   if (raw === 'hs' || raw.includes('hacker')) return 'hs';
-  return 'labdiv';
+  if (raw === 'labdiv' || raw.includes('divulgacao') || raw.includes('divulgação')) return 'labdiv';
+  return raw;
 }
 
 export function resolveOrgBrandTokens(
@@ -125,7 +127,7 @@ export function resolveOrgBrandTokens(
   brandConfig?: Record<string, unknown> | null
 ): OrgBrandTokens {
   const key = normalizeOrgBrandSlug(slug);
-  const preset = ORG_BRAND_PRESETS[key];
+  const preset = ORG_BRAND_PRESETS[key as OrgBrandSlug] || ORG_BRAND_PRESETS['labdiv'];
   // Organizações oficiais do ecossistema preservam estritamente seu preset canônico de IDV
   if (key === 'labdiv' || key === 'show-da-fisica' || key === 'hs') {
     return preset;
@@ -148,6 +150,43 @@ export function resolveOrgBrandTokens(
       typeof brandConfig.glowIntensity === 'number'
         ? brandConfig.glowIntensity
         : preset.glowIntensity,
+  };
+}
+
+export function resolvePersonalStudioTokens(
+  palette?: string[] | null,
+  mode?: 'dark' | 'light'
+): OrgBrandTokens {
+  const isDark = mode !== 'light';
+  const accents = Array.isArray(palette) && palette.length > 0
+    ? palette
+    : ['#3b82f6', '#8b5cf6', '#ec4899', '#10b981'];
+
+  return {
+    themeId: 'hs',
+    displayName: 'Meu Studio',
+    badgeTag: 'STUDIO PESSOAL',
+    bgApp: isDark ? '#090d16' : '#f8fafc',
+    bgSurface: isDark ? '#111827' : '#ffffff',
+    textPrimary: isDark ? '#f9fafb' : '#0f172a',
+    textMuted: isDark ? '#9ca3af' : '#64748b',
+    primaryColor: accents[0] || '#3b82f6',
+    secondaryColor: accents[1] || '#8b5cf6',
+    tertiaryColor: accents[2] || '#ec4899',
+    containerColor: isDark ? '#1e293b' : '#f1f5f9',
+    accents,
+    fontDisplay: "'Plus Jakarta Sans', 'Inter', sans-serif",
+    fontBody: "'Inter', sans-serif",
+    googleFontsHref:
+      'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap',
+    uppercaseTitles: false,
+    letterSpacingTitle: '-0.02em',
+    glowIntensity: 0.6,
+    titleShadowCss: 'none',
+    borderStyleCss: '1px solid rgba(255, 255, 255, 0.1)',
+    tricolorTitlePreset: false,
+    defaultPostTitle: 'Meu Novo Projeto',
+    defaultPostBody: 'Crie posts, carrosséis e histórias com a sua identidade visual pessoal.',
   };
 }
 

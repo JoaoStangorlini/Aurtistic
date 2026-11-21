@@ -74,6 +74,16 @@ export default function ResumoClient({
 
   const [resumoData, setResumoData] = useState(initialResumoData);
 
+  const resolvedProfileImageUrl = React.useMemo(() => {
+    const raw = resumoData.profile_image_url;
+    if (!raw) return '/perfil.jpeg';
+    if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('/')) {
+      return raw;
+    }
+    const ticketToUse = activeTicket || vaultTicket || '';
+    return buildTenantThumbUrl(raw, ticketToUse, { serverUrl });
+  }, [resumoData.profile_image_url, activeTicket, vaultTicket, serverUrl]);
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -355,7 +365,7 @@ export default function ResumoClient({
                 <img 
                   className="w-full h-full object-cover rounded-xl saturate-[0.7] hover:saturate-100 transition-all duration-700" 
                   alt="Profile Photo" 
-                  src={resumoData.profile_image_url || '/perfil.jpeg'} 
+                  src={resolvedProfileImageUrl} 
                   onError={(e) => {
                     // Fallback to default
                     (e.target as HTMLImageElement).src = '/perfil.jpeg';
@@ -381,7 +391,9 @@ export default function ResumoClient({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-l-4 border-[#FFCC00] pl-4">
                 <div>
                   <h2 className="text-3xl font-['Bukra'] font-bold text-fg">Obras Fotográficas Favoritas</h2>
-                  <p className="text-sm text-fg-secondary mt-1">Fotografias autorais selecionadas do meu acervo de 2.369 fotos.</p>
+                  <p className="text-sm text-fg-secondary mt-1">
+                    Fotografias autorais selecionadas {favPhotos.length > 0 ? `(${favPhotos.length} em destaque)` : ''} do acervo no servidor.
+                  </p>
                 </div>
                 <Link
                   href="/portfolio"
@@ -571,8 +583,14 @@ export default function ResumoClient({
           onClose={() => setIsAvatarPickerOpen(false)}
           taskId=""
           taskTitle="Foto de Perfil"
+          mode="pick-file"
           ticket={vaultTicket || activeTicket || ''}
           serverUrl={serverUrl}
+          onFilesPicked={(paths) => {
+            if (paths.length > 0 && paths[0]) {
+              setResumoData((prev) => ({ ...prev, profile_image_url: paths[0] }));
+            }
+          }}
           onLinkedUpdated={() => {
             setIsAvatarPickerOpen(false);
           }}

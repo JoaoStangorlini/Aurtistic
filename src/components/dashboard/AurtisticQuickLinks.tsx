@@ -127,7 +127,7 @@ export function AurtisticQuickLinks({
   return (
     <div
       data-tour="quick-links-menu"
-      className="mb-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] shadow-sm transition-all overflow-hidden"
+      className="mb-4 rounded-2xl border border-border-subtle bg-surface shadow-sm transition-all overflow-hidden"
     >
       {/* Barra de Topo Compacta (Modo Default h-11) */}
       <div className="flex items-center justify-between px-3 sm:px-4 py-2 min-h-[44px] gap-2 flex-wrap">
@@ -135,14 +135,14 @@ export function AurtisticQuickLinks({
           <button
             type="button"
             onClick={toggleExpanded}
-            className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors py-1 px-2 rounded-lg hover:bg-[var(--surface-hover)]"
+            className="flex items-center gap-1.5 text-xs font-semibold text-fg-secondary hover:text-fg transition-colors py-1 px-2 rounded-lg hover:bg-surface-hover"
             title={isExpanded ? 'Recolher menu de links' : 'Expandir todos os links'}
           >
             <span className="material-symbols-outlined text-[18px] text-[var(--accent-primary)]">
               link
             </span>
             <span>Links Rápidos</span>
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-[var(--surface-hover)] text-[var(--text-secondary)]">
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-surface-hover text-fg-secondary">
               {links.length}
             </span>
             <span className="material-symbols-outlined text-[18px] transition-transform duration-200">
@@ -159,7 +159,7 @@ export function AurtisticQuickLinks({
                   href={link.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] px-2 py-0.5 rounded-md bg-[var(--surface-secondary)] hover:bg-[var(--surface-hover)] border border-[var(--border-subtle)] transition-colors"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-fg-secondary hover:text-fg px-2 py-0.5 rounded-md bg-surface-hover hover:opacity-90 border border-border-subtle transition-colors"
                 >
                   <span className="truncate max-w-[120px]">{link.name}</span>
                   <span className="material-symbols-outlined text-[12px] opacity-60">open_in_new</span>
@@ -169,7 +169,7 @@ export function AurtisticQuickLinks({
                 <button
                   type="button"
                   onClick={toggleExpanded}
-                  className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                  className="text-[10px] text-fg-muted hover:text-fg transition-colors"
                 >
                   +{links.length - 4} mais
                 </button>
@@ -189,7 +189,7 @@ export function AurtisticQuickLinks({
             className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
               isEditing
                 ? 'bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] shadow-sm'
-                : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] border border-[var(--border-subtle)]'
+                : 'bg-surface hover:bg-surface-hover text-fg-secondary hover:text-fg border border-border-subtle'
             }`}
             title="Gerenciar e adicionar links"
           >
@@ -203,11 +203,11 @@ export function AurtisticQuickLinks({
 
       {/* Painel Expansível Completo */}
       {isExpanded && (
-        <div className="border-t border-[var(--border-subtle)] p-3 sm:p-4 bg-[var(--surface-secondary)]/50 flex flex-col gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="border-t border-border-subtle p-3 sm:p-4 bg-surface-hover/20 flex flex-col gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
           {/* Links do Servidor e LabDiv (Admin/LabDiv) */}
           {isPrivilegedUser && (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mr-2">
+              <span className="text-[11px] font-semibold text-fg-muted uppercase tracking-wider mr-2">
                 Links Gerais:
               </span>
               {systemLinks.map((link) => (
@@ -224,12 +224,12 @@ export function AurtisticQuickLinks({
 
           {/* Links Customizados do Usuário */}
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mr-2">
+            <span className="text-[11px] font-semibold text-fg-muted uppercase tracking-wider mr-2">
               Meus Links:
             </span>
 
             {links.length === 0 ? (
-              <span className="text-xs text-[var(--text-muted)] italic">
+              <span className="text-xs text-fg-muted italic">
                 Nenhum link adicionado ainda.
               </span>
             ) : (
@@ -250,26 +250,26 @@ export function AurtisticQuickLinks({
 
           {/* Formulário Inline de Novo Link */}
           {isEditing && (
-            <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-[var(--surface-primary)] border border-[var(--border-subtle)] w-full max-w-xl">
+            <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-surface border border-border-subtle w-full max-w-xl">
               <input
                 type="text"
                 placeholder="Nome (ex: Meu Drive)"
                 value={newLinkName}
                 onChange={(e) => setNewLinkName(e.target.value)}
-                className="bg-[var(--surface-secondary)] text-sm text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] focus:border-[var(--accent-primary)] focus:outline-none flex-1 min-w-[140px]"
+                className="bg-app text-sm text-fg px-3 py-1.5 rounded-lg border border-border-subtle focus:border-[var(--accent-primary)] focus:outline-none flex-1 min-w-[140px]"
               />
               <input
                 type="url"
                 placeholder="URL (https://...)"
                 value={newLinkHref}
                 onChange={(e) => setNewLinkHref(e.target.value)}
-                className="bg-[var(--surface-secondary)] text-sm text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] focus:border-[var(--accent-primary)] focus:outline-none flex-1 min-w-[180px]"
+                className="bg-app text-sm text-fg px-3 py-1.5 rounded-lg border border-border-subtle focus:border-[var(--accent-primary)] focus:outline-none flex-1 min-w-[180px]"
               />
               <button
                 type="button"
                 onClick={addLink}
                 disabled={!newLinkName.trim() || !newLinkHref.trim()}
-                className="bg-[var(--accent-primary)] text-[var(--accent-primary-fg)] px-3.5 py-1.5 rounded-lg text-xs font-bold disabled:opacity-40 hover:opacity-90 transition-opacity flex items-center gap-1 shadow-sm"
+                className="bg-[var(--accent-primary)] text-[var(--accent-primary-fg,#FFFFFF)] px-3.5 py-1.5 rounded-lg text-xs font-bold disabled:opacity-40 hover:opacity-90 transition-opacity flex items-center gap-1 shadow-sm"
               >
                 <span className="material-symbols-outlined text-[14px]">save</span>
                 Salvar

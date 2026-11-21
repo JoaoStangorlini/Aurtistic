@@ -6,7 +6,7 @@ import type { AspectRatioKey, StudioStage, StudioActiveTab, StudioSlide, StudioL
 import { useOrganizationBrand } from '../OrganizationBrandProvider';
 import { saveDraftToIdb, getAllDraftsFromIdb, deleteDraftFromIdb, rehydrateDraft } from '@/lib/studio/studio-idb';
 import { rehydrateStudioDraftAction } from '@/app/(dashboard)/organizacoes/studio-actions';
-import { createDefaultSlide, adaptSlideLayersForAspect } from './studio-helpers';
+import { createDefaultSlide, createBlankSlide, adaptSlideLayersForAspect } from './studio-helpers';
 import { clearStudioRenderCache } from '@/lib/studio/lut-processor';
 import { enforceContiguousFolders, reorderContiguousFolderBlock, reorderSingleLayerStep } from '@/lib/studio/folder-utils';
 
@@ -35,6 +35,7 @@ function hashDataUrl(value: string): string {
 interface StudioContextValue {
   organizationId?: string | null;
   orgSlug?: string | null;
+  scope?: 'personal' | 'org';
   stage: StudioStage;
   setStage: (s: StudioStage) => void;
   activeTab: StudioActiveTab;
@@ -53,7 +54,7 @@ interface StudioContextValue {
   setSelectedLayerIds: (ids: string[]) => void;
   toggleLayerSelection: (id: string) => void;
   updateSlide: (slideId: string, patch: Partial<StudioSlide>) => void;
-  addSlide: () => void;
+  addSlide: (initialLayers?: StudioLayer[]) => void;
   duplicateSlide: (slideId: string) => void;
   removeSlide: (slideId: string) => void;
   editingTextLayerId: string | null;
@@ -159,7 +160,19 @@ interface StudioContextValue {
 
 const StudioContext = createContext<StudioContextValue | null>(null);
 
-export function StudioProvider({ children, organizationId, orgSlug }: { children: React.ReactNode; organizationId?: string | null; orgSlug?: string | null }) {
+export function StudioProvider({
+  children,
+  organizationId,
+  orgSlug,
+  scope = 'org',
+  userId,
+}: {
+  children: React.ReactNode;
+  organizationId?: string | null;
+  orgSlug?: string | null;
+  scope?: 'personal' | 'org';
+  userId?: string;
+}) {
   const { tokens } = useOrganizationBrand();
   const [stage, setStage] = useState<StudioStage>('launcher');
   const [activeTab, setActiveTab] = useState<StudioActiveTab>('images');
@@ -207,6 +220,7 @@ export function StudioProvider({ children, organizationId, orgSlug }: { children
   const clipboardRef = useRef<{ sourceSlideId: string; layers: StudioLayer[] } | null>(null);
   const pasteCountRef = useRef<number>(0);
   const slidesRef = useRef<StudioSlide[]>(slides);
+  const loadSeqRef = useRef(0);
   useEffect(() => {
     slidesRef.current = slides;
   }, [slides]);
@@ -341,26 +355,22 @@ export function StudioProvider({ children, organizationId, orgSlug }: { children
   }, [activeSliderId]);
 
   const undo = useCallback(() => {
-    setHistoryPast((prev) => {
-      if (prev.length === 0) return prev;
-      const previousEntry = prev[prev.length - 1];
-      const currentEntry = makeHistoryEntry(slidesRef.current, previousEntry.label);
-      setHistoryFuture((f) => [currentEntry, ...f.slice(0, MAX_HISTORY_SNAPSHOTS - 1)]);
-      setSlides(rehydrateSlideAssets(previousEntry.slides));
-      return prev.slice(0, -1);
-    });
-  }, [makeHistoryEntry, rehydrateSlideAssets]);
+    if (historyPast.length === 0) return;
+    const previousEntry = historyPast[historyPast.length - 1];
+    const currentEntry = makeHistoryEntry(slidesRef.current, previousEntry.label);
+    setHistoryPast((prev) => prev.slice(0, -1));
+    setHistoryFuture((f) => [currentEntry, ...f.slice(0, MAX_HISTORY_SNAPSHOTS - 1)]);
+    setSlides(rehydrateSlideAssets(previousEntry.slides));
+  }, [historyPast, makeHistoryEntry, rehydrateSlideAssets]);
 
   const redo = useCallback(() => {
-    setHistoryFuture((prev) => {
-      if (prev.length === 0) return prev;
-      const [nextEntry, ...rest] = prev;
-      const currentEntry = makeHistoryEntry(slidesRef.current, nextEntry.label);
-      setHistoryPast((p) => [...p.slice(-(MAX_HISTORY_SNAPSHOTS - 1)), currentEntry]);
-      setSlides(rehydrateSlideAssets(nextEntry.slides));
-      return rest;
-    });
-  }, [makeHistoryEntry, rehydrateSlideAssets]);
+    if (historyFuture.length === 0) return;
+    const [nextEntry, ...rest] = historyFuture;
+    const currentEntry = makeHistoryEntry(slidesRef.current, nextEntry.label);
+    setHistoryFuture(rest);
+    setHistoryPast((p) => [...p.slice(-(MAX_HISTORY_SNAPSHOTS - 1)), currentEntry]);
+    setSlides(rehydrateSlideAssets(nextEntry.slides));
+  }, [historyFuture, makeHistoryEntry, rehydrateSlideAssets]);
 
   const jumpToHistory = useCallback((target: 'past' | 'future', index: number) => {
     if (target === 'past') {
@@ -368,8 +378,8 @@ export function StudioProvider({ children, organizationId, orgSlug }: { children
       const targetEntry = historyPast[index];
       const trailingPast = historyPast.slice(index + 1);
       const currentEntry = makeHistoryEntry(slidesRef.current, targetEntry.label);
-      setHistoryFuture((prevFuture) => [...trailingPast.reverse(), currentEntry, ...prevFuture].slice(0, MAX_HISTORY_SNAPSHOTS));
-      setHistoryPast(historyPast.slice(0, index));
+      setHistoryFuture((prevFuture) => [[...trailingPast].reverse(), currentEntry, ...prevFuture].flat().slice(0, MAX_HISTORY_SNAPSHOTS));
+      setHistoryPast((prevPast) => prevPast.slice(0, index));
       setSlides(rehydrateSlideAssets(targetEntry.slides));
       return;
     }
@@ -378,7 +388,7 @@ export function StudioProvider({ children, organizationId, orgSlug }: { children
     const precedingFuture = historyFuture.slice(0, index);
     const currentEntry = makeHistoryEntry(slidesRef.current, targetEntry.label);
     setHistoryPast((prevPast) => [...prevPast, currentEntry, ...precedingFuture].slice(-MAX_HISTORY_SNAPSHOTS));
-    setHistoryFuture(historyFuture.slice(index + 1));
+    setHistoryFuture((prevFuture) => prevFuture.slice(index + 1));
     setSlides(rehydrateSlideAssets(targetEntry.slides));
   }, [historyPast, historyFuture, makeHistoryEntry, rehydrateSlideAssets]);
 
@@ -414,7 +424,7 @@ export function StudioProvider({ children, organizationId, orgSlug }: { children
             layers: s.layers.map((l) => {
               if (l.id !== currentLayer.id) return l;
               if (l.type === 'text') return { ...l, color: normalized };
-              if (l.type === 'shape') return { ...l, fill: normalized };
+              if (l.type === 'shape') return { ...l, fillColor: normalized };
               return l;
             }),
           }
@@ -437,12 +447,19 @@ export function StudioProvider({ children, organizationId, orgSlug }: { children
     })));
   }, [commitHistorySnapshot]);
 
+  const scopeKey = scope === 'personal'
+    ? (userId ? `personal:${userId}` : 'personal')
+    : (organizationId ? `org:${organizationId}` : (orgSlug ? `org:${orgSlug}` : 'org:default'));
+
   useEffect(() => {
-    getAllDraftsFromIdb().then((local) => {
+    getAllDraftsFromIdb(scopeKey).then((local) => {
       if (local?.length) setDrafts(local);
     });
     const slug = orgSlug || tokens.themeId;
-    fetch(`/api/studio/drafts?org=${encodeURIComponent(slug)}`)
+    const url = scope === 'personal'
+      ? '/api/studio/drafts?scope=personal'
+      : `/api/studio/drafts?org=${encodeURIComponent(slug)}`;
+    fetch(url)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (Array.isArray(data?.drafts) && data.drafts.length) {
@@ -450,7 +467,7 @@ export function StudioProvider({ children, organizationId, orgSlug }: { children
         }
       })
       .catch(() => {});
-  }, [orgSlug, tokens.themeId]);
+  }, [orgSlug, tokens.themeId, scope, scopeKey]);
 
   const activeSlide = slides.find((s) => s.id === activeSlideId) || slides[0];
   const selectedLayer = activeSlide?.layers.find((l) => l.id === selectedLayerId) || null;
@@ -468,31 +485,34 @@ export function StudioProvider({ children, organizationId, orgSlug }: { children
     })));
   }, []);
 
-  const addSlide = useCallback(() => {
-    const newSlide = { ...createDefaultSlide(`slide-${Date.now()}`, aspectRatio, tokens), title: `Tela ${slides.length + 1}` };
+  const addSlide = useCallback((initialLayers?: StudioLayer[]) => {
+    commitHistorySnapshot(slidesRef.current, 'Adicionar Tela');
+    const newSlide = { ...createDefaultSlide(`slide-${crypto.randomUUID()}`, aspectRatio, tokens), title: `Tela ${slides.length + 1}` };
+    if (initialLayers && initialLayers.length > 0) {
+      newSlide.layers = initialLayers;
+    }
     setSlides((prev) => [...prev, newSlide]);
     setActiveSlideId(newSlide.id);
-  }, [slides.length, aspectRatio, tokens]);
+  }, [slides.length, aspectRatio, tokens, commitHistorySnapshot]);
 
   const duplicateSlide = useCallback((slideId: string) => {
     const src = slidesRef.current.find((s) => s.id === slideId);
     if (!src) return;
     commitHistorySnapshot(slidesRef.current);
-    const now = Date.now();
     const folderIdMap = new Map<string, string>();
-    const newFolders = (src.folders || []).map((f, idx) => {
-      const nextId = `folder-${now}-${idx}`;
+    const newFolders = (src.folders || []).map((f) => {
+      const nextId = `folder-${crypto.randomUUID()}`;
       folderIdMap.set(f.id, nextId);
       return { ...f, id: nextId };
     });
-    const newLayers = src.layers.map((l, idx) => ({
-      ...l,
-      id: `${l.type}-${now}-${idx}`,
+    const newLayers = src.layers.map((l) => ({
+      ...structuredClone(l),
+      id: `${l.type}-${crypto.randomUUID()}`,
       folderId: l.folderId ? (folderIdMap.get(l.folderId) ?? null) : null,
     })) as StudioLayer[];
     const cloned: StudioSlide = {
       ...src,
-      id: `slide-${now}`,
+      id: `slide-${crypto.randomUUID()}`,
       title: `${src.title} (Cópia)`,
       folders: newFolders,
       layers: newLayers,
@@ -506,13 +526,14 @@ export function StudioProvider({ children, organizationId, orgSlug }: { children
   }, [commitHistorySnapshot]);
 
   const removeSlide = useCallback((id: string) => {
+    commitHistorySnapshot(slidesRef.current, 'Excluir Tela');
     setSlides((prev) => {
       if (prev.length <= 1) return prev;
       const filtered = prev.filter((s) => s.id !== id);
       setActiveSlideId(filtered[0].id);
       return filtered;
     });
-  }, []);
+  }, [commitHistorySnapshot]);
 
   const addLayer = useCallback((layer: StudioLayer) => {
     commitHistorySnapshot(slidesRef.current);
@@ -567,7 +588,7 @@ export function StudioProvider({ children, organizationId, orgSlug }: { children
       const dy = options?.offsetY ?? 0.03;
       const now = Date.now();
       const copies = targets.map((t, idx) => ({
-        ...t,
+        ...structuredClone(t),
         id: `${t.id}-copy-${now}-${idx}`,
         name: `${t.name} (Cópia)`,
         x: Math.min(0.95, t.x + dx),
@@ -884,7 +905,7 @@ export function StudioProvider({ children, organizationId, orgSlug }: { children
     if (!target) return;
     commitHistorySnapshot(slidesRef.current);
     const copy: StudioLayer = {
-      ...target,
+      ...structuredClone(target),
       id: `${target.type}-${Date.now()}`,
       name: `${target.name} (Cópia)`,
       x: Math.min(0.85, target.x + 0.04),
@@ -971,7 +992,9 @@ export function StudioProvider({ children, organizationId, orgSlug }: { children
     if (local.slides[0]) setActiveSlideId(local.slides[0].id);
     setSelectedLayerId(null);
     setStage('editor');
+    const loadSeq = ++loadSeqRef.current;
     rehydrateStudioDraftAction(draft, slug, organizationId || undefined).then((res) => {
+      if (loadSeq !== loadSeqRef.current) return;
       if (res?.ok && res.draft) setSlides(res.draft.slides);
     }).catch(() => {});
   }, [orgSlug, organizationId, tokens.themeId, clearHistoryAndAssets]);
@@ -986,24 +1009,38 @@ export function StudioProvider({ children, organizationId, orgSlug }: { children
     setSelectedLayerId(null);
     setStage('editor');
     const slug = orgSlug || tokens.themeId;
-    rehydrateStudioDraftAction({ id: tpl.id, slotIndex: 1, title: tpl.title, aspectRatio: tpl.aspectRatio, updatedAt: '', slides: tpl.slides }, slug, organizationId || undefined).then((r) => { if (r?.ok && r.draft) setSlides(r.draft.slides); }).catch(() => {});
+    const loadSeqTpl = ++loadSeqRef.current;
+    rehydrateStudioDraftAction({ id: tpl.id, slotIndex: 1, title: tpl.title, aspectRatio: tpl.aspectRatio, updatedAt: '', slides: tpl.slides }, slug, organizationId || undefined).then((r) => {
+      if (loadSeqTpl !== loadSeqRef.current) return;
+      if (r?.ok && r.draft) setSlides(r.draft.slides);
+    }).catch(() => {});
   }, [orgSlug, organizationId, tokens.themeId, clearHistoryAndAssets]);
 
   const saveCurrentToDraftSlot = useCallback((slot: 1 | 2 | 3, title?: string) => {
+    const existing = drafts.find((d) => d.slotIndex === slot);
     const newDraft: StudioDraft = {
       id: `draft-slot-${slot}`,
       slotIndex: slot,
-      title: title || `Rascunho ${slot} - ${new Date().toLocaleDateString('pt-BR')}`,
+      title: title || existing?.title || `Rascunho ${slot} - ${new Date().toLocaleDateString('pt-BR')}`,
       aspectRatio,
       updatedAt: new Date().toISOString(),
       slides,
+      scope,
+      scopeKey,
+      storageKey: `${scopeKey}:${slot}`,
     };
-    saveDraftToIdb(newDraft);
+    saveDraftToIdb(newDraft, scopeKey);
     const slug = orgSlug || tokens.themeId;
     fetch('/api/studio/drafts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slotIndex: slot, orgSlug: slug, draft: newDraft }),
+      body: JSON.stringify({
+        slotIndex: slot,
+        orgSlug: scope === 'personal' ? 'personal' : slug,
+        scope,
+        scopeKey,
+        draft: newDraft,
+      }),
     }).catch(() => {});
     setDrafts((prev) => {
       const filtered = prev.filter((d) => d.slotIndex !== slot);
@@ -1011,21 +1048,26 @@ export function StudioProvider({ children, organizationId, orgSlug }: { children
     });
     setActiveDraftSlot(slot);
     setLastSavedAt(new Date().toISOString());
-  }, [aspectRatio, slides, orgSlug, tokens.themeId]);
+  }, [aspectRatio, slides, orgSlug, tokens.themeId, scope, scopeKey, drafts]);
 
   const deleteDraftSlot = useCallback((slot: 1 | 2 | 3) => {
-    deleteDraftFromIdb(slot);
+    deleteDraftFromIdb(slot, scopeKey);
     const slug = orgSlug || tokens.themeId;
-    fetch(`/api/studio/drafts?slotIndex=${slot}&orgSlug=${encodeURIComponent(slug)}`, { method: 'DELETE' }).catch(() => {});
+    const url = scope === 'personal'
+      ? `/api/studio/drafts?slotIndex=${slot}&scope=personal`
+      : `/api/studio/drafts?slotIndex=${slot}&orgSlug=${encodeURIComponent(slug)}`;
+    fetch(url, { method: 'DELETE' }).catch(() => {});
     setDrafts((prev) => prev.filter((d) => d.slotIndex !== slot));
     if (activeDraftSlot === slot) setActiveDraftSlot(null);
-  }, [activeDraftSlot, orgSlug, tokens.themeId]);
+  }, [activeDraftSlot, orgSlug, tokens.themeId, scope, scopeKey]);
+
+  // Auto-save gerenciado por useStudioAutoSave (em StudioWorkspaceView) — bloco removido para evitar duplicação
 
   const resetToBlank = useCallback((aspect: AspectRatioKey) => {
     clearStudioRenderCache();
     clearHistoryAndAssets();
     setAspectRatio(aspect);
-    const blank = createDefaultSlide(`slide-${Date.now()}`, aspect, tokens);
+    const blank = createBlankSlide(`slide-${crypto.randomUUID()}`, aspect, tokens.bgApp || '#07090e');
     setSlides([blank]);
     setActiveSlideId(blank.id);
     setSelectedLayerId(null);
@@ -1036,7 +1078,7 @@ export function StudioProvider({ children, organizationId, orgSlug }: { children
   return (
     <StudioContext.Provider
       value={{
-        organizationId, orgSlug, stage, setStage, activeTab, setActiveTab, aspectRatio, setAspectRatio, adaptFormatTo,
+        organizationId, orgSlug, scope, stage, setStage, activeTab, setActiveTab, aspectRatio, setAspectRatio, adaptFormatTo,
         slides, activeSlideId, activeSlide, setActiveSlideId,
         selectedLayerId, selectedLayerIds, selectedLayer, setSelectedLayerId, setSelectedLayerIds, toggleLayerSelection,
         updateSlide, addSlide, duplicateSlide, removeSlide,

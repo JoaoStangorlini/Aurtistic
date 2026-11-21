@@ -10,6 +10,7 @@ import { syncUserFileIndexAction } from '@/app/(dashboard)/servidor/actions';
 export interface VaultIdeWorkbenchProps {
   activeEntry: EdgeVaultEntry | null;
   ticket: string;
+  organizationId?: string | null;
   serverUrl?: string;
   indexedRow?: UserFileIndexRow;
   availableTasks?: Task[];
@@ -28,6 +29,7 @@ export interface VaultIdeWorkbenchProps {
 export function VaultIdeWorkbench({
   activeEntry,
   ticket,
+  organizationId,
   serverUrl,
   currentFolder,
   onCreateNote,
@@ -127,6 +129,7 @@ export function VaultIdeWorkbench({
 
       await syncUserFileIndexAction({
         mutation,
+        organizationId: organizationId || null,
       });
 
       setInitialNoteContent(noteContent);

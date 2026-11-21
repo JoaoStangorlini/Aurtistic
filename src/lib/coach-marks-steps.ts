@@ -449,9 +449,11 @@ export const ROUTE_COACH_MARKS: Record<string, CoachMarksTour> = {
 };
 
 export function getCoachMarksForPathname(pathname: string): CoachMarksTour {
-  // Normaliza caminhos como /aurtistic/portfolio -> /portfolio
+  // Normaliza caminhos como /aurtistic ou /aurtistic/portfolio -> /portfolio
   let cleanPath = pathname || '/';
-  if (cleanPath.startsWith('/aurtistic/')) {
+  if (cleanPath === '/aurtistic' || cleanPath === '/aurtistic/') {
+    cleanPath = '/';
+  } else if (cleanPath.startsWith('/aurtistic/')) {
     cleanPath = cleanPath.replace('/aurtistic', '');
   }
   if (!cleanPath.startsWith('/')) {

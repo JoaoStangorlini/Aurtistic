@@ -35,6 +35,11 @@ export interface OrganizationManagementViewProps {
   userEvents?: AgendaEvent[];
   onMeetingsUpdated?: () => void;
   onOpenVault?: () => void;
+  onClaimTask?: (taskId: string) => Promise<void>;
+  onRelieveTask?: (taskId: string, targetMemberName: string) => Promise<void>;
+  onAssignAllToMe?: () => Promise<void>;
+  onTaskCreated?: (task: Task) => void;
+  onTaskUpdated?: (task: Task) => void;
 }
 
 export function OrganizationManagementView({
@@ -47,6 +52,11 @@ export function OrganizationManagementView({
   userEvents = [],
   onMeetingsUpdated,
   onOpenVault,
+  onClaimTask,
+  onRelieveTask,
+  onAssignAllToMe,
+  onTaskCreated,
+  onTaskUpdated,
 }: OrganizationManagementViewProps) {
   const [activeInviteToken, setActiveInviteToken] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
@@ -164,55 +174,57 @@ export function OrganizationManagementView({
         </div>
       </div>
 
-      {/* Card Visual de Convite / Código de Entrada da Equipe */}
-      <div className="bg-surface border border-teal-500/30 rounded-2xl p-5 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-500/10 text-teal-400 border border-teal-500/20">
-            <span className="material-symbols-outlined text-[20px]">share</span>
+      {/* Card Visual de Convite / Código de Entrada da Equipe (Apenas Admins) */}
+      {isOrgAdmin && (
+        <div className="bg-surface border border-teal-500/30 rounded-2xl p-5 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-500/10 text-teal-400 border border-teal-500/20">
+              <span className="material-symbols-outlined text-[20px]">share</span>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                Código de Entrada da Equipe
+                {copyFeedback && (
+                  <span className="text-[11px] font-bold text-emerald-400 animate-pulse">
+                    ✅ {copyFeedback}
+                  </span>
+                )}
+              </h3>
+              <p className="text-xs text-fg-muted mt-0.5">
+                Compartilhe o código ou o link direto para que novos colegas entrem na organização em 1 clique.
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              Código de Entrada da Equipe
-              {copyFeedback && (
-                <span className="text-[11px] font-bold text-emerald-400 animate-pulse">
-                  ✅ {copyFeedback}
-                </span>
-              )}
-            </h3>
-            <p className="text-xs text-fg-muted mt-0.5">
-              Compartilhe o código ou o link direto para que novos colegas entrem na organização em 1 clique.
-            </p>
+
+          <div className="flex items-center gap-2">
+            <div className="flex items-center rounded-xl border border-border-subtle bg-app text-fg px-3 py-1.5">
+              <span className="text-xs font-mono font-bold text-teal-400 tracking-wider">
+                {activeInviteToken || 'Carregando...'}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCopyCode}
+              disabled={!activeInviteToken}
+              className="flex items-center gap-1 rounded-xl border border-border-subtle bg-surface hover:bg-surface-hover text-fg px-3 py-2 text-xs font-bold text-white transition-colors"
+            >
+              <span className="material-symbols-outlined text-[14px]">content_copy</span>
+              Copiar Código
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              disabled={!activeInviteToken}
+              className="flex items-center gap-1 rounded-xl bg-teal-600 hover:bg-teal-500 px-3.5 py-2 text-xs font-bold text-white transition-colors shadow-md"
+            >
+              <span className="material-symbols-outlined text-[14px]">link</span>
+              Copiar Link
+            </button>
           </div>
         </div>
-
-        <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-xl border border-border-subtle bg-app text-fg px-3 py-1.5">
-            <span className="text-xs font-mono font-bold text-teal-400 tracking-wider">
-              {activeInviteToken ? activeInviteToken.slice(0, 16) : 'Carregando...'}
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleCopyCode}
-            disabled={!activeInviteToken}
-            className="flex items-center gap-1 rounded-xl border border-border-subtle bg-surface hover:bg-surface-hover text-fg px-3 py-2 text-xs font-bold text-white transition-colors"
-          >
-            <span className="material-symbols-outlined text-[14px]">content_copy</span>
-            Copiar Código
-          </button>
-
-          <button
-            type="button"
-            onClick={handleCopyLink}
-            disabled={!activeInviteToken}
-            className="flex items-center gap-1 rounded-xl bg-teal-600 hover:bg-teal-500 px-3.5 py-2 text-xs font-bold text-white transition-colors shadow-md"
-          >
-            <span className="material-symbols-outlined text-[14px]">link</span>
-            Copiar Link
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Painel de Progresso das Subequipes e Membros */}
       <TeamProgressPanel
@@ -220,6 +232,10 @@ export function OrganizationManagementView({
         subteams={subteams}
         members={members}
         tasks={tasks}
+        currentUserId={currentUserId}
+        onClaimTask={onClaimTask}
+        onRelieveTask={onRelieveTask}
+        onAssignAllToMe={onAssignAllToMe}
       />
 
       {/* Painel de Metas Globais e por Categoria */}
@@ -227,6 +243,9 @@ export function OrganizationManagementView({
         organization={organization}
         subteams={subteams}
         tasks={tasks}
+        currentUserId={currentUserId}
+        onTaskCreated={onTaskCreated}
+        onTaskUpdated={onTaskUpdated}
       />
 
       {/* Horários, Escalas e Controle de Presenças com QR Code */}

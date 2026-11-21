@@ -9,6 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const fflate = require('fflate');
+const vaultCrypto = require('./vault-crypto');
 
 const IGNORED_ENTRIES = new Set([
   '.trash',
@@ -27,9 +28,10 @@ const IGNORED_ENTRIES = new Set([
  * Coleta recursivamente todos os arquivos de uma pasta.
  * @param {string} baseDir - Diretório raiz da exportação
  * @param {string} currentDir - Subdiretório atual
+ * @param {((relPath: string, isDir: boolean) => boolean)|null} [isPathAllowedFn] - Predicado de permissão
  * @returns {Promise<Array<{ absolutePath: string, relativePath: string, size: number }>>}
  */
-async function collectFiles(baseDir, currentDir = '') {
+async function collectFiles(baseDir, currentDir = '', isPathAllowedFn = null) {
   const fullPath = path.join(baseDir, currentDir);
   const dirents = await fs.promises.readdir(fullPath, { withFileTypes: true }).catch(() => []);
   let files = [];
@@ -40,16 +42,22 @@ async function collectFiles(baseDir, currentDir = '') {
     const rel = currentDir ? `${currentDir}/${d.name}` : d.name;
     const abs = path.join(fullPath, d.name);
 
+    if (isPathAllowedFn && !isPathAllowedFn(rel, d.isDirectory())) {
+      continue;
+    }
+
     if (d.isDirectory()) {
-      const subFiles = await collectFiles(baseDir, rel);
+      const subFiles = await collectFiles(baseDir, rel, isPathAllowedFn);
       files = files.concat(subFiles);
     } else if (d.isFile()) {
       try {
+        const encHdr = await vaultCrypto.readEncryptedHeader(abs).catch(() => null);
         const stat = await fs.promises.stat(abs);
         files.push({
           absolutePath: abs,
           relativePath: rel.replace(/\\/g, '/'),
-          size: stat.size,
+          size: encHdr ? encHdr.plaintextSize : stat.size,
+          encrypted: Boolean(encHdr),
         });
       } catch {}
     }
@@ -65,13 +73,14 @@ async function collectFiles(baseDir, currentDir = '') {
  * @param {Object} res - Objeto de resposta do Express
  * @param {string} [downloadFilename] - Nome do arquivo para download
  * @param {Set<string>|Array<string>|null} [filterFiles] - Lista ou conjunto opcional para download seletivo
+ * @param {((relPath: string, isDir: boolean) => boolean)|null} [isPathAllowedFn] - Predicado opcional de permissão por caminho/PIN
  */
-async function streamDirectoryAsZip(sourceDir, req, res, downloadFilename = 'download.zip', filterFiles = null) {
+async function streamDirectoryAsZip(sourceDir, req, res, downloadFilename = 'download.zip', filterFiles = null, isPathAllowedFn = null) {
   if (!fs.existsSync(sourceDir)) {
     return res.status(404).json({ error: 'Diretório não encontrado para exportação.' });
   }
 
-  let files = await collectFiles(sourceDir);
+  let files = await collectFiles(sourceDir, '', isPathAllowedFn);
   if (filterFiles && (filterFiles instanceof Set || Array.isArray(filterFiles))) {
     const filterSet = filterFiles instanceof Set ? filterFiles : new Set(filterFiles);
     files = files.filter(
@@ -84,14 +93,26 @@ async function streamDirectoryAsZip(sourceDir, req, res, downloadFilename = 'dow
   }
 
   let isAborted = false;
-  req.on('close', () => {
+  let activeReadStream = null;
+
+  const onAbort = () => {
     isAborted = true;
-  });
+    if (activeReadStream) {
+      try {
+        activeReadStream.destroy();
+      } catch {}
+      activeReadStream = null;
+    }
+  };
+
+  req.on('close', onAbort);
+  res.on('close', onAbort);
 
   const safeFilename = downloadFilename.replace(/[^a-zA-Z0-9_\u00C0-\u017F\s.-]/g, '_');
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(safeFilename)}"`);
 
+  let isDraining = false;
   const zip = new fflate.Zip((err, chunk, isLast) => {
     if (err) {
       console.error('[ZipExporter] Erro no stream do ZIP:', err);
@@ -99,7 +120,21 @@ async function streamDirectoryAsZip(sourceDir, req, res, downloadFilename = 'dow
       return;
     }
     if (!isAborted && res.writable) {
-      res.write(Buffer.from(chunk));
+      const ok = res.write(Buffer.from(chunk));
+      if (!ok && activeReadStream && !isDraining) {
+        isDraining = true;
+        try {
+          activeReadStream.pause();
+        } catch {}
+        res.once('drain', () => {
+          isDraining = false;
+          if (!isAborted && activeReadStream) {
+            try {
+              activeReadStream.resume();
+            } catch {}
+          }
+        });
+      }
       if (isLast) {
         res.end();
       }
@@ -115,10 +150,12 @@ async function streamDirectoryAsZip(sourceDir, req, res, downloadFilename = 'dow
       zip.add(zipEntry);
 
       const readStream = fs.createReadStream(file.absolutePath, { highWaterMark: 64 * 1024 });
+      activeReadStream = readStream;
 
       readStream.on('data', (chunk) => {
         if (isAborted) {
           readStream.destroy();
+          activeReadStream = null;
           resolve();
           return;
         }
@@ -126,11 +163,13 @@ async function streamDirectoryAsZip(sourceDir, req, res, downloadFilename = 'dow
       });
 
       readStream.on('end', () => {
+        activeReadStream = null;
         zipEntry.push(new Uint8Array(0), true);
         resolve();
       });
 
       readStream.on('error', (readErr) => {
+        activeReadStream = null;
         console.warn(`[ZipExporter] Erro ao ler arquivo ${file.relativePath}:`, readErr.message);
         zipEntry.push(new Uint8Array(0), true);
         resolve();

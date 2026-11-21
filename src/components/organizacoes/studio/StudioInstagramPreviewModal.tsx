@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { useStudio } from './StudioContext';
 import { useOrganizationBrand } from '../OrganizationBrandProvider';
 import { exportSlideToBlob } from '@/lib/studio/studio-exporter';
+import { createClient } from '@/utils/supabase/client';
 
 interface StudioInstagramPreviewModalProps {
   open: boolean;
@@ -12,7 +13,7 @@ interface StudioInstagramPreviewModalProps {
 }
 
 export function StudioInstagramPreviewModal({ open, onClose }: StudioInstagramPreviewModalProps) {
-  const { slides, aspectRatio, orgSlug } = useStudio();
+  const { slides, aspectRatio, orgSlug, scope } = useStudio();
   const { tokens } = useOrganizationBrand();
 
   const [mode, setMode] = useState<'feed' | 'reels'>('feed');
@@ -20,6 +21,30 @@ export function StudioInstagramPreviewModal({ open, onClose }: StudioInstagramPr
   const [activeIndex, setActiveIndex] = useState(0);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [personalProfile, setPersonalProfile] = useState<{ displayName?: string; username?: string; avatarUrl?: string } | null>(null);
+
+  useEffect(() => {
+    if (!open || scope !== 'personal') return;
+    let active = true;
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user || !active) return;
+      supabase
+        .from('user_profiles')
+        .select('display_name, username, avatar_url')
+        .eq('id', user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (!active || !data) return;
+          setPersonalProfile({
+            displayName: data.display_name || undefined,
+            username: data.username || undefined,
+            avatarUrl: data.avatar_url || undefined,
+          });
+        });
+    });
+    return () => { active = false; };
+  }, [open, scope]);
 
   useEffect(() => {
     if (!open) return;
@@ -84,7 +109,12 @@ export function StudioInstagramPreviewModal({ open, onClose }: StudioInstagramPr
 
   if (!open) return null;
 
-  const effectiveHandle = `@${(orgSlug || tokens.themeId || 'organizacao').toLowerCase()}`;
+  const effectiveHandle = scope === 'personal'
+    ? (personalProfile?.username ? `@${personalProfile.username}` : '@criativo')
+    : `@${(orgSlug || tokens.themeId || 'organizacao').toLowerCase()}`;
+  const avatarLabel = scope === 'personal'
+    ? ((personalProfile?.displayName || personalProfile?.username || 'EU').slice(0, 2).toUpperCase())
+    : tokens.displayName.slice(0, 2).toUpperCase();
   const currentUrl = previewUrls[activeIndex] || previewUrls[0] || '';
   const coverUrl = previewUrls[0] || '';
 
@@ -165,7 +195,7 @@ export function StudioInstagramPreviewModal({ open, onClose }: StudioInstagramPr
                       className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-black shrink-0"
                       style={{ backgroundColor: tokens.primaryColor || '#FFCC00' }}
                     >
-                      {tokens.displayName.slice(0, 2).toUpperCase()}
+                      {avatarLabel}
                     </span>
                     <span className="text-[11px] font-bold truncate">{effectiveHandle}</span>
                   </div>
@@ -353,7 +383,7 @@ export function StudioInstagramPreviewModal({ open, onClose }: StudioInstagramPr
                     className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black text-black"
                     style={{ backgroundColor: tokens.primaryColor || '#FFCC00' }}
                   >
-                    {tokens.displayName.slice(0, 2).toUpperCase()}
+                    {avatarLabel}
                   </span>
                   <span className="text-[11px] font-bold truncate">{effectiveHandle}</span>
                 </div>

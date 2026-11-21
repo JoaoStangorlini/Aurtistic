@@ -63,11 +63,14 @@ export default function AdvancedConfigClient({
 
   const hasChanges = JSON.stringify(config) !== JSON.stringify(safeInitialConfig);
 
-  const handleToggle = (field: keyof AdvancedConfig) => {
-    setConfig(prev => ({
-      ...prev,
-      [field]: prev[field] === undefined ? true : !prev[field]
-    }));
+  const handleToggle = (field: keyof AdvancedConfig, defaultVal = false) => {
+    setConfig(prev => {
+      const current = prev[field] !== undefined ? Boolean(prev[field]) : defaultVal;
+      return {
+        ...prev,
+        [field]: !current
+      };
+    });
   };
 
   const handleDefaultValueChange = (field: 'status' | 'prioridade' | 'categoria' | 'prazo', value: string) => {
@@ -183,7 +186,7 @@ export default function AdvancedConfigClient({
                     Ativa o painel de Espaços (Workspaces). Se desativado, o Aurtistic será focado em uma única visão central.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('enable_workspaces')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.enable_workspaces ? 'bg-accent-primary' : 'bg-surface-hover'}`}>
+                <button onClick={() => handleToggle('enable_workspaces', true)} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.enable_workspaces !== false ? 'bg-accent-primary' : 'bg-surface-hover'}`}>
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.enable_workspaces ? 'translate-x-6' : 'translate-x-1'}`} />
                 </button>
               </div>
@@ -195,7 +198,7 @@ export default function AdvancedConfigClient({
                     Preenche automaticamente a dimensão ao criar uma nova tarefa com base na dimensão que você está filtrando.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('auto_fill_dimension')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.auto_fill_dimension !== false ? 'bg-accent-primary' : 'bg-surface-hover'}`}>
+                <button onClick={() => handleToggle('auto_fill_dimension', true)} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.auto_fill_dimension !== false ? 'bg-accent-primary' : 'bg-surface-hover'}`}>
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.auto_fill_dimension !== false ? 'translate-x-6' : 'translate-x-1'}`} />
                 </button>
               </div>
@@ -207,7 +210,7 @@ export default function AdvancedConfigClient({
                     Substitui o ícone padrão de usuário pela foto principal cadastrada no seu currículo.
                   </p>
                 </div>
-                <button onClick={() => handleToggle('sync_curriculum_photo')} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.sync_curriculum_photo !== false ? 'bg-accent-primary' : 'bg-surface-hover'}`}>
+                <button onClick={() => handleToggle('sync_curriculum_photo', true)} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${config.sync_curriculum_photo !== false ? 'bg-accent-primary' : 'bg-surface-hover'}`}>
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.sync_curriculum_photo !== false ? 'translate-x-6' : 'translate-x-1'}`} />
                 </button>
               </div>

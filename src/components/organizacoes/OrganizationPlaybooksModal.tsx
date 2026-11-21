@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type {
+  Organization,
   OrganizationSubteam,
   OrganizationTaskTemplate,
 } from '@/types/organizations';
@@ -17,6 +18,7 @@ export interface OrganizationPlaybooksModalProps {
   isOpen: boolean;
   onClose: () => void;
   organizationId: string;
+  currentOrg?: Organization;
   subteams: OrganizationSubteam[];
   onPlaybookApplied?: () => void;
 }
@@ -25,9 +27,11 @@ export function OrganizationPlaybooksModal({
   isOpen,
   onClose,
   organizationId,
+  currentOrg,
   subteams,
   onPlaybookApplied,
 }: OrganizationPlaybooksModalProps) {
+  const effectiveOrgId = currentOrg?.id || organizationId;
   const [templates, setTemplates] = useState<OrganizationTaskTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -39,14 +43,14 @@ export function OrganizationPlaybooksModal({
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isOpen || !organizationId) return;
+    if (!isOpen || !effectiveOrgId) return;
     setLoading(true);
-    getOrganizationTaskTemplatesAction(organizationId)
+    getOrganizationTaskTemplatesAction(effectiveOrgId)
       .then((res) => {
         if (res.ok && res.templates) setTemplates(res.templates);
       })
       .finally(() => setLoading(false));
-  }, [isOpen, organizationId]);
+  }, [isOpen, effectiveOrgId]);
 
   if (!isOpen) return null;
 
@@ -61,7 +65,7 @@ export function OrganizationPlaybooksModal({
       .map((text) => ({ text, done: false }));
 
     const res = await createOrganizationTaskTemplateAction({
-      organizationId,
+      organizationId: effectiveOrgId,
       title: newTitle.trim(),
       description: newDesc.trim() || undefined,
       subteamId: newSubteamId || undefined,
@@ -89,6 +93,8 @@ export function OrganizationPlaybooksModal({
         setStatusMsg('Roteiro instanciado com sucesso em suas tarefas!');
         onPlaybookApplied?.();
         setTimeout(() => setStatusMsg(null), 3500);
+      } else {
+        setStatusMsg(res.error || 'Falha ao aplicar roteiro.');
       }
     } finally {
       setApplyingId(null);

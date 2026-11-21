@@ -31,6 +31,7 @@ export interface UserStorageProfile {
   temp_quota_bytes: number | null;
   temp_quota_expires_at: string | null;
   temp_quota_reason: string | null;
+  last_boost_granted_at?: string | null;
   used_bytes: number;
   pinned_folders: string[];
   preferences: UserStoragePreferences;
@@ -246,6 +247,7 @@ export interface AdminStorageUserSummary {
   temp_quota_bytes: number | null;
   temp_quota_expires_at: string | null;
   temp_quota_reason: string | null;
+  last_boost_granted_at?: string | null;
   used_bytes: number;
   last_sync_at: string | null;
   created_at: string;

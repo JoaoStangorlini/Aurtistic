@@ -20,6 +20,22 @@ interface EventFormModalProps {
 
 const DIAS_SEMANA = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 
+function toDatetimeLocalValue(isoStr?: string | null): string {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return isoStr.slice(0, 16);
+  const offset = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function fromDatetimeLocalValue(localStr?: string | null): string | null {
+  if (!localStr) return null;
+  const d = new Date(localStr);
+  if (isNaN(d.getTime())) return localStr.slice(0, 10) || null;
+  const offset = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - offset).toISOString().slice(0, 10);
+}
+
 export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDimensions, isLabdivScope, columns = [], onEditColumn, onSuccess }: EventFormModalProps) {
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
@@ -37,8 +53,8 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
         setNome(event.nome);
         setDescricao(event.descricao || '');
         setStatus((event.status as any) || 'confirmado');
-        setDataInicio(event.data_inicio || '');
-        setDataFim(event.data_fim || '');
+        setDataInicio(toDatetimeLocalValue(event.data_inicio));
+        setDataFim(toDatetimeLocalValue(event.data_fim));
         setDimensao(event.dimensao || '');
         setHorarios(event.horarios_semanais || {});
       } else {
@@ -87,8 +103,8 @@ export function EventFormModal({ isOpen, onClose, event, defaultValues, uniqueDi
         nome,
         descricao: descricao || null,
         status: status || 'confirmado',
-        data_inicio: dataInicio || null,
-        data_fim: dataFim || null,
+        data_inicio: fromDatetimeLocalValue(dataInicio),
+        data_fim: fromDatetimeLocalValue(dataFim),
         dimensao: dimensao || null,
         horarios_semanais: Object.keys(horarios).length > 0 ? horarios : null,
         is_labdiv: isLabdivScope

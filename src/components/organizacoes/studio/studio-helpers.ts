@@ -58,6 +58,68 @@ export function createDefaultSlide(
   };
 }
 
+export function createBlankSlide(
+  id: string,
+  aspect: AspectRatioKey,
+  backgroundColor?: string
+): StudioSlide {
+  return {
+    id,
+    title: 'Tela em Branco',
+    aspectRatio: aspect,
+    backgroundColor: backgroundColor || '#07090e',
+    globalFilters: { brightness: 100, contrast: 100, saturation: 100, blur: 0, grayscale: 0, sepia: 0, overlayDark: 0, temperature: 0, vignette: 0 },
+    showBrandBadge: false,
+    brandBadgeText: '',
+    layers: [],
+  };
+}
+
+export function sanitizeCustomTemplate(
+  template: StudioSlide
+): { ok: true; sanitized: StudioSlide } | { ok: false; error: string } {
+  for (const layer of template.layers) {
+    if (layer.type === 'image') {
+      const img = layer as any;
+      if (img.src && typeof img.src === 'string' && img.src.startsWith('data:image/')) {
+        return {
+          ok: false,
+          error: 'Templates customizados não podem conter imagens em Base64. Use referências do Cofre ou imagens públicas.',
+        };
+      }
+    }
+  }
+
+  const cleanSlide: StudioSlide = {
+    ...template,
+    layers: template.layers.map((l) => {
+      if (l.type === 'image') {
+        const img = l as any;
+        const cleanSrc = typeof img.src === 'string'
+          ? img.src.replace(/([?&])ticket=[^&]*(&|$)/, '$1').replace(/[?&]$/, '')
+          : img.src;
+        return {
+          ...img,
+          src: cleanSrc,
+          resolvedUrl: undefined,
+        };
+      }
+      return l;
+    }),
+  };
+
+  const jsonStr = JSON.stringify(cleanSlide);
+  const sizeBytes = new Blob([jsonStr]).size;
+  if (sizeBytes > 64 * 1024) {
+    return {
+      ok: false,
+      error: `O template excede o limite máximo de 64 KB (${(sizeBytes / 1024).toFixed(1)} KB). Remova camadas pesadas.`,
+    };
+  }
+
+  return { ok: true, sanitized: cleanSlide };
+}
+
 export function adaptSlideLayersForAspect(layers: StudioLayer[], newAspect: AspectRatioKey): StudioLayer[] {
   return layers.map((layer) => {
     let y = layer.y;

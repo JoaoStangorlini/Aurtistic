@@ -70,6 +70,9 @@ export function InviteAcceptClient({
       if (data?.success) {
         router.push('/');
         router.refresh();
+      } else {
+        setErrorMsg(data?.error || 'Não foi possível aceitar o convite.');
+        setIsSubmitting(false);
       }
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Falha ao aceitar convite.');

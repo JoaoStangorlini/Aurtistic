@@ -15,6 +15,7 @@ interface SpotlightItem {
 
 const SPOTLIGHT_ITEMS: SpotlightItem[] = [
   { id: 'tarefas', label: 'Tarefas & Agenda', desc: 'Quadro Kanban, lista e calendário semanal', href: '/', icon: 'checklist', category: 'Espaço' },
+  { id: 'studio-pessoal', label: 'Studio Pessoal', desc: 'Criador visual para seus projetos e postagens', href: '/studio', icon: 'palette', category: 'Espaço' },
   { id: 'gestao', label: 'Gestão & Bastidores', desc: 'Ponto QR, Matriz de Horários, Metas e Equipe', href: '/labdiv', icon: 'domain', category: 'Organizações' },
   { id: 'studio', label: 'HUB Studio', desc: 'Criador visual integrado Aurtistic + HUB', href: '/labdiv?view=studio', icon: 'palette', category: 'Organizações' },
   { id: 'cofre', label: 'Cofre & Arquivos', desc: 'Armazenamento local offline, galeria e IDE', href: '/servidor', icon: 'folder_special', category: 'Arquivos' },

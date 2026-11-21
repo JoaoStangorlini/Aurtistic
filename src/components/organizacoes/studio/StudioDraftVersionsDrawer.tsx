@@ -1,10 +1,11 @@
 // Este programa é um software livre (Licença AGPLv3)
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStudio } from './StudioContext';
 import type { StudioDraft } from './types';
 import { exportSlideToPngDataUrl } from '@/lib/studio/studio-exporter';
+import { preloadSlideAssets } from '@/lib/studio/canvas-renderer';
 
 export interface StudioDraftVersionsDrawerProps {
   isOpen: boolean;
@@ -16,13 +17,58 @@ export function StudioDraftVersionsDrawer({ isOpen, onClose }: StudioDraftVersio
   const [comparingDraft, setComparingDraft] = useState<StudioDraft | null>(null);
   const [snapshotName, setSnapshotName] = useState('');
   const [targetSlot, setTargetSlot] = useState<1 | 2 | 3>((activeDraftSlot as 1 | 2 | 3) || 1);
+  const [currentPreview, setCurrentPreview] = useState<string>('');
+  const [comparePreview, setComparePreview] = useState<string>('');
+
+  useEffect(() => {
+    if (activeDraftSlot) {
+      setTargetSlot(activeDraftSlot as 1 | 2 | 3);
+    }
+  }, [activeDraftSlot]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    (async () => {
+      try {
+        await preloadSlideAssets(activeSlide);
+        const url = exportSlideToPngDataUrl(activeSlide, aspectRatio, 0.25);
+        if (active) setCurrentPreview(url);
+      } catch {
+        // Ignora erro de renderização
+      }
+    })();
+    return () => { active = false; };
+  }, [isOpen, activeSlide, aspectRatio]);
+
+  useEffect(() => {
+    if (!isOpen || !comparingDraft?.slides[0]) {
+      setComparePreview('');
+      return;
+    }
+    let active = true;
+    (async () => {
+      try {
+        await preloadSlideAssets(comparingDraft.slides[0]);
+        const url = exportSlideToPngDataUrl(comparingDraft.slides[0], comparingDraft.aspectRatio, 0.25);
+        if (active) setComparePreview(url);
+      } catch {
+        // Ignora erro de renderização
+      }
+    })();
+    return () => { active = false; };
+  }, [isOpen, comparingDraft]);
 
   if (!isOpen) return null;
-
-  const currentPreview = exportSlideToPngDataUrl(activeSlide, aspectRatio, 0.25);
-  const comparePreview = comparingDraft?.slides[0]
-    ? exportSlideToPngDataUrl(comparingDraft.slides[0], comparingDraft.aspectRatio, 0.25)
-    : '';
 
   const handleSaveNamedSnapshot = (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +78,12 @@ export function StudioDraftVersionsDrawer({ isOpen, onClose }: StudioDraftVersio
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/75 backdrop-blur-xs animate-in fade-in">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex justify-end bg-black/75 backdrop-blur-xs animate-in fade-in"
+    >
       <div className="w-full max-w-md bg-surface border-l border-border-subtle h-full p-5 flex flex-col gap-4 shadow-2xl text-fg">
         <div className="flex items-center justify-between border-b border-border-subtle pb-3">
           <div className="flex items-center gap-2">

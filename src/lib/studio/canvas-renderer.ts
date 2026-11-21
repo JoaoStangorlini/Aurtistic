@@ -37,6 +37,34 @@ export function preloadImage(src: string): Promise<HTMLImageElement> {
   return promise;
 }
 
+export async function preloadSlideAssets(slide: StudioSlide): Promise<void> {
+  const promises: Promise<unknown>[] = [];
+  if (slide.backgroundImageUrl) {
+    promises.push(preloadImage(slide.backgroundImageUrl).catch(() => {}));
+  }
+  for (const layer of slide.layers) {
+    if (!layer.visible) continue;
+    if (layer.type === 'image') {
+      const imgLayer = layer as StudioImageLayer;
+      const effectiveSrc = imgLayer.resolvedUrl || imgLayer.src;
+      if (effectiveSrc) promises.push(preloadImage(effectiveSrc).catch(() => {}));
+      if (imgLayer.src && imgLayer.src !== effectiveSrc) promises.push(preloadImage(imgLayer.src).catch(() => {}));
+      if (imgLayer.fallbackUrl) promises.push(preloadImage(imgLayer.fallbackUrl).catch(() => {}));
+      if (imgLayer.maskDataUrl) promises.push(preloadImage(imgLayer.maskDataUrl).catch(() => {}));
+    } else if (layer.type === 'logo') {
+      const logoLayer = layer as StudioLogoLayer;
+      const srcUrl = logoLayer.src || (logoLayer.preset === 'org-logo' ? '/labdiv-logo.png' : null);
+      if (srcUrl) promises.push(preloadImage(srcUrl).catch(() => {}));
+    } else if (layer.type === 'shape') {
+      const shapeLayer = layer as StudioShapeLayer;
+      if (shapeLayer.frameClip?.resolvedUrl || shapeLayer.frameClip?.src) {
+        promises.push(preloadImage(shapeLayer.frameClip.resolvedUrl || shapeLayer.frameClip.src).catch(() => {}));
+      }
+    }
+  }
+  await Promise.all(promises);
+}
+
 export function buildCssFilter(filters?: StudioLayerFilterConfig): string {
   if (!filters) return 'none';
   const p: string[] = [];
@@ -89,6 +117,36 @@ function applyPostEffects(ctx: CanvasRenderingContext2D, f: StudioLayerFilterCon
     const grad = ctx.createRadialGradient(x + w / 2, y + h / 2, Math.max(w, h) * 0.1, x + w / 2, y + h / 2, Math.max(w, h) * 0.75);
     grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(1, `rgba(0,0,0,${f.vignette / 100})`);
     ctx.fillStyle = grad; ctx.fillRect(x, y, w, h); ctx.restore();
+  }
+  if (f.grain && f.grain > 0) {
+    ctx.save();
+    const grainAlpha = Math.min(0.28, (f.grain / 100) * 0.28);
+    ctx.fillStyle = `rgba(180,180,180,${grainAlpha})`;
+    const step = 4;
+    for (let py = y; py < y + h; py += step * 2) {
+      for (let px = x; px < x + w; px += step * 2) {
+        if ((px + py) % 7 === 0 || (px * 3 + py * 7) % 11 === 0) {
+          ctx.fillRect(px, py, step, step);
+        }
+      }
+    }
+    ctx.restore();
+  }
+  if (f.splitHighlightsColor || f.splitShadowsColor) {
+    ctx.save();
+    if (f.splitHighlightsColor) {
+      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = f.splitHighlightsColor;
+      ctx.globalAlpha = Math.max(0.04, Math.min(0.25, 0.12 + (f.splitBalance || 0) * 0.001));
+      ctx.fillRect(x, y, w, h);
+    }
+    if (f.splitShadowsColor) {
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.fillStyle = f.splitShadowsColor;
+      ctx.globalAlpha = Math.max(0.04, Math.min(0.25, 0.12 - (f.splitBalance || 0) * 0.001));
+      ctx.fillRect(x, y, w, h);
+    }
+    ctx.restore();
   }
 }
 
@@ -436,6 +494,7 @@ function renderVectorShape(ctx: CanvasRenderingContext2D, layer: StudioShapeLaye
   ctx.globalAlpha = layer.opacity;
   ctx.translate(x + w / 2, y + h / 2);
   if (layer.rotation) ctx.rotate((layer.rotation * Math.PI) / 180);
+  if (layer.flipH || layer.flipV) ctx.scale(layer.flipH ? -1 : 1, layer.flipV ? -1 : 1);
   ctx.translate(-(x + w / 2), -(y + h / 2));
 
   ctx.fillStyle = layer.fillColor || '#ffffff';
@@ -513,7 +572,19 @@ function renderVectorShape(ctx: CanvasRenderingContext2D, layer: StudioShapeLaye
 function renderLogoLayer(ctx: CanvasRenderingContext2D, layer: StudioLogoLayer, canvasW: number, canvasH: number, onNeedRepaint?: () => void) {
   const x = layer.x * canvasW, y = layer.y * canvasH, w = layer.width * canvasW, h = layer.height * canvasH;
   const srcUrl = layer.src || (layer.preset === 'org-logo' ? '/labdiv-logo.png' : null);
-  ctx.save(); ctx.globalAlpha = layer.opacity;
+  ctx.save();
+  ctx.globalAlpha = layer.opacity;
+
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  ctx.translate(cx, cy);
+  if (layer.rotation) ctx.rotate((layer.rotation * Math.PI) / 180);
+  if (layer.flipH || layer.flipV) ctx.scale(layer.flipH ? -1 : 1, layer.flipV ? -1 : 1);
+  ctx.translate(-cx, -cy);
+
+  if (layer.monochrome) {
+    ctx.filter = 'grayscale(100%)';
+  }
 
   if (srcUrl) {
     const img = getImageSync(srcUrl);
@@ -521,7 +592,18 @@ function renderLogoLayer(ctx: CanvasRenderingContext2D, layer: StudioLogoLayer, 
     else {
       let dW = w, dH = h;
       if (layer.preserveAspect) { const r = Math.min(w / img.naturalWidth, h / img.naturalHeight); dW = img.naturalWidth * r; dH = img.naturalHeight * r; }
-      ctx.drawImage(img, x + (w - dW) / 2, y + (h - dH) / 2, dW, dH);
+      const dx = x + (w - dW) / 2;
+      const dy = y + (h - dH) / 2;
+      if (layer.tintColor) {
+        ctx.drawImage(img, dx, dy, dW, dH);
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-in';
+        ctx.fillStyle = layer.tintColor;
+        ctx.fillRect(dx, dy, dW, dH);
+        ctx.restore();
+      } else {
+        ctx.drawImage(img, dx, dy, dW, dH);
+      }
     }
   } else {
     ctx.fillStyle = layer.tintColor || '#FFCC00'; ctx.font = `bold ${Math.round(h * 0.45)}px sans-serif`;
@@ -688,6 +770,16 @@ export function renderSlideToCanvas(
           tokens, boxCenterX: 0, boxTopY: localTopY, maxBoxWidth, boxHeight: boxH, fontSize: textLayer.fontSize,
           align: textLayer.align, customColorOverride: textLayer.color,
           lineHeightMultiplier: textLayer.lineHeight || 1.24,
+          fontFamily: textLayer.fontFamily,
+          bold: textLayer.bold,
+          italic: textLayer.italic,
+          letterSpacing: textLayer.letterSpacing,
+          shadow: textLayer.shadowBlur && textLayer.shadowBlur > 0 ? {
+            color: textLayer.shadowColor,
+            blur: textLayer.shadowBlur,
+            offsetX: textLayer.shadowOffsetX ?? 0,
+            offsetY: textLayer.shadowOffsetY ?? 2,
+          } : undefined,
         });
         if (options?.onTextHeightOverflow && totalHeight > boxH + 6) {
           const requiredNormHeight = Math.min(0.95, Number(((totalHeight + 12) / canvasH).toFixed(3)));

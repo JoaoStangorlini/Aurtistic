@@ -164,6 +164,7 @@ export function VaultContextMenu({
       }
     };
     const handleScroll = () => {
+      if (isDeviceModalOpen) return;
       onClose();
     };
 

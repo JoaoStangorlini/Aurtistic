@@ -8,6 +8,7 @@ import { ASPECT_DIMENSIONS, type StudioImageLayer, type StudioVaultRef } from '.
 import { StudioVaultBrowserModal, type VaultBrowserSelectedItem } from './StudioVaultBrowserModal';
 import { StudioLiveSlider } from './StudioLiveSlider';
 import { StudioHelpTooltip } from './StudioHelpTooltip';
+import { isLayerEffectivelyLocked } from '@/lib/studio/folder-utils';
 
 type ImageSubTab = 'library' | 'framing';
 
@@ -222,13 +223,20 @@ export function StudioImagePanel() {
                 <span className="material-symbols-outlined text-[14px]">brush</span>
                 <span>Máscara</span>
               </button>
-              <button
-                type="button"
-                onClick={() => removeLayer(selectedImageLayer.id)}
-                className="p-1 rounded-lg text-red-400 hover:bg-red-500/20 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px]">delete</span>
-              </button>
+              {(() => {
+                const isLocked = isLayerEffectivelyLocked(selectedImageLayer, activeSlide.folders);
+                return (
+                  <button
+                    type="button"
+                    onClick={() => !isLocked && removeLayer(selectedImageLayer.id)}
+                    disabled={isLocked}
+                    title={isLocked ? 'Camada bloqueada (direta ou por pasta)' : 'Excluir imagem'}
+                    className={`p-1 rounded-lg ${isLocked ? 'text-fg-muted/40 cursor-not-allowed' : 'text-red-400 hover:bg-red-500/20 cursor-pointer'}`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                  </button>
+                );
+              })()}
             </div>
           </div>
 

@@ -140,8 +140,16 @@ test('4.1. server.js valida scopeType !== org antes de ativar ponte PORTFOLIO_DI
     'server.js não verifica scopeType para desativar ponte PORTFOLIO_DIR'
   );
   assert(
-    serverCode.includes("ORGS_ROOT_DIR = path.join(STORAGE_DIR, 'orgs')"),
-    'ORGS_ROOT_DIR não definido em server.js'
+    serverCode.includes("let ORGS_ROOT_DIR = path.join(TENANT_BASE_DIR, 'orgs')") &&
+      serverCode.includes("ORGS_ROOT_DIR = path.join(TENANT_BASE_DIR, 'orgs');") &&
+      serverCode.includes('function syncDerivedStoragePaths()') &&
+      serverCode.includes('TENANT_BASE_DIR = getTenantBaseDir(STORAGE_DIR)'),
+    'ORGS_ROOT_DIR deve ser resolvido dinamicamente via TENANT_BASE_DIR / syncDerivedStoragePaths() em server.js'
+  );
+  assert(
+    serverCode.includes("req.tenant.scopeType !== 'org' &&") &&
+      serverCode.includes("scopeType !== 'org' &&\n    isPortRel &&\n    (userId === PRIMARY_ADMIN_UUID || role === 'admin')"),
+    'Ponte PORTFOLIO_DIR deve ser guardada por scopeType !== org + admin'
   );
 });
 

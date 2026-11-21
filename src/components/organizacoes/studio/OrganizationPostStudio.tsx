@@ -10,6 +10,8 @@ import type { StudioStage } from './types';
 export interface OrganizationPostStudioProps {
   organizationId?: string | null;
   orgSlug?: string | null;
+  scope?: 'personal' | 'org';
+  userId?: string;
   onStageChange?: (stage: StudioStage) => void;
 }
 
@@ -44,10 +46,12 @@ const StudioPublishModal = dynamic(
 
 function StudioStageRouter({ orgSlug, onStageChange }: { orgSlug?: string | null; onStageChange?: (stage: StudioStage) => void }) {
   const { stage } = useStudio();
+  const { setIsStudioActive } = useTheme();
 
   useEffect(() => {
+    setIsStudioActive(stage === 'editor');
     onStageChange?.(stage);
-  }, [stage, onStageChange]);
+  }, [stage, setIsStudioActive, onStageChange]);
 
   if (stage === 'launcher') {
     return <StudioLauncherView orgSlug={orgSlug} />;
@@ -61,7 +65,13 @@ function StudioStageRouter({ orgSlug, onStageChange }: { orgSlug?: string | null
   );
 }
 
-export function OrganizationPostStudio({ organizationId, orgSlug, onStageChange }: OrganizationPostStudioProps) {
+export function OrganizationPostStudio({
+  organizationId,
+  orgSlug,
+  scope = 'org',
+  userId,
+  onStageChange,
+}: OrganizationPostStudioProps) {
   const { setIsStudioActive } = useTheme();
 
   useEffect(() => {
@@ -71,7 +81,12 @@ export function OrganizationPostStudio({ organizationId, orgSlug, onStageChange 
   }, [setIsStudioActive]);
 
   return (
-    <StudioProvider organizationId={organizationId} orgSlug={orgSlug}>
+    <StudioProvider
+      organizationId={organizationId}
+      orgSlug={orgSlug}
+      scope={scope}
+      userId={userId}
+    >
       <div className="text-fg flex-1 min-h-0 flex flex-col">
         <StudioStageRouter orgSlug={orgSlug} onStageChange={onStageChange} />
       </div>

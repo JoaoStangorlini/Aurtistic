@@ -17,8 +17,9 @@ import {
 } from '@/lib/studio/studio-exporter';
 
 export function StudioPublishModal({ orgSlug }: { orgSlug?: string | null }) {
-  const { stage, setStage, slides, aspectRatio } = useStudio();
+  const { stage, setStage, slides, aspectRatio, scope } = useStudio();
   const { tokens } = useOrganizationBrand();
+  const isPersonal = scope === 'personal';
 
   const [previewMode, setPreviewMode] = useState<'feed' | 'stories'>('feed');
   const [igSimulatorOpen, setIgSimulatorOpen] = useState(false);
@@ -116,15 +117,17 @@ export function StudioPublishModal({ orgSlug }: { orgSlug?: string | null }) {
 
   const handleSaveVault = async (type: 'prontos' | 'modelos') => {
     setPublishing(true);
+    const isPersonal = scope === 'personal' || effectiveSlug === 'personal';
     const res = await saveToOrgVaultAction(type, effectiveSlug, {
       title: slides[0]?.title || 'Post do Studio',
       slides,
       aspectRatio,
       previewDataUrl: previewPng,
-    });
+    }, isPersonal ? 'personal' : 'org');
     setPublishing(false);
     if (res.ok) {
-      setNotice(`Salvo com sucesso na pasta /orgs/${effectiveSlug}/studio/${type}!`);
+      const folderPath = isPersonal ? `/studio/${type}` : `/orgs/${effectiveSlug}/studio/${type}`;
+      setNotice(`Salvo com sucesso na pasta ${folderPath}!`);
       setTimeout(() => setNotice(null), 4000);
     }
   };
@@ -345,14 +348,16 @@ export function StudioPublishModal({ orgSlug }: { orgSlug?: string | null }) {
               </div>
             </div>
 
-            {/* Enviar ao Feed do HUB */}
-            <button
-              type="button" disabled={publishing} onClick={handleSendToHub}
-              className="w-full py-3 rounded-xl bg-[#FFCC00] text-black font-black text-xs hover:bg-[#FFD633] transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[18px]">send</span>
-              <span>Enviar para o Feed do HUB LabDiv</span>
-            </button>
+            {/* Enviar ao Feed do HUB (somente no escopo de organização) */}
+            {!isPersonal && (
+              <button
+                type="button" disabled={publishing} onClick={handleSendToHub}
+                className="w-full py-3 rounded-xl bg-[#FFCC00] text-black font-black text-xs hover:bg-[#FFD633] transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">send</span>
+                <span>Enviar para o Feed do HUB LabDiv</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

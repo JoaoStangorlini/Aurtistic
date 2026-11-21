@@ -13,7 +13,7 @@ interface InstagramMuralSectionProps {
 }
 
 const INSTAGRAM_URL_REGEX =
-  /^https?:\/\/(?:www\.)?instagram\.com\/(?:[^/]+\/)?(p|reel|tv)\/([A-Za-z0-9_-]+)(?:\/|\?|$)/i;
+  /^https?:\/\/(?:www\.)?instagram\.com\/(?:[^/]+\/)?(p|reels?|tv)\/([A-Za-z0-9_-]+)(?:\/|\?|$)/i;
 
 export function parseInstagramPostUrl(rawUrl: string): {
   postType: 'p' | 'reel' | 'tv';

@@ -104,6 +104,7 @@ export function EmbedAuthBridge({
 
     return () => {
       cancelled = true;
+      inFlightTicketRef.current = null;
     };
   }, [ticket, orgSlug, hasServerUser, router]);
 

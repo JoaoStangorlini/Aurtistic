@@ -239,6 +239,7 @@ export async function updateFileEcosystemLinksAction(input: {
   mimeType?: string;
   sizeBytes?: number;
   patch: EcosystemLinksPatch;
+  organizationId?: string | null;
 }) {
   const cleanRel = sanitizeRelativeTenantPath(input.relativePath, { allowEmpty: false });
   if (!cleanRel.ok) return { ok: false, error: cleanRel.error };
@@ -261,6 +262,7 @@ export async function updateFileEcosystemLinksAction(input: {
       },
     },
     ecosystemLinks: input.patch,
+    organizationId: input.organizationId || null,
   });
 }
 
@@ -273,6 +275,8 @@ export async function reconcileFolderIndexAction(input: {
   missingEntries: EdgeVaultEntry[];
   totalUsedBytes?: number;
   organizationId?: string | null;
+  hdConnected?: boolean;
+  degraded?: boolean;
 }) {
   const supabase = await createClient();
   const {
@@ -280,15 +284,41 @@ export async function reconcileFolderIndexAction(input: {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false };
 
-  if (typeof input.totalUsedBytes === 'number' && input.totalUsedBytes >= 0) {
+  if (typeof input.totalUsedBytes === 'number' && input.totalUsedBytes >= 0 && !input.degraded) {
     if (input.organizationId) {
-      await supabase.rpc('recalc_org_vault_used_bytes', {
-        p_org_id: input.organizationId,
-      });
-    } else {
-      await supabase.rpc('sync_user_storage_used_bytes', {
-        p_used_bytes: Math.floor(input.totalUsedBytes),
-      });
+      if (input.hdConnected !== false) {
+        await supabase.rpc('recalc_org_vault_used_bytes', {
+          p_org_id: input.organizationId,
+        });
+      }
+    } else if (input.hdConnected !== false) {
+      const candidateUsed = Math.floor(input.totalUsedBytes);
+      let allowPersonalSync = true;
+
+      // Bloqueia sobrescrita anômala (ex: "827 Bytes") se o índice do usuário possuir volume real muito maior
+      if (candidateUsed < 10240) {
+        const { data: idxCheck } = await supabase
+          .from('user_files_index')
+          .select('size_bytes')
+          .eq('user_id', user.id)
+          .is('organization_id', null)
+          .gt('size_bytes', 0)
+          .limit(50);
+
+        const sampleSum = (idxCheck || []).reduce(
+          (acc, r) => acc + Math.max(0, Number(r.size_bytes) || 0),
+          0
+        );
+        if (sampleSum > 65536 && candidateUsed < sampleSum * 0.25) {
+          allowPersonalSync = false;
+        }
+      }
+
+      if (allowPersonalSync) {
+        await supabase.rpc('sync_user_storage_used_bytes', {
+          p_used_bytes: candidateUsed,
+        });
+      }
     }
   }
 
@@ -509,12 +539,29 @@ export async function refreshTenantTicketAction(options: {
     options.readOnly || purpose === 'public_media' || !isApprovedForStorage
   );
 
+  const { data: memberOrgs } = await supabase
+    .from('organization_members')
+    .select('organization:organizations(slug)')
+    .eq('user_id', user.id);
+
+  const allowedOrgSlugs = Array.from(
+    new Set(
+      (memberOrgs || [])
+        .map((row: any) => {
+          const orgObj = Array.isArray(row.organization) ? row.organization[0] : row.organization;
+          return String(orgObj?.slug || '').trim().toLowerCase();
+        })
+        .filter(Boolean)
+    )
+  );
+
   const ticket = signEdgeTenantTicket({
     userId: user.id,
     role: profile.storage_role,
     purpose,
     quotaLimitBytes: effectiveQuotaBytes,
     usedBytes: profile.used_bytes,
+    allowedOrgSlugs,
     allowedPaths: options.allowedPaths,
     readOnly,
     unlockedPins: options.unlockedPins,
@@ -549,9 +596,11 @@ export async function createShareLinkAction(input: {
   if (!cleanTitle) return { ok: false, error: 'Informe um título para o álbum compartilhado.' };
 
   let pinHash: string | null = null;
+  let plainPin: string | null = null;
   if (input.pin && input.pin.trim() !== '') {
     const validPin = validateNumericPin(input.pin);
     if (!validPin.ok) return { ok: false, error: validPin.error };
+    plainPin = validPin.data;
     pinHash = hashShareOrFolderPin(validPin.data);
   }
 
@@ -578,6 +627,17 @@ export async function createShareLinkAction(input: {
     .single();
 
   if (error) return { ok: false, error: error.message };
+
+  if (data?.id && plainPin) {
+    const { error: pinPgErr } = await supabase.rpc('set_share_link_pin_pg_hash', {
+      p_share_id: data.id,
+      p_pin: plainPin,
+    });
+    if (pinPgErr && pinPgErr.code !== '42883') {
+      console.warn('[createShareLinkAction] Aviso ao gravar pin_pg_hash:', pinPgErr.message);
+    }
+  }
+
   revalidatePath('/servidor');
   return { ok: true, shareLink: data };
 }
@@ -767,17 +827,20 @@ export async function requestEventQuotaBoostAction(input: {
 
     if (error) return { ok: false, error: error.message };
   } else {
-    const { error } = await supabase
-      .from('user_storage_profiles')
-      .update({
-        temp_quota_bytes: boostBytes,
-        temp_quota_expires_at: expiresAt,
-        temp_quota_reason: `Evento: ${input.eventName}`,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('user_id', user.id);
+    // Para perfil pessoal, utiliza RPC SECURITY DEFINER com trava de governança e cooldown de 30 dias
+    const { data: boostRes, error } = await supabase.rpc('request_personal_storage_boost', {
+      p_reason: `Evento: ${input.eventName}`,
+    });
 
     if (error) return { ok: false, error: error.message };
+    if (boostRes && typeof boostRes === 'object' && 'expires_at' in boostRes) {
+      revalidatePath('/servidor');
+      return {
+        ok: true,
+        expiresAt: (boostRes as any).expires_at,
+        boostBytes: (boostRes as any).boost_bytes || boostBytes,
+      };
+    }
   }
 
   revalidatePath('/servidor');
@@ -1261,7 +1324,7 @@ export async function getPhotoExifDetailAction(fileId: string): Promise<{
   return { ok: true, exifData: (data?.exif_data as Record<string, any>) || null };
 }
 
-export async function checkBackupHashesAction(hashes: string[]): Promise<{
+export async function checkBackupHashesAction(hashes: string[], organizationId?: string | null): Promise<{
   ok: boolean;
   knownHashes: string[];
 }> {
@@ -1274,18 +1337,18 @@ export async function checkBackupHashesAction(hashes: string[]): Promise<{
   const clean = hashes.filter((h) => /^[a-f0-9]{64}$/i.test(h)).slice(0, 200);
   if (clean.length === 0) return { ok: true, knownHashes: [] };
 
-  const [origRes, proxyRes] = await Promise.all([
-    supabase
-      .from('user_files_index')
-      .select('content_hash')
-      .eq('user_id', user.id)
-      .in('content_hash', clean),
-    supabase
-      .from('user_files_index')
-      .select('compressed_proxy_hash')
-      .eq('user_id', user.id)
-      .in('compressed_proxy_hash', clean),
-  ]);
+  let origQuery = supabase.from('user_files_index').select('content_hash').in('content_hash', clean);
+  let proxyQuery = supabase.from('user_files_index').select('compressed_proxy_hash').in('compressed_proxy_hash', clean);
+
+  if (organizationId) {
+    origQuery = origQuery.eq('organization_id', organizationId);
+    proxyQuery = proxyQuery.eq('organization_id', organizationId);
+  } else {
+    origQuery = origQuery.eq('user_id', user.id).is('organization_id', null);
+    proxyQuery = proxyQuery.eq('user_id', user.id).is('organization_id', null);
+  }
+
+  const [origRes, proxyRes] = await Promise.all([origQuery, proxyQuery]);
 
   const set = new Set<string>();
   for (const r of origRes.data || []) if (r.content_hash) set.add(r.content_hash);

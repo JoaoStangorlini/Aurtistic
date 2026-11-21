@@ -1,16 +1,47 @@
 // Este programa é um software livre (Licença AGPLv3)
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { signEdgeTenantTicket, getEdgeStorageServerUrl } from '@/lib/edge-ticket';
+import {
+  PRIMARY_ADMIN_UUID,
+  signEdgeTenantTicket,
+  getEdgeStorageServerUrl,
+} from '@/lib/edge-ticket';
 import { buildTenantStreamUrl } from '@/lib/edge-urls';
 import type { StudioTemplate } from '@/components/organizacoes/studio/types';
 
 export async function GET(req: NextRequest) {
   try {
-    const orgSlug = req.nextUrl.searchParams.get('orgSlug') || req.nextUrl.searchParams.get('org') || '';
+    const orgSlug = (req.nextUrl.searchParams.get('orgSlug') || req.nextUrl.searchParams.get('org') || '').trim();
+    if (!orgSlug) {
+      return NextResponse.json({ templates: [] }, { status: 400 });
+    }
+
     const supabase = await createClient();
-    const { data: org } = await supabase.from('organizations').select('id').ilike('slug', orgSlug).maybeSingle();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Não autenticado.', templates: [] }, { status: 401 });
+    }
+
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('id, slug')
+      .ilike('slug', orgSlug)
+      .maybeSingle();
     if (!org?.id) return NextResponse.json({ templates: [] });
+
+    if (user.id !== PRIMARY_ADMIN_UUID) {
+      const { data: memberRow } = await supabase
+        .from('organization_members')
+        .select('id')
+        .eq('organization_id', org.id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (!memberRow) {
+        return NextResponse.json({ error: 'Sem permissão.', templates: [] }, { status: 403 });
+      }
+    }
 
     const { data: files } = await supabase
       .from('user_files_index')
@@ -25,11 +56,14 @@ export async function GET(req: NextRequest) {
 
     let ticket = '';
     const serverUrl = getEdgeStorageServerUrl();
+    const resolvedSlug = String(org.slug || orgSlug).trim().toLowerCase();
     try {
       const ticketRes = signEdgeTenantTicket({
-        userId: 'studio-template-reader',
+        userId: user.id,
         scopeType: 'org',
-        orgSlug,
+        organizationId: org.id,
+        orgSlug: resolvedSlug,
+        allowedOrgSlugs: [resolvedSlug],
         role: 'member',
         readOnly: true,
         ttlMs: 60 * 60 * 1000,
@@ -43,7 +77,7 @@ export async function GET(req: NextRequest) {
       let payload: any = null;
       if (ticket && serverUrl) {
         try {
-          const fetchUrl = buildTenantStreamUrl(f.relative_path, ticket);
+          const fetchUrl = buildTenantStreamUrl(f.relative_path, ticket, { serverUrl });
           const res = await fetch(fetchUrl, { signal: AbortSignal.timeout(1500) }).catch(() => null);
           if (res && res.ok) payload = await res.json().catch(() => null);
         } catch {}

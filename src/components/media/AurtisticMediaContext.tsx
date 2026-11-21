@@ -241,13 +241,28 @@ export function AurtisticMediaProvider({
   }, [refreshMediaTicket, refreshVaultTicket]);
 
   // Recuperação de erro de áudio (faixa > 2h ou queda temporária)
+  const audioRetryCountRef = useRef(0);
   const handleAudioError = useCallback(async () => {
     const audio = audioRef.current;
     if (!audio || !currentTrack) return;
 
+    if (audioRetryCountRef.current >= 1) {
+      console.warn('[AudioPlayer] Limite de 1 retentativa atingido. Interrompendo áudio com erro.');
+      audio.removeAttribute('src');
+      audio.load();
+      setIsPlaying(false);
+      return;
+    }
+
+    audioRetryCountRef.current += 1;
     const savedTime = audio.currentTime || 0;
     const newTicket = await refreshMediaTicket();
-    if (!newTicket) return;
+    if (!newTicket) {
+      audio.removeAttribute('src');
+      audio.load();
+      setIsPlaying(false);
+      return;
+    }
 
     const freshUrl = buildPlayableUrl(currentTrack, newTicket);
     setLockedSrc(freshUrl);
@@ -264,6 +279,8 @@ export function AurtisticMediaProvider({
     (track: MediaTrack, newPlaylist?: MediaTrack[]) => {
       const audio = audioRef.current;
       if (!audio) return;
+
+      audioRetryCountRef.current = 0;
 
       if (newPlaylist && newPlaylist.length > 0) {
         setPlaylist(newPlaylist);
@@ -439,11 +456,16 @@ export function AurtisticMediaProvider({
       filename?: string;
       linkedTaskId?: string | null;
     }) => {
+      const derivedFolder = params.folderPath || (params.relativePath && params.relativePath.includes('/')
+        ? params.relativePath.substring(0, params.relativePath.lastIndexOf('/'))
+        : 'Arquivos');
+      const derivedFilename = params.filename || (params.relativePath ? params.relativePath.split('/').pop() : undefined);
+
       setNoteState({
         isOpen: true,
-        folderPath: params.folderPath || (params.relativePath ? params.relativePath.split('/')[0] : 'Arquivos'),
+        folderPath: derivedFolder,
         initialRelativePath: params.relativePath,
-        initialFilename: params.filename,
+        initialFilename: derivedFilename,
         linkedTaskId: params.linkedTaskId,
       } as InPlaceNoteState);
     },

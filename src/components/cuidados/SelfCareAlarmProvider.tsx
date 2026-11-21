@@ -321,11 +321,13 @@ export function SelfCareAlarmProvider({ children }: { children: React.ReactNode 
       const next = prev.map((cfg) => {
         if (cfg.key === key) {
           const checked = cfg.todayCheckedTimes || [];
+          const pastFixed = (cfg.fixedTimes || []).filter(t => t <= currentHHMM);
+          const newChecked = Array.from(new Set([...checked, ...pastFixed, currentHHMM]));
           return {
             ...cfg,
             lastDoneTimestamp: now,
             todayCount: (cfg.todayCount || 0) + 1,
-            todayCheckedTimes: checked.includes(currentHHMM) ? checked : [...checked, currentHHMM],
+            todayCheckedTimes: newChecked,
             nextTriggerTimestamp: now + cfg.intervalMinutes * 60 * 1000,
           };
         }
@@ -340,11 +342,16 @@ export function SelfCareAlarmProvider({ children }: { children: React.ReactNode 
 
   const snoozeAlarm = useCallback((id: string, minutes: number = 5) => {
     const now = Date.now();
+    const currentHHMM = getCurrentHHMM();
     setConfigs((prev) => {
       const next = prev.map((cfg) => {
         if (cfg.id === id) {
+          const checked = cfg.todayCheckedTimes || [];
+          const pastFixed = (cfg.fixedTimes || []).filter(t => t <= currentHHMM);
+          const newChecked = Array.from(new Set([...checked, ...pastFixed, currentHHMM]));
           return {
             ...cfg,
+            todayCheckedTimes: newChecked,
             nextTriggerTimestamp: now + minutes * 60 * 1000,
           };
         }
@@ -358,11 +365,16 @@ export function SelfCareAlarmProvider({ children }: { children: React.ReactNode 
 
   const dismissAlarm = useCallback((id: string) => {
     const now = Date.now();
+    const currentHHMM = getCurrentHHMM();
     setConfigs((prev) => {
       const next = prev.map((cfg) => {
         if (cfg.id === id) {
+          const checked = cfg.todayCheckedTimes || [];
+          const pastFixed = (cfg.fixedTimes || []).filter(t => t <= currentHHMM);
+          const newChecked = Array.from(new Set([...checked, ...pastFixed, currentHHMM]));
           return {
             ...cfg,
+            todayCheckedTimes: newChecked,
             nextTriggerTimestamp: now + cfg.intervalMinutes * 60 * 1000,
           };
         }

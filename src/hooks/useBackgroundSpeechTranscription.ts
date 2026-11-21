@@ -2,7 +2,7 @@
 // ARQUIVO: src/hooks/useBackgroundSpeechTranscription.ts
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 export interface UseBackgroundSpeechTranscriptionOptions {
   meetingId: string;
@@ -23,6 +23,7 @@ export function useBackgroundSpeechTranscription({
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
   const combinedStreamRef = useRef<MediaStream | null>(null);
   const displayStreamRef = useRef<MediaStream | null>(null);
   const pendingFlushResolveRef = useRef<(() => void) | null>(null);
@@ -65,6 +66,7 @@ export function useBackgroundSpeechTranscription({
         const micStream = await navigator.mediaDevices.getUserMedia({
           audio: { echoCancellation: true, noiseSuppression: true },
         });
+        micStreamRef.current = micStream;
         const micSource = audioCtx.createMediaStreamSource(micStream);
         micSource.connect(destination);
 
@@ -153,6 +155,10 @@ export function useBackgroundSpeechTranscription({
     });
 
     // Encerra streams e AudioContext
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((t) => t.stop());
+      micStreamRef.current = null;
+    }
     if (combinedStreamRef.current) {
       combinedStreamRef.current.getTracks().forEach((t) => t.stop());
       combinedStreamRef.current = null;
@@ -168,6 +174,33 @@ export function useBackgroundSpeechTranscription({
 
     setIsRecording(false);
     setIsProcessingLastChunk(false);
+  }, []);
+
+  // Cleanup automático de todas as faixas e microfone ao desmontar o componente
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.stop();
+        } catch {}
+      }
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach((t) => t.stop());
+        micStreamRef.current = null;
+      }
+      if (combinedStreamRef.current) {
+        combinedStreamRef.current.getTracks().forEach((t) => t.stop());
+        combinedStreamRef.current = null;
+      }
+      if (displayStreamRef.current) {
+        displayStreamRef.current.getTracks().forEach((t) => t.stop());
+        displayStreamRef.current = null;
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
+    };
   }, []);
 
   return {

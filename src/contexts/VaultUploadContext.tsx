@@ -16,6 +16,7 @@ import { resolveItemTargetFolder } from '@/lib/file-upload-helpers';
 import { uploadTenantFileDirect } from '@/lib/edge-client';
 import {
   refreshTenantTicketAction,
+  refreshOrganizationTicketAction,
   syncUserFileIndexAction,
   checkBackupHashesAction,
   recordBackupProxyMetadataAction,
@@ -152,6 +153,9 @@ export function VaultUploadProvider({
   const currentTicketRef = useRef(activeTicket);
   const lastTicketRefreshRef = useRef(Date.now());
   const cancelRequestedRef = useRef(false);
+  const cancelledIdsRef = useRef<Set<string>>(new Set());
+  const activeAbortControllerRef = useRef<AbortController | null>(null);
+  const activeUploadIdRef = useRef<string | null>(null);
   const lastProgressUpdateRef = useRef(0);
   const speedSampleRef = useRef<{ time: number; loaded: number } | null>(null);
   const emaSpeedRef = useRef<number>(0);
@@ -199,6 +203,16 @@ export function VaultUploadProvider({
     }
 
     try {
+      if (selectedOrgId) {
+        const orgRes = await refreshOrganizationTicketAction({ organizationId: selectedOrgId });
+        if (orgRes.ok && orgRes.session?.vaultTicket?.ticket) {
+          const fresh = orgRes.session.vaultTicket.ticket;
+          currentTicketRef.current = fresh;
+          lastTicketRefreshRef.current = Date.now();
+          setActiveTicket(fresh);
+          return fresh;
+        }
+      }
       const refreshed = await refreshTenantTicketAction({
         purpose: 'vault',
         readOnly: false,
@@ -252,7 +266,7 @@ export function VaultUploadProvider({
   );
 
   const handleSetOverrideFolder = useCallback((newFolder: string | null) => {
-    const clean = newFolder ? newFolder.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '') : null;
+    const clean = typeof newFolder === 'string' ? newFolder.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '') : null;
     setOverrideFolder(clean);
     if (clean !== null) {
       setQueue((prev) =>
@@ -293,6 +307,10 @@ export function VaultUploadProvider({
   }, []);
 
   const cancelUpload = useCallback((id: string) => {
+    cancelledIdsRef.current.add(id);
+    if (activeUploadIdRef.current === id) {
+      activeAbortControllerRef.current?.abort();
+    }
     setQueue((prev) =>
       prev.map((it) => (it.id === id ? { ...it, status: 'error', error: 'Cancelado pelo usuário' } : it))
     );
@@ -300,6 +318,7 @@ export function VaultUploadProvider({
 
   const cancelAll = useCallback(() => {
     cancelRequestedRef.current = true;
+    activeAbortControllerRef.current?.abort();
     setQueue((prev) =>
       prev.map((it) =>
         it.status === 'uploading' || it.status === 'idle'
@@ -330,18 +349,19 @@ export function VaultUploadProvider({
     setQueue((prev) => prev.filter((it) => it.status !== 'success'));
   }, []);
 
-  // Loop de Upload Sequencial com Trava Wi-Fi e Proteção Anti-Loop
-  const startUpload = useCallback(async () => {
+  // Loop de Upload Sequencial com Trava Wi-Fi para Backup Automático e Proteção Anti-Loop
+  const startUpload = useCallback(async (options?: { isAutoBackup?: boolean }) => {
     if (isUploading || queue.length === 0) return;
 
+    // Trava Wi-Fi restrita exclusivamente a rotinas de backup automático de segundo plano (nunca bloqueia upload manual direto no Cofre)
     const backupPrefs = loadSmartBackupPreferences();
-    if (backupPrefs.wifiOnly && typeof navigator !== 'undefined') {
+    if (options?.isAutoBackup && backupPrefs.wifiOnly && typeof navigator !== 'undefined') {
       const capPlugin = (window as any).Capacitor?.Plugins?.SmartBackup;
       if (capPlugin?.isUnmeteredWifi) {
         try {
           const wifiRes = await capPlugin.isUnmeteredWifi();
           if (wifiRes && wifiRes.unmeteredWifi === false) {
-            alert('Sincronização pausada: conecte-se a uma rede Wi-Fi para enviar arquivos.');
+            alert('Sincronização em segundo plano pausada: conecte-se a uma rede Wi-Fi para enviar arquivos.');
             return;
           }
         } catch {}
@@ -352,7 +372,7 @@ export function VaultUploadProvider({
           conn?.saveData === true ||
           (conn?.type && conn.type !== 'wifi' && conn.type !== 'ethernet')
         ) {
-          alert('Sincronização pausada: trava "Somente Wi-Fi" ativa.');
+          alert('Sincronização automática pausada: trava "Somente Wi-Fi" ativa.');
           return;
         }
       }
@@ -360,6 +380,7 @@ export function VaultUploadProvider({
 
     setIsUploading(true);
     cancelRequestedRef.current = false;
+    cancelledIdsRef.current.clear();
     speedSampleRef.current = null;
     emaSpeedRef.current = 0;
     setUploadSpeedMbps(0);
@@ -376,7 +397,7 @@ export function VaultUploadProvider({
     for (let i = 0; i < queue.length; i++) {
       if (cancelRequestedRef.current) break;
       const currentItem = queue[i];
-      if (currentItem.status === 'success') continue;
+      if (currentItem.status === 'success' || cancelledIdsRef.current.has(currentItem.id)) continue;
 
       const completedBytesBeforeThis = queue
         .slice(0, i)
@@ -394,7 +415,7 @@ export function VaultUploadProvider({
           continue;
         }
         itemSha256 = await computeFileSha256(currentItem.file);
-        const hashRes = await checkBackupHashesAction([itemSha256]);
+        const hashRes = await checkBackupHashesAction([itemSha256], selectedOrgId);
         if (hashRes.ok && hashRes.knownHashes.includes(itemSha256)) {
           setQueue((prev) =>
             prev.map((it, idx) => (idx === i ? { ...it, status: 'success', progressPercent: 100 } : it))
@@ -414,8 +435,11 @@ export function VaultUploadProvider({
       let attempt = 0;
       let lastErr: unknown;
 
-      while (!uploadSuccess && attempt < 2 && !cancelRequestedRef.current) {
+      while (!uploadSuccess && attempt < 2 && !cancelRequestedRef.current && !cancelledIdsRef.current.has(currentItem.id)) {
         attempt++;
+        const abortController = new AbortController();
+        activeAbortControllerRef.current = abortController;
+        activeUploadIdRef.current = currentItem.id;
         try {
           const ticketToUse = await ensureFreshTicket(attempt > 1);
 
@@ -424,6 +448,7 @@ export function VaultUploadProvider({
             folderPath: currentItem.targetFolder,
             ticket: ticketToUse,
             serverUrl,
+            signal: abortController.signal,
             onProgress: (pct, loadedBytes) => {
               const now = Date.now();
               const currentLoaded = loadedBytes ?? Math.round((currentItem.file.size * pct) / 100);
@@ -579,6 +604,9 @@ export function VaultUploadProvider({
             continue;
           }
           break;
+        } finally {
+          activeAbortControllerRef.current = null;
+          activeUploadIdRef.current = null;
         }
       }
 

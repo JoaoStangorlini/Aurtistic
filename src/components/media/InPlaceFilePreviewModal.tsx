@@ -43,6 +43,12 @@ export function InPlaceFilePreviewModal({
     serverUrl,
   });
 
+  const downloadUrl = streamUrl
+    ? streamUrl.includes('/api/tenant/stream')
+      ? streamUrl.replace('/api/tenant/stream', '/api/tenant/download')
+      : `${streamUrl}${streamUrl.includes('?') ? '&' : '?'}download=1`
+    : '';
+
   const isImage =
     mimeType.startsWith('image/') ||
     /\.(jpg|jpeg|png|webp|avif|gif|bmp)$/i.test(filename);
@@ -75,7 +81,7 @@ export function InPlaceFilePreviewModal({
 
         <div className="flex items-center gap-2">
           <a
-            href={streamUrl}
+            href={downloadUrl || streamUrl}
             download={filename}
             target="_blank"
             rel="noopener noreferrer"
@@ -121,7 +127,7 @@ export function InPlaceFilePreviewModal({
               Pré-visualização direta não disponível no navegador para este tipo de arquivo ({mimeType}).
             </p>
             <a
-              href={streamUrl}
+              href={downloadUrl || streamUrl}
               download={filename}
               className="px-5 py-2.5 bg-[#FFCC00] hover:bg-[#e6b800] text-[#121212] font-bold text-xs rounded-xl inline-flex items-center gap-2 transition-colors shadow-md"
             >

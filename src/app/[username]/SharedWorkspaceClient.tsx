@@ -60,9 +60,9 @@ export default function SharedWorkspaceClient({
     extra: 'Link Extra',
   };
 
-  // Filter out 'tasks' tab for security/privacy
+  const ALLOWED_PUBLIC_TABS = ['resumo', 'curriculo', 'portfolio', 'extra'];
   const visibleTabs = orderedTabs.filter(
-    (tab: string) => activeTabs.includes(tab) && tab !== 'tasks'
+    (tab: string) => activeTabs.includes(tab) && ALLOWED_PUBLIC_TABS.includes(tab)
   );
 
   const [activeTab, setActiveTab] = useState<string>(
@@ -150,7 +150,8 @@ export default function SharedWorkspaceClient({
                   : (customLabels[key] || defaultLabels[key] || key);
 
                 if (key === 'extra') {
-                  const targetUrl = customLinks.extra || '#';
+                  const rawUrl = customLinks.extra || '';
+                  const targetUrl = /^https?:\/\//i.test(rawUrl) ? rawUrl : '#';
                   return (
                     <a
                       key={key}
@@ -208,7 +209,8 @@ export default function SharedWorkspaceClient({
               const icon = tabIcons[key] || 'link';
 
               if (key === 'extra') {
-                const targetUrl = customLinks.extra || '#';
+                const rawUrl = customLinks.extra || '';
+                const targetUrl = /^https?:\/\//i.test(rawUrl) ? rawUrl : '#';
                 return (
                   <a
                     key={key}

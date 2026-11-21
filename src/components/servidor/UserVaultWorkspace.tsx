@@ -289,6 +289,9 @@ export function UserVaultWorkspace({
     saveVaultSortPreference(next);
   }, []);
   const [usedBytes, setUsedBytes] = useState(profile.used_bytes || 0);
+  const [personalUsedBytes, setPersonalUsedBytes] = useState(profile.used_bytes || 0);
+  const activeScopeOrgIdRef = useRef<string | null>(initialOrgId || null);
+  const dirAbortRef = useRef<AbortController | null>(null);
   const [isEdgeOnline, setIsEdgeOnline] = useState<boolean | null>(null);
   const [isHdConnected, setIsHdConnected] = useState<boolean | null>(null);
   const [loadingDir, setLoadingDir] = useState(false);
@@ -306,6 +309,38 @@ export function UserVaultWorkspace({
       ? orgVaultTicket.ticket
       : ''
     : ticket;
+
+  // Renovação periódica (a cada 10 min e no visibilitychange) do ticket da organização ativa
+  useEffect(() => {
+    if (!selectedOrgId) return;
+    let cancelled = false;
+
+    const renewOrgTicket = async () => {
+      try {
+        const res = await refreshOrganizationTicketAction({
+          organizationId: selectedOrgId,
+          unlockedPins,
+        });
+        if (!cancelled && res.ok && res.session?.vaultTicket?.ticket) {
+          setOrgVaultTicket({ orgId: selectedOrgId, ticket: res.session.vaultTicket.ticket });
+        }
+      } catch {}
+    };
+
+    const interval = setInterval(renewOrgTicket, 10 * 60 * 1000);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void renewOrgTicket();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [selectedOrgId, unlockedPins]);
 
   // Índice local dos 4 Pilares
   const [indexedFiles, setIndexedFiles] = useState<UserFileIndexRow[]>(initialIndexedFiles);
@@ -1014,6 +1049,24 @@ export function UserVaultWorkspace({
         if (parentDir.toLowerCase() !== cleanTarget.toLowerCase()) continue;
 
         const scName = row.filename || (slashIdx === -1 ? cleanRel : cleanRel.slice(slashIdx + 1));
+        const scTargetNorm = String(exif.shortcutTarget || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase();
+        const scNameNorm = scName
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase();
+        // Isolamento estrito: atalho do Show de Física nunca aparece em outra org (ex.: Hackerspace)
+        if (
+          scopeOrgId &&
+          selectedOrg?.slug !== 'show-da-fisica' &&
+          (scTargetNorm.includes('show de fisica') ||
+            scTargetNorm.includes('show-da-fisica') ||
+            scNameNorm.includes('show de fisica'))
+        ) {
+          continue;
+        }
         if (existingNames.has(scName.toLowerCase())) continue;
         existingNames.add(scName.toLowerCase());
 
@@ -1043,10 +1096,18 @@ export function UserVaultWorkspace({
     async (targetFolder: string, activeTicketToUse = activeTicket, quiet = false) => {
       if (!isApprovedForStorage && profile.storage_role !== 'admin') return;
       if (!activeTicketToUse) return;
+      dirAbortRef.current?.abort();
+      const controller = new AbortController();
+      dirAbortRef.current = controller;
+      const reqOrgId = selectedOrgId || null;
       if (!quiet) setLoadingDir(true);
       setDirError(null);
       try {
-        const res = await fetchTenantDirectory(targetFolder, activeTicketToUse, { serverUrl });
+        const res = await fetchTenantDirectory(targetFolder, activeTicketToUse, {
+          serverUrl,
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted || activeScopeOrgIdRef.current !== reqOrgId) return;
         setIsEdgeOnline(true);
         if (typeof res.hdConnected === 'boolean') {
           setIsHdConnected(res.hdConnected);
@@ -1073,22 +1134,65 @@ export function UserVaultWorkspace({
             },
           ]
         );
-        setFolders(mergeIndexedShortcuts(res.folders || [], targetFolder, selectedOrgId));
-        setFiles(res.files || []);
+        const rawFolders = mergeIndexedShortcuts(res.folders || [], targetFolder, selectedOrgId);
+        const filteredFolders = selectedOrgId && selectedOrg?.slug !== 'show-da-fisica'
+          ? rawFolders.filter((f) => {
+              if (!f.isShortcut) return true;
+              const nName = f.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+              const nTarget = String(f.shortcutTarget || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+              return !nName.includes('show de fisica') && !nTarget.includes('show de fisica') && !nTarget.includes('show-da-fisica');
+            })
+          : rawFolders;
+
+        const diskFiles = res.files || [];
+        const cleanTargetLower = String(targetFolder || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').toLowerCase();
+        const isPortfolioDir =
+          cleanTargetLower === 'portfolio' ||
+          cleanTargetLower.startsWith('portfolio/') ||
+          cleanTargetLower === 'portifolio' ||
+          cleanTargetLower.startsWith('portifolio/');
+
+        if (isPortfolioDir && diskFiles.length === 0 && filteredFolders.length === 0 && !selectedOrgId) {
+          const fallback = resolveFallbackFolderListing(targetFolder);
+          if (fallback.files.length > 0 || fallback.folders.length > 0) {
+            setFolders(fallback.folders);
+            setFiles(fallback.files);
+          } else {
+            setFolders(filteredFolders);
+            setFiles(diskFiles);
+          }
+        } else {
+          setFolders(filteredFolders);
+          setFiles(diskFiles);
+        }
+
         if (typeof res.total_used_bytes === 'number') {
           setUsedBytes(res.total_used_bytes);
+          if (reqOrgId) {
+            setSyncedOrgs((prev) =>
+              (prev || userOrganizations).map((o) =>
+                o.id === reqOrgId ? { ...o, usedBytes: res.total_used_bytes! } : o
+              )
+            );
+          } else if (res.hdConnected !== false) {
+            setPersonalUsedBytes(res.total_used_bytes);
+          }
         }
 
         // Auto-Heal silencioso: se houver arquivos no disco ainda não indexados no Supabase
         const missing = computeUnindexedDiskEntries(res, indexedMap);
-        if (missing.length > 0 || typeof res.total_used_bytes === 'number') {
+        if (missing.length > 0 || (typeof res.total_used_bytes === 'number' && res.hdConnected !== false)) {
           void reconcileFolderIndexAction({
             missingEntries: missing,
-            totalUsedBytes: res.total_used_bytes,
-            organizationId: selectedOrgId || undefined,
+            totalUsedBytes: res.hdConnected !== false ? res.total_used_bytes : undefined,
+            organizationId: reqOrgId || undefined,
+            hdConnected: res.hdConnected,
           });
         }
       } catch (err: unknown) {
+        if ((err instanceof Error && err.name === 'AbortError') || controller.signal.aborted) {
+          return;
+        }
         setIsEdgeOnline(false);
         // Fallback Resiliente via Cache Indexado do Supabase (+ busca remota de itens de atalho cross-owner)
         let fallback = resolveFallbackFolderListing(targetFolder);
@@ -1164,6 +1268,8 @@ export function UserVaultWorkspace({
 
   const handleSwitchScope = async (orgId: string | null, force = false) => {
     if (!force && orgId === selectedOrgId && (!orgId || orgVaultTicket?.orgId === orgId)) return;
+    dirAbortRef.current?.abort();
+    activeScopeOrgIdRef.current = orgId;
     setSwitchingScope(true);
     setSelectedOrgId(orgId);
     setOrgVaultTicket(null);
@@ -1184,7 +1290,7 @@ export function UserVaultWorkspace({
     try {
       if (!orgId) {
         setOrgVaultTicket(null);
-        setUsedBytes(profile.used_bytes || 0);
+        setUsedBytes(personalUsedBytes);
         setBreadcrumbs([{ name: userName ? `Cofre ${userName}` : 'Meus Arquivos', path: '' }]);
         await loadDirectory('', ticket);
       } else {
@@ -1262,14 +1368,15 @@ export function UserVaultWorkspace({
   }, []);
 
   useEffect(() => {
-    let ignore = false;
+    const controller = new AbortController();
     // Abort auto-reload while switching between personal/org scope to avoid race condition
-    if (switchingScope) return;
-    if (selectedOrgId && !activeTicket) return;
+    if (switchingScope) return () => controller.abort();
+    if (selectedOrgId && !activeTicket) return () => controller.abort();
+    const reqOrgId = selectedOrgId || null;
     if (activeTab === 'vault' && (isApprovedForStorage || profile.storage_role === 'admin')) {
-      fetchTenantDirectory(currentFolder, activeTicket, { serverUrl })
+      fetchTenantDirectory(currentFolder, activeTicket, { serverUrl, signal: controller.signal })
         .then((res) => {
-          if (ignore) return;
+          if (controller.signal.aborted || activeScopeOrgIdRef.current !== reqOrgId) return;
           setIsEdgeOnline(true);
           if (typeof res.hdConnected === 'boolean') {
             setIsHdConnected(res.hdConnected);
@@ -1297,24 +1404,55 @@ export function UserVaultWorkspace({
               },
             ]
           );
-          setFolders(mergeIndexedShortcuts(res.folders || [], currentFolder, selectedOrgId));
-          setFiles(res.files || []);
+          const mergedFolders = mergeIndexedShortcuts(res.folders || [], currentFolder, selectedOrgId);
+          const diskFiles = res.files || [];
+          const cleanTargetLower = String(currentFolder || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').toLowerCase();
+          const isPortfolioDir =
+            cleanTargetLower === 'portfolio' ||
+            cleanTargetLower.startsWith('portfolio/') ||
+            cleanTargetLower === 'portifolio' ||
+            cleanTargetLower.startsWith('portifolio/');
+
+          if (isPortfolioDir && diskFiles.length === 0 && mergedFolders.length === 0 && !selectedOrgId) {
+            const fallback = resolveFallbackFolderListing(currentFolder);
+            if (fallback.files.length > 0 || fallback.folders.length > 0) {
+              setFolders(fallback.folders);
+              setFiles(fallback.files);
+            } else {
+              setFolders(mergedFolders);
+              setFiles(diskFiles);
+            }
+          } else {
+            setFolders(mergedFolders);
+            setFiles(diskFiles);
+          }
+
           if (typeof res.total_used_bytes === 'number') {
             setUsedBytes(res.total_used_bytes);
+            if (reqOrgId) {
+              setSyncedOrgs((prev) =>
+                (prev || userOrganizations).map((o) =>
+                  o.id === reqOrgId ? { ...o, usedBytes: res.total_used_bytes! } : o
+                )
+              );
+            } else if (res.hdConnected !== false) {
+              setPersonalUsedBytes(res.total_used_bytes);
+            }
           }
 
           const missing = computeUnindexedDiskEntries(res, indexedMap);
-          if (missing.length > 0 || typeof res.total_used_bytes === 'number') {
+          if (missing.length > 0 || (typeof res.total_used_bytes === 'number' && res.hdConnected !== false)) {
             void reconcileFolderIndexAction({
               missingEntries: missing,
-              totalUsedBytes: res.total_used_bytes,
-              organizationId: selectedOrgId || undefined,
+              totalUsedBytes: res.hdConnected !== false ? res.total_used_bytes : undefined,
+              organizationId: reqOrgId || undefined,
+              hdConnected: res.hdConnected,
             });
           }
           setLoadingDir(false);
         })
         .catch((err: unknown) => {
-          if (ignore) return;
+          if (controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')) return;
           setIsEdgeOnline(false);
           const fallback = resolveFallbackFolderListing(currentFolder);
           if (fallback.files.length > 0 || fallback.folders.length > 0 || Boolean(currentFolder)) {
@@ -1331,9 +1469,9 @@ export function UserVaultWorkspace({
         });
     }
     return () => {
-      ignore = true;
+      controller.abort();
     };
-  }, [activeTab, currentFolder, isApprovedForStorage, profile.storage_role, activeTicket, serverUrl, indexedMap, selectedOrgId, selectedOrg, resolveFallbackFolderListing]);
+  }, [activeTab, currentFolder, isApprovedForStorage, profile.storage_role, activeTicket, serverUrl, indexedMap, selectedOrgId, selectedOrg, switchingScope, resolveFallbackFolderListing, mergeIndexedShortcuts]);
 
   // Monitoramento contínuo em tempo real do status do nó Fire TV e montagem do HD USB
   useEffect(() => {
@@ -1979,7 +2117,7 @@ export function UserVaultWorkspace({
 
   const handleDownloadBatchZip = () => {
     if (selectedPaths.size === 0) return;
-    const url = buildTenantZipUrl(currentFolder, ticket, {
+    const url = buildTenantZipUrl(currentFolder, activeTicket, {
       serverUrl,
       paths: Array.from(selectedPaths),
     });
@@ -1987,7 +2125,7 @@ export function UserVaultWorkspace({
   };
 
   const handleDownloadFolderZip = (folderPath: string) => {
-    const url = buildTenantZipUrl(folderPath, ticket, { serverUrl });
+    const url = buildTenantZipUrl(folderPath, activeTicket, { serverUrl });
     window.open(url, '_blank');
   };
 
@@ -2343,7 +2481,21 @@ export function UserVaultWorkspace({
     if (mode === 'unlock') {
       const nextPins = Array.from(new Set([...unlockedPins, folderPath]));
       setUnlockedPins(nextPins);
-      const refreshed = await refreshTicket();
+      if (selectedOrgId) {
+        try {
+          const orgRes = await refreshOrganizationTicketAction({
+            organizationId: selectedOrgId,
+            unlockedPins: nextPins,
+          });
+          if (orgRes.ok && orgRes.session?.vaultTicket?.ticket) {
+            const nextOrgTicket = orgRes.session.vaultTicket.ticket;
+            setOrgVaultTicket({ orgId: selectedOrgId, ticket: nextOrgTicket });
+            await loadDirectory(folderPath, nextOrgTicket);
+            return;
+          }
+        } catch {}
+      }
+      const refreshed = await refreshTicket(nextPins);
       await loadDirectory(folderPath, refreshed?.ticket || ticket);
     } else {
       await loadDirectory(currentFolder);
@@ -2429,7 +2581,7 @@ export function UserVaultWorkspace({
               <span>Organizações</span>
             </Link>
             <Link
-              href={selectedOrg ? `/labdiv?org=${encodeURIComponent(selectedOrg.slug)}&view=studio` : '/labdiv?view=studio'}
+              href={selectedOrg ? `/labdiv?org=${encodeURIComponent(selectedOrg.slug)}&view=studio` : '/studio'}
               prefetch={true}
               className="flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold text-fg-secondary hover:text-fg transition-colors"
               title="Abrir HUB Studio (Criador Visual)"
@@ -2442,7 +2594,7 @@ export function UserVaultWorkspace({
       )}
 
       {/* Faixa 2: Seção só com a Logo e o Switch de Conta (Pessoal / Organização) */}
-      <div className="relative shrink-0 flex flex-wrap items-center justify-between gap-4 bg-surface border border-border-subtle rounded-2xl p-4 shadow-lg z-20">
+      <div className="org-card relative shrink-0 flex flex-wrap items-center justify-between gap-4 bg-surface border border-border-subtle rounded-2xl p-4 shadow-lg z-20">
         <div className="flex items-center gap-3.5 min-w-0">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/30 overflow-hidden p-1.5 shadow-inner">
             {!selectedOrg ? (
@@ -2682,7 +2834,7 @@ export function UserVaultWorkspace({
           )}
 
           {/* Barra de Ferramentas e Caminho do Arquivo */}
-          <div className="relative z-30 bg-surface border border-border-subtle rounded-2xl p-3.5 sm:p-4 space-y-3">
+          <div className="org-card relative z-30 bg-surface border border-border-subtle rounded-2xl p-3.5 sm:p-4 space-y-3">
             {/* Linha 1: Controles de Exibição e Ações Principais */}
             <div className="flex flex-wrap items-center justify-between gap-3" data-tour="vault-actions">
               {/* Seletor de Layout (Grade / Lista / IDE / Fotos / Painel) rolável no mobile 365px */}
@@ -2778,7 +2930,7 @@ export function UserVaultWorkspace({
                     </button>
 
                     <a
-                      href={buildTenantZipUrl(currentFolder, ticket, { serverUrl })}
+                      href={buildTenantZipUrl(currentFolder, activeTicket, { serverUrl })}
                       className="px-3 py-2 rounded-xl bg-app hover:bg-surface-hover text-fg-secondary hover:text-fg border border-border-subtle text-xs font-bold flex items-center gap-1.5 transition-colors"
                     >
                       <span className="material-symbols-outlined text-[18px]">folder_zip</span>
@@ -3195,6 +3347,7 @@ export function UserVaultWorkspace({
                 files={files}
                 unlockedPins={unlockedPins}
                 ticket={activeTicket}
+                selectedOrgId={selectedOrgId}
                 serverUrl={serverUrl}
                 onSelectFolder={(folderPath, folderEntry) => {
                   const resolvedPath = folderPath || (folderEntry as unknown as { path?: string })?.path || folderEntry?.name || '';
@@ -3289,6 +3442,7 @@ export function UserVaultWorkspace({
                 <VaultIdeWorkbench
                   activeEntry={openIdeTabs.find((t) => t.relativePath === activeIdeTabPath) || null}
                   ticket={activeTicket}
+                  organizationId={selectedOrgId}
                   serverUrl={serverUrl}
                   indexedRow={activeIdeTabPath ? indexedMap.get(activeIdeTabPath) : undefined}
                   availableTasks={userTasks}
@@ -3814,7 +3968,7 @@ export function UserVaultWorkspace({
                                       </span>
                                     </button>
                                     <a
-                                      href={buildTenantStreamUrl(file.relativePath, ticket, { serverUrl, download: true })}
+                                      href={buildTenantStreamUrl(file.relativePath, activeTicket, { serverUrl, download: true })}
                                       className="p-1 rounded text-fg-secondary hover:text-fg hover:bg-surface-hover"
                                       title="Download direto"
                                     >
@@ -3860,7 +4014,7 @@ export function UserVaultWorkspace({
                         const isImage = file.kind === 'image';
                         const isNote = file.kind === 'note';
                         const thumbUrl = isImage
-                          ? buildTenantThumbUrl(file.relativePath, ticket, { serverUrl })
+                          ? buildTenantThumbUrl(file.relativePath, activeTicket, { serverUrl })
                           : null;
                         const isSelected = selectedPaths.has(file.relativePath) || selectedEntry?.relativePath === file.relativePath;
                         const isFavorite = Boolean(indexRow?.is_favorite);
@@ -3934,7 +4088,7 @@ export function UserVaultWorkspace({
                                     const target = e.currentTarget;
                                     if (!target.dataset.fallback) {
                                       target.dataset.fallback = 'true';
-                                      target.src = buildTenantStreamUrl(file.relativePath, ticket, { serverUrl });
+                                      target.src = buildTenantStreamUrl(file.relativePath, activeTicket, { serverUrl });
                                     }
                                   }}
                                 />
@@ -4028,7 +4182,7 @@ export function UserVaultWorkspace({
                               </div>
 
                               <a
-                                href={buildTenantStreamUrl(file.relativePath, ticket, {
+                                href={buildTenantStreamUrl(file.relativePath, activeTicket, {
                                   serverUrl,
                                   download: true,
                                 })}
@@ -4067,7 +4221,7 @@ export function UserVaultWorkspace({
               entry={selectedEntry}
               isOpen={isPreviewOpen}
               onClose={() => setIsPreviewOpen(false)}
-              ticket={ticket}
+              ticket={activeTicket}
               serverUrl={serverUrl}
               indexedRow={selectedEntry ? indexedMap.get(selectedEntry.relativePath) : undefined}
               availableTasks={userTasks}
@@ -4250,7 +4404,7 @@ export function UserVaultWorkspace({
         onClose={() => setNoteDrawerOpen(false)}
         folderPath={currentFolder || ''}
         initialRelativePath={editingNotePath}
-        ticket={ticket}
+        ticket={activeTicket}
         serverUrl={serverUrl}
         onSaved={(mut) => {
           if (typeof mut.total_used_bytes === 'number') setUsedBytes(mut.total_used_bytes);
@@ -4264,7 +4418,7 @@ export function UserVaultWorkspace({
         mode={pinModal.mode}
         folderPath={pinModal.folderPath}
         pinHint={pinModal.pinHint}
-        ticket={ticket}
+        ticket={activeTicket}
         serverUrl={serverUrl}
         onClose={() => setPinModal((p) => ({ ...p, isOpen: false }))}
         onSuccess={(fp, m) => void handlePinModalSuccess(fp, m)}
@@ -4630,7 +4784,7 @@ export function UserVaultWorkspace({
           }}
           onPreviewFile={(entry) => handleSelectEntryForPreview(entry)}
           onDownload={(entry) => {
-            const url = buildTenantStreamUrl(entry.relativePath, ticket, { serverUrl, download: true });
+            const url = buildTenantStreamUrl(entry.relativePath, activeTicket, { serverUrl, download: true });
             window.open(url, '_blank');
           }}
           onDownloadZip={(folderPath) => handleDownloadFolderZip(folderPath)}

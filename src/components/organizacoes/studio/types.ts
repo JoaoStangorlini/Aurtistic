@@ -295,6 +295,10 @@ export interface StudioSlide {
 export interface StudioDraft {
   id: string;
   slotIndex: 1 | 2 | 3;
+  storageKey?: string;
+  scopeKey?: string;
+  scope?: 'personal' | 'org';
+  orgSlug?: string;
   title: string;
   aspectRatio: AspectRatioKey;
   updatedAt: string;

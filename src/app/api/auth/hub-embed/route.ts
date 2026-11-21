@@ -11,6 +11,7 @@ const ORG_SLUG_TO_ID: Record<string, string> = {
   labdiv: '1ab41410-0000-4000-8000-000000000001',
   'show-da-fisica': '1ab41410-0000-4000-8000-000000000002',
   hs: '1ab41410-0000-4000-8000-000000000003',
+  profis: '1ab41410-0000-4000-8000-000000000004',
 };
 
 const ALLOWED_ORIGINS = new Set([
@@ -34,7 +35,6 @@ function corsHeaders(origin: string | null): Record<string, string> {
     origin &&
     (ALLOWED_ORIGINS.has(origin) ||
       origin.endsWith('.hublabdiv.com.br') ||
-      origin.endsWith('.vercel.app') ||
       /^http:\/\/[a-z0-9-]+\.localhost:3001$/i.test(origin));
   const allowOrigin = isAllowed ? origin! : 'https://hub-lab-div.vercel.app';
   return {
@@ -181,7 +181,12 @@ export async function POST(request: Request) {
     const { data: activeSessionData } = await supabase.auth.getUser();
     if (activeSessionData?.user) {
       const activeEmail = activeSessionData.user.email?.toLowerCase().trim();
-      if (!payload.email || activeEmail === ticketEmail || activeSessionData.user.id) {
+      const activeHubUserId = String(activeSessionData.user.user_metadata?.hub_user_id || '').trim();
+      if (
+        (!payload.email && !payload.hubUserId) ||
+        activeEmail === ticketEmail ||
+        (payload.hubUserId && activeHubUserId === String(payload.hubUserId).trim())
+      ) {
         authUser = activeSessionData.user;
         const { data: sessionWrap } = await supabase.auth.getSession();
         authSession = sessionWrap.session;
@@ -298,7 +303,7 @@ export async function POST(request: Request) {
 
     if (userId) {
       // Auto-seed defensivo de todas as 4 organizações e subtimes no banco remoto
-      void ensureEcosystemOrganizationsSeeded(dbClient, {
+      await ensureEcosystemOrganizationsSeeded(dbClient, {
         id: userId,
         email: ticketEmail,
         role: payload.role,

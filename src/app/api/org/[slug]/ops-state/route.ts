@@ -2,17 +2,74 @@
 import { NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 import { createClient } from '@/utils/supabase/server';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/utils/supabase/admin';
 import { normalizeOrgBrandSlug } from '@/lib/org-brand-tokens';
+import { PRIMARY_ADMIN_UUID } from '@/lib/edge-ticket';
+
+const ALLOWED_CORS_ORIGINS = new Set([
+  'https://hub-lab-div.vercel.app',
+  'https://aurtistic.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3001',
+]);
 
 function corsHeaders(origin: string | null): Record<string, string> {
+  const isAllowed =
+    origin &&
+    (ALLOWED_CORS_ORIGINS.has(origin) ||
+      origin.endsWith('.hublabdiv.com.br') ||
+      /^http:\/\/[a-z0-9-]+\.localhost:3001$/i.test(origin));
+  const allowOrigin = isAllowed ? origin! : 'https://hub-lab-div.vercel.app';
   return {
-    'Access-Control-Allow-Origin': origin || '*',
+    'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-supabase-auth-token',
     'Access-Control-Allow-Credentials': 'true',
     'Cache-Control': 'no-store',
   };
+}
+
+async function authorizeOrgOpsAccess(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  normalizedSlug: string
+): Promise<
+  | { ok: true; userId: string; org: { id: string; slug: string; brand_config: unknown } | null }
+  | { ok: false; status: number; error: string }
+> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, status: 401, error: 'Não autenticado.' };
+  }
+
+  const db = createAdminClient() || supabase;
+  const { data: org } = await db
+    .from('organizations')
+    .select('id, slug, brand_config')
+    .ilike('slug', normalizedSlug)
+    .maybeSingle();
+
+  if (!org) {
+    return { ok: false, status: 404, error: 'Organização não encontrada.' };
+  }
+
+  if (user.id !== PRIMARY_ADMIN_UUID) {
+    const { data: memberRow } = await db
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', org.id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (!memberRow) {
+      return { ok: false, status: 403, error: 'Sem permissão para esta organização.' };
+    }
+  }
+
+  return { ok: true, userId: user.id, org };
 }
 
 function getHubBaseUrl(): string {
@@ -48,13 +105,12 @@ export async function GET(
     const normalizedSlug = normalizeOrgBrandSlug(slug);
     const supabase = await createClient();
 
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('id, slug, brand_config')
-      .eq('slug', normalizedSlug)
-      .maybeSingle();
+    const authz = await authorizeOrgOpsAccess(supabase, normalizedSlug);
+    if (!authz.ok) {
+      return NextResponse.json({ ok: false, error: authz.error }, { status: authz.status, headers });
+    }
 
-    const brandConfig = (org?.brand_config as Record<string, unknown> | null) || {};
+    const brandConfig = (authz.org?.brand_config as Record<string, unknown> | null) || {};
     const operationalState = (brandConfig.operational_state as Record<string, unknown> | undefined) || {};
 
     let hubQuestions: unknown[] = [];
@@ -109,23 +165,13 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
 
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ ok: false, error: 'Não autenticado.' }, { status: 401, headers });
+    const authz = await authorizeOrgOpsAccess(supabase, normalizedSlug);
+    if (!authz.ok) {
+      return NextResponse.json({ ok: false, error: authz.error }, { status: authz.status, headers });
     }
 
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const db = serviceKey
-      ? createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, {
-          auth: { autoRefreshToken: false, persistSession: false },
-        })
-      : supabase;
-
-    const { data: org } = await db
-      .from('organizations')
-      .select('id, brand_config')
-      .eq('slug', normalizedSlug)
-      .maybeSingle();
+    const db = createAdminClient() || supabase;
+    const org = authz.org;
 
     if (org) {
       const currentBrand = (org.brand_config as Record<string, unknown> | null) || {};
@@ -135,13 +181,17 @@ export async function POST(
         ...(body.operationalStatePatch || {}),
         updatedAt: new Date().toISOString(),
       };
-      await db
+      const { error: updateErr } = await db
         .from('organizations')
         .update({
           brand_config: { ...currentBrand, operational_state: nextOps },
           updated_at: new Date().toISOString(),
         })
         .eq('id', org.id);
+
+      if (updateErr) {
+        return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500, headers });
+      }
     }
 
     if (normalizedSlug === 'show-da-fisica' && body.hubSyncAction) {

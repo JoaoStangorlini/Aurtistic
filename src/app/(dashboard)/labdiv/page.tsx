@@ -299,27 +299,22 @@ export default async function LabDivPage({ searchParams }: LabDivPageProps) {
     ) || null;
 
   const normalizedEmail = (user.email || '').toLowerCase().trim();
-  const normalizedUsername = (profile?.username || user.user_metadata?.username || '').toLowerCase().trim();
   const isPrimaryAdmin =
     user.id === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e' ||
     user.id === '48b2fb73-c5d3-4eff-b727-54e4b91bf21b' ||
-    user.id === '8a3e4272-010d-4479-94cb-26178d544ea2' ||
-    normalizedUsername === 'joaostangorlini' ||
-    normalizedUsername === 'joao';
+    user.id === '8a3e4272-010d-4479-94cb-26178d544ea2';
   const isProfileAdmin = profile?.role === 'admin';
   const isConfirmedAdmin =
     isPrimaryAdmin ||
     isProfileAdmin ||
+    myMember?.org_role === 'admin' ||
     user.id === '7dcfe172-1cf0-4389-9abd-f340b1408386' ||
     user.id === 'fb12ee7b-da8f-4b80-ac5c-3b8d478047d2' ||
     normalizedEmail === 'joaopaulostangorlini@usp.br' ||
     normalizedEmail === 'joaostangorlini@usp.br' ||
     normalizedEmail === 'joao@aurtistic.com' ||
     normalizedEmail === 'hublabdiv@gmail.com' ||
-    normalizedUsername === 'hublabdiv' ||
-    normalizedUsername === 'hublabdiv_institucional' ||
-    user.app_metadata?.role === 'admin' ||
-    user.user_metadata?.role === 'admin';
+    user.app_metadata?.role === 'admin';
 
   if (!myMember && !isConfirmedAdmin && !isOrgInHub) {
     return (
@@ -341,16 +336,15 @@ export default async function LabDivPage({ searchParams }: LabDivPageProps) {
       normalizedEmail === 'joaopaulostangorlini@usp.br' ||
       normalizedEmail === 'joaostangorlini@usp.br' ||
       normalizedEmail === 'hublabdiv@gmail.com' ||
-      user.app_metadata?.role === 'admin' ||
-      user.user_metadata?.role === 'admin';
+      user.app_metadata?.role === 'admin';
 
     myMember = {
       id: user.id,
       organization_id: organization.id,
       user_id: user.id,
       full_name:
+        profile?.display_name ||
         user.user_metadata?.full_name ||
-        user.user_metadata?.username ||
         profile?.username ||
         (isPrimaryAdmin ? 'João Stangorlini' : 'Membro HUB LabDiv'),
       email: user.email || '',

@@ -1,7 +1,7 @@
 // Este programa é um software livre (Licença AGPLv3)
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { resolveClientEdgeServerUrl } from '@/lib/edge-urls';
 
 export interface PinLockModalProps {
@@ -29,6 +29,15 @@ export function PinLockModal({
   const [hint, setHint] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setPin('');
+      setHint('');
+      setError(null);
+      setLoading(false);
+    }
+  }, [isOpen, folderPath, mode]);
 
   if (!isOpen) return null;
 

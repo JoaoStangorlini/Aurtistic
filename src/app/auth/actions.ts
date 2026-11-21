@@ -5,6 +5,7 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
+import { createAdminClient } from '@/utils/supabase/admin';
 import {
   verifyHubSsoTicket,
   encryptLinkSecret,
@@ -92,8 +93,26 @@ export async function linkExistingAccountAction(formData: FormData) {
 
   const aurtisticUser = authData.user;
 
-  // Cifra a credencial local para permitir logins futuros com 1 clique via SSO do HUB
+  // Cifra a credencial local e armazena estritamente na tabela privada (service_role only)
   const encryptedSecret = encryptLinkSecret(password, secret);
+  const adminClient = createAdminClient();
+
+  if (adminClient) {
+    try {
+      await adminClient.from('user_private_secrets').upsert(
+        {
+          user_id: aurtisticUser.id,
+          hub_user_id: payload.hubUserId,
+          linked_email: loginEmail,
+          encrypted_link_secret: encryptedSecret,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      );
+    } catch (secErr) {
+      console.warn('[auth/actions] Falha ao persistir user_private_secrets:', secErr);
+    }
+  }
 
   const hubConnection: HubConnectionData = {
     hub_user_id: payload.hubUserId,
@@ -104,28 +123,32 @@ export async function linkExistingAccountAction(formData: FormData) {
     is_labdiv: Boolean(payload.isLabdiv),
     organizations: payload.organizations || [],
     linked_at: new Date().toISOString(),
-    encrypted_link_secret: encryptedSecret,
     linked_email: loginEmail,
   };
 
-  // Salva no perfil do usuário
+  // Salva hub_connection público (sem encrypted_link_secret) no perfil do usuário de forma atômica
   try {
-    const { data: existingProfile } = await supabase
-      .from('user_profiles')
-      .select('features_config')
-      .eq('id', aurtisticUser.id)
-      .maybeSingle();
+    const { error: rpcErr } = await supabase.rpc('merge_user_features_config', {
+      p_patch: { hub_connection: hubConnection },
+    });
 
-    const currentFeatures = existingProfile?.features_config || {};
-    const updatedFeatures = {
-      ...currentFeatures,
-      hub_connection: hubConnection,
-    };
+    if (rpcErr && (rpcErr.code === '42883' || rpcErr.message?.includes('merge_user_features_config'))) {
+      const { data: existingProfile } = await supabase
+        .from('user_profiles')
+        .select('features_config')
+        .eq('id', aurtisticUser.id)
+        .maybeSingle();
 
-    await supabase
-      .from('user_profiles')
-      .update({ features_config: updatedFeatures })
-      .eq('id', aurtisticUser.id);
+      const currentFeatures = existingProfile?.features_config || {};
+      const updatedFeatures = {
+        ...currentFeatures,
+        hub_connection: hubConnection,
+      };
+
+      await supabase
+        .from('user_profiles')
+        .upsert({ id: aurtisticUser.id, features_config: updatedFeatures }, { onConflict: 'id' });
+    }
   } catch (err) {
     console.error('Erro ao atualizar hub_connection no perfil:', err);
   }
@@ -144,37 +167,53 @@ export async function linkExistingAccountAction(formData: FormData) {
     // Não impeditivo
   }
 
-  // Migração de Ativos de Conta Secundária (Tarefas, Arquivos, Links, Membros)
+  // Migração de Ativos de Conta Secundária (Tarefas, Arquivos, Links, Membros) usando adminClient
   try {
-    const { data: secondaryProfiles } = await supabase
-      .from('user_profiles')
-      .select('id, features_config')
-      .neq('id', aurtisticUser.id);
+    const dbReader = adminClient || supabase;
+    let secondaryUserIds: string[] = [];
 
-    const secondaryUserIds = (secondaryProfiles || [])
-      .filter((p: any) => {
-        const hc = p?.features_config?.hub_connection;
-        return (
-          hc?.hub_user_id === payload.hubUserId ||
-          (hc?.hub_email && hc.hub_email.toLowerCase() === payload.email.toLowerCase())
-        );
-      })
-      .map((p: any) => p.id);
+    if (adminClient) {
+      const { data: secretMatches } = await adminClient
+        .from('user_private_secrets')
+        .select('user_id')
+        .eq('hub_user_id', payload.hubUserId)
+        .neq('user_id', aurtisticUser.id);
+      if (Array.isArray(secretMatches)) {
+        secondaryUserIds = secretMatches.map((r: any) => r.user_id).filter(Boolean);
+      }
+
+      if (secondaryUserIds.length === 0) {
+        const { data: secondaryProfiles } = await adminClient
+          .from('user_profiles')
+          .select('id, features_config')
+          .neq('id', aurtisticUser.id);
+
+        secondaryUserIds = (secondaryProfiles || [])
+          .filter((p: any) => {
+            const hc = p?.features_config?.hub_connection;
+            return (
+              hc?.hub_user_id === payload.hubUserId ||
+              (hc?.hub_email && hc.hub_email.toLowerCase() === payload.email.toLowerCase())
+            );
+          })
+          .map((p: any) => p.id);
+      }
+    }
 
     for (const secId of secondaryUserIds) {
-      await supabase.from('tasks').update({ user_id: aurtisticUser.id }).eq('user_id', secId);
-      await supabase.from('events').update({ user_id: aurtisticUser.id }).eq('user_id', secId);
-      await supabase.from('user_files_index').update({ user_id: aurtisticUser.id }).eq('user_id', secId);
-      await supabase.from('share_links').update({ user_id: aurtisticUser.id }).eq('user_id', secId);
+      await dbReader.from('tasks').update({ user_id: aurtisticUser.id }).eq('user_id', secId);
+      await dbReader.from('events').update({ user_id: aurtisticUser.id }).eq('user_id', secId);
+      await dbReader.from('user_files_index').update({ user_id: aurtisticUser.id }).eq('user_id', secId);
+      await dbReader.from('share_links').update({ user_id: aurtisticUser.id }).eq('user_id', secId);
 
-      const { data: secMemberships } = await supabase
+      const { data: secMemberships } = await dbReader
         .from('organization_members')
         .select('*')
         .eq('user_id', secId);
 
       if (secMemberships && secMemberships.length > 0) {
         for (const m of secMemberships) {
-          const { data: masterMembership } = await supabase
+          const { data: masterMembership } = await dbReader
             .from('organization_members')
             .select('id')
             .eq('organization_id', m.organization_id)
@@ -182,12 +221,12 @@ export async function linkExistingAccountAction(formData: FormData) {
             .maybeSingle();
 
           if (!masterMembership) {
-            await supabase
+            await dbReader
               .from('organization_members')
               .update({ user_id: aurtisticUser.id })
               .eq('id', m.id);
           } else {
-            await supabase
+            await dbReader
               .from('organization_members')
               .delete()
               .eq('id', m.id);
@@ -197,7 +236,7 @@ export async function linkExistingAccountAction(formData: FormData) {
     }
 
     // Reivindica perfis placeholder correspondentes ao email no LabDiv ou em outras orgs
-    await supabase
+    await dbReader
       .from('organization_members')
       .update({
         user_id: aurtisticUser.id,
@@ -280,20 +319,31 @@ export async function unlinkHubAccountAction() {
   }
 
   try {
-    const { data: existingProfile } = await supabase
-      .from('user_profiles')
-      .select('features_config')
-      .eq('id', user.id)
-      .maybeSingle();
+    const adminClient = createAdminClient();
+    if (adminClient) {
+      await adminClient.from('user_private_secrets').delete().eq('user_id', user.id);
+    }
 
-    if (existingProfile?.features_config) {
-      const updatedFeatures = { ...existingProfile.features_config };
-      delete updatedFeatures.hub_connection;
+    const { error: rpcErr } = await supabase.rpc('merge_user_features_config', {
+      p_patch: { hub_connection: null },
+    });
 
-      await supabase
+    if (rpcErr && (rpcErr.code === '42883' || rpcErr.message?.includes('merge_user_features_config'))) {
+      const { data: existingProfile } = await supabase
         .from('user_profiles')
-        .update({ features_config: updatedFeatures })
-        .eq('id', user.id);
+        .select('features_config')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (existingProfile?.features_config) {
+        const updatedFeatures = { ...existingProfile.features_config };
+        delete updatedFeatures.hub_connection;
+
+        await supabase
+          .from('user_profiles')
+          .update({ features_config: updatedFeatures })
+          .eq('id', user.id);
+      }
     }
 
     await supabase.auth.updateUser({

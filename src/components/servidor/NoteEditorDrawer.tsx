@@ -1,7 +1,7 @@
 // Este programa é um software livre (Licença AGPLv3)
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { readTenantNoteDirect, saveTenantNoteDirect } from '@/lib/edge-client';
 import { syncUserFileIndexAction } from '@/app/(dashboard)/servidor/actions';
 import type { EdgeMutationResponse } from '@/types';
@@ -42,6 +42,14 @@ export function NoteEditorDrawer({
 
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
   const [prevPath, setPrevPath] = useState(initialRelativePath);
+
+  const ticketRef = useRef(ticket);
+  const serverUrlRef = useRef(serverUrl);
+
+  useEffect(() => {
+    ticketRef.current = ticket;
+    serverUrlRef.current = serverUrl;
+  }, [ticket, serverUrl]);
 
   if (isOpen !== prevIsOpen || initialRelativePath !== prevPath) {
     setPrevIsOpen(isOpen);
@@ -104,8 +112,8 @@ export function NoteEditorDrawer({
         folderPath: targetFolder,
         filename: filename.trim() || 'nota.md',
         content,
-        ticket,
-        serverUrl,
+        ticket: ticketRef.current || ticket,
+        serverUrl: serverUrlRef.current || serverUrl,
       });
 
       await syncUserFileIndexAction({

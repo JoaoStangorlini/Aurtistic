@@ -14,7 +14,13 @@ const RETENTION_MS = RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
 class TrashManager {
   constructor(storageDir) {
-    this.storageDir = path.resolve(storageDir);
+    this.setBaseDir(storageDir);
+  }
+
+  setBaseDir(storageDir) {
+    const resolved = path.resolve(storageDir);
+    if (this.storageDir === resolved) return;
+    this.storageDir = resolved;
     this.trashDir = path.join(this.storageDir, '.trash');
     this.manifestPath = path.join(this.trashDir, 'trash_manifest.json');
     this._ensureInit();

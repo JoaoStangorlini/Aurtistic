@@ -11,6 +11,7 @@ export interface VaultIdeTreeSidebarProps {
   files: EdgeVaultEntry[];
   unlockedPins?: string[];
   ticket?: string;
+  selectedOrgId?: string | null;
   serverUrl?: string;
   onSelectFolder: (folderPath: string, folder?: EdgeVaultEntry) => void;
   onSelectFile: (file: EdgeVaultEntry) => void;
@@ -271,6 +272,7 @@ export function VaultIdeTreeSidebar({
   files,
   unlockedPins,
   ticket,
+  selectedOrgId,
   serverUrl,
   onSelectFolder,
   onSelectFile,
@@ -285,11 +287,13 @@ export function VaultIdeTreeSidebar({
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [treeData, setTreeData] = useState<Record<string, DirectoryNodeData>>({});
 
-  // Limpa cache da árvore quando o ticket/escopo muda (Pessoal ↔ Organização)
+  // Limpa cache da árvore apenas quando o escopo muda (Pessoal ↔ Organização),
+  // sem colapsar pastas quando o ticket é renovado periodicamente.
+  const scopeKey = selectedOrgId || 'personal';
   useEffect(() => {
     setTreeData({});
     setExpandedFolders(new Set());
-  }, [ticket]);
+  }, [scopeKey]);
 
   // Sincroniza dados da raiz quando props mudam na raiz
   useEffect(() => {

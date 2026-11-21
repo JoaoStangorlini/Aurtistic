@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useLayoutEffect, useMemo } from 'react';
 import {
   resolveOrgBrandTokens,
+  resolvePersonalStudioTokens,
   type OrgBrandTokens,
 } from '@/lib/org-brand-tokens';
 import { useTheme } from '@/components/theme/ThemeProvider';
@@ -36,10 +37,12 @@ export function OrganizationBrandProvider({
   const { setActiveOrgPalette, overrideOrgTheme, resolvedMode, isStudioActive } = useTheme();
   const isLight = resolvedMode === 'light';
 
-  const baseTokens = useMemo(
-    () => resolveOrgBrandTokens(orgSlug, brandConfig),
-    [orgSlug, brandConfig]
-  );
+  const baseTokens = useMemo(() => {
+    if (orgSlug === 'personal') {
+      return resolvePersonalStudioTokens(undefined, resolvedMode);
+    }
+    return resolveOrgBrandTokens(orgSlug, brandConfig);
+  }, [orgSlug, brandConfig, resolvedMode]);
 
   const tokens = useMemo<OrgBrandTokens>(() => {
     if (!isLight) return baseTokens;

@@ -847,6 +847,7 @@ export default function PortfolioClient({
               onClose={() => setIsPhotoPickerOpen(false)}
               taskId=""
               taskTitle="Portfólio de Fotografia"
+              mode="portfolio"
               initialFolder="Portfolio"
               initialTab={photos.length === 0 ? 'upload' : 'browse'}
               currentlyLinkedPaths={photos.map((p) => p.relative_path)}

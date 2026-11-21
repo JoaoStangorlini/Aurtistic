@@ -2,7 +2,7 @@
 import { zipSync } from 'fflate';
 import type { StudioSlide, AspectRatioKey } from '@/components/organizacoes/studio/types';
 import { ASPECT_DIMENSIONS } from '@/components/organizacoes/studio/types';
-import { renderSlideToCanvas } from './canvas-renderer';
+import { renderSlideToCanvas, preloadSlideAssets } from './canvas-renderer';
 import type { OrgBrandTokens } from '@/lib/org-brand-tokens';
 
 export type StudioExportFormat = 'png' | 'webp' | 'jpeg';
@@ -66,6 +66,7 @@ export async function exportSlideToBlob(
   } = {}
 ): Promise<Blob | null> {
   await ensureFontsReady();
+  await preloadSlideAssets(slide);
   const format = options.format ?? 'png';
   const scale = options.scale ?? 1;
   const quality = Math.max(0.6, Math.min(1, options.quality ?? 0.92));
@@ -214,18 +215,30 @@ export function generatePostCaptionAndAlt(
 export async function saveToOrgVaultAction(
   type: 'prontos' | 'modelos',
   orgSlug: string,
-  payload: { title: string; slides: StudioSlide[]; aspectRatio: AspectRatioKey; previewDataUrl: string; }
+  payload: { title: string; slides: StudioSlide[]; aspectRatio: AspectRatioKey; previewDataUrl: string; },
+  scope: 'personal' | 'org' = 'org'
 ): Promise<{ ok: boolean; path?: string; error?: string }> {
   try {
+    const targetFolder = scope === 'personal' || orgSlug === 'personal'
+      ? `studio/${type}`
+      : `/orgs/${orgSlug}/studio/${type}`;
     const res = await fetch('/api/studio/vault-save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targetFolder: `/orgs/${orgSlug}/studio/${type}`, fileName: `${type === 'modelos' ? 'modelo' : 'post'}-${Date.now()}.json`, orgSlug, payload }),
+      body: JSON.stringify({
+        targetFolder,
+        fileName: `${type === 'modelos' ? 'modelo' : 'post'}-${Date.now()}.json`,
+        orgSlug: scope === 'personal' ? 'personal' : orgSlug,
+        scope,
+        payload,
+      }),
     });
-    if (!res.ok) return { ok: true, path: `/orgs/${orgSlug}/studio/${type}/salvo-localmente` };
     const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, error: data.error || `Falha ao salvar no cofre (${res.status}).` };
+    }
     return { ok: true, path: data.path };
-  } catch {
-    return { ok: true, path: `/orgs/${orgSlug}/studio/${type}/sucesso` };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Falha de rede ao salvar no cofre.' };
   }
 }

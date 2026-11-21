@@ -2,9 +2,14 @@
 // ARQUIVO: src/components/organizacoes/OrganizationRequestsPanel.tsx
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useTransition } from 'react';
 import type { Organization, OrganizationSubteam } from '@/types/organizations';
 import { OrgLiveStageModerationPanel } from './OrgBastidoresModules';
+import {
+  getOrganizationRequestsAction,
+  createOrganizationRequestAction,
+  updateOrganizationRequestStatusAction,
+} from '@/app/(dashboard)/organizacoes/actions';
 
 export type RequestItemType = 'pedido' | 'sugestao';
 export type RequestPriority = 'Baixa' | 'Média' | 'Alta' | 'Urgente';
@@ -61,47 +66,52 @@ export function OrganizationRequestsPanel({
   const [respondingItemId, setRespondingItemId] = useState<string | null>(null);
   const [responseText, setResponseText] = useState('');
   const [responseStatus, setResponseStatus] = useState<RequestStatus>('Aprovado / Atendido');
+  const [, startTransition] = useTransition();
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          setItems(parsed);
-        }
-      } else {
-        // Demandas semente para demonstração e clareza
-        const seed: OrgDemandItem[] = [
-          {
-            id: 'demand-seed-1',
+    let cancelled = false;
+    startTransition(async () => {
+      try {
+        const res = await getOrganizationRequestsAction(organization.id);
+        if (!cancelled && res.ok && Array.isArray(res.requests) && res.requests.length > 0) {
+          const mapped: OrgDemandItem[] = res.requests.map((r: any) => ({
+            id: r.id,
             type: 'pedido',
-            title: 'Leitor de cartão SD USB para fotos de campo',
-            description: 'Necessário para descarregar fotos da Canon no cofre durante eventos externos.',
-            subteam_id: subteams.find((s) => s.name.toLowerCase().includes('comunic'))?.id || null,
-            priority: 'Alta',
-            status: 'Pendente',
-            created_by_name: 'Equipe de Mídia',
-            created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-          },
-          {
-            id: 'demand-seed-2',
-            type: 'sugestao',
-            title: 'Pausa de 5 minutos antes do início de reuniões presenciais',
-            description: 'Reduz sobrecarga sensorial para membros neurodivergentes antes da pauta principal.',
-            subteam_id: null,
-            priority: 'Média',
-            status: 'Em Análise',
-            created_by_name: 'Membro do Laboratório',
-            created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
-          },
-        ];
-        setItems(seed);
-        localStorage.setItem(storageKey, JSON.stringify(seed));
+            title: r.title,
+            description: r.description || '',
+            subteam_id: r.subteam_id,
+            priority: r.urgency === 'urgent' ? 'Urgente' : r.urgency === 'high' ? 'Alta' : r.urgency === 'low' ? 'Baixa' : 'Média',
+            status: r.status === 'resolved' ? 'Aprovado / Atendido' : r.status === 'in_review' ? 'Em Análise' : r.status === 'closed' ? 'Arquivado' : 'Pendente',
+            created_by_name: 'Membro da Equipe',
+            created_at: r.created_at,
+          }));
+          setItems(mapped);
+          setIsLoaded(true);
+          return;
+        }
+      } catch {}
+
+      // Fallback local caso o banco esteja offline ou vazio
+      try {
+        const stored = localStorage.getItem(storageKey);
+        if (stored && !cancelled) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setItems(parsed);
+            setIsLoaded(true);
+            return;
+          }
+        }
+      } catch {}
+
+      if (!cancelled) {
+        setItems([]);
+        setIsLoaded(true);
       }
-    } catch {}
-    setIsLoaded(true);
-  }, [storageKey, subteams]);
+    });
+
+    return () => { cancelled = true; };
+  }, [organization.id, storageKey]);
 
   const saveItems = useCallback(
     (newItems: OrgDemandItem[]) => {
@@ -117,8 +127,9 @@ export function OrganizationRequestsPanel({
     e.preventDefault();
     if (!title.trim() || !description.trim()) return;
 
+    const optimisticId = `demand_tmp_${Date.now()}`;
     const newItem: OrgDemandItem = {
-      id: `demand_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: optimisticId,
       type: demandType,
       title: title.trim(),
       description: description.trim(),
@@ -135,6 +146,25 @@ export function OrganizationRequestsPanel({
     setSubteamId('');
     setPriority('Média');
     setIsFormOpen(false);
+
+    startTransition(async () => {
+      try {
+        const res = await createOrganizationRequestAction({
+          organizationId: organization.id,
+          title: newItem.title,
+          description: newItem.description,
+          subteamId: newItem.subteam_id,
+          urgency: priority === 'Urgente' ? 'urgent' : priority === 'Alta' ? 'high' : priority === 'Baixa' ? 'low' : 'normal',
+        });
+        if (res.ok && res.request) {
+          setItems((prev) =>
+            prev.map((it) => (it.id === optimisticId ? { ...it, id: res.request.id } : it))
+          );
+        }
+      } catch (err) {
+        console.warn('[OrganizationRequestsPanel] Falha ao persistir demanda no banco:', err);
+      }
+    });
   };
 
   const handleSaveAdminResponse = (itemId: string) => {
@@ -152,6 +182,16 @@ export function OrganizationRequestsPanel({
     saveItems(updated);
     setRespondingItemId(null);
     setResponseText('');
+
+    startTransition(async () => {
+      try {
+        const dbStatus = responseStatus === 'Aprovado / Atendido' ? 'resolved' : responseStatus === 'Em Análise' ? 'in_review' : responseStatus === 'Arquivado' ? 'closed' : 'open';
+        await updateOrganizationRequestStatusAction({
+          requestId: itemId,
+          status: dbStatus,
+        });
+      } catch {}
+    });
   };
 
   const filteredItems = useMemo(() => {

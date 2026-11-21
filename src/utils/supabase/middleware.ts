@@ -50,7 +50,7 @@ export async function updateSession(request: NextRequest) {
     supabaseResponse.headers.delete('X-Frame-Options')
     supabaseResponse.headers.set(
       'Content-Security-Policy',
-      "frame-ancestors 'self' http://localhost:3001 http://*.localhost:3001 http://127.0.0.1:3001 http://showdefisica.localhost:3001 http://labdiv.localhost:3001 http://profis.localhost:3001 http://hs.localhost:3001 https://hub-lab-div.vercel.app https://*.hublabdiv.com.br https://*.vercel.app http://localhost:3000 http://127.0.0.1:3000;"
+      "frame-ancestors 'self' http://localhost:3001 http://*.localhost:3001 http://127.0.0.1:3001 http://showdefisica.localhost:3001 http://labdiv.localhost:3001 http://profis.localhost:3001 http://hs.localhost:3001 https://hub-lab-div.vercel.app https://aurtistic.vercel.app https://*.hublabdiv.com.br http://localhost:3000 http://127.0.0.1:3000;"
     )
     return supabaseResponse
   }

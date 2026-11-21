@@ -104,6 +104,7 @@ export async function uploadTenantFileDirect(input: {
   folderPath: string;
   ticket: string;
   serverUrl?: string;
+  signal?: AbortSignal;
   onProgress?: (percent: number, loadedBytes?: number, totalBytes?: number) => void;
 }): Promise<EdgeMutationResponse> {
   const base = resolveClientEdgeServerUrl(input.serverUrl);
@@ -116,6 +117,17 @@ export async function uploadTenantFileDirect(input: {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `${base}/api/tenant/upload`);
       xhr.setRequestHeader('x-tenant-ticket', input.ticket);
+
+      if (input.signal) {
+        if (input.signal.aborted) {
+          xhr.abort();
+          return reject(new Error('Upload cancelado.'));
+        }
+        input.signal.addEventListener('abort', () => {
+          xhr.abort();
+          reject(new Error('Upload cancelado pelo usuário.'));
+        });
+      }
 
       xhr.upload.onprogress = (evt) => {
         if (evt.lengthComputable && input.onProgress) {

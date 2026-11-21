@@ -9,6 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
+const vaultCrypto = require('./vault-crypto');
 
 const IGNORED_NAMES = new Set([
   '.trash',
@@ -49,8 +50,20 @@ class WebdavServer {
     this.trashManager = options.trashManager || null;
   }
 
+  setRootDir(newRootDir) {
+    const resolved = path.resolve(newRootDir);
+    if (this.rootDir !== resolved) {
+      this.rootDir = resolved;
+    }
+  }
+
   resolveSafePath(reqPath) {
-    const decoded = decodeURIComponent(reqPath || '').replace(/^\/webdav\/?/i, '');
+    let decoded = '';
+    try {
+      decoded = decodeURIComponent(reqPath || '').replace(/^\/webdav\/?/i, '');
+    } catch {
+      decoded = (reqPath || '').replace(/^\/webdav\/?/i, '');
+    }
     const clean = path.normalize(decoded).replace(/^(\.\.[\/\\])+/, '');
     const full = path.join(this.rootDir, clean);
     if (!full.startsWith(this.rootDir)) {
@@ -81,7 +94,14 @@ class WebdavServer {
     } else {
       propXml += `
         <d:resourcetype/>
-        <d:getcontentlength>${stat.size}</d:getcontentlength>
+        <d:getcontentlength>${(() => {
+          try {
+            const hdr = vaultCrypto.readEncryptedHeaderSync(fullPath);
+            return hdr ? hdr.plaintextSize : stat.size;
+          } catch {
+            return stat.size;
+          }
+        })()}</d:getcontentlength>
       `;
     }
 
@@ -172,12 +192,21 @@ class WebdavServer {
           res.setHeader('Last-Modified', toRfc1123Date(stat.mtime));
           if (method === 'HEAD') return res.status(200).end();
 
+          const encHdr = await vaultCrypto.readEncryptedHeader(targetPath).catch(() => null);
+          if (encHdr) {
+            res.status(403).json({ error: 'Arquivo criptografado AURTENC2: leitura raw bloqueada via WebDAV.' });
+            return;
+          }
           const stream = fs.createReadStream(targetPath);
           return stream.pipe(res);
         }
 
         // 5. Método PUT (Upload / Gravação de Arquivo)
         if (method === 'PUT') {
+          if (vaultCrypto.isEncryptionEnabled()) {
+            res.status(403).end('Cofre criptografado AURTENC2 ativo: gravacao via WebDAV bloqueada.');
+            return;
+          }
           const parentDir = path.dirname(targetPath);
           if (!fs.existsSync(parentDir)) {
             await fs.promises.mkdir(parentDir, { recursive: true });
@@ -206,6 +235,10 @@ class WebdavServer {
 
         // 7. Método DELETE (Excluir)
         if (method === 'DELETE') {
+          if (targetPath === this.rootDir || path.relative(this.rootDir, targetPath) === '') {
+            return res.status(403).send('Não é permitido excluir a raiz do WebDAV.');
+          }
+
           if (!fs.existsSync(targetPath)) {
             return res.status(404).end();
           }

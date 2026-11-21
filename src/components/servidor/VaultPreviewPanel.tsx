@@ -47,7 +47,7 @@ export function VaultPreviewPanel({
   const [showTaskSelector, setShowTaskSelector] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
-  // Atalhos de teclado (Alt+P, Escape) com proteção contra digitação
+  // Atalhos de teclado (Escape) com proteção contra digitação
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -57,10 +57,7 @@ export function VaultPreviewPanel({
 
       if (isTyping) return;
 
-      if (e.altKey && (e.key === 'p' || e.key === 'P')) {
-        e.preventDefault();
-        onClose();
-      } else if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape' && isOpen) {
         e.preventDefault();
         e.stopPropagation();
         onClose();
@@ -152,7 +149,7 @@ export function VaultPreviewPanel({
         sizeBytes: entry.sizeBytes,
         patch: {
           showInPortfolio: nextVal,
-          visibility: nextVal ? 'public' : 'private',
+          visibility: nextVal ? 'public' : (inCurriculum ? 'public' : 'private'),
         },
       });
       onEcosystemUpdated?.();
@@ -173,7 +170,7 @@ export function VaultPreviewPanel({
         sizeBytes: entry.sizeBytes,
         patch: {
           showInCurriculum: nextVal,
-          visibility: nextVal ? 'public' : 'private',
+          visibility: nextVal ? 'public' : (inPortfolio ? 'public' : 'private'),
         },
       });
       onEcosystemUpdated?.();
@@ -265,14 +262,6 @@ export function VaultPreviewPanel({
               </span>
             </button>
           )}
-          {!isDetached && (
-            <span
-              className="text-[10px] font-mono text-fg-muted bg-app px-1.5 py-0.5 rounded border border-border-subtle hidden sm:inline"
-              title="Atalho de teclado"
-            >
-              Alt+P
-            </span>
-          )}
           <button
             type="button"
             onClick={onClose}
@@ -346,11 +335,14 @@ export function VaultPreviewPanel({
                 <audio controls src={streamUrl} className="w-full h-8" />
               </div>
             ) : isVideo ? (
+            <div className="relative group/video w-full flex flex-col items-center">
               <video
                 controls
                 src={streamUrl}
                 className="max-h-[260px] w-full object-contain bg-black rounded"
+                onContextMenu={(e) => e.stopPropagation()}
               />
+            </div>
             ) : isNote ? (
               <div className="w-full p-3 flex flex-col max-h-[280px]">
                 <div className="flex items-center justify-between pb-2 border-b border-border-subtle">

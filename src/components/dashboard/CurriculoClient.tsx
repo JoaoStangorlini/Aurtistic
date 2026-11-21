@@ -851,7 +851,15 @@ export default function CurriculoClient({
                         )}
 
                         <a
-                          href={fileUrl}
+                          href={(() => {
+                            try {
+                              const u = new URL(fileUrl, typeof window !== 'undefined' ? window.location.origin : 'https://aurtistic.local');
+                              u.searchParams.set('download', '1');
+                              return fileUrl.startsWith('http') ? u.toString() : `${u.pathname}${u.search}${u.hash}`;
+                            } catch {
+                              return fileUrl;
+                            }
+                          })()}
                           download={doc.filename}
                           title="Baixar Arquivo"
                           className="p-1.5 bg-surface-hover hover:bg-[#333333] text-fg-secondary hover:text-fg rounded-lg transition-colors"
@@ -873,6 +881,7 @@ export default function CurriculoClient({
               onClose={() => setIsPickerOpen(false)}
               taskId=""
               taskTitle="Certificados e Diplomas"
+              mode="curriculum"
               currentlyLinkedPaths={docs.map((d) => d.relative_path)}
               ticket={vaultTicket || activeTicket || ''}
               serverUrl={serverUrl}

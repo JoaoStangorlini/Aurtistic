@@ -28,6 +28,8 @@ export interface TaskFilePickerModalProps {
   onLinkedUpdated: () => void;
   initialFolder?: string;
   initialTab?: 'browse' | 'upload';
+  mode?: 'task' | 'portfolio' | 'curriculum' | 'pick-file';
+  onFilesPicked?: (paths: string[]) => void;
 }
 
 export function TaskFilePickerModal({
@@ -41,6 +43,8 @@ export function TaskFilePickerModal({
   onLinkedUpdated,
   initialFolder = '',
   initialTab = 'browse',
+  mode = 'task',
+  onFilesPicked,
 }: TaskFilePickerModalProps) {
   const [activeTab, setActiveTab] = useState<'browse' | 'upload'>(initialTab);
 
@@ -157,6 +161,13 @@ export function TaskFilePickerModal({
     setLinkingBusy(true);
     setError(null);
     try {
+      if (mode === 'pick-file') {
+        onFilesPicked?.(Array.from(selectedPaths));
+        onLinkedUpdated();
+        onClose();
+        return;
+      }
+
       for (const relPath of Array.from(selectedPaths)) {
         const entry = folderEntries.find((e) => e.relativePath === relPath);
         if (!entry) continue;
@@ -167,12 +178,15 @@ export function TaskFilePickerModal({
           mimeType: entry.mimeType,
           sizeBytes: entry.sizeBytes,
           patch: {
-            addTaskIds: [taskId],
+            ...(mode === 'portfolio' ? { showInPortfolio: true, visibility: 'public' } : {}),
+            ...(mode === 'curriculum' ? { showInCurriculum: true, visibility: 'public' } : {}),
+            ...(taskId ? { addTaskIds: [taskId] } : {}),
           },
         });
       }
 
-      setFeedback(`${selectedPaths.size} arquivo(s) vinculado(s) à tarefa com sucesso!`);
+      onFilesPicked?.(Array.from(selectedPaths));
+      setFeedback(`${selectedPaths.size} arquivo(s) processado(s) com sucesso!`);
       setSelectedPaths(new Set());
       onLinkedUpdated();
       setTimeout(() => {
@@ -237,8 +251,8 @@ export function TaskFilePickerModal({
           },
         });
 
-        const isPortfolio = targetFolder === 'Portfolio' || targetFolder.startsWith('Portfolio/');
-        const isCurriculum = targetFolder === 'Curriculo' || targetFolder.startsWith('Curriculo/');
+        const isPortfolio = mode === 'portfolio' || targetFolder === 'Portfolio' || targetFolder.startsWith('Portfolio/');
+        const isCurriculum = mode === 'curriculum' || targetFolder === 'Curriculo' || targetFolder.startsWith('Curriculo/');
 
         // Sincronização atômica imediata vinculando aos ecossistemas correspondentes
         await syncUserFileIndexAction({

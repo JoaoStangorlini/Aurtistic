@@ -61,7 +61,13 @@ export default async function ConfiguracoesAvancadasPage() {
     soft_delete_to_discarded: false
   };
 
-  const hubConnection = profile.features_config?.hub_connection || null;
+  const rawHubConn = profile.features_config?.hub_connection || null;
+  const hubConnection = rawHubConn
+    ? (() => {
+        const { encrypted_link_secret: _omit, ...safeHub } = rawHubConn;
+        return safeHub;
+      })()
+    : null;
 
   return (
     <main className="min-h-full bg-transparent p-4 md:p-8">

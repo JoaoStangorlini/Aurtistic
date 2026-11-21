@@ -38,7 +38,7 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
     try {
       const saved = localStorage.getItem('aurtistic_studio_fav_palettes');
       if (saved) setFavorites(JSON.parse(saved));
-    } catch {}
+    } catch { }
   }, []);
 
   const toggleFavorite = (palette: string[]) => {
@@ -49,7 +49,7 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
         : [palette, ...favorites].slice(0, 5);
       setFavorites(next);
       localStorage.setItem('aurtistic_studio_fav_palettes', JSON.stringify(next));
-    } catch {}
+    } catch { }
   };
 
   const harmonies = getHarmonies(baseColor);
@@ -99,6 +99,10 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
       }
       return;
     }
+    if (targetOverride === 'layer' && (!selectedLayer || selectedLayer.type === 'image')) {
+      // Protege contra sobrescrever o fundo acidentalmente quando o alvo explícito é "Camada"
+      return;
+    }
     commitHistorySnapshot(slides, 'Cor de fundo do slide');
     updateSlide(activeSlide.id, { backgroundColor: color, backgroundGradient: undefined });
   };
@@ -128,9 +132,8 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
               key={t.id}
               type="button"
               onClick={() => setTargetOverride(t.id)}
-              className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-colors ${
-                targetOverride === t.id ? 'bg-[#FFCC00] text-black' : 'text-fg-muted hover:text-fg'
-              }`}
+              className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-colors ${targetOverride === t.id ? 'bg-[#FFCC00] text-black' : 'text-fg-muted hover:text-fg'
+                }`}
             >
               {t.label}
             </button>
@@ -165,18 +168,16 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
               startEyedropper((hex) => handleApplyColor(hex));
             }}
             title="Pipeta Eyedropper (I)"
-            className={`p-1 rounded-lg cursor-pointer transition-colors ${
-              isEyedropperActive ? 'bg-[#FFCC00] text-black' : 'bg-surface border border-border-subtle text-amber-600 dark:text-amber-300'
-            }`}
+            className={`p-1 rounded-lg cursor-pointer transition-colors ${isEyedropperActive ? 'bg-[#FFCC00] text-black' : 'bg-surface border border-border-subtle text-amber-600 dark:text-amber-300'
+              }`}
           >
             <span className="material-symbols-outlined text-[15px]">colorize</span>
           </button>
           <button
             type="button"
             onClick={() => setShowWheel((v) => !v)}
-            className={`px-2 py-1 rounded-lg border text-[10px] font-bold cursor-pointer ${
-              showWheel ? 'bg-[#FFCC00] text-black border-[#FFCC00]' : 'bg-surface border-border-subtle text-fg-secondary'
-            }`}
+            className={`px-2 py-1 rounded-lg border text-[10px] font-bold cursor-pointer ${showWheel ? 'bg-[#FFCC00] text-black border-[#FFCC00]' : 'bg-surface border-border-subtle text-fg-secondary'
+              }`}
           >
             Seletor
           </button>
@@ -201,9 +202,8 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
                 key={st}
                 type="button"
                 onClick={() => setActiveStyle(st)}
-                className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase cursor-pointer ${
-                  activeStyle === st ? 'bg-[#FFCC00] text-black' : 'bg-surface-hover text-fg-muted'
-                }`}
+                className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase cursor-pointer ${activeStyle === st ? 'bg-[#FFCC00] text-black' : 'bg-surface-hover text-fg-muted'
+                  }`}
               >
                 {st}
               </button>
@@ -246,9 +246,8 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
                 key={h.id}
                 type="button"
                 onClick={() => setHarmonyType(h.id)}
-                className={`px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap cursor-pointer ${
-                  harmonyType === h.id ? 'bg-[#FFCC00] text-black' : 'bg-surface text-fg-muted hover:text-fg'
-                }`}
+                className={`px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap cursor-pointer ${harmonyType === h.id ? 'bg-[#FFCC00] text-black' : 'bg-surface text-fg-muted hover:text-fg'
+                  }`}
               >
                 {h.label}
               </button>
@@ -281,6 +280,32 @@ export function StudioPaletteCenter({ onPickColor }: { onPickColor?: () => void 
           ))}
         </div>
       </div>
+
+      {/* Paletas Favoritadas (★) */}
+      {favorites.length > 0 && (
+        <div className="space-y-1 pt-1 border-t border-border-subtle/50">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500 flex items-center gap-1">
+            <span className="material-symbols-outlined text-[12px]">star</span>
+            Paletas Favoritas
+          </span>
+          <div className="flex flex-col gap-1">
+            {favorites.map((fav, fIdx) => (
+              <div key={fIdx} className="flex items-center gap-1">
+                {fav.map((c, cIdx) => (
+                  <button
+                    key={cIdx}
+                    type="button"
+                    onClick={() => handleApplyColor(c)}
+                    className="flex-1 h-4 rounded border border-white/15 hover:scale-105 transition-transform cursor-pointer"
+                    style={{ backgroundColor: c }}
+                    title={`Aplicar ${c}`}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Busca rápida compacta */}
       <div className="flex items-center gap-2">

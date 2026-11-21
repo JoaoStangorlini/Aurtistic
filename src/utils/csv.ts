@@ -25,12 +25,12 @@ export function downloadCSV(tasks: Task[], filename: string = 'tarefas.csv') {
     escapeCSV(task.categoria),
     escapeCSV(task.responsavel),
     escapeCSV(task.dimensao),
-    escapeCSV(task.inicio ? new Date(task.inicio).toLocaleString() : ''),
-    escapeCSV(task.prazo ? new Date(task.prazo).toLocaleString() : ''),
-    escapeCSV(task.concluida_em ? new Date(task.concluida_em).toLocaleString() : ''),
+    escapeCSV(task.inicio ? new Date(task.inicio).toISOString() : ''),
+    escapeCSV(task.prazo ? new Date(task.prazo).toISOString() : ''),
+    escapeCSV(task.concluida_em ? new Date(task.concluida_em).toISOString() : ''),
     escapeCSV(task.frequencia),
     escapeCSV(task.descricao),
-    escapeCSV(task.created_at ? new Date(task.created_at).toLocaleString() : '')
+    escapeCSV(task.created_at ? new Date(task.created_at).toISOString() : '')
   ]);
 
   const csvContent = [
@@ -84,7 +84,9 @@ export function parseTasksFromCSV(file: File): Promise<Partial<Task>[]> {
             if (header === 'dimensao') task.dimensao = val;
             if (header === 'frequencia') task.frequencia = val;
             if (header === 'descricao') task.descricao = val;
-            // Ignore dates for simplicity, or could try parsing if needed
+            if (header === 'inicio') task.inicio = val;
+            if (header === 'prazo') task.prazo = val;
+            if (header === 'concluida em' || header === 'concluida_em') task.concluida_em = val;
           }
         }
         

@@ -269,7 +269,7 @@ export async function getStudioGalleryMediaAction(input?: {
           orgSlug: isOrgVault && rawSlug ? rawSlug : undefined,
           organizationId: isOrgVault && orgId ? orgId : undefined,
           role: 'member',
-          purpose: 'share',
+          purpose: 'public_media',
           allowedPaths: [row.relative_path],
           readOnly: true,
           allowDownload: true,
@@ -351,7 +351,7 @@ export async function getStudioGalleryMediaAction(input?: {
             organizationId: targetOrg || undefined,
             allowedOrgSlugs: targetOrgSlug ? [targetOrgSlug] : undefined,
             role: 'member',
-            purpose: 'share',
+            purpose: 'public_media',
             allowedPaths: [pRow.relative_path],
             readOnly: true,
             allowDownload: true,
@@ -531,6 +531,13 @@ async function loadOrgShortcutsForStudio(
       const scRel = splitVaultSegments(String(sc.relative_path || scName)).join('/');
 
       if (scRel && ((targetOrgSlug || targetOrgId) || (ownerUserId && targetRel))) {
+        // Isolamento estrito: atalhos do Show de Física não vazam para o cofre do Hackerspace
+        const isHsOrg = orgId === '1ab41410-0000-4000-8000-000000000003';
+        const normTarget = stripVaultAccents(targetRel);
+        const normScName = stripVaultAccents(scName);
+        if (isHsOrg && (normTarget.includes('show de fisica') || normScName.includes('show de fisica'))) {
+          continue;
+        }
         list.push({
           scRel,
           name: scName,
@@ -1221,7 +1228,7 @@ export async function rehydrateStudioDraftAction(
             orgSlug: scopeType === 'org' ? targetOrgSlug : undefined,
             organizationId: scopeType === 'org' ? targetOrgId : undefined,
             role: 'member',
-            purpose: 'share',
+            purpose: 'public_media',
             allowedPaths: [relPath],
             readOnly: true,
             allowDownload: true,

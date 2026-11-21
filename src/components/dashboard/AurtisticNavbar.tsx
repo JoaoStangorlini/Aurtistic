@@ -6,6 +6,7 @@ import { useEffect, useState, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter, usePathname } from 'next/navigation';
 import { logoutAurtistic } from '@/app/(dashboard)/aurtistic/actions';
+import { clearAllUserClientCaches } from '@/lib/client-cache-cleanup';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { useTheme } from '@/components/theme/ThemeProvider';
@@ -84,6 +85,7 @@ export default function AurtisticNavbar() {
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setProfile(null);
+        void clearAllUserClientCaches();
       }
       setLoading(false);
     });
@@ -123,9 +125,11 @@ export default function AurtisticNavbar() {
 
   const handleLogout = async () => {
     try {
+      await clearAllUserClientCaches();
       await logoutAurtistic();
     } catch (e) {
       console.error(e);
+      await clearAllUserClientCaches();
       await supabase.auth.signOut();
       router.push('/login');
     }
@@ -143,7 +147,7 @@ export default function AurtisticNavbar() {
     }
   };
 
-  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário';
+  const displayName = profile?.display_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário';
 
   const customLabels = profile?.features_config?.labels || {};
   const customLinks = profile?.features_config?.custom_links || {};
@@ -390,9 +394,9 @@ export default function AurtisticNavbar() {
                 className="flex items-center gap-2 pl-1 pr-3 py-1.5 rounded-full border border-border-subtle bg-surface hover:border-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 transition-colors cursor-pointer shrink-0"
               >
                 <div className="w-7 h-7 rounded-full overflow-hidden bg-surface-hover flex items-center justify-center border border-[var(--accent-secondary)] shrink-0">
-                  {user?.user_metadata?.avatar_url ? (
-                    <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                  ) : (user?.id === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e' && profile?.features_config?.advanced_settings?.sync_curriculum_photo !== false) ? (
+                  {profile?.avatar_url || user?.user_metadata?.avatar_url ? (
+                    <img src={profile?.avatar_url || user?.user_metadata?.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                  ) : profile?.features_config?.advanced_settings?.sync_curriculum_photo !== false ? (
                     <img src="/perfil.jpeg" alt="Profile" className="w-full h-full object-cover" />
                   ) : (
                     <span className="material-symbols-outlined text-[16px] text-fg">person</span>
@@ -448,7 +452,16 @@ export default function AurtisticNavbar() {
                     </div>
                     
                     {/* Seletor Compacto de Tema */}
-                    <ThemeDropdownSection />
+                    <ThemeDropdownSection userId={user?.id} />
+
+                    <Link
+                      href="/studio"
+                      onClick={() => setIsSettingsOpen(false)}
+                      className="w-full text-left px-4 py-2 text-xs text-fg-secondary hover:bg-surface-hover hover:text-[var(--accent-primary)] transition-colors flex items-center gap-2.5 font-medium group"
+                    >
+                      <span className="material-symbols-outlined text-[18px] text-[var(--accent-primary)]">brush</span>
+                      <span>Studio Visual &amp; Publicações</span>
+                    </Link>
 
                     <Link 
                       href="/configuracoes-avancadas"

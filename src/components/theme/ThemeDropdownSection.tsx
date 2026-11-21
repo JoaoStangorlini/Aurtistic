@@ -7,7 +7,7 @@ import { PALETTE_LIST, ORG_PALETTE_LIST, type ThemeMode } from '@/lib/theme-conf
 import { normalizeOrgBrandSlug } from '@/lib/org-brand-tokens';
 import { getUserOrganizationsAction } from '@/app/(dashboard)/organizacoes/actions';
 
-export function ThemeDropdownSection() {
+export function ThemeDropdownSection({ userId }: { userId?: string }) {
   const {
     mode,
     palette,
@@ -23,6 +23,20 @@ export function ThemeDropdownSection() {
 
   useEffect(() => {
     let active = true;
+    const cacheKey = userId ? `aurtistic_org_palettes_v1_${userId}` : null;
+
+    // 1. Leitura instantânea (0ms) do cache escopado por userId
+    if (cacheKey && typeof window !== 'undefined') {
+      try {
+        const cached = window.localStorage.getItem(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) setMemberSlugs(parsed);
+        }
+      } catch {}
+    }
+
+    // 2. Revalidação silenciosa em background
     void getUserOrganizationsAction()
       .then((res) => {
         if (!active || !res?.ok || !Array.isArray(res.organizations)) return;
@@ -34,12 +48,17 @@ export function ThemeDropdownSection() {
           )
         );
         setMemberSlugs(slugs);
+        if (cacheKey && typeof window !== 'undefined') {
+          try {
+            window.localStorage.setItem(cacheKey, JSON.stringify(slugs));
+          } catch {}
+        }
       })
       .catch(() => {});
     return () => {
       active = false;
     };
-  }, []);
+  }, [userId]);
 
   const availableOrgPalettes = ORG_PALETTE_LIST.filter((p) => memberSlugs.includes(p.id));
 

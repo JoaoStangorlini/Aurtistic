@@ -4,7 +4,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Task, TaskColumn, AgendaEvent, UserFileIndexRow } from '@/types';
 import { useAurtisticMedia } from '@/components/media/AurtisticMediaContext';
-import { TaskFilePickerModal } from '@/components/tarefas/TaskFilePickerModal';
 import { formatStorageBytes } from '@/lib/edge-urls';
 import { OrganizationManagementView } from '@/components/organizacoes/OrganizationManagementView';
 import { OrganizationScopeToolbar } from '@/components/organizacoes/OrganizationScopeToolbar';
@@ -88,22 +87,31 @@ function getPriorityWeight(p: string | null) {
   return 0;
 }
 
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 const HighlightedText = ({ text, highlight }: { text: string | null, highlight: string }) => {
   if (!text) return null;
-  if (!highlight.trim()) return <>{text}</>;
+  const clean = (highlight || '').trim();
+  if (!clean) return <>{text}</>;
 
-  const parts = text.split(new RegExp(`(${highlight})`, 'gi'));
-  return (
-    <>
-      {parts.map((part, index) =>
-        part.toLowerCase() === highlight.toLowerCase() ? (
-          <span key={index} className="bg-accent-primary/50 text-on-accent-primary rounded-sm px-0.5">{part}</span>
-        ) : (
-          part
-        )
-      )}
-    </>
-  );
+  try {
+    const parts = text.split(new RegExp(`(${escapeRegExp(clean)})`, 'gi'));
+    return (
+      <>
+        {parts.map((part, index) =>
+          part.toLowerCase() === clean.toLowerCase() ? (
+            <span key={index} className="bg-accent-primary/50 text-on-accent-primary rounded-sm px-0.5">{part}</span>
+          ) : (
+            part
+          )
+        )}
+      </>
+    );
+  } catch {
+    return <>{text}</>;
+  }
 };
 
 export function TasksView({
@@ -179,7 +187,6 @@ export function TasksView({
   const [orgMeetings, setOrgMeetings] = useState<any[]>([]);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [filePickerTaskId, setFilePickerTaskId] = useState<string | null>(null);
   const [userFiles, setUserFiles] = useState<UserFileIndexRow[]>(initialUserFiles || []);
   const [onlyMyTasks, setOnlyMyTasks] = useState(false);
   const [isQuickFiltersExpanded, setIsQuickFiltersExpanded] = useState(false);
@@ -823,9 +830,12 @@ export function TasksView({
   // Selection
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [lastSelectedTaskId, setLastSelectedTaskId] = useState<string | null>(null);
+  const [desktopTaskLayout, setDesktopTaskLayout] = useState<'cards' | 'table'>('cards');
 
   const defaultTaskValues = useMemo(() => {
-    let vals = { ...(advancedSettings.default_task_values || {}) };
+    // Respeita flag pre_fill_defaults das Configurações Avançadas
+    const shouldPreFill = advancedSettings?.pre_fill_defaults !== false;
+    let vals = shouldPreFill ? { ...(advancedSettings.default_task_values || {}) } : {};
     if (advancedSettings.auto_fill_dimension !== false && selectedDimensions.length === 1) {
       vals.dimensao = selectedDimensions[0];
     }
@@ -1219,15 +1229,51 @@ export function TasksView({
     return Array.from(new Set([...predefined, ...fromTasks]));
   }, [localTasks, columns, userId]);
 
+  const resolveResponsavelLabel = React.useCallback((task: Task): string => {
+    const members: Array<{ id: string; user_id?: string | null; full_name: string; display_name?: string | null; username?: string | null }> = activeOrgDetails?.members || [];
+    const getMemberDisplayName = (m: { full_name: string; display_name?: string | null; username?: string | null; user_id?: string | null }): string => {
+      if (m.user_id === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e') {
+        return m.display_name || 'Stangorlini';
+      }
+      return m.display_name || (m.username && m.username !== 'joao' ? m.username : '') || m.full_name;
+    };
+
+    if (task.assigned_member_ids && task.assigned_member_ids.length > 0) {
+      const m = members.find((mem) => task.assigned_member_ids?.includes(mem.id) || (mem.user_id && task.assigned_member_ids?.includes(mem.user_id)));
+      if (m) return getMemberDisplayName(m);
+    }
+    const raw = (task.responsavel || '').trim();
+    if (raw) {
+      const lowerRaw = raw.toLowerCase();
+      const matchedMember = members.find(
+        (m) => m.full_name.toLowerCase() === lowerRaw ||
+               (m.display_name && m.display_name.toLowerCase() === lowerRaw) ||
+               (m.username && m.username.toLowerCase() === lowerRaw) ||
+               (lowerRaw.length >= 3 && m.full_name.toLowerCase().startsWith(`${lowerRaw} `))
+      );
+      if (matchedMember) return getMemberDisplayName(matchedMember);
+      if ((lowerRaw === 'joão' || lowerRaw === 'joao' || lowerRaw.includes('stangorlini')) && userId === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e') {
+        return 'Stangorlini';
+      }
+      return raw;
+    }
+    if (task.user_id) {
+      const ownerMember = members.find((m) => m.user_id === task.user_id);
+      if (ownerMember) return getMemberDisplayName(ownerMember);
+      if (task.user_id === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e') return 'Stangorlini';
+    }
+    return '';
+  }, [activeOrgDetails?.members, userId]);
+
   const uniqueUsers = useMemo(() => {
     const isJoao = userId === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e';
     const userCol = columns.find(c => c.key === 'responsavel');
-    let predefined = userCol ? userCol.options.map(o => o.value) : ['João', 'Andy', 'Leo', 'Dani', 'Lorenzo', 'Nacky'];
+    let predefined = userCol ? userCol.options.map(o => ((o.value === 'João' || o.value === 'João Paulo Stangorlini') && isJoao ? 'Stangorlini' : o.value)) : ['Stangorlini', 'Andy', 'Leo', 'Dani', 'Lorenzo', 'Nacky'];
     if (!isJoao) predefined = ['Você'];
 
-    const fromTasks = localTasks.map(t => t.responsavel).filter(Boolean) as string[];
+    const fromTasks = localTasks.map(t => resolveResponsavelLabel(t)).filter(Boolean);
     return Array.from(new Set([...predefined, ...fromTasks])).sort();
-  }, [localTasks, columns, userId]);
+  }, [localTasks, columns, userId, resolveResponsavelLabel]);
 
   const uniqueDimensions = useMemo(() => {
     const isJoao = userId === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e';
@@ -1440,7 +1486,34 @@ export function TasksView({
 
   // Process Tasks: Filter and Sort
   const processedTasks = (() => {
-    let tasks = [...localTasks];
+    // 0. Sanitização de auto-referência e detecção de ciclos na árvore de tarefas
+    const taskMap = new Map<string, Task>();
+    localTasks.forEach(t => taskMap.set(t.id, t));
+
+    const sanitizeParent = (t: Task): Task => {
+      if (!t.parent_id) return t;
+      if (t.parent_id === t.id) {
+        return { ...t, parent_id: null };
+      }
+      const visited = new Set<string>([t.id]);
+      let currId: string | null = t.parent_id;
+      while (currId) {
+        if (visited.has(currId)) {
+          // Ciclo detectado -> promove à raiz para evitar sumiço
+          return { ...t, parent_id: null };
+        }
+        visited.add(currId);
+        const parent = taskMap.get(currId);
+        if (!parent) {
+          // Pai não existe no mapa local (órfã) -> promove à raiz
+          return { ...t, parent_id: null };
+        }
+        currId = parent.parent_id || null;
+      }
+      return t;
+    };
+
+    let tasks = localTasks.map(sanitizeParent);
 
     const isOrgTask = (t: Task) => {
       if (t.is_personal === true) return false;
@@ -1520,7 +1593,11 @@ export function TasksView({
     }
     // 4. Filter Users
     if (selectedUsers.length > 0) {
-      tasks = tasks.filter(t => t.parent_id || (t.responsavel && selectedUsers.includes(t.responsavel)));
+      tasks = tasks.filter(t => {
+        if (t.parent_id) return true;
+        const resolved = resolveResponsavelLabel(t);
+        return (resolved && selectedUsers.includes(resolved)) || (t.responsavel && selectedUsers.includes(t.responsavel));
+      });
     }
     // 5. Filter Dimensions
     if (selectedDimensions.length > 0) {
@@ -2022,6 +2099,21 @@ export function TasksView({
               </button>
             )}
 
+            {/* Alternar Cards (Opção A) / Tabela Clássica no Desktop */}
+            {viewMode === 'list' && displayMode !== 'eventos' && (
+              <button
+                type="button"
+                onClick={() => setDesktopTaskLayout((m) => (m === 'cards' ? 'table' : 'cards'))}
+                className="hidden md:flex h-[34px] px-2.5 py-1 text-xs font-bold rounded-lg items-center gap-1.5 transition-colors cursor-pointer bg-app border border-border-subtle text-fg-secondary hover:text-fg hover:border-border-strong hover:bg-surface-hover"
+                title={desktopTaskLayout === 'cards' ? 'Mudar para visualização em Tabela' : 'Mudar para visualização em Cards'}
+              >
+                <span className="material-symbols-outlined text-[16px]">
+                  {desktopTaskLayout === 'cards' ? 'table_rows' : 'view_agenda'}
+                </span>
+                <span>{desktopTaskLayout === 'cards' ? 'Tabela' : 'Cards'}</span>
+              </button>
+            )}
+
             {/* Importar ICS se modo não for apenas tarefas */}
             {displayMode !== 'tarefas' && (
               <button
@@ -2497,8 +2589,255 @@ export function TasksView({
       })()}
 
       {viewMode === 'list' && displayMode !== 'eventos' && (
-        <div data-tour="tasks-main-view" className="flex flex-col gap-2 mt-4 custom-scrollbar overflow-x-auto w-full border border-border-subtle rounded-lg relative overflow-hidden" style={{ minHeight: '600px' }}>
-          <div ref={desktopContainerRef} style={{ overflowAnchor: 'none' }} className="hidden md:block overflow-x-auto bg-surface border border-border-subtle rounded-lg relative">
+        <div data-tour="tasks-main-view" className="flex flex-col gap-2 mt-4 custom-scrollbar w-full relative" style={{ minHeight: '600px' }}>
+          {/* Opção A — Desktop Cards com Pílulas Acima do Título (sem scroll horizontal) */}
+          {desktopTaskLayout === 'cards' && (
+            <div className="hidden md:flex flex-col gap-2.5">
+              <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-surface/80 border border-border-subtle text-xs text-fg-muted">
+                <label
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-2 cursor-pointer font-semibold select-none"
+                >
+                  {(() => {
+                    const allSelected = processedTasks.length > 0 && selectedTasks.size === processedTasks.length;
+                    const isIndeterminate = selectedTasks.size > 0 && !allSelected;
+                    return (
+                      <>
+                        <input
+                          type="checkbox"
+                          className="sr-only"
+                          aria-checked={allSelected ? 'true' : isIndeterminate ? 'mixed' : 'false'}
+                          ref={(el) => {
+                            if (el) el.indeterminate = isIndeterminate;
+                          }}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedTasks(new Set(processedTasks.map(t => t.id)));
+                            } else {
+                              setSelectedTasks(new Set());
+                            }
+                          }}
+                          checked={allSelected}
+                        />
+                        <span
+                          data-checked={allSelected ? 'true' : 'false'}
+                          data-indeterminate={isIndeterminate ? 'true' : 'false'}
+                          className="org-task-checkbox w-4 h-4 flex items-center justify-center shrink-0"
+                        >
+                          {allSelected && <span className="material-symbols-outlined text-[13px] font-bold">check</span>}
+                          {isIndeterminate && <span className="material-symbols-outlined text-[13px] font-bold">remove</span>}
+                        </span>
+                      </>
+                    );
+                  })()}
+                  <span>Selecionar todas ({processedTasks.length})</span>
+                </label>
+                <span className="text-[11px]">Clique nas pílulas para editar Status, Dimensão, Prioridade ou Responsável</span>
+              </div>
+
+              {localTasks.length === 0 ? (
+                <div className="org-card p-8 text-center text-fg-muted text-sm bg-surface border border-border-subtle rounded-2xl">
+                  Nenhuma tarefa encontrada. Clique em <span className="text-[#FFCC00] font-bold">+ Nova Tarefa</span> para começar.
+                </div>
+              ) : processedTasks.length === 0 ? (
+                <div className="org-card p-8 text-center text-fg-muted text-sm bg-surface border border-border-subtle rounded-2xl">
+                  Nenhuma tarefa encontrada.
+                </div>
+              ) : (
+                processedTasks.map((task) => {
+                  const displayResp = resolveResponsavelLabel(task);
+                  const hasChildren = !task.parent_id && localTasks.some((t) => t.parent_id === task.id);
+                  return (
+                    <div
+                      key={task.id}
+                      draggable={sortBy === 'manual' ? true : undefined}
+                      onDragStart={sortBy === 'manual' ? (e) => handleDragStart(e, task.id) : undefined}
+                      onDragOver={sortBy === 'manual' ? (e) => handleDragOver(e, task.id) : undefined}
+                      onDragLeave={sortBy === 'manual' ? handleDragLeave : undefined}
+                      onDrop={sortBy === 'manual' ? (e) => handleDrop(e, task.id) : undefined}
+                      onDragEnd={sortBy === 'manual' ? () => setDropTargetId(null) : undefined}
+                      onClick={(e) => handleRowClick(e, task.id)}
+                      className={`org-card group rounded-2xl border p-3.5 transition-all bg-surface ${
+                        task.parent_id ? 'ml-6 border-l-4 border-l-[#FFCC00]' : ''
+                      } ${
+                        selectedTasks.has(task.id)
+                          ? 'ring-2 ring-[var(--accent-primary)] bg-accent-primary/10'
+                          : 'border-border-subtle hover:border-[var(--accent-primary)]/60'
+                      } ${draggedTaskId === task.id ? 'opacity-50' : ''} ${
+                        dropTargetId === task.id
+                          ? dropPosition === 'top'
+                            ? 'border-t-2 border-t-accent-primary'
+                            : 'border-b-2 border-b-accent-primary'
+                          : ''
+                      }`}
+                    >
+                      {/* Linha 1 (Acima do Título): Check + Status + Dimensão + Prioridade + Categoria + Responsável + Prazo + Ações */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                          <input
+                            type="checkbox"
+                            className="accent-[var(--accent-primary)] rounded-sm cursor-pointer shrink-0"
+                            checked={selectedTasks.has(task.id)}
+                            onChange={(e) => toggleCheckbox(e, task.id)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          {hasChildren && (
+                            <button
+                              type="button"
+                              onClick={(e) => toggleExpand(e, task.id)}
+                              className="text-fg-muted hover:text-fg transition-colors flex items-center justify-center shrink-0 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">
+                                {!collapsedTasks.has(task.id) ? 'expand_more' : 'chevron_right'}
+                              </span>
+                            </button>
+                          )}
+                          <div
+                            onClick={(e) => handleBadgeClick(e, task, 'status')}
+                            className="cursor-pointer hover:opacity-85 transition-opacity"
+                            title="Alterar Status"
+                          >
+                            <Badge type="status" value={task.status} customColor={getColColor('status', task.status)} />
+                          </div>
+                          <div
+                            onClick={(e) => handleBadgeClick(e, task, 'dimensao')}
+                            className="cursor-pointer hover:opacity-85 transition-opacity"
+                            title="Alterar Dimensão"
+                          >
+                            <Badge type="dimensao" value={task.dimensao} customColor={getColColor('dimensao', task.dimensao)} />
+                          </div>
+                          <div
+                            onClick={(e) => handleBadgeClick(e, task, 'prioridade')}
+                            className="cursor-pointer hover:opacity-85 transition-opacity"
+                            title="Alterar Prioridade"
+                          >
+                            <Badge type="prioridade" value={task.prioridade} customColor={getColColor('prioridade', task.prioridade)} />
+                          </div>
+                          {visibleExtraCols.includes('categoria') && task.categoria && (
+                            <div
+                              onClick={(e) => handleBadgeClick(e, task, 'categoria')}
+                              className="cursor-pointer hover:opacity-85 transition-opacity"
+                              title="Alterar Categoria"
+                            >
+                              <Badge type="categoria" value={task.categoria} customColor={getColColor('categoria', task.categoria)} />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {!isPersonalScope && (
+                            <div
+                              onClick={(e) => handleBadgeClick(e, task, 'responsavel')}
+                              className="cursor-pointer hover:opacity-85 transition-opacity"
+                              title="Alterar Responsável"
+                            >
+                              <Badge type="responsavel" value={displayResp} customColor={getColColor('responsavel', displayResp || task.responsavel)} />
+                            </div>
+                          )}
+                          {task.prazo && (
+                            <span className="text-[11px] font-semibold text-fg-secondary px-2 py-0.5 rounded-md bg-app border border-border-subtle">
+                              {formatDate(task.prazo)}
+                              {(() => {
+                                if (task.status === 'completa' || task.status === 'descartada') return null;
+                                const days = getDaysUntil(task.prazo);
+                                if (days === null) return null;
+                                if (days < 0) return <span className="ml-1 text-[#db4437] font-bold">({-days}d atraso)</span>;
+                                if (days === 0) return <span className="ml-1 text-[#db4437] font-bold">(Hoje!)</span>;
+                                return <span className="ml-1 text-[#FFCC00] font-bold">({days}d)</span>;
+                              })()}
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => handleFavoriteToggle(e, task.id)}
+                            className={`transition-colors p-1 rounded-lg hover:bg-surface-hover cursor-pointer ${
+                              task.is_favorite ? 'text-[#FFCC00]' : 'text-fg-muted hover:text-[#FFCC00] opacity-50 group-hover:opacity-100'
+                            }`}
+                            title="Favoritar"
+                          >
+                            <span
+                              className={`material-symbols-outlined text-[17px] ${task.is_favorite ? 'filled' : ''}`}
+                              style={task.is_favorite ? { fontVariationSettings: "'FILL' 1" } : {}}
+                            >
+                              star
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEdit(task);
+                            }}
+                            className="text-fg-muted hover:text-accent-primary p-1 rounded-lg hover:bg-surface-hover transition-colors cursor-pointer"
+                            title="Editar tarefa"
+                          >
+                            <span className="material-symbols-outlined text-[17px]">edit</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Linha 2: Título em destaque + Subtarefas + Descrição */}
+                      <div className="pl-6 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-[15px] font-bold text-fg leading-snug">
+                            <HighlightedText text={task.nome} highlight={searchTerm} />
+                          </h3>
+                          {(task as any).custom_fields?.foto_url && (
+                            <a
+                              href={(task as any).custom_fields.foto_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-fg-muted hover:text-accent-primary flex items-center transition-colors"
+                              title="Ver foto"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">image</span>
+                            </a>
+                          )}
+                        </div>
+                        <TaskDelegationBadges
+                          task={task}
+                          allTasks={localTasks}
+                          subteams={activeOrgDetails?.subteams || []}
+                          members={activeOrgDetails?.members || []}
+                          completionStatuses={advancedSettings?.completion_statuses}
+                          onToggleSubtask={handleToggleSubtaskQuick}
+                        />
+                        {task.descricao && (
+                          <div className="mt-1 flex flex-col items-start w-full">
+                            <p
+                              className={`text-xs text-fg-secondary transition-all ${
+                                expandedTasks.includes(task.id) || advancedSettings?.auto_expand_descriptions
+                                  ? 'whitespace-pre-wrap'
+                                  : 'line-clamp-2'
+                              }`}
+                            >
+                              <HighlightedText text={task.descricao} highlight={searchTerm} />
+                            </p>
+                            {!advancedSettings?.auto_expand_descriptions && (task.descricao.length > 100 || task.descricao.includes('\n')) && (
+                              <button
+                                type="button"
+                                onClick={(e) => toggleTaskExpansion(task.id, e)}
+                                className="text-accent-primary text-[10px] font-bold mt-0.5 flex items-center hover:underline cursor-pointer"
+                              >
+                                {expandedTasks.includes(task.id) ? (
+                                  <>Ver menos <span className="material-symbols-outlined text-[14px]">expand_less</span></>
+                                ) : (
+                                  <>Ver mais <span className="material-symbols-outlined text-[14px]">expand_more</span></>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          <div ref={desktopContainerRef} style={{ overflowAnchor: 'none' }} className={desktopTaskLayout === 'table' ? 'hidden md:block overflow-x-auto bg-surface border border-border-subtle rounded-lg relative' : 'hidden'}>
             <table className="w-full text-left border-collapse min-w-[1400px]">
               <thead className="bg-surface-hover border-b border-border-subtle sticky top-0 z-10">
                 <tr>
@@ -2581,7 +2920,7 @@ export function TasksView({
                 {localTasks.length === 0 && (
                   <tr>
                     <td colSpan={10} className="p-8 text-center text-fg-muted text-sm">
-                      Nenhuma tarefa encontrada. Clique em <span className="text-[#FFCC00] font-bold">+ Nova Tarefa</span> para começar.
+                      Nenhuma tarefa encontrada. Clique em <span className="text-accent-primary font-bold">+ Nova Tarefa</span> para começar.
                     </td>
                   </tr>
                 )}
@@ -2600,12 +2939,24 @@ export function TasksView({
                       {/* Check + Ação unificados em 64px (Frente 2.7.5) */}
                       <td className="py-2.5 px-2 w-[64px] text-center shrink-0">
                         <div className="flex items-center justify-center gap-1">
-                          <input
-                            type="checkbox"
-                            className="accent-[var(--accent-primary)] rounded-sm cursor-pointer"
-                            checked={selectedTasks.has(task.id)}
-                            onChange={(e) => toggleCheckbox(e, task.id)}
-                          />
+                          <label
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center cursor-pointer"
+                            title="Selecionar tarefa"
+                          >
+                            <input
+                              type="checkbox"
+                              className="sr-only"
+                              checked={selectedTasks.has(task.id)}
+                              onChange={(e) => toggleCheckbox(e, task.id)}
+                            />
+                            <span
+                              data-checked={selectedTasks.has(task.id) ? 'true' : 'false'}
+                              className="org-task-checkbox w-4 h-4 flex items-center justify-center shrink-0"
+                            >
+                              {selectedTasks.has(task.id) && <span className="material-symbols-outlined text-[13px] font-bold">check</span>}
+                            </span>
+                          </label>
                           <button
                             type="button"
                             onClick={() => handleEdit(task)}
@@ -2691,13 +3042,16 @@ export function TasksView({
                       <td className="py-2.5 px-3 text-xs text-fg-secondary">{formatDate(task.prazo)}</td>
 
                       {/* Responsável (6 Colunas Essenciais) */}
-                      {!isPersonalScope && visibleExtraCols.includes("responsavel") && (
-                        <td className="py-2.5 px-3" onClick={(e) => handleBadgeClick(e, task, 'responsavel')}>
-                          <div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar responsável">
-                            <Badge type="responsavel" value={task.responsavel} customColor={getColColor('responsavel', task.responsavel)} />
-                          </div>
-                        </td>
-                      )}
+                      {!isPersonalScope && visibleExtraCols.includes("responsavel") && (() => {
+                        const displayResp = resolveResponsavelLabel(task);
+                        return (
+                          <td className="py-2.5 px-3" onClick={(e) => handleBadgeClick(e, task, 'responsavel')}>
+                            <div className="cursor-pointer hover:opacity-80 transition-opacity inline-block" title="Clique para alterar responsável">
+                              <Badge type="responsavel" value={displayResp} customColor={getColColor('responsavel', displayResp || task.responsavel)} />
+                            </div>
+                          </td>
+                        );
+                      })()}
 
                       {/* Colunas Opcionais */}
                       {visibleExtraCols.includes("categoria") && (
@@ -2775,7 +3129,24 @@ export function TasksView({
                   <button onClick={(e) => handleFavoriteToggle(e, task.id)} className={`transition-colors flex items-center justify-center ${task.is_favorite ? 'text-accent-secondary' : 'text-fg-muted hover:text-accent-secondary'}`}>
                     <span className={`material-symbols-outlined text-[18px] ${task.is_favorite ? 'filled' : ''}`} style={task.is_favorite ? { fontVariationSettings: "'FILL' 1" } : {}}>star</span>
                   </button>
-                  <input type="checkbox" className="accent-[var(--accent-primary)] rounded-sm w-4 h-4" checked={selectedTasks.has(task.id)} onChange={(e) => toggleCheckbox(e, task.id)} />
+                  <label
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center cursor-pointer"
+                    title="Selecionar tarefa"
+                  >
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={selectedTasks.has(task.id)}
+                      onChange={(e) => toggleCheckbox(e, task.id)}
+                    />
+                    <span
+                      data-checked={selectedTasks.has(task.id) ? 'true' : 'false'}
+                      className="org-task-checkbox w-4 h-4 flex items-center justify-center shrink-0"
+                    >
+                      {selectedTasks.has(task.id) && <span className="material-symbols-outlined text-[13px] font-bold">check</span>}
+                    </span>
+                  </label>
                   <button
                     onClick={() => handleEdit(task)}
                     className="text-fg-muted hover:text-accent-primary"
@@ -2846,7 +3217,7 @@ export function TasksView({
                     <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'status')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="status" value={task.status} customColor={getColColor('status', task.status)} /></div></div>
                     <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'prioridade')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="prioridade" value={task.prioridade} customColor={getColColor('prioridade', task.prioridade)} /></div></div>
                     <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'categoria')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="categoria" value={task.categoria} customColor={getColColor('categoria', task.categoria)} /></div></div>
-                    <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'responsavel')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="responsavel" value={task.responsavel} customColor={getColColor('responsavel', task.responsavel)} /></div></div>
+                    <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'responsavel')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="responsavel" value={resolveResponsavelLabel(task)} customColor={getColColor('responsavel', resolveResponsavelLabel(task) || task.responsavel)} /></div></div>
                     <div className="flex-1 flex justify-center overflow-hidden" onClick={(e) => handleBadgeClick(e, task, 'dimensao')}><div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"><Badge type="dimensao" value={task.dimensao} customColor={getColColor('dimensao', task.dimensao)} /></div></div>
                   </div>
                 </div>
@@ -3176,7 +3547,7 @@ export function TasksView({
                     };
                     return (
                       <label key={key} className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-surface-hover rounded-md transition-colors">
-                        <input type="checkbox" className="accent-[#FFCC00] w-4 h-4 cursor-pointer" checked={isSelected} onChange={(e) => {
+                        <input type="checkbox" className="accent-[var(--accent-primary)] w-4 h-4 cursor-pointer" checked={isSelected} onChange={(e) => {
                           let newFilters = [...quickFilters];
                           if (e.target.checked) newFilters.push(key);
                           else newFilters = newFilters.filter(k => k !== key);
@@ -3197,7 +3568,7 @@ export function TasksView({
                     const isSelected = quickFilters.includes(col.key);
                     return (
                       <label key={col.id} className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-surface-hover rounded-md transition-colors">
-                        <input type="checkbox" className="accent-[#FFCC00] w-4 h-4 cursor-pointer" checked={isSelected} onChange={(e) => {
+                        <input type="checkbox" className="accent-[var(--accent-primary)] w-4 h-4 cursor-pointer" checked={isSelected} onChange={(e) => {
                           let newFilters = [...quickFilters];
                           if (e.target.checked) newFilters.push(col.key);
                           else newFilters = newFilters.filter(k => k !== col.key);
@@ -3224,7 +3595,7 @@ export function TasksView({
                     };
                     return (
                       <label key={key} className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-surface-hover rounded-md transition-colors">
-                        <input type="checkbox" className="accent-[#FFCC00] w-4 h-4 cursor-pointer" checked={isSelected} onChange={(e) => {
+                        <input type="checkbox" className="accent-[var(--accent-primary)] w-4 h-4 cursor-pointer" checked={isSelected} onChange={(e) => {
                           let newSorts = [...quickSorts];
                           if (e.target.checked) newSorts.push(key);
                           else newSorts = newSorts.filter(k => k !== key);
@@ -3244,7 +3615,7 @@ export function TasksView({
                     const isSelected = quickSorts.includes(col.key);
                     return (
                       <label key={col.id} className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-surface-hover rounded-md transition-colors">
-                        <input type="checkbox" className="accent-[#FFCC00] w-4 h-4 cursor-pointer" checked={isSelected} onChange={(e) => {
+                        <input type="checkbox" className="accent-[var(--accent-primary)] w-4 h-4 cursor-pointer" checked={isSelected} onChange={(e) => {
                           let newSorts = [...quickSorts];
                           if (e.target.checked) newSorts.push(col.key);
                           else newSorts = newSorts.filter(k => k !== col.key);
@@ -3299,6 +3670,12 @@ export function TasksView({
                 }
               }
             }}
+            onTaskCreated={(t) => {
+              setLocalTasks((prev) => [t, ...prev.filter((p) => p.id !== t.id)]);
+            }}
+            onTaskUpdated={(t) => {
+              setLocalTasks((prev) => prev.map((p) => (p.id === t.id ? t : p)));
+            }}
           />
         </div>
       )}
@@ -3331,21 +3708,6 @@ export function TasksView({
           }
         }}
       />
-
-      {/* Modal de Anexo de Arquivos nas Tarefas */}
-      {filePickerTaskId && (
-        <TaskFilePickerModal
-          isOpen={Boolean(filePickerTaskId)}
-          onClose={() => setFilePickerTaskId(null)}
-          taskId={filePickerTaskId}
-          taskTitle={localTasks.find(t => t.id === filePickerTaskId)?.nome || 'Tarefa'}
-          currentlyLinkedPaths={(localTasks.find(t => t.id === filePickerTaskId) as any)?.arquivos_vinculados || []}
-          ticket=""
-          onLinkedUpdated={() => {
-            setFilePickerTaskId(null);
-          }}
-        />
-      )}
     </div>
   );
 }

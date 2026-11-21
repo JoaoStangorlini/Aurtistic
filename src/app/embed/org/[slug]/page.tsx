@@ -27,7 +27,7 @@ export default async function EmbedOrgPage({
   const { slug } = await params;
   const { ticket, view } = await searchParams;
   const normalizedSlug = normalizeOrgBrandSlug(slug);
-  const preset = ORG_BRAND_PRESETS[normalizedSlug];
+  const preset = ORG_BRAND_PRESETS[normalizedSlug] || ORG_BRAND_PRESETS.labdiv;
 
   const supabase = await createClient();
   const {
@@ -98,7 +98,6 @@ export default async function EmbedOrgPage({
   );
 
   const normalizedEmail = (user?.email || '').toLowerCase().trim();
-  const normalizedUsername = (user?.user_metadata?.username || '').toLowerCase().trim();
   const isEcosystemAdmin = Boolean(
     (user &&
       (user.id === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e' ||
@@ -110,12 +109,7 @@ export default async function EmbedOrgPage({
         normalizedEmail === 'joaostangorlini@usp.br' ||
         normalizedEmail === 'joao@aurtistic.com' ||
         normalizedEmail === 'hublabdiv@gmail.com' ||
-        normalizedUsername === 'joaostangorlini' ||
-        normalizedUsername === 'joao' ||
-        normalizedUsername === 'hublabdiv' ||
-        normalizedUsername === 'hublabdiv_institucional' ||
-        user.app_metadata?.role === 'admin' ||
-        user.user_metadata?.role === 'admin')) ||
+        user.app_metadata?.role === 'admin')) ||
       ssoPayload?.role === 'admin'
   );
 

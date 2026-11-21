@@ -2,8 +2,13 @@
 import type { StudioDraft, StudioImageLayer } from '@/components/organizacoes/studio/types';
 
 const DB_NAME = 'aurtistic_studio_v4';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'draft_slots';
+
+export function buildStorageKey(scopeKey: string | undefined, slotIndex: number): string {
+  const cleanScope = (scopeKey || 'personal').trim();
+  return `${cleanScope}:${slotIndex}`;
+}
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -11,10 +16,17 @@ function openDb(): Promise<IDBDatabase> {
       return reject(new Error('IndexedDB não suportado'));
     }
     const req = window.indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (event) => {
       const db = req.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'slotIndex' });
+      const oldVersion = event.oldVersion;
+
+      if (oldVersion < 2) {
+        if (db.objectStoreNames.contains(STORE_NAME)) {
+          // Migração v1 -> v2: chave composta storageKey `${scopeKey}:${slotIndex}`
+          db.deleteObjectStore(STORE_NAME);
+        }
+        const store = db.createObjectStore(STORE_NAME, { keyPath: 'storageKey' });
+        store.createIndex('by_scope', 'scopeKey', { unique: false });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -68,10 +80,16 @@ export function sanitizeDraftForStorage(draft: StudioDraft): StudioDraft {
   };
 }
 
-export async function saveDraftToIdb(draft: StudioDraft): Promise<void> {
+export async function saveDraftToIdb(draft: StudioDraft, scopeKey?: string): Promise<void> {
   try {
     const db = await openDb();
-    const sanitized = sanitizeDraftForStorage(draft);
+    const effectiveScope = (scopeKey || draft.scopeKey || 'personal').trim();
+    const storageKey = draft.storageKey || buildStorageKey(effectiveScope, draft.slotIndex);
+    const sanitized = {
+      ...sanitizeDraftForStorage(draft),
+      storageKey,
+      scopeKey: effectiveScope,
+    };
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
@@ -84,13 +102,14 @@ export async function saveDraftToIdb(draft: StudioDraft): Promise<void> {
   }
 }
 
-export async function getDraftFromIdb(slotIndex: 1 | 2 | 3): Promise<StudioDraft | null> {
+export async function getDraftFromIdb(slotIndex: 1 | 2 | 3, scopeKey?: string): Promise<StudioDraft | null> {
   try {
     const db = await openDb();
+    const key = buildStorageKey(scopeKey, slotIndex);
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
-      const req = store.get(slotIndex);
+      const req = store.get(key);
       req.onsuccess = () => {
         const d = req.result as StudioDraft | undefined;
         resolve(d ? rehydrateDraft(d) : null);
@@ -102,31 +121,47 @@ export async function getDraftFromIdb(slotIndex: 1 | 2 | 3): Promise<StudioDraft
   }
 }
 
-export async function getAllDraftsFromIdb(): Promise<StudioDraft[]> {
+export async function getAllDraftsFromIdb(scopeKey?: string): Promise<StudioDraft[]> {
   try {
     const db = await openDb();
+    const cleanScope = scopeKey?.trim();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
-      const req = store.getAll();
-      req.onsuccess = () => {
-        const arr = (req.result as StudioDraft[]) || [];
-        resolve(arr.map(rehydrateDraft).sort((a, b) => a.slotIndex - b.slotIndex));
-      };
-      req.onerror = () => reject(req.error);
+
+      if (cleanScope && store.indexNames.contains('by_scope')) {
+        const idx = store.index('by_scope');
+        const req = idx.getAll(cleanScope);
+        req.onsuccess = () => {
+          const arr = (req.result as StudioDraft[]) || [];
+          resolve(arr.map(rehydrateDraft).sort((a, b) => a.slotIndex - b.slotIndex));
+        };
+        req.onerror = () => reject(req.error);
+      } else {
+        const req = store.getAll();
+        req.onsuccess = () => {
+          let arr = (req.result as StudioDraft[]) || [];
+          if (cleanScope) {
+            arr = arr.filter((d) => (d.scopeKey || 'personal') === cleanScope);
+          }
+          resolve(arr.map(rehydrateDraft).sort((a, b) => a.slotIndex - b.slotIndex));
+        };
+        req.onerror = () => reject(req.error);
+      }
     });
   } catch {
     return [];
   }
 }
 
-export async function deleteDraftFromIdb(slotIndex: 1 | 2 | 3): Promise<void> {
+export async function deleteDraftFromIdb(slotIndex: 1 | 2 | 3, scopeKey?: string): Promise<void> {
   try {
     const db = await openDb();
+    const key = buildStorageKey(scopeKey, slotIndex);
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
-      const req = store.delete(slotIndex);
+      const req = store.delete(key);
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });

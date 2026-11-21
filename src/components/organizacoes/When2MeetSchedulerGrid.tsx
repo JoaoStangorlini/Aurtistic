@@ -28,8 +28,12 @@ export function When2MeetSchedulerGrid({
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(() => {
     const s = new Set<string>();
     for (const slot of initialSlots) {
-      if (slot.user_id === currentUserId && slot.is_available) {
-        s.add(slot.slot_start);
+      if (slot.user_id === currentUserId && slot.is_available && slot.slot_start) {
+        try {
+          s.add(new Date(slot.slot_start).toISOString());
+        } catch {
+          s.add(slot.slot_start);
+        }
       }
     }
     return s;

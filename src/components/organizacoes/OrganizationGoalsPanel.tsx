@@ -2,13 +2,18 @@
 // ARQUIVO: src/components/organizacoes/OrganizationGoalsPanel.tsx
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useTransition } from 'react';
 import type { Task } from '@/types';
 import type {
   Organization,
   OrganizationSubteam,
 } from '@/types/organizations';
 import { saveTask } from '@/app/(dashboard)/actions';
+import {
+  getOrgGoalsAction,
+  createOrgGoalAction,
+  deleteOrgGoalAction,
+} from '@/app/(dashboard)/organizacoes/actions';
 
 export interface GoalItem {
   id: string;
@@ -16,6 +21,8 @@ export interface GoalItem {
   description?: string;
   subteam_id?: string | null;
   targetDate?: string;
+  /** true se veio do banco (não é seed) */
+  fromDb?: boolean;
 }
 
 export interface OrganizationGoalsPanelProps {
@@ -28,8 +35,6 @@ export interface OrganizationGoalsPanelProps {
   onTaskUpdated?: (task: Task) => void;
 }
 
-const GOALS_KEY_PREFIX = 'aurtistic_org_goals_v2_';
-
 export function OrganizationGoalsPanel({
   organization,
   subteams,
@@ -39,11 +44,11 @@ export function OrganizationGoalsPanel({
   onTaskCreated,
   onTaskUpdated,
 }: OrganizationGoalsPanelProps) {
-  const goalsStorageKey = `${GOALS_KEY_PREFIX}${organization.id}`;
-  const [customGoals, setCustomGoals] = useState<GoalItem[]>([]);
+  const [dbGoals, setDbGoals] = useState<GoalItem[]>([]);
   const [selectedAxisFilter, setSelectedAxisFilter] = useState<string>('all');
   const [expandedGoalIds, setExpandedGoalIds] = useState<string[]>([]);
   const [isNewGoalOpen, setIsNewGoalOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   // Formulário de nova meta
   const [newGoalTitle, setNewGoalTitle] = useState('');
@@ -54,19 +59,24 @@ export function OrganizationGoalsPanel({
   const [taskDraftByGoal, setTaskDraftByGoal] = useState<Record<string, string>>({});
   const [creatingGoalId, setCreatingGoalId] = useState<string | null>(null);
 
+  // Carrega metas do banco ao montar ou trocar de org
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(goalsStorageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setCustomGoals(parsed);
-          return;
-        }
+    startTransition(async () => {
+      const res = await getOrgGoalsAction(organization.id);
+      if (res.ok && Array.isArray(res.goals)) {
+        setDbGoals(
+          res.goals.map((g: any) => ({
+            id: g.id,
+            title: g.title,
+            description: g.description || undefined,
+            subteam_id: g.subteam_id || null,
+            targetDate: g.target_date || undefined,
+            fromDb: true,
+          }))
+        );
       }
-    } catch {}
-    setCustomGoals([]);
-  }, [goalsStorageKey]);
+    });
+  }, [organization.id]);
 
   const seedGoals: GoalItem[] = useMemo(() => {
     const goals: GoalItem[] = [
@@ -89,35 +99,76 @@ export function OrganizationGoalsPanel({
     return goals;
   }, [organization.name, subteams]);
 
-  const allGoals = useMemo(() => [...customGoals, ...seedGoals], [customGoals, seedGoals]);
+  // Metas do banco têm prioridade; seeds só aparecem se não houver meta do banco para o mesmo subteam
+  const allGoals = useMemo(() => {
+    const dbSubteamIds = new Set(dbGoals.map((g) => g.subteam_id ?? 'global'));
+    const filteredSeeds = seedGoals.filter((s) => {
+      const key = s.subteam_id ?? 'global';
+      return !dbSubteamIds.has(key);
+    });
+    return [...dbGoals, ...filteredSeeds];
+  }, [dbGoals, seedGoals]);
 
   const handleCreateGoal = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newGoalTitle.trim()) return;
+    const optimisticId = `goal_tmp_${Date.now()}`;
     const created: GoalItem = {
-      id: `goal_${Date.now()}`,
+      id: optimisticId,
       title: newGoalTitle.trim(),
       description: newGoalDesc.trim() || undefined,
       subteam_id: newGoalSubteamId || null,
+      fromDb: false,
     };
-    const next = [created, ...customGoals];
-    setCustomGoals(next);
-    try {
-      localStorage.setItem(goalsStorageKey, JSON.stringify(next));
-    } catch {}
+    // Optimistic update
+    setDbGoals((prev) => [created, ...prev]);
+    setExpandedGoalIds((prev) => [...prev, optimisticId]);
     setNewGoalTitle('');
     setNewGoalDesc('');
     setNewGoalSubteamId('');
     setIsNewGoalOpen(false);
-    setExpandedGoalIds((prev) => [...prev, created.id]);
+
+    startTransition(async () => {
+      const res = await createOrgGoalAction({
+        organizationId: organization.id,
+        title: created.title,
+        description: created.description,
+        subteamId: created.subteam_id,
+      });
+      if (res.ok && res.goal) {
+        const saved = res.goal as any;
+        setDbGoals((prev) =>
+          prev.map((g) =>
+            g.id === optimisticId
+              ? { ...g, id: saved.id, fromDb: true }
+              : g
+          )
+        );
+        setExpandedGoalIds((prev) => [
+          ...prev.filter((id) => id !== optimisticId),
+          saved.id,
+        ]);
+      } else {
+        // Reverte se falhar
+        setDbGoals((prev) => prev.filter((g) => g.id !== optimisticId));
+      }
+    });
   };
 
   const handleDeleteGoal = (goalId: string) => {
-    const next = customGoals.filter((g) => g.id !== goalId);
-    setCustomGoals(next);
-    try {
-      localStorage.setItem(goalsStorageKey, JSON.stringify(next));
-    } catch {}
+    const goal = dbGoals.find((g) => g.id === goalId);
+    if (!goal) return;
+    // Remove optimisticamente
+    setDbGoals((prev) => prev.filter((g) => g.id !== goalId));
+    if (goal.fromDb) {
+      startTransition(async () => {
+        const res = await deleteOrgGoalAction(goalId);
+        if (!res.ok) {
+          // Reverte se falhar
+          setDbGoals((prev) => [goal, ...prev]);
+        }
+      });
+    }
   };
 
   const getLinkedTasksForGoal = (goal: GoalItem) => {
@@ -366,7 +417,7 @@ export function OrganizationGoalsPanel({
         {filteredGoals.map((g) => {
           const sub = subteams.find((s) => s.id === g.subteam_id);
           const isGlobal = !g.subteam_id;
-          const isCustom = customGoals.some((cg) => cg.id === g.id);
+          const isCustom = dbGoals.some((cg) => cg.id === g.id && cg.fromDb);
           const isExpanded = expandedGoalIds.includes(g.id);
 
           return (

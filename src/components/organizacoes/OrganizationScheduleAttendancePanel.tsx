@@ -147,6 +147,8 @@ export function OrganizationScheduleAttendancePanel({
       const storedAtt = localStorage.getItem(attendanceStorageKey);
       if (storedAtt) {
         setAttendances(JSON.parse(storedAtt));
+      } else {
+        setAttendances([]);
       }
 
       const storedMatrix = localStorage.getItem(matrixStorageKey);

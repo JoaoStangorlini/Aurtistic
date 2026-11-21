@@ -1,5 +1,6 @@
 // Este programa é um software livre (Licença AGPLv3)
 import { createClient } from '@/utils/supabase/server';
+import { createAdminClient } from '@/utils/supabase/admin';
 import { redirect } from 'next/navigation';
 import { issueUserStorageSession } from '@/lib/edge-ticket';
 import { getUserOrganizationsAction } from '@/app/(dashboard)/organizacoes/actions';
@@ -28,13 +29,28 @@ export default async function ServidorPage({
       const verification = verifyHubSsoTicket(queryTicket, secret);
       if (verification.valid && verification.payload) {
         const sso = verification.payload;
-        const { data: foundUser } = await supabase
-          .from('user_profiles')
-          .select('id, username')
-          .eq('email', sso.email)
-          .maybeSingle();
+        let resolvedSsoUserId: string | null = null;
+        const adminClient = createAdminClient();
+        if (adminClient) {
+          if (sso.hubUserId) {
+            const { data: secByHub } = await adminClient
+              .from('user_private_secrets')
+              .select('user_id')
+              .eq('hub_user_id', sso.hubUserId)
+              .maybeSingle();
+            if (secByHub?.user_id) resolvedSsoUserId = secByHub.user_id;
+          }
+          if (!resolvedSsoUserId && sso.email) {
+            const { data: secByEmail } = await adminClient
+              .from('user_private_secrets')
+              .select('user_id')
+              .ilike('linked_email', sso.email)
+              .maybeSingle();
+            if (secByEmail?.user_id) resolvedSsoUserId = secByEmail.user_id;
+          }
+        }
 
-        const ssoUserId = foundUser?.id || sso.hubUserId || 'sso-guest';
+        const ssoUserId = resolvedSsoUserId || sso.hubUserId || 'sso-guest';
         user = {
           id: ssoUserId,
           email: sso.email,
@@ -138,14 +154,50 @@ export default async function ServidorPage({
     .map((o: any) => String(o?.id || ''))
     .filter((id: string) => /^[0-9a-f-]{36}$/i.test(id));
 
-  // Busca índice de arquivos do usuário + itens/atalhos das organizações em que ele é membro (Ponto 9)
-  let filesQuery = supabase.from('user_files_index').select('*');
-  if (memberOrgIds.length > 0) {
-    filesQuery = filesQuery.or(`user_id.eq.${user.id},organization_id.in.(${memberOrgIds.join(',')})`);
-  } else {
-    filesQuery = filesQuery.eq('user_id', user.id);
+  // Busca índice de arquivos em projeção leve (sem exif_data das fotos no SSR) + paginação
+  const LIGHT_INDEX_COLUMNS =
+    'id, user_id, organization_id, relative_path, filename, mime_type, size_bytes, is_directory, has_pin, linked_task_id, linked_task_ids, show_in_portfolio, show_in_curriculum, curriculum_label, title, description, album, category, tags, is_favorite, visibility, display_order, created_at, updated_at';
+  const scopeFilterOr =
+    memberOrgIds.length > 0
+      ? `user_id.eq.${user.id},organization_id.in.(${memberOrgIds.join(',')})`
+      : null;
+
+  const indexedFiles: any[] = [];
+  const PAGE_SIZE = 1000;
+  for (let offset = 0; offset < 10000; offset += PAGE_SIZE) {
+    let pageQuery = supabase
+      .from('user_files_index')
+      .select(LIGHT_INDEX_COLUMNS);
+    pageQuery = scopeFilterOr ? pageQuery.or(scopeFilterOr) : pageQuery.eq('user_id', user.id);
+    const { data: pageRows } = await pageQuery
+      .order('created_at', { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
+    if (!Array.isArray(pageRows) || pageRows.length === 0) break;
+    indexedFiles.push(...pageRows);
+    if (pageRows.length < PAGE_SIZE) break;
   }
-  const { data: indexedFiles } = await filesQuery.order('created_at', { ascending: false });
+
+  // Carrega exif_data exclusivamente de atalhos de pasta (poucas linhas) para preservar resolução cross-scope
+  let shortcutsMetaQuery = supabase
+    .from('user_files_index')
+    .select('id, exif_data')
+    .or('mime_type.eq.inode/directory+shortcut,relative_path.ilike.%.shortcut.json')
+    .limit(200);
+  if (scopeFilterOr) {
+    shortcutsMetaQuery = shortcutsMetaQuery.or(scopeFilterOr);
+  } else {
+    shortcutsMetaQuery = shortcutsMetaQuery.eq('user_id', user.id);
+  }
+  const { data: shortcutMetaRows } = await shortcutsMetaQuery;
+  const shortcutExifById = new Map<string, Record<string, unknown>>();
+  for (const row of shortcutMetaRows || []) {
+    if (row?.id && row.exif_data) {
+      shortcutExifById.set(row.id, row.exif_data as Record<string, unknown>);
+    }
+  }
+  for (const row of indexedFiles) {
+    row.exif_data = shortcutExifById.get(row.id) || {};
+  }
 
   // Busca links de compartilhamento do usuário
   const { data: shareLinks } = await supabase
@@ -205,18 +257,29 @@ export default async function ServidorPage({
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const formattedOrgs = (rawOrgs || []).map((o: any) => ({
-    id: o.id,
-    name: o.name || 'LabDiv',
-    slug: o.slug || 'labdiv',
-    role: o.myRole || o.role || 'membro',
-    can_upload_vault: o.canUploadOrgVault !== false,
-    quotaBytes: Number(o.vault_quota_bytes || o.storage_quota_bytes || 26843545600),
-    usedBytes: Number(o.vault_used_bytes || o.storage_used_bytes || 0),
-    boostActive: Boolean(o.event_boost_active),
-    boostExpiresAt: o.event_boost_expires_at || null,
-    boostReason: o.event_boost_reason || null,
-  }));
+  const formattedOrgs = (rawOrgs || []).map((o: any) => {
+    const hasOrgBoost = Boolean(
+      o.event_boost_active ||
+      (typeof o.storage_boost_bytes === 'number' &&
+       o.storage_boost_bytes > 0 &&
+       (!o.storage_boost_until || new Date(o.storage_boost_until).getTime() > Date.now()))
+    );
+
+    return {
+      id: o.id,
+      name: o.name || 'LabDiv',
+      slug: o.slug || 'labdiv',
+      role: o.myRole || o.role || 'membro',
+      can_upload_vault: o.canUploadOrgVault !== false,
+      quotaBytes: hasOrgBoost && typeof o.storage_boost_bytes === 'number' && o.storage_boost_bytes > 0
+        ? Number(o.storage_boost_bytes)
+        : Number(o.vault_quota_bytes || o.storage_quota_bytes || 26843545600),
+      usedBytes: Number(o.vault_used_bytes || o.storage_used_bytes || 0),
+      boostActive: hasOrgBoost,
+      boostExpiresAt: o.event_boost_expires_at || o.storage_boost_until || null,
+      boostReason: o.event_boost_reason || o.storage_boost_reason || null,
+    };
+  });
 
   const initialOrgId = queryOrg
     ? (formattedOrgs.find((o: any) => o.id === queryOrg || o.slug === queryOrg)?.id || null)

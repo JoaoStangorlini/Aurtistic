@@ -56,7 +56,15 @@ export function OrganizationScopeToolbar({
             className="flex items-center gap-1.5 rounded-xl border border-teal-500/40 bg-teal-500/10 px-3.5 py-1.5 text-xs font-bold text-teal-600 dark:text-teal-300 hover:bg-teal-500/20 transition-colors shadow-sm cursor-pointer"
           >
             <span className="material-symbols-outlined text-[16px]">domain_add</span>
-            🏛️ + Entrar com Código ou Criar Organização
+            Entrar com Código
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-[var(--accent-primary)]/40 bg-[var(--accent-primary)]/10 px-3.5 py-1.5 text-xs font-bold text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/20 transition-colors shadow-sm cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[16px]">add_business</span>
+            Criar Organização
           </button>
         </div>
 

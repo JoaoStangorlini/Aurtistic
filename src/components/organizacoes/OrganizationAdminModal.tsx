@@ -10,11 +10,16 @@ import type {
   OrganizationSubteam,
 } from '@/types/organizations';
 import { saveTask } from '@/lib/offlineActions';
+import {
+  createOrganizationSubteamAction,
+  deleteOrganizationSubteamAction,
+} from '@/app/(dashboard)/organizacoes/actions';
 
 export interface OrganizationAdminModalProps {
   isOpen: boolean;
   onClose: () => void;
   organization: Organization;
+  currentOrg?: Organization;
   subteams: OrganizationSubteam[];
   members: OrganizationMember[];
   tasks: Task[];
@@ -27,6 +32,7 @@ export function OrganizationAdminModal({
   isOpen,
   onClose,
   organization,
+  currentOrg,
   subteams,
   members,
   tasks,
@@ -34,6 +40,7 @@ export function OrganizationAdminModal({
   onTasksUpdated,
   onSubteamsUpdated,
 }: OrganizationAdminModalProps) {
+  const effectiveOrg = currentOrg || organization;
   const [activeTab, setActiveTab] = useState<'associar' | 'reatribuir' | 'categorias' | 'membros' | 'lote'>('associar');
   const [taskSearch, setTaskSearch] = useState('');
   const [nameMapping, setNameMapping] = useState<Record<string, string>>({});
@@ -384,12 +391,14 @@ export function OrganizationAdminModal({
 
               <div className="space-y-2">
                 {filteredTasks.map((task) => {
-                  const assignedMember = members.find(
-                    (m) =>
-                      (task.assigned_member_ids && task.assigned_member_ids.includes(m.id)) ||
-                      (m.user_id && task.user_id === m.user_id) ||
-                      (task.responsavel && task.responsavel.toLowerCase() === m.full_name.toLowerCase())
-                  );
+                  const isUnassigned = !task.responsavel || task.responsavel.trim() === '' || task.responsavel === 'Sem Responsável';
+                  const assignedMember = isUnassigned
+                    ? null
+                    : members.find(
+                        (m) =>
+                          (task.assigned_member_ids && task.assigned_member_ids.includes(m.id)) ||
+                          (task.responsavel && task.responsavel.toLowerCase() === m.full_name.toLowerCase())
+                      );
 
                   return (
                     <div
@@ -449,11 +458,12 @@ export function OrganizationAdminModal({
           {activeTab === 'categorias' && (
             <div className="space-y-4">
               <form
-                onSubmit={(e) => {
+                onSubmit={async (e) => {
                   e.preventDefault();
                   if (!newCategoryName.trim()) return;
+                  const tempId = crypto.randomUUID();
                   const newSub: OrganizationSubteam = {
-                    id: crypto.randomUUID(),
+                    id: tempId,
                     organization_id: organization.id,
                     name: newCategoryName.trim(),
                     description: newCategoryDesc.trim() || 'Categoria oficial da organização',
@@ -464,7 +474,23 @@ export function OrganizationAdminModal({
                   onSubteamsUpdated?.(updated);
                   setNewCategoryName('');
                   setNewCategoryDesc('');
-                  setStatusMessage(`Categoria "${newSub.name}" criada com sucesso!`);
+                  setStatusMessage(`Salvando categoria "${newSub.name}"...`);
+
+                  try {
+                    const res = await createOrganizationSubteamAction({
+                      organizationId: organization.id,
+                      name: newSub.name,
+                      description: newSub.description || undefined,
+                      color: newSub.color,
+                    });
+                    if (res.ok && res.subteam) {
+                      const finalSubteams = subteams.map(s => s.id === tempId ? (res.subteam as OrganizationSubteam) : s);
+                      onSubteamsUpdated?.([...subteams.filter(s => s.id !== tempId), res.subteam as OrganizationSubteam]);
+                      setStatusMessage(`Categoria "${newSub.name}" criada com sucesso no servidor!`);
+                    }
+                  } catch (err) {
+                    console.error('[OrganizationAdminModal] Falha ao persistir subequipe:', err);
+                  }
                 }}
                 className="p-4 rounded-xl bg-app border border-accent-primary/30 space-y-3"
               >
@@ -552,10 +578,16 @@ export function OrganizationAdminModal({
                         </div>
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={async () => {
                             const updated = subteams.filter((s) => s.id !== sub.id);
                             onSubteamsUpdated?.(updated);
-                            setStatusMessage(`Categoria "${sub.name}" removida.`);
+                            setStatusMessage(`Removendo categoria "${sub.name}"...`);
+                            try {
+                              await deleteOrganizationSubteamAction(sub.id);
+                              setStatusMessage(`Categoria "${sub.name}" removida com sucesso no servidor.`);
+                            } catch (err) {
+                              console.error('[OrganizationAdminModal] Falha ao excluir subequipe:', err);
+                            }
                           }}
                           className="p-1.5 rounded-lg text-fg-muted hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer shrink-0"
                           title="Remover categoria"

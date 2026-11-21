@@ -133,6 +133,28 @@ export function VaultUploadManagerModal({
     }
   }, [ticket, uploadCtx]);
 
+  const handleCancelUpload = () => {
+    if (isUploading) {
+      setIsConfirmingCancel(true);
+    } else {
+      handleClose();
+    }
+  };
+
+  // Teclado: Escape fecha/cancela modal de upload
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        handleCancelUpload();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isModalOpen, isUploading]);
+
   const prevInitialItemsRef = useRef<UploadItem[] | undefined>(undefined);
   useEffect(() => {
     if (isModalOpen && initialItems && initialItems.length > 0 && initialItems !== prevInitialItemsRef.current) {
@@ -164,14 +186,6 @@ export function VaultUploadManagerModal({
 
   const handleSetTargetFolder = (newFolder: string) => {
     uploadCtx.setOverrideFolder(newFolder);
-  };
-
-  const handleCancelUpload = () => {
-    if (isUploading) {
-      setIsConfirmingCancel(true);
-    } else {
-      handleClose();
-    }
   };
 
   const handleZipSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {

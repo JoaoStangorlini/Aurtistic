@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 import { createClient } from '@/utils/supabase/server';
+import { createAdminClient } from '@/utils/supabase/admin';
 import {
   verifyHubSsoTicket,
   decryptLinkSecret,
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
   const match = cookieHeader.match(/aurtistic_sso_state=([^;]+)/);
   const cookieState = match ? match[1] : null;
 
-  if (cookieState && state && cookieState !== state) {
+  if (!cookieState || !state || cookieState !== state) {
     return NextResponse.redirect(
       `${origin}/login?error=${encodeURIComponent('Falha na validação CSRF do SSO (state mismatch).')}`
     );
@@ -141,41 +142,76 @@ export async function GET(request: Request) {
       }
     }
 
-    const res = NextResponse.redirect(`${origin}${finalNext}?hub_linked=success`);
+    const redirectUrl = new URL(finalNext, origin);
+    redirectUrl.searchParams.set('hub_linked', 'success');
+    const res = NextResponse.redirect(redirectUrl.toString());
     res.cookies.set('aurtistic_sso_state', '', { maxAge: 0, path: '/' });
     return res;
   }
 
-  // 3. CENÁRIO B: Usuário deslogado -> Verificar se este hub_user_id já está vinculado a uma conta existente
+  // 3. CENÁRIO B: Usuário deslogado -> Consulta segredos privados exclusivamente via adminClient (service_role)
   try {
-    const { data: linkedProfiles } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .filter('features_config->hub_connection->>hub_user_id', 'eq', payload.hubUserId)
-      .limit(1);
+    const adminClient = createAdminClient();
+    if (adminClient) {
+      let targetUserId: string | null = null;
+      let encryptedSecret: string | null = null;
+      let linkedEmail: string | null = null;
+      let usernameHint: string | null = null;
 
-    if (linkedProfiles && linkedProfiles.length > 0) {
-      const profile = linkedProfiles[0];
-      const hubConn = profile.features_config?.hub_connection as HubConnectionData | undefined;
+      const { data: privRow, error: privErr } = await adminClient
+        .from('user_private_secrets')
+        .select('user_id, linked_email, encrypted_link_secret')
+        .eq('hub_user_id', payload.hubUserId)
+        .maybeSingle();
 
-      // Se possui credencial cifrada vinculada, faz login direto com 1 toque
-      if (hubConn?.encrypted_link_secret) {
-        const decryptedPassword = decryptLinkSecret(hubConn.encrypted_link_secret, secret);
+      if (!privErr && privRow?.user_id && privRow?.encrypted_link_secret) {
+        targetUserId = privRow.user_id;
+        encryptedSecret = privRow.encrypted_link_secret;
+        linkedEmail = privRow.linked_email || null;
+      } else if (privErr?.code === '42P01' || !privRow) {
+        // Fallback antes ou durante transição da Migration 14 (exclusivamente via service_role)
+        const { data: linkedProfiles } = await adminClient
+          .from('user_profiles')
+          .select('id, username, features_config')
+          .filter('features_config->hub_connection->>hub_user_id', 'eq', payload.hubUserId)
+          .limit(1);
+
+        if (linkedProfiles && linkedProfiles.length > 0) {
+          const p = linkedProfiles[0];
+          const hc = p.features_config?.hub_connection as HubConnectionData | undefined;
+          if (hc?.encrypted_link_secret) {
+            targetUserId = p.id;
+            encryptedSecret = hc.encrypted_link_secret;
+            linkedEmail = hc.linked_email || null;
+            usernameHint = p.username || null;
+          }
+        }
+      }
+
+      if (targetUserId && encryptedSecret) {
+        const decryptedPassword = decryptLinkSecret(encryptedSecret, secret);
         if (decryptedPassword) {
-          const loginEmail = hubConn.linked_email || `${profile.username}@aurtistic.local`;
+          if (!linkedEmail && !usernameHint) {
+            const { data: profName } = await adminClient
+              .from('user_profiles')
+              .select('username')
+              .eq('id', targetUserId)
+              .maybeSingle();
+            usernameHint = profName?.username || null;
+          }
+          const loginEmail = linkedEmail || `${usernameHint || 'membro'}@aurtistic.local`;
           const { error: ssoErr } = await supabase.auth.signInWithPassword({
             email: loginEmail,
             password: decryptedPassword,
           });
 
           if (!ssoErr) {
-            // Sincroniza pertinência ao LabDiv
             if (payload.isLabdiv || payload.organizations?.includes('labdiv')) {
               try {
-                await supabase.from('organization_members').upsert(
+                await adminClient.from('organization_members').upsert(
                   {
                     organization_id: LABDIV_ORG_ID,
-                    user_id: profile.id,
+                    user_id: targetUserId,
                     full_name: payload.fullName,
                     email: payload.email,
                     org_role: payload.role === 'admin' ? 'admin' : 'member',
@@ -192,7 +228,7 @@ export async function GET(request: Request) {
               const { data: userProfile } = await supabase
                 .from('user_profiles')
                 .select('features_config')
-                .eq('id', profile.id)
+                .eq('id', targetUserId)
                 .maybeSingle();
               const modules = userProfile?.features_config?.modules;
               if (modules?.defaultRoute && modules.defaultRoute.startsWith('/') && !modules.defaultRoute.startsWith('//')) {

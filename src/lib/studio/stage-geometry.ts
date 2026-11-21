@@ -57,6 +57,10 @@ export function getRotatedLayerAabb(layer: Pick<StudioLayer, 'x' | 'y' | 'width'
   return { minX, maxX, minY, maxY };
 }
 
+export function stageAspect(w: number, h: number): number {
+  return w / h;
+}
+
 export function rectsIntersect(a: NormalizedRect, b: NormalizedRect): boolean {
   return a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
 }

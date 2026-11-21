@@ -99,7 +99,8 @@ export default function TaskCalendar({ tasks, events = [], currentDate, format =
     const cDate = cellDate.getDate();
     
     const cellDateStr = `${cYear}-${String(cMonth + 1).padStart(2, '0')}-${String(cDate).padStart(2, '0')}`;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const isToday = cellDateStr === todayStr;
 
     const dayOfWeek = cellDate.getDay();
@@ -108,12 +109,22 @@ export default function TaskCalendar({ tasks, events = [], currentDate, format =
     const d = cDate;
 
     const dayTasks = tasks.filter(t => {
-      if (t.prazo && t.prazo.startsWith(cellDateStr)) return true;
+      if (t.prazo) {
+        if (t.prazo.startsWith(cellDateStr)) return true;
+        const pDate = new Date(t.prazo);
+        if (!isNaN(pDate.getTime())) {
+          const pStr = `${pDate.getFullYear()}-${String(pDate.getMonth() + 1).padStart(2, '0')}-${String(pDate.getDate()).padStart(2, '0')}`;
+          if (pStr === cellDateStr) return true;
+        }
+      }
       if (t.frequencia && t.status !== 'completa' && t.status !== 'descartada') {
         const freq = t.frequencia;
         if (freq === 'Diária') return true;
         if (freq.startsWith('Semanal - ') && freq.includes(cellDayName)) return true;
-        if (freq.startsWith('Mensal - Dia ') && freq.includes(String(d))) return true;
+        if (freq.startsWith('Mensal - Dia ')) {
+          const matchDay = parseInt(freq.replace('Mensal - Dia ', '').trim(), 10);
+          if (matchDay === d) return true;
+        }
       }
       return false;
     });

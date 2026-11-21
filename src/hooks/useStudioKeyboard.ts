@@ -6,13 +6,17 @@ import type { StudioLayer } from '@/components/organizacoes/studio/types';
 
 interface StudioKeyboardActions {
   selectedLayer: StudioLayer | null;
+  selectedLayerIds?: string[];
   isSelectedLocked?: boolean;
   isEditingText?: boolean;
   onUndo: () => void;
   onRedo: () => void;
   onDeleteLayer: (id: string) => void;
+  onDeleteLayersBatch?: (ids: string[]) => void;
   onDuplicateLayer: (id: string) => void;
+  onDuplicateLayersBatch?: (ids: string[]) => void;
   onMoveLayer: (id: string, dx: number, dy: number) => void;
+  onMoveLayersBatch?: (ids: string[], dx: number, dy: number) => void;
   onReorderLayer: (up: boolean) => void;
   onSaveDraft: () => void;
   onClearSelection: () => void;
@@ -40,8 +44,8 @@ export function useStudioKeyboard(actions: StudioKeyboardActions) {
       const targetEl = e.target as HTMLElement | null;
       return Boolean(
         actions.isEditingText ||
-        ['input', 'textarea', 'select'].includes(activeEl?.tagName?.toLowerCase() || '') ||
-        ['input', 'textarea', 'select'].includes(targetEl?.tagName?.toLowerCase() || '') ||
+        ['input', 'textarea', 'select', 'button'].includes(activeEl?.tagName?.toLowerCase() || '') ||
+        ['input', 'textarea', 'select', 'button'].includes(targetEl?.tagName?.toLowerCase() || '') ||
         activeEl?.isContentEditable ||
         targetEl?.isContentEditable
       );
@@ -170,17 +174,30 @@ export function useStudioKeyboard(actions: StudioKeyboardActions) {
 
       const effectivelyLocked = Boolean(actions.selectedLayer.locked || actions.isSelectedLocked);
 
-      // Delete / Backspace: excluir camada se não estiver bloqueada (nem na pasta)
+      const multiIds = actions.selectedLayerIds && actions.selectedLayerIds.length > 1
+        ? actions.selectedLayerIds
+        : null;
+
+      // Delete / Backspace: excluir camada(s) se não estiver bloqueada (nem na pasta)
       if ((e.key === 'Delete' || e.key === 'Backspace') && !effectivelyLocked) {
         e.preventDefault();
-        actions.onDeleteLayer(actions.selectedLayer.id);
+        if (multiIds && actions.onDeleteLayersBatch) {
+          actions.onDeleteLayersBatch(multiIds);
+        } else {
+          actions.onDeleteLayer(actions.selectedLayer.id);
+        }
         return;
       }
 
-      // Duplicar camada: Ctrl+D
+      // Duplicar camada(s): Ctrl+D
       if (isCtrlOrCmd && e.key.toLowerCase() === 'd') {
+        if (effectivelyLocked) return;
         e.preventDefault();
-        actions.onDuplicateLayer(actions.selectedLayer.id);
+        if (multiIds && actions.onDuplicateLayersBatch) {
+          actions.onDuplicateLayersBatch(multiIds);
+        } else {
+          actions.onDuplicateLayer(actions.selectedLayer.id);
+        }
         return;
       }
 
@@ -199,10 +216,17 @@ export function useStudioKeyboard(actions: StudioKeyboardActions) {
       // Movimentação por setas (precisão: 0.001 ~1px, Shift: 0.01 ~10px em canvas de 1080px)
       if (effectivelyLocked) return;
       const step = e.shiftKey ? 0.01 : 0.001;
-      if (e.key === 'ArrowLeft') { e.preventDefault(); actions.onMoveLayer(actions.selectedLayer.id, -step, 0); }
-      if (e.key === 'ArrowRight') { e.preventDefault(); actions.onMoveLayer(actions.selectedLayer.id, step, 0); }
-      if (e.key === 'ArrowUp') { e.preventDefault(); actions.onMoveLayer(actions.selectedLayer.id, 0, -step); }
-      if (e.key === 'ArrowDown') { e.preventDefault(); actions.onMoveLayer(actions.selectedLayer.id, 0, step); }
+      const moveTarget = (dx: number, dy: number) => {
+        if (multiIds && actions.onMoveLayersBatch) {
+          actions.onMoveLayersBatch(multiIds, dx, dy);
+        } else {
+          actions.onMoveLayer(actions.selectedLayer!.id, dx, dy);
+        }
+      };
+      if (e.key === 'ArrowLeft') { e.preventDefault(); moveTarget(-step, 0); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); moveTarget(step, 0); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); moveTarget(0, -step); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); moveTarget(0, step); }
     };
 
     const releaseSpaceHand = () => {

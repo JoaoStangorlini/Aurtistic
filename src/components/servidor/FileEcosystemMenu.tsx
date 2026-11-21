@@ -9,6 +9,7 @@ export interface FileEcosystemMenuProps {
   entry: EdgeVaultEntry;
   indexRow?: UserFileIndexRow;
   availableTasks: Task[];
+  organizationId?: string | null;
   onUpdated: () => void;
   onRequestRename: (entry: EdgeVaultEntry) => void;
   onRequestDelete: (entry: EdgeVaultEntry) => void;
@@ -18,6 +19,7 @@ export function FileEcosystemMenu({
   entry,
   indexRow,
   availableTasks,
+  organizationId,
   onUpdated,
   onRequestRename,
   onRequestDelete,
@@ -47,10 +49,11 @@ export function FileEcosystemMenu({
         filename: entry.name,
         mimeType: entry.mimeType,
         sizeBytes: entry.sizeBytes,
+        organizationId: organizationId || null,
         patch: {
           showInPortfolio: nextVal,
           album: indexRow?.album || folderAlbum,
-          visibility: nextVal ? 'public' : indexRow?.visibility || 'private',
+          visibility: nextVal ? 'public' : (inCurriculum ? 'public' : 'private'),
         },
       });
       onUpdated();

@@ -26,12 +26,29 @@ export default async function AurtisticPage() {
     (o) => o.id === '1ab41410-0000-4000-8000-000000000001' || o.slug === 'labdiv' || o.name?.toLowerCase().includes('labdiv')
   );
 
-  // 1. Pessoal tasks
-  const { data: pessoalTasks, error: pessoalError } = await supabase
-    .from('tasks')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false });
+  async function fetchAllTasks(
+    buildQuery: (from: number, to: number) => PromiseLike<{ data: Task[] | null; error: any }>
+  ): Promise<Task[]> {
+    const list: Task[] = [];
+    const CHUNK = 1000;
+    for (let from = 0; from < 20000; from += CHUNK) {
+      const { data, error } = await buildQuery(from, from + CHUNK - 1);
+      if (error || !Array.isArray(data) || data.length === 0) break;
+      list.push(...data);
+      if (data.length < CHUNK) break;
+    }
+    return list;
+  }
+
+  // 1. Pessoal tasks (com paginação até esgotar)
+  const pessoalTasks = await fetchAllTasks((from, to) =>
+    supabase
+      .from('tasks')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .range(from, to)
+  );
 
   // 1.1 Pessoal events
   const { data: pessoalEvents } = await supabase
@@ -47,26 +64,18 @@ export default async function AurtisticPage() {
     .eq('user_id', user.id)
     .or('linked_task_id.not.is.null,linked_task_ids.neq.{}');
 
-  if (pessoalError) {
-    return (
-      <div className="h-full flex flex-col p-4 md:p-8 bg-app">
-        <div className="p-4 bg-[#93000a]/20 border border-[#93000a] text-[#ffdad6] rounded-md text-sm">
-          Erro ao carregar tarefas: {pessoalError.message}
-        </div>
-      </div>
-    );
-  }
-
   // 2. Servidor tasks (Somente João)
   let servidorTasks: Task[] = [];
   let servidorEvents: AgendaEvent[] = [];
   if (user.id === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e') {
-    const { data: sTasks } = await supabase
-      .from('tasks')
-      .select('*')
-      .or('is_personal.is.null,is_personal.eq.false')
-      .order('created_at', { ascending: false });
-    servidorTasks = sTasks || [];
+    servidorTasks = await fetchAllTasks((from, to) =>
+      supabase
+        .from('tasks')
+        .select('*')
+        .or('is_personal.is.null,is_personal.eq.false')
+        .order('created_at', { ascending: false })
+        .range(from, to)
+    );
 
     const { data: sEvents } = await supabase
       .from('events')
@@ -80,12 +89,14 @@ export default async function AurtisticPage() {
   let labdivTasks: Task[] = [];
   let labdivEvents: AgendaEvent[] = [];
   if (hasLabdiv || user.id === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e' || user.id === '7dcfe172-1cf0-4389-9abd-f340b1408386') {
-    const { data: lTasks } = await supabase
-      .from('tasks')
-      .select('*')
-      .or('dimensao.eq.HUB,dimensao.eq.LabDiv,dimensao.eq.labdiv')
-      .order('created_at', { ascending: false });
-    labdivTasks = lTasks || [];
+    labdivTasks = await fetchAllTasks((from, to) =>
+      supabase
+        .from('tasks')
+        .select('*')
+        .or('dimensao.eq.HUB,dimensao.eq.LabDiv,dimensao.eq.labdiv')
+        .order('created_at', { ascending: false })
+        .range(from, to)
+    );
 
     const { data: lEvents } = await supabase
       .from('events')

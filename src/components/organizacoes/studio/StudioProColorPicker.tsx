@@ -119,7 +119,8 @@ export function StudioProColorPicker({
           const angle = Math.atan2(dy, dx); // -PI..PI
           const hue = (angle + Math.PI) / (2 * Math.PI); // 0..1
           const sat = Math.min(1, dist / radius);
-          const [r, g, b] = hsvToRgb(hue, sat, hsv[2] || 1);
+          const previewV = hsv[2] === 0 ? 0.05 : (hsv[2] || 1);
+          const [r, g, b] = hsvToRgb(hue, sat, previewV);
           data[idx] = r;
           data[idx + 1] = g;
           data[idx + 2] = b;

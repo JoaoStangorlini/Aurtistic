@@ -25,6 +25,12 @@ export default function Navbar({
   const [isInIframe, setIsInIframe] = useState(false);
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && (window.self !== window.top || window.location.search.includes('embed=1'))) {
+      setIsInIframe(true);
+    }
+  }, []);
+
+  useEffect(() => {
     try {
       if (typeof window !== 'undefined' && window.self !== window.top) {
         setIsInIframe(true);
@@ -59,12 +65,25 @@ export default function Navbar({
     };
   }, [router]);
 
-  if (
+  const PRIVATE_PREFIXES = [
+    '/galeria', '/curriculo', '/portfolio', '/resumo', '/labdiv',
+    '/organizacoes', '/servidor', '/studio', '/configuracoes-avancadas',
+    '/configurar-notificacoes', '/configurar-widget', '/exportar-importar',
+    '/relatar-bug', '/aurtistic', '/auth',
+  ];
+  const isKnownPrivate = pathname === '/' || PRIVATE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const isPublicShowcaseRoute =
+    pathname.startsWith('/s/') ||
+    pathname.startsWith('/convite/') ||
+    (!isKnownPrivate && pathname.split('/').filter(Boolean).length === 1);
+
+  const isPublicRoute =
     pathname === '/login' ||
     pathname.startsWith('/embed') ||
-    isInIframe ||
-    (typeof window !== 'undefined' && (window.self !== window.top || window.location.search.includes('embed=1')))
-  ) {
+    isPublicShowcaseRoute ||
+    isInIframe;
+
+  if (isPublicRoute) {
     return null;
   }
   return <AurtisticNavbar />;

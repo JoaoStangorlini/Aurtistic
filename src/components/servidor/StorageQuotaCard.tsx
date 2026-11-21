@@ -60,7 +60,7 @@ export function StorageQuotaCard({
   }, [hasActiveEventBoost, tempQuotaExpiresAt, renderNow]);
 
   return (
-    <div className="bg-surface border border-border-subtle rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="org-card bg-surface border border-border-subtle rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div className="flex items-start sm:items-center gap-3">
         <div className="w-11 h-11 rounded-xl bg-app border border-border-subtle flex items-center justify-center shrink-0">
           <span className="material-symbols-outlined text-[#FFCC00] text-[24px]">

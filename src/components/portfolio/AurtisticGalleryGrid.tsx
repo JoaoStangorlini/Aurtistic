@@ -8,7 +8,7 @@ import type { UserFileIndexRow } from '@/types';
 import { buildTenantThumbUrl, buildTenantZipUrl, formatStorageBytes, resolveClientEdgeServerUrl } from '@/lib/edge-urls';
 import { PhotoInspectModal, type PhotoInspectItem } from './PhotoInspectModal';
 import { useAurtisticMedia } from '@/components/media/AurtisticMediaContext';
-import { getPortfolioAlbumZipUrlAction } from '@/app/(dashboard)/actions';
+import { getPortfolioAlbumZipUrlAction, savePortfolioLayoutOrderAction } from '@/app/(dashboard)/actions';
 
 export interface AurtisticGalleryGridProps {
   items: PhotoInspectItem[];
@@ -281,6 +281,9 @@ export function AurtisticGalleryGrid({
       try {
         localStorage.setItem('aurtistic_portfolio_album_order', JSON.stringify(currentList));
       } catch {}
+
+      // Persiste no Supabase via merge_user_features_config (RPC atômica do perfil)
+      void savePortfolioLayoutOrderAction({ albumOrder: currentList });
 
       try {
         const edgeBase = resolveClientEdgeServerUrl(serverUrl);

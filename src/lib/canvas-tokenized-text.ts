@@ -40,6 +40,16 @@ export interface TokenizedTextRenderOptions {
   align?: 'left' | 'center' | 'right';
   customColorOverride?: string | null;
   tricolorAuto?: boolean;
+  fontFamily?: string;
+  bold?: boolean;
+  italic?: boolean;
+  letterSpacing?: number;
+  shadow?: {
+    color?: string;
+    blur?: number;
+    offsetX?: number;
+    offsetY?: number;
+  };
 }
 
 const TAG_COLOR_MAP: Record<string, string> = {
@@ -70,7 +80,7 @@ function buildStyledTokensForLine(
   const isHeading = blockKind === 'h1' || blockKind === 'h2' || blockKind === 'h3';
 
   const spans = tokenizeMarkdownAndLatexLine(lineContent);
-  const fontFamily = mode === 'title' || isHeading ? tokens.fontDisplay : tokens.fontBody;
+  const fontFamily = opts.fontFamily || (mode === 'title' || isHeading ? tokens.fontDisplay : tokens.fontBody);
   const baseColor = customColorOverride || (mode === 'title' ? '#ffffff' : tokens.textPrimary);
   const accentColor = tokens.accents[0] || tokens.secondaryColor;
   const tricolorPalette = tokens.accents.length >= 3 ? tokens.accents.slice(0, 3) : ['#ff1e1e', '#0066ff', '#00ff44'];
@@ -126,8 +136,8 @@ function buildStyledTokensForLine(
     const words = rawText.split(/\s+/).filter(Boolean);
 
     for (const word of words) {
-      const bold = mode === 'title' || isHeading || Boolean(span.bold) || Boolean(span.colorCode);
-      const italic = Boolean(span.italic);
+      const bold = opts.bold !== undefined ? opts.bold : (mode === 'title' || isHeading || Boolean(span.bold) || Boolean(span.colorCode));
+      const italic = opts.italic !== undefined ? opts.italic : Boolean(span.italic);
       const strike = Boolean(span.strike);
       const font = `${italic ? 'italic ' : ''}${bold ? '800 ' : '500 '}${effFontSize}px ${fontFamily}`;
 
@@ -374,8 +384,10 @@ export function renderTokenizedRichTextCanvas(
           ctx.fillStyle = token.fillColor;
           ctx.fillText(token.text, cursorX, drawBaselineY);
         } else {
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
-          ctx.shadowBlur = 8;
+          ctx.shadowColor = opts.shadow?.color || 'rgba(0, 0, 0, 0.85)';
+          ctx.shadowBlur = opts.shadow?.blur !== undefined ? opts.shadow.blur : 8;
+          ctx.shadowOffsetX = opts.shadow?.offsetX ?? 0;
+          ctx.shadowOffsetY = opts.shadow?.offsetY ?? 0;
           ctx.fillStyle = token.fillColor;
           ctx.fillText(token.text, cursorX, drawBaselineY);
         }

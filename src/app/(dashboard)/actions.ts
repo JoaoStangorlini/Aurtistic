@@ -300,6 +300,11 @@ export async function updateMultipleTasks(taskIds: string[], updates: Partial<Ta
 
   // Remove empty strings and replace with null for database consistency
   const dataToSave = { ...updates };
+  delete (dataToSave as any).subtasks;
+  delete (dataToSave as any).parent_task;
+  delete (dataToSave as any).files;
+  delete (dataToSave as any).checklist;
+
   Object.keys(dataToSave).forEach(key => {
     if (dataToSave[key as keyof Task] === '') {
       (dataToSave as any)[key] = null;
@@ -643,18 +648,71 @@ export async function saveUserProfileData(profileData: {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuário não autenticado");
 
-  const { error } = await supabase
-    .from('user_profiles')
-    .update(profileData)
-    .eq('id', user.id);
+  const { features_config, ...scalarFields } = profileData;
 
-  if (error) {
-    console.error("Erro ao salvar perfil do usuário:", error);
-    throw new Error(error.message);
+  if (Object.keys(scalarFields).length > 0) {
+    const { error } = await supabase
+      .from('user_profiles')
+      .upsert({ id: user.id, ...scalarFields }, { onConflict: 'id' });
+
+    if (error) {
+      console.error("Erro ao salvar perfil do usuário:", error);
+      throw new Error(error.message);
+    }
+  }
+
+  if (features_config && typeof features_config === 'object') {
+    await mergeUserFeaturesConfigServer(supabase, user.id, features_config);
   }
 
   revalidatePath('/aurtistic');
   revalidatePath('/');
+}
+
+async function mergeUserFeaturesConfigServer(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  patch: Record<string, any>
+) {
+  const cleanPatch = { ...(patch || {}) };
+  if (cleanPatch.hub_connection && typeof cleanPatch.hub_connection === 'object') {
+    const { encrypted_link_secret: _omit, ...safeHub } = cleanPatch.hub_connection;
+    cleanPatch.hub_connection = safeHub;
+  }
+
+  const { data, error } = await supabase.rpc('merge_user_features_config', {
+    p_patch: cleanPatch,
+  });
+
+  if (!error) {
+    return data || {};
+  }
+
+  // Fallback controlado caso Migration 14 ainda não tenha sido aplicada no Supabase
+  if (error.code === '42883' || error.message?.includes('merge_user_features_config')) {
+    console.warn('[Migration14 Pendente] merge_user_features_config ausente; aplicando fallback controlado.');
+    const { data: profile, error: fetchErr } = await supabase
+      .from('user_profiles')
+      .select('features_config')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (fetchErr) throw new Error(fetchErr.message);
+
+    const merged = {
+      ...(profile?.features_config || {}),
+      ...cleanPatch,
+    };
+
+    const { error: upsertErr } = await supabase
+      .from('user_profiles')
+      .upsert({ id: userId, features_config: merged }, { onConflict: 'id' });
+
+    if (upsertErr) throw new Error(upsertErr.message);
+    return merged;
+  }
+
+  throw new Error(error.message);
 }
 
 export async function updateNotificationConfig(notificationsConfig: any) {
@@ -662,31 +720,35 @@ export async function updateNotificationConfig(notificationsConfig: any) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuário não autenticado");
 
-  // Fetch current config to merge
-  const { data: profile, error: fetchError } = await supabase
-    .from('user_profiles')
-    .select('features_config')
-    .eq('id', user.id)
-    .single();
-
-  if (fetchError) throw new Error(fetchError.message);
-
-  const currentFeaturesConfig = profile?.features_config || {};
-  
-  const updatedFeaturesConfig = {
-    ...currentFeaturesConfig,
-    notifications: notificationsConfig
-  };
-
-  const { error } = await supabase
-    .from('user_profiles')
-    .update({ features_config: updatedFeaturesConfig })
-    .eq('id', user.id);
-
-  if (error) throw new Error(error.message);
+  await mergeUserFeaturesConfigServer(supabase, user.id, {
+    notifications: notificationsConfig,
+  });
 
   revalidatePath('/configurar-notificacoes');
   revalidatePath('/aurtistic');
+  revalidatePath('/');
+}
+
+export async function savePortfolioLayoutOrderAction(input: {
+  albumOrder?: string[];
+  subfolderOrder?: Record<string, string[]>;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Usuário não autenticado' };
+
+  const patch: Record<string, any> = {};
+  if (input.albumOrder) patch.portfolio_album_order = input.albumOrder;
+  if (input.subfolderOrder) patch.portfolio_subfolder_order = input.subfolderOrder;
+
+  try {
+    await mergeUserFeaturesConfigServer(supabase, user.id, patch);
+    return { ok: true };
+  } catch (err: unknown) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Falha ao salvar ordem do layout' };
+  }
 }
 
 // ----------------------------------------------------------------------
@@ -785,13 +847,24 @@ export async function updateAdvancedConfig(advancedSettings: any) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  const { data: profile } = await supabase.from('user_profiles').select('features_config').eq('id', user.id).single();
-  const features_config = profile?.features_config || {};
-  
-  features_config.advanced_settings = advancedSettings;
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('features_config')
+    .eq('id', user.id)
+    .maybeSingle();
 
-  const { error } = await supabase.from('user_profiles').update({ features_config }).eq('id', user.id);
-  if (error) throw new Error(error.message);
+  const existingAdvanced = (profile?.features_config?.advanced_settings || {}) as Record<string, any>;
+  const fullAdvancedSettings = {
+    ...existingAdvanced,
+    ...(advancedSettings && typeof advancedSettings === 'object' ? advancedSettings : {}),
+  };
+
+  await mergeUserFeaturesConfigServer(supabase, user.id, {
+    advanced_settings: fullAdvancedSettings,
+  });
+
+  revalidatePath('/configuracoes-avancadas');
+  revalidatePath('/');
 }
 
 export async function updateThemePreferencesAction(theme: {
@@ -828,25 +901,14 @@ export async function updateThemePreferencesAction(theme: {
   if (!user) return { ok: false, error: 'Não autenticado' };
 
   try {
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('features_config')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    const features_config = profile?.features_config || {};
-    features_config.theme = {
-      mode: safeMode,
-      palette: safePalette,
-      overrideOrgTheme: safeOverride,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { error } = await supabase
-      .from('user_profiles')
-      .upsert({ id: user.id, features_config }, { onConflict: 'id' });
-
-    if (error) throw error;
+    await mergeUserFeaturesConfigServer(supabase, user.id, {
+      theme: {
+        mode: safeMode,
+        palette: safePalette,
+        overrideOrgTheme: safeOverride,
+        updated_at: new Date().toISOString(),
+      },
+    });
     return { ok: true };
   } catch (err: any) {
     console.error('Erro ao salvar tema do usuário:', err);
@@ -872,20 +934,19 @@ export async function updateModulesConfigAction(modules: {
       .from('user_profiles')
       .select('features_config')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
-    const features_config = profile?.features_config || {};
-    features_config.modules = {
-      ...modules,
-      updated_at: new Date().toISOString(),
-    };
+    const existingModules = (profile?.features_config?.modules || {}) as Record<string, any>;
 
-    const { error } = await supabase
-      .from('user_profiles')
-      .update({ features_config })
-      .eq('id', user.id);
+    await mergeUserFeaturesConfigServer(supabase, user.id, {
+      modules: {
+        ...existingModules,
+        ...modules,
+        updated_at: new Date().toISOString(),
+      },
+    });
 
-    if (error) throw error;
+    revalidatePath('/');
     return { ok: true };
   } catch (err: any) {
     console.error('Erro ao salvar configuração de módulos:', err);
@@ -894,8 +955,8 @@ export async function updateModulesConfigAction(modules: {
 }
 
 /**
- * [CORREÇÃO ERRO 403]: Emite um ticket de download autorizado (purpose: 'share', allowDownload: true)
- * com escopo estrito no álbum/pasta requisitada para que os botões de download .ZIP funcionem perfeitamente.
+ * [CORREÇÃO ERRO 403 / A5]: Emite ticket de download autorizado (purpose: 'share', allowDownload: true)
+ * validando ownership e garantindo que terceiros só baixem álbuns explicitamente públicos.
  */
 export async function getPortfolioAlbumZipUrlAction(input: {
   albumPath: string;
@@ -907,15 +968,37 @@ export async function getPortfolioAlbumZipUrlAction(input: {
       data: { user },
     } = await supabase.auth.getUser();
 
-    const cleanAlbum = (input.albumPath || 'Portfolio')
+    const cleanAlbum = String(input.albumPath || '')
       .replace(/\\/g, '/')
-      .replace(/^\/+|\/+$/g, '');
+      .replace(/^\/+|\/+$/g, '')
+      .trim();
 
-    const targetOwnerId = user?.id || input.ownerId || PRIMARY_ADMIN_UUID;
+    if (!cleanAlbum || cleanAlbum.includes('..') || cleanAlbum.includes('\0')) {
+      return { ok: false, error: 'Caminho de álbum inválido para download.' };
+    }
+
+    const targetOwnerId = input.ownerId || user?.id || PRIMARY_ADMIN_UUID;
+    const isOwner = Boolean(user?.id && user.id === targetOwnerId);
+
+    if (!isOwner) {
+      const escapedPrefix = cleanAlbum.replace(/[\\%_]/g, (m) => `\\${m}`);
+      const { data: publicItems } = await supabase
+        .from('user_files_index')
+        .select('id')
+        .eq('user_id', targetOwnerId)
+        .eq('visibility', 'public')
+        .eq('show_in_portfolio', true)
+        .or(`relative_path.eq.${cleanAlbum},relative_path.ilike.${escapedPrefix}/%`)
+        .limit(1);
+
+      if (!publicItems || publicItems.length === 0) {
+        return { ok: false, error: 'Álbum não encontrado ou indisponível para download público.' };
+      }
+    }
 
     const ticketObj = signEdgeTenantTicket({
       userId: targetOwnerId,
-      role: user?.id === targetOwnerId ? 'admin' : 'member',
+      role: isOwner ? 'admin' : 'member',
       purpose: 'share',
       allowedPrefix: cleanAlbum,
       readOnly: true,

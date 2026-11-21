@@ -219,7 +219,7 @@ export function StudioMaskBrushModal() {
 
         {/* Visualizador com Overlay Vermelho rgba(255, 0, 0, 0.4) */}
         <div className="relative w-full aspect-square max-h-[360px] rounded-2xl overflow-hidden bg-black/70 border border-border-subtle flex items-center justify-center">
-          <img src={targetLayer.src} alt="Preview" crossOrigin="anonymous" className="absolute inset-0 w-full h-full object-contain pointer-events-none opacity-80" />
+          <img src={targetLayer.resolvedUrl || targetLayer.src} alt="Preview" crossOrigin="anonymous" className="absolute inset-0 w-full h-full object-contain pointer-events-none opacity-80" />
           <canvas
             ref={canvasRef}
             width={800}

@@ -5,6 +5,7 @@
 import crypto from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
+import { createAdminClient } from '@/utils/supabase/admin';
 import type {
   CognitiveCapacity,
   OrgRole,
@@ -194,10 +195,8 @@ export async function getUserOrganizationsAction() {
   if (!user) return { ok: false, error: 'Não autenticado.' };
 
   const normalizedEmail = (user.email || '').toLowerCase().trim();
-  const normalizedUsername = (user.user_metadata?.username || '').toLowerCase().trim();
   const isGlobalAdmin =
     user.app_metadata?.role === 'admin' ||
-    user.user_metadata?.role === 'admin' ||
     user.id === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e' ||
     user.id === '48b2fb73-c5d3-4eff-b727-54e4b91bf21b' ||
     user.id === '8a3e4272-010d-4479-94cb-26178d544ea2' ||
@@ -206,11 +205,7 @@ export async function getUserOrganizationsAction() {
     normalizedEmail === 'joaopaulostangorlini@usp.br' ||
     normalizedEmail === 'joaostangorlini@usp.br' ||
     normalizedEmail === 'joao@aurtistic.com' ||
-    normalizedEmail === 'hublabdiv@gmail.com' ||
-    normalizedUsername === 'joaostangorlini' ||
-    normalizedUsername === 'joao' ||
-    normalizedUsername === 'hublabdiv' ||
-    normalizedUsername === 'hublabdiv_institucional';
+    normalizedEmail === 'hublabdiv@gmail.com';
 
   let orgs: any[] = [];
 
@@ -386,10 +381,8 @@ export async function syncHubOrganizationsAction(): Promise<{
   if (!user) return { ok: false, error: 'Não autenticado.', syncedCount: 0 };
 
   const normalizedEmail = (user.email || '').toLowerCase().trim();
-  const normalizedUsername = (user.user_metadata?.username || '').toLowerCase().trim();
   const isGlobalAdmin =
     user.app_metadata?.role === 'admin' ||
-    user.user_metadata?.role === 'admin' ||
     user.id === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e' ||
     user.id === '48b2fb73-c5d3-4eff-b727-54e4b91bf21b' ||
     user.id === '8a3e4272-010d-4479-94cb-26178d544ea2' ||
@@ -398,11 +391,7 @@ export async function syncHubOrganizationsAction(): Promise<{
     normalizedEmail === 'joaopaulostangorlini@usp.br' ||
     normalizedEmail === 'joaostangorlini@usp.br' ||
     normalizedEmail === 'joao@aurtistic.com' ||
-    normalizedEmail === 'hublabdiv@gmail.com' ||
-    normalizedUsername === 'joaostangorlini' ||
-    normalizedUsername === 'joao' ||
-    normalizedUsername === 'hublabdiv' ||
-    normalizedUsername === 'hublabdiv_institucional';
+    normalizedEmail === 'hublabdiv@gmail.com';
 
   const hubBaseUrl = (process.env.NEXT_PUBLIC_HUB_URL || process.env.HUB_URL || 'http://localhost:3001').replace(/\/+$/, '');
   const expectedSecret =
@@ -440,13 +429,18 @@ export async function syncHubOrganizationsAction(): Promise<{
     hubOrgs = ['labdiv', 'show-da-fisica', 'hs'];
   }
 
+  const dbWriter = createAdminClient() || supabase;
+  const fallbackFullName =
+    String(user.user_metadata?.full_name || user.user_metadata?.name || '').trim() ||
+    (user.email ? user.email.split('@')[0] : 'Membro');
+
   let synced = 0;
   for (const orgSlug of hubOrgs) {
     const defaultOrg = DEFAULT_ECOSYSTEM_ORGS.find((d) => d.slug === orgSlug);
     if (!defaultOrg) continue;
 
     try {
-      await supabase.from('organizations').upsert(
+      const { error: orgUpsertErr } = await dbWriter.from('organizations').upsert(
         {
           id: defaultOrg.id,
           slug: defaultOrg.slug,
@@ -461,17 +455,27 @@ export async function syncHubOrganizationsAction(): Promise<{
         },
         { onConflict: 'id' }
       );
+      if (orgUpsertErr) {
+        console.warn('[syncHubOrganizationsAction] Erro upsert org:', orgUpsertErr.message);
+        continue;
+      }
 
-      await supabase.from('organization_members').upsert(
+      const { error: memUpsertErr } = await dbWriter.from('organization_members').upsert(
         {
           organization_id: defaultOrg.id,
           user_id: user.id,
+          full_name: fallbackFullName,
+          email: user.email || null,
           org_role: isHubStaff ? 'admin' : 'member',
           can_upload_org_vault: true,
           cognitive_capacity: 'normal',
         },
         { onConflict: 'organization_id,user_id' }
       );
+      if (memUpsertErr) {
+        console.warn('[syncHubOrganizationsAction] Erro upsert member:', memUpsertErr.message);
+        continue;
+      }
       synced++;
     } catch {
       // Ignora erro individual
@@ -541,7 +545,7 @@ export async function getOrganizationDetailsAction(orgId: string) {
       .maybeSingle();
 
     if (!orgErr && org) {
-      const [{ data: subteams }, { data: members }, tasks] = await Promise.all([
+      const [{ data: subteams }, { data: members }, dirRes, tasks] = await Promise.all([
         supabase
           .from('organization_subteams')
           .select('*')
@@ -552,14 +556,43 @@ export async function getOrganizationDetailsAction(orgId: string) {
           .select('*, subteam:organization_subteams(*)')
           .eq('organization_id', orgId)
           .order('full_name'),
+        supabase.rpc('get_org_member_directory', { p_org_id: orgId }),
         fetchOrgTasks(orgId),
       ]);
+
+      const directoryMap = new Map<
+        string,
+        { display_name?: string | null; username?: string | null; avatar_url?: string | null }
+      >();
+      if (!dirRes.error && Array.isArray(dirRes.data)) {
+        for (const d of dirRes.data as Array<{
+          user_id?: string;
+          display_name?: string | null;
+          username?: string | null;
+          avatar_url?: string | null;
+        }>) {
+          if (d?.user_id) {
+            directoryMap.set(d.user_id, d);
+          }
+        }
+      }
+
+      const enrichedMembers = (members || []).map((m: any) => {
+        const dir = m.user_id ? directoryMap.get(m.user_id) : undefined;
+        if (!dir) return m;
+        return {
+          ...m,
+          display_name: dir.display_name || m.display_name || m.full_name,
+          username: dir.username || m.username || null,
+          avatar_url: m.avatar_url || dir.avatar_url || null,
+        };
+      });
 
       return {
         ok: true,
         organization: org,
         subteams: subteams || [],
-        members: members || [],
+        members: enrichedMembers,
         tasks,
       };
     }
@@ -851,7 +884,7 @@ export async function applyPlaybookToTasksAction(input: {
       assigned_member_ids: input.assignedMemberIds || [],
       nome: `[Playbook] ${tmpl.title}`,
       descricao: tmpl.description || null,
-      status: 'A Fazer',
+      status: 'não iniciada',
       prioridade: 'Média',
       dimensao: orgName,
       prazo: input.prazo || null,
@@ -871,7 +904,7 @@ export async function applyPlaybookToTasksAction(input: {
       assigned_member_ids: input.assignedMemberIds || [],
       parent_id: parentTask.id,
       nome: item.text || `Passo ${idx + 1}`,
-      status: 'A Fazer',
+      status: 'não iniciada',
       prioridade: 'Média',
       dimensao: orgName,
       is_personal: false,
@@ -996,13 +1029,17 @@ export async function updateMeetingNotesAction(input: {
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (input.liveNotes !== undefined) patch.live_notes_markdown = input.liveNotes;
     if (input.processNotes !== undefined) patch.process_notes_markdown = input.processNotes;
-    if (input.transcriptText !== undefined) patch.transcript_text = input.transcriptText;
+    if (input.transcriptText !== undefined) patch.transcription_raw_text = input.transcriptText;
     if (input.agendaItems !== undefined) patch.agenda_items = input.agendaItems;
 
-    await supabase
+    const { error: updateMeetingError } = await supabase
       .from('organization_meetings')
       .update(patch)
       .eq('id', input.meetingId);
+
+    if (updateMeetingError) {
+      return { ok: false, error: updateMeetingError.message };
+    }
   }
 
   // Atualiza notas pessoais isoladas do usuário
@@ -1158,25 +1195,37 @@ export async function joinOrganizationByCodeAction(input: {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: 'Você precisa estar logado para entrar na organização.' };
 
-  const cleanToken = input.codeOrUrl
+  const rawToken = input.codeOrUrl
     .trim()
     .replace(/^.*\/convite\//, '')
     .split('?')[0]
     .split('#')[0]
-    .trim()
-    .toUpperCase();
+    .trim();
 
-  if (!cleanToken) return { ok: false, error: 'Código de convite inválido.' };
+  if (!rawToken) return { ok: false, error: 'Código de convite inválido.' };
 
   // Reivindicação automática de perfil placeholder se houver correspondência de e-mail ou nome
   let claimPlaceholderId = input.claimPlaceholderId || null;
+  let resolvedToken = rawToken;
   if (!claimPlaceholderId) {
     try {
-      const { data: inv } = await supabase
+      let { data: inv } = await supabase
         .from('organization_invites')
-        .select('organization_id')
-        .eq('token', cleanToken)
+        .select('organization_id, token')
+        .eq('token', rawToken)
         .maybeSingle();
+
+      if (!inv && rawToken !== rawToken.toUpperCase()) {
+        const fallbackRes = await supabase
+          .from('organization_invites')
+          .select('organization_id, token')
+          .eq('token', rawToken.toUpperCase())
+          .maybeSingle();
+        if (fallbackRes.data) {
+          inv = fallbackRes.data;
+          resolvedToken = fallbackRes.data.token || rawToken.toUpperCase();
+        }
+      }
 
       if (inv?.organization_id) {
         const userEmail = (user.email || '').toLowerCase().trim();
@@ -1214,14 +1263,14 @@ export async function joinOrganizationByCodeAction(input: {
   };
 
   const { data, error } = await supabase.rpc('accept_organization_invite', {
-    p_token: cleanToken,
+    p_token: resolvedToken,
     p_claim_placeholder_id: claimPlaceholderId,
   });
 
   let effectiveOrgId = (data as any)?.organization_id;
 
   if (error) {
-    const inst = INSTITUTIONAL_CODES[cleanToken];
+    const inst = INSTITUTIONAL_CODES[resolvedToken.toUpperCase()];
     if (inst) {
       // Ingressa diretamente na organização institucional reconhecida
       effectiveOrgId = inst.orgId;
@@ -1344,4 +1393,195 @@ export async function getOrCreateActiveInviteAction(orgId: string) {
 
   if (invErr) return { ok: false, error: invErr.message };
   return { ok: true, token: newInv.token, invite: newInv };
+}
+
+// ─── Metas de Organização (organization_goals) ───────────────────────────────
+
+export async function getOrgGoalsAction(orgId: string) {
+  if (!isUuid(orgId)) return { ok: false, error: 'ID inválido', goals: [] };
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Não autenticado', goals: [] };
+
+  const { data, error } = await supabase
+    .from('organization_goals')
+    .select('*')
+    .eq('organization_id', orgId)
+    .order('created_at', { ascending: false });
+
+  if (error) return { ok: false, error: error.message, goals: [] };
+  return { ok: true, goals: data || [] };
+}
+
+export async function createOrgGoalAction(input: {
+  organizationId: string;
+  title: string;
+  description?: string;
+  subteamId?: string | null;
+  targetDate?: string | null;
+}) {
+  if (!isUuid(input.organizationId)) return { ok: false, error: 'ID inválido' };
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Não autenticado' };
+
+  const { data, error } = await supabase
+    .from('organization_goals')
+    .insert({
+      organization_id: input.organizationId,
+      title: input.title.trim(),
+      description: input.description?.trim() || null,
+      subteam_id: input.subteamId || null,
+      target_date: input.targetDate || null,
+      status: 'active',
+      created_by: user.id,
+    })
+    .select('*')
+    .single();
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/organizacoes');
+  return { ok: true, goal: data };
+}
+
+export async function deleteOrgGoalAction(goalId: string) {
+  if (!isUuid(goalId)) return { ok: false, error: 'ID inválido' };
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Não autenticado' };
+
+  const { error } = await supabase
+    .from('organization_goals')
+    .delete()
+    .eq('id', goalId);
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/organizacoes');
+  return { ok: true };
+}
+
+// ─── Subequipes de Organização (organization_subteams) ────────────────────────
+
+export async function createOrganizationSubteamAction(input: {
+  organizationId: string;
+  name: string;
+  description?: string;
+  color?: string;
+}) {
+  if (!isUuid(input.organizationId)) return { ok: false, error: 'ID inválido' };
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Não autenticado' };
+
+  const { data, error } = await supabase
+    .from('organization_subteams')
+    .insert({
+      organization_id: input.organizationId,
+      name: input.name.trim(),
+      description: input.description?.trim() || 'Subequipe da organização',
+      color: input.color || '#FFCC00',
+    })
+    .select('*')
+    .single();
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/organizacoes');
+  revalidatePath('/labdiv');
+  return { ok: true, subteam: data };
+}
+
+export async function deleteOrganizationSubteamAction(subteamId: string) {
+  if (!isUuid(subteamId)) return { ok: false, error: 'ID inválido' };
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Não autenticado' };
+
+  const { error } = await supabase
+    .from('organization_subteams')
+    .delete()
+    .eq('id', subteamId);
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/organizacoes');
+  revalidatePath('/labdiv');
+  return { ok: true };
+}
+
+// ─── Demandas e Solicitações de Organização (organization_requests) ───────────
+
+export async function getOrganizationRequestsAction(orgId: string) {
+  if (!isUuid(orgId)) return { ok: false, error: 'ID inválido', requests: [] };
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Não autenticado', requests: [] };
+
+  const { data, error } = await supabase
+    .from('organization_requests')
+    .select('*')
+    .eq('organization_id', orgId)
+    .order('created_at', { ascending: false });
+
+  if (error) return { ok: false, error: error.message, requests: [] };
+  return { ok: true, requests: data || [] };
+}
+
+export async function createOrganizationRequestAction(input: {
+  organizationId: string;
+  title: string;
+  description?: string;
+  urgency?: 'low' | 'normal' | 'high' | 'urgent';
+  subteamId?: string | null;
+}) {
+  if (!isUuid(input.organizationId)) return { ok: false, error: 'ID inválido' };
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Não autenticado' };
+
+  const { data, error } = await supabase
+    .from('organization_requests')
+    .insert({
+      organization_id: input.organizationId,
+      title: input.title.trim(),
+      description: input.description?.trim() || null,
+      urgency: input.urgency || 'normal',
+      status: 'open',
+      subteam_id: input.subteamId || null,
+      requested_by: user.id,
+    })
+    .select('*')
+    .single();
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/organizacoes');
+  return { ok: true, request: data };
+}
+
+export async function updateOrganizationRequestStatusAction(input: {
+  requestId: string;
+  status: 'open' | 'in_review' | 'resolved' | 'closed';
+  assignedTo?: string | null;
+}) {
+  if (!isUuid(input.requestId)) return { ok: false, error: 'ID inválido' };
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Não autenticado' };
+
+  const patch: Record<string, any> = {
+    status: input.status,
+    updated_at: new Date().toISOString(),
+  };
+  if (input.assignedTo !== undefined) {
+    patch.assigned_to = input.assignedTo;
+  }
+
+  const { data, error } = await supabase
+    .from('organization_requests')
+    .update(patch)
+    .eq('id', input.requestId)
+    .select('*')
+    .single();
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/organizacoes');
+  return { ok: true, request: data };
 }

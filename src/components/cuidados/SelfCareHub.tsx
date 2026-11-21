@@ -205,6 +205,17 @@ export function SelfCareHub() {
                         {dailyLog.medsTaken ? 'Tomado' : 'Pendente'}
                       </span>
                     )}
+                    {configs
+                      .filter((c) => (c.isCustom || c.key.startsWith('custom') || c.key === 'custom') && c.enabled)
+                      .map((c) => (
+                        <span
+                          key={c.key}
+                          className="text-[10px] px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-[11px]">{c.icon || 'alarm'}</span>
+                          <span>{c.name}</span>
+                        </span>
+                      ))}
                   </>
                 )}
               </div>

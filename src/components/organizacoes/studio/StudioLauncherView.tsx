@@ -1,21 +1,70 @@
 // Este programa é um software livre (Licença AGPLv3)
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { useStudio } from './StudioContext';
 import { useOrganizationBrand } from '../OrganizationBrandProvider';
 import { getOrgStudioTemplates } from './studio-presets';
 import { ASPECT_DIMENSIONS, type AspectRatioKey, type StudioTemplate } from './types';
+import { sanitizeCustomTemplate } from './studio-helpers';
+import { createClient } from '@/utils/supabase/client';
 
 type LauncherSection = 'drafts' | 'presets' | 'new';
 
 export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
-  const { drafts, loadDraft, loadTemplate, resetToBlank } = useStudio();
+  const { drafts, loadDraft, loadTemplate, resetToBlank, scope } = useStudio();
   const { tokens } = useOrganizationBrand();
-  const [activeSection, setActiveSection] = useState<LauncherSection>('drafts');
+  const [activeSection, setActiveSection] = useState<LauncherSection | null>('drafts');
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [serverTemplates, setServerTemplates] = useState<StudioTemplate[]>([]);
+  const [showConfigModal, setShowConfigModal] = useState(false);
 
+  const effectiveScopeKey = scope === 'personal' ? 'personal' : (orgSlug || tokens.themeId || 'default');
+  const storageDefaultKey = `aurtistic_studio_default_${effectiveScopeKey}`;
+
+  // Lê slide padrão configurado
+  const savedDefaultTemplate = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem(storageDefaultKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const res = sanitizeCustomTemplate(parsed);
+      return res.ok ? res.sanitized : null;
+    } catch {
+      return null;
+    }
+  }, [storageDefaultKey, showConfigModal]);
+
+  // Hidrata do Supabase (features_config.studio_default_template) quando localStorage estiver vazio
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (localStorage.getItem(storageDefaultKey)) return;
+    let active = true;
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user || !active) return;
+      supabase
+        .from('user_profiles')
+        .select('features_config')
+        .eq('id', user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (!active) return;
+          const map = (data?.features_config as any)?.studio_default_template;
+          const remoteSlide = map?.[effectiveScopeKey];
+          if (remoteSlide) {
+            const res = sanitizeCustomTemplate(remoteSlide);
+            if (res.ok) {
+              localStorage.setItem(storageDefaultKey, JSON.stringify(res.sanitized));
+              setShowConfigModal((prev) => prev);
+            }
+          }
+        });
+    });
+    return () => { active = false; };
+  }, [storageDefaultKey, effectiveScopeKey]);
   const effectiveSlug = orgSlug || tokens.themeId;
   const localTemplates = getOrgStudioTemplates(effectiveSlug, tokens);
 
@@ -25,7 +74,7 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
       .then((data) => {
         if (Array.isArray(data?.templates)) setServerTemplates(data.templates);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [effectiveSlug]);
 
   const allTemplates = [...localTemplates, ...serverTemplates];
@@ -39,11 +88,60 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
   };
 
   const toggleSection = (sec: LauncherSection) => {
-    setActiveSection((curr) => (curr === sec ? curr : sec));
+    setActiveSection((curr) => (curr === sec ? null : sec));
+  };
+
+  const handleCreateNew = (aspect: AspectRatioKey, preferDefault = false) => {
+    handleActionWithSlotCheck(() => {
+      if (preferDefault && savedDefaultTemplate) {
+        loadTemplate({
+          id: savedDefaultTemplate.id || `tpl-default-${Date.now()}`,
+          title: savedDefaultTemplate.title || 'Meu Padrão',
+          orgSlug: effectiveSlug || 'personal',
+          category: 'modelo',
+          aspectRatio: aspect,
+          previewUrl: '',
+          slides: [{ ...savedDefaultTemplate, aspectRatio: aspect }],
+        });
+      } else {
+        resetToBlank(aspect);
+      }
+    });
   };
 
   return (
     <div className="space-y-6 py-4 max-w-4xl mx-auto animate-in fade-in">
+      {/* Alternador / Badge de Escopo */}
+      <div className="flex items-center justify-between pb-2 border-b border-border-subtle">
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-[20px] text-accent-primary">
+            {scope === 'personal' ? 'person' : 'corporate_fare'}
+          </span>
+          <span className="text-xs font-mono font-bold uppercase tracking-wider text-fg">
+            {scope === 'personal' ? 'Studio Pessoal' : `${tokens.displayName || 'Organização'}`}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {scope === 'personal' ? (
+            <Link
+              href="/labdiv"
+              className="text-[11px] font-bold text-fg-muted hover:text-accent-primary transition-colors flex items-center gap-1"
+            >
+              <span>Ver Organizações</span>
+              <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+            </Link>
+          ) : (
+            <Link
+              href="/studio"
+              className="text-[11px] font-bold text-fg-muted hover:text-accent-primary transition-colors flex items-center gap-1"
+            >
+              <span>Meu Studio Pessoal</span>
+              <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+            </Link>
+          )}
+        </div>
+      </div>
+
       {/* Cabeçalho Limpo Direto no Fundo Atmosférico */}
       <div className="border-b border-border-subtle pb-4">
         <span className="text-xs font-mono font-bold uppercase tracking-widest text-amber-500 dark:text-[#FFCC00]">
@@ -66,36 +164,62 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
               <span className="material-symbols-outlined text-[20px] text-emerald-500">crop_free</span>
               <div>
                 <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-fg">
-                  Nova Arte em Branco
+                  Nova Arte {savedDefaultTemplate ? '(Em Branco ou Padrão)' : 'em Branco'}
                 </h2>
                 <p className="text-[10px] text-fg-muted hidden sm:block">
                   Escolha uma proporção para abrir o editor
                 </p>
               </div>
             </div>
+            <div className="flex items-center gap-1.5">
+              {savedDefaultTemplate && (
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-accent-primary/10 text-accent-primary border border-accent-primary/20">
+                  Padrão Ativo: {savedDefaultTemplate.title}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowConfigModal(true)}
+                title="Configurar Tela Inicial Padrão"
+                className="p-1.5 text-xs text-fg-muted hover:text-fg rounded-lg border border-border-subtle bg-surface-hover/50 hover:bg-surface-hover cursor-pointer flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-[14px]">settings</span>
+                <span className="text-[10px] font-bold hidden sm:inline">Padrão</span>
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             {(['1:1', '4:5', '9:16', '16:9'] as AspectRatioKey[]).map((aspect) => {
               const dim = ASPECT_DIMENSIONS[aspect];
               return (
-                <button
-                  key={aspect}
-                  type="button"
-                  onClick={() => handleActionWithSlotCheck(() => resetToBlank(aspect))}
-                  className="p-2.5 sm:p-3 rounded-xl border border-border-subtle bg-surface-hover/60 hover:border-[#FFCC00] hover:bg-surface-hover transition-all flex sm:flex-col items-center sm:justify-center gap-2.5 sm:gap-1.5 cursor-pointer shadow-xs group text-left sm:text-center"
-                >
-                  <div
-                    className="border-2 border-border-subtle group-hover:border-[#FFCC00] rounded-xs transition-colors shrink-0"
-                    style={{
-                      width: aspect === '16:9' ? 28 : aspect === '9:16' ? 16 : 22,
-                      height: aspect === '16:9' ? 16 : aspect === '9:16' ? 28 : aspect === '4:5' ? 26 : 22,
-                    }}
-                  />
-                  <div className="min-w-0">
-                    <span className="text-xs font-bold text-fg block truncate">{dim.label}</span>
-                    <span className="text-[10px] font-mono text-fg-muted">{aspect}</span>
-                  </div>
-                </button>
+                <div key={aspect} className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleCreateNew(aspect, Boolean(savedDefaultTemplate))}
+                    className="p-2.5 sm:p-3 rounded-xl border border-border-subtle bg-surface-hover/60 hover:border-accent-primary hover:bg-surface-hover transition-all flex sm:flex-col items-center sm:justify-center gap-2.5 sm:gap-1.5 cursor-pointer shadow-xs group text-left sm:text-center w-full"
+                  >
+                    <div
+                      className="border-2 border-border-subtle group-hover:border-accent-primary rounded-xs transition-colors shrink-0"
+                      style={{
+                        width: aspect === '16:9' ? 28 : aspect === '9:16' ? 16 : 22,
+                        height: aspect === '16:9' ? 16 : aspect === '9:16' ? 28 : aspect === '4:5' ? 26 : 22,
+                      }}
+                    />
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-fg block truncate">{dim.label}</span>
+                      <span className="text-[10px] font-mono text-fg-muted">{aspect}</span>
+                    </div>
+                  </button>
+                  {savedDefaultTemplate && (
+                    <button
+                      type="button"
+                      onClick={() => handleCreateNew(aspect, false)}
+                      className="text-[9px] text-fg-muted hover:text-fg text-center underline cursor-pointer"
+                    >
+                      Criar em Branco
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -161,11 +285,10 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
           <button
             type="button"
             onClick={() => toggleSection('presets')}
-            className={`w-full flex items-center justify-between p-3.5 sm:p-4 text-left font-bold transition-colors cursor-pointer ${
-              activeSection === 'presets'
-                ? 'bg-surface-hover/80 text-fg'
-                : 'hover:bg-surface-hover/40 text-fg-secondary hover:text-fg'
-            }`}
+            className={`w-full flex items-center justify-between p-3.5 sm:p-4 text-left font-bold transition-colors cursor-pointer ${activeSection === 'presets'
+              ? 'bg-surface-hover/80 text-fg'
+              : 'hover:bg-surface-hover/40 text-fg-secondary hover:text-fg'
+              }`}
           >
             <div className="flex items-center gap-2.5">
               <span className="material-symbols-outlined text-[20px] text-blue-500">
@@ -181,9 +304,8 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
               </div>
             </div>
             <span
-              className={`material-symbols-outlined text-[20px] text-fg-muted transition-transform duration-200 ${
-                activeSection === 'presets' ? 'rotate-180 text-blue-500' : ''
-              }`}
+              className={`material-symbols-outlined text-[20px] text-fg-muted transition-transform duration-200 ${activeSection === 'presets' ? 'rotate-180 text-blue-500' : ''
+                }`}
             >
               expand_more
             </span>
@@ -214,6 +336,112 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
           )}
         </div>
       </div>
+
+      {/* Modal de Configuração de Tela Inicial Padrão */}
+      {showConfigModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-surface border border-border-subtle rounded-2xl p-5 max-w-md w-full space-y-4 shadow-2xl text-fg">
+            <div className="flex items-center justify-between border-b border-border-subtle pb-3">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[20px] text-accent-primary">settings</span>
+                <h3 className="font-bold text-sm">Configurar Tela Inicial Padrão</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowConfigModal(false)}
+                className="p-1 text-fg-muted hover:text-fg rounded-lg"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <p className="text-xs text-fg-muted">
+              Defina um modelo base para ser carregado automaticamente toda vez que você iniciar uma nova arte.
+            </p>
+
+            {savedDefaultTemplate ? (
+              <div className="p-3 rounded-xl bg-surface-hover/60 border border-border-subtle flex items-center justify-between gap-2">
+                <div>
+                  <span className="text-xs font-bold text-fg block">{savedDefaultTemplate.title}</span>
+                  <span className="text-[10px] text-fg-muted">{savedDefaultTemplate.layers.length} camadas • {savedDefaultTemplate.aspectRatio}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.removeItem(storageDefaultKey);
+                    const supabase = createClient();
+                    supabase.auth.getUser().then(({ data: { user } }) => {
+                      if (!user) return;
+                      supabase.from('user_profiles').select('features_config').eq('id', user.id).maybeSingle().then(({ data }) => {
+                        const curMap = { ...((data?.features_config as any)?.studio_default_template || {}) };
+                        delete curMap[effectiveScopeKey];
+                        supabase.rpc('merge_user_features_config', {
+                          p_patch: { studio_default_template: curMap },
+                        }).then(() => {}, () => {});
+                      });
+                    });
+                    setShowConfigModal(false);
+                  }}
+                  className="px-2 py-1 rounded text-[11px] font-bold text-red-400 hover:bg-red-500/10 border border-red-500/20"
+                >
+                  Remover Padrão
+                </button>
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl bg-surface-hover/30 border border-dashed border-border-subtle text-center text-xs text-fg-muted">
+                Nenhum padrão configurado. O editor inicia em branco com 0 camadas.
+              </div>
+            )}
+
+            {drafts.length > 0 && (
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-fg-muted">
+                  Definir a partir de um Rascunho Salvo:
+                </span>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {drafts.map((d) => (
+                    <div
+                      key={d.slotIndex}
+                      className="p-2 rounded-lg bg-surface-hover/40 border border-border-subtle flex items-center justify-between text-xs"
+                    >
+                      <span className="truncate">{d.title || `Slot ${d.slotIndex}`}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const targetSlide = d.slides[0];
+                          if (!targetSlide) return;
+                          const sanitized = sanitizeCustomTemplate(targetSlide);
+                          if (sanitized.ok) {
+                            localStorage.setItem(storageDefaultKey, JSON.stringify(sanitized.sanitized));
+                            const supabase = createClient();
+                            supabase.rpc('merge_user_features_config', {
+                              p_patch: { studio_default_template: { [effectiveScopeKey]: sanitized.sanitized } },
+                            }).then(() => { }, () => { });
+                            setShowConfigModal(false);
+                          }
+                        }}
+                        className="px-2 py-0.5 rounded text-[10px] font-bold bg-accent-primary text-black hover:brightness-110"
+                      >
+                        Tornar Padrão
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2 border-t border-border-subtle">
+              <button
+                type="button"
+                onClick={() => setShowConfigModal(false)}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold text-fg-secondary hover:text-fg"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de confirmação caso os 3 slots estejam ocupados */}
       {pendingAction && (

@@ -70,11 +70,7 @@ export async function ensurePortfolioCatalogLoaded(
       });
       if (res.ok) {
         const edgeCat = await res.json();
-        if (Array.isArray(edgeCat?.items)) {
-          if (edgeCat.items.length === 0) {
-            // Servidor confirmou que o acervo foi limpo/está vazio
-            return [];
-          }
+        if (Array.isArray(edgeCat?.items) && edgeCat.items.length > 0) {
           legacyItems = edgeCat.items;
         }
       }
@@ -82,8 +78,8 @@ export async function ensurePortfolioCatalogLoaded(
       console.warn('[PortfolioCatalog] Falha ao consultar nó Edge /api/portfolio:', edgeErr);
     }
 
-    // 2. Se não conectou ao nó Edge, verifica os arquivos de catálogo em disco
-    if (legacyItems.length === 0) {
+    // 2. Se não conectou ao nó Edge ou veio vazio, verifica os arquivos de catálogo em disco (exclusivo PRIMARY_ADMIN_UUID)
+    if (legacyItems.length === 0 && userId === PRIMARY_ADMIN_UUID) {
       const candidates = [
         path.resolve(process.cwd(), 'servidor/data/catalog.json'),
         path.resolve(process.cwd(), 'servidor/storage/portfolio/catalog.json'),
@@ -95,10 +91,7 @@ export async function ensurePortfolioCatalogLoaded(
         if (fs.existsSync(catalogPath)) {
           try {
             const cat = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
-            if (Array.isArray(cat?.items)) {
-              if (cat.items.length === 0) {
-                return [];
-              }
+            if (Array.isArray(cat?.items) && cat.items.length > 0) {
               legacyItems = cat.items;
               break;
             }
@@ -107,8 +100,8 @@ export async function ensurePortfolioCatalogLoaded(
       }
     }
 
-    // Se nenhum arquivo local existir (ex: container Vercel enxuto), busca do nó Edge via HTTP
-    if (legacyItems.length === 0) {
+    // Se nenhum arquivo local existir (ex: container Vercel enxuto), busca do nó Edge via HTTP (header x-tenant-ticket)
+    if (legacyItems.length === 0 && userId === PRIMARY_ADMIN_UUID) {
       try {
         const serverUrl = getEdgeStorageServerUrl();
         const exportTicket = signEdgeTenantTicket({
@@ -119,7 +112,7 @@ export async function ensurePortfolioCatalogLoaded(
         });
         const res = await fetch(`${serverUrl}/api/tenant/legacy-catalog-export`, {
           headers: {
-            Authorization: `Bearer ${exportTicket.ticket}`,
+            'x-tenant-ticket': exportTicket.ticket,
           },
           signal: AbortSignal.timeout(5000),
         });
@@ -195,7 +188,7 @@ export async function ensurePortfolioCatalogLoaded(
               const batch = mapped.slice(i, i + CHUNK_SIZE);
               await supabase
                 .from('user_files_index')
-                .upsert(batch, { onConflict: 'user_id,relative_path' });
+                .upsert(batch, { onConflict: 'vault_scope_key,relative_path' });
             }
           } catch (upsertErr) {
             console.warn('[PortfolioCatalog] Erro na sincronização assíncrona com Supabase:', upsertErr);

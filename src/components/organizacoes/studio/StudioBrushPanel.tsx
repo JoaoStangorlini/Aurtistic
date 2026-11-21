@@ -7,6 +7,7 @@ import { useOrganizationBrand } from '../OrganizationBrandProvider';
 import { StudioLiveSlider } from './StudioLiveSlider';
 import { StudioProColorPicker } from './StudioProColorPicker';
 import { StudioHelpTooltip } from './StudioHelpTooltip';
+import { isLayerEffectivelyLocked } from '@/lib/studio/folder-utils';
 import type { StudioBrushKind, StudioDrawingLayer } from './types';
 
 const BRUSH_TOOLS: { id: StudioBrushKind; label: string; icon: string }[] = [
@@ -180,8 +181,8 @@ export function StudioBrushPanel({ onExitBrushMode }: { onExitBrushMode: () => v
         </button>
         <button
           type="button"
-          disabled={!activeDrawing || activeDrawing.strokes.length === 0}
-          onClick={() => activeDrawing && clearDrawingLayer(activeDrawing.id)}
+          disabled={!activeDrawing || isLayerEffectivelyLocked(activeDrawing, activeSlide.folders) || activeDrawing.strokes.length === 0}
+          onClick={() => activeDrawing && !isLayerEffectivelyLocked(activeDrawing, activeSlide.folders) && clearDrawingLayer(activeDrawing.id)}
           className="py-1.5 px-2 rounded-xl bg-surface border border-border-subtle text-[10px] font-bold text-red-400 hover:border-red-500 disabled:opacity-40 cursor-pointer flex items-center justify-center gap-1"
         >
           <span className="material-symbols-outlined text-[14px]">delete_sweep</span>
