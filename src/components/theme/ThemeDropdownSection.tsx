@@ -19,7 +19,17 @@ export function ThemeDropdownSection({ userId }: { userId?: string }) {
     setThemePalette,
     paletteDef,
   } = useTheme();
-  const [memberSlugs, setMemberSlugs] = useState<string[]>([]);
+  const [memberSlugs, setMemberSlugs] = useState<string[]>(() => {
+    if (!userId || typeof window === 'undefined') return [];
+    try {
+      const cached = window.localStorage.getItem(`aurtistic_org_palettes_v1_${userId}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
 
   useEffect(() => {
     let active = true;

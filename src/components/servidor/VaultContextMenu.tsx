@@ -70,6 +70,7 @@ export interface VaultContextMenuProps {
   onToggleCurriculum?: (entry: EdgeVaultEntry) => void;
   onShareWithClient?: (path: string, name?: string) => void;
   onCreateShortcut?: (folderRelPath: string, folderName: string) => void;
+  onSyncFolder?: (folderRelPath: string, folderName: string) => void;
   onTagFolderDevice?: (
     folderPath: string,
     category: 'camera' | 'mobile' | 'drone' | 'other',
@@ -115,6 +116,7 @@ export function VaultContextMenu({
   onToggleCurriculum,
   onShareWithClient,
   onCreateShortcut,
+  onSyncFolder,
   onTagFolderDevice,
   onLinkTask,
   onCreateFolder,
@@ -489,6 +491,20 @@ export function VaultContextMenu({
                   share
                 </span>
                 <span>Compartilhar com o Cliente</span>
+              </button>
+            )}
+
+            {!(entry?.isShortcut || entry?.mimeType === 'inode/directory+shortcut') && onSyncFolder && (
+              <button
+                type="button"
+                onClick={() => {
+                  onSyncFolder(entry.relativePath, entry.name);
+                  onClose();
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-fg hover:bg-surface-hover hover:text-emerald-400 transition-colors text-left font-medium cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px] text-emerald-400">sync</span>
+                <span>Atualizar pasta…</span>
               </button>
             )}
 

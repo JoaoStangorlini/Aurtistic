@@ -56,6 +56,9 @@ export interface LabDivWorkspaceClientProps {
   isEmbed?: boolean;
   ticket?: string;
   initialView?: 'organizacoes' | 'studio';
+  userAvatarUrl?: string | null;
+  /** Usuário sem organizações: apenas Cofre + Studio Pessoal */
+  personalOnly?: boolean;
 }
 
 export function LabDivWorkspaceClient({
@@ -76,6 +79,8 @@ export function LabDivWorkspaceClient({
   isEmbed = false,
   ticket,
   initialView = 'organizacoes',
+  userAvatarUrl = null,
+  personalOnly = false,
 }: LabDivWorkspaceClientProps) {
   const router = useRouter();
   const [currentOrg, setCurrentOrg] = useState<Organization>(initialOrg);
@@ -126,7 +131,7 @@ export function LabDivWorkspaceClient({
       }
       if (!isEmbed && selected.slug) {
         const viewQs = activeMacroView === 'studio' ? '&view=studio' : '';
-        router.push(`/labdiv?org=${encodeURIComponent(selected.slug)}${viewQs}`);
+        router.replace(`/labdiv?org=${encodeURIComponent(selected.slug)}${viewQs}`, { scroll: false });
       }
     }
   };
@@ -142,6 +147,22 @@ export function LabDivWorkspaceClient({
   const [studioVisited, setStudioVisited] = useState(
     queryView === 'studio' || initialView === 'studio'
   );
+  const [isPersonalStudio, setIsPersonalStudio] = useState(
+    () => personalOnly || searchParams?.get('scope') === 'personal'
+  );
+  const isPersonalStudioActive = activeMacroView === 'studio' && isPersonalStudio;
+
+  // URL como fonte de verdade: ?view=studio&scope=personal (sem org) — reload mantém o Studio Pessoal
+  const enterPersonalStudio = () => {
+    setIsPersonalStudio(true);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('view', 'studio');
+      url.searchParams.set('scope', 'personal');
+      url.searchParams.delete('org');
+      window.history.replaceState(null, '', url.toString());
+    }
+  };
   const isStudioEditorFull = activeMacroView === 'studio' && studioStage === 'editor';
 
   useEffect(() => {
@@ -192,8 +213,14 @@ export function LabDivWorkspaceClient({
       const url = new URL(window.location.href);
       if (view === 'studio') {
         url.searchParams.set('view', 'studio');
+        if (isPersonalStudio) {
+          url.searchParams.set('scope', 'personal');
+          url.searchParams.delete('org');
+        }
       } else {
         url.searchParams.delete('view');
+        url.searchParams.delete('scope');
+        if (currentOrg.slug) url.searchParams.set('org', currentOrg.slug);
       }
       window.history.replaceState(null, '', url.toString());
     }
@@ -311,7 +338,11 @@ export function LabDivWorkspaceClient({
   };
 
   return (
-    <OrganizationBrandProvider orgSlug={currentOrg.slug} brandConfig={currentOrg.brand_config}>
+    <OrganizationBrandProvider
+      orgSlug={currentOrg.slug}
+      brandConfig={currentOrg.brand_config}
+      neutral={isPersonalStudioActive}
+    >
       <div
         {...swipeHandlers}
         className={
@@ -339,14 +370,15 @@ export function LabDivWorkspaceClient({
         <div className="flex flex-col items-center gap-1.5 shrink-0">
           <div className="inline-flex items-center p-1 bg-surface rounded-2xl border border-border-subtle shadow-md gap-1">
             <Link
-              href={`/servidor?org=${encodeURIComponent(currentOrg.id)}`}
+              href={isPersonalStudioActive || personalOnly ? '/servidor' : `/servidor?org=${encodeURIComponent(currentOrg.id)}`}
               prefetch={true}
               className="flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold text-fg-secondary hover:text-fg transition-colors"
-              title={`Abrir Cofre de Arquivos de ${currentOrg.name}`}
+              title={isPersonalStudioActive || personalOnly ? 'Abrir Cofre Pessoal' : `Abrir Cofre de Arquivos de ${currentOrg.name}`}
             >
               <span className="material-symbols-outlined text-[16px]">folder_special</span>
               <span>Cofre</span>
             </Link>
+            {!personalOnly && (
             <button
               type="button"
               onClick={() => selectMacroView('organizacoes')}
@@ -359,6 +391,7 @@ export function LabDivWorkspaceClient({
               <span className="material-symbols-outlined text-[16px]">domain</span>
               <span>Organizações</span>
             </button>
+            )}
             <button
               type="button"
               onClick={() => selectMacroView('studio')}
@@ -372,7 +405,7 @@ export function LabDivWorkspaceClient({
               <span>Studio</span>
             </button>
           </div>
-          {activeMacroView === 'studio' && (
+          {activeMacroView === 'studio' && !isPersonalStudio && (
             <div
               className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-2xl bg-surface/90 border border-border-subtle shadow-xs backdrop-blur-xs transition-all animate-in fade-in duration-200"
               title="Integração Oficial de Ecossistema: HUB LabDiv × Aurtistic"
@@ -436,7 +469,22 @@ export function LabDivWorkspaceClient({
       <div data-tour="org-view-mode" className="relative shrink-0 flex flex-wrap items-center justify-between gap-4 bg-surface border border-border-subtle rounded-2xl p-4 shadow-lg z-20">
         <div className="flex items-center gap-3.5 min-w-0">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/30 overflow-hidden p-1.5 shadow-inner">
-            {currentOrg.slug === 'labdiv' || (!currentOrg.slug && currentOrg.name?.toLowerCase().includes('labdiv')) ? (
+            {isPersonalStudioActive ? (
+              userAvatarUrl ? (
+                <img
+                  src={userAvatarUrl}
+                  alt={myMember?.full_name || 'Perfil Pessoal'}
+                  className="w-full h-full object-cover rounded-xl"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              ) : (
+                <span className="text-lg font-black text-[var(--accent-primary)]">
+                  {(myMember?.full_name || 'Eu').trim().slice(0, 2).toUpperCase()}
+                </span>
+              )
+            ) : currentOrg.slug === 'labdiv' || (!currentOrg.slug && currentOrg.name?.toLowerCase().includes('labdiv')) ? (
               <img src="/labdiv-logo.png" alt="LabDiv" className="w-full h-full object-contain" />
             ) : currentOrg.slug === 'show-da-fisica' ? (
               <div className="w-full h-full flex flex-col items-center justify-center font-black text-center leading-none">
@@ -465,9 +513,21 @@ export function LabDivWorkspaceClient({
               </div>
             ) : (
               <OrganizationMaterialSelector
-                organizations={userOrganizations}
-                selectedOrgId={currentOrg.id}
-                onSelectOrg={(id) => id && handleSwitchOrg(id)}
+                organizations={personalOnly ? [] : userOrganizations}
+                selectedOrgId={isPersonalStudioActive ? null : currentOrg.id}
+                onSelectOrg={(id) => {
+                  if (id === null) {
+                    enterPersonalStudio();
+                  } else if (personalOnly) {
+                    return;
+                  } else {
+                    setIsPersonalStudio(false);
+                    void handleSwitchOrg(id);
+                  }
+                }}
+                allowPersonal={activeMacroView === 'studio' || personalOnly}
+                personalLabel={myMember?.full_name ? `Perfil ${myMember.full_name}` : 'Perfil Pessoal'}
+                personalAvatarUrl={userAvatarUrl || myMember?.avatar_url || null}
                 onCreateOrg={() => setIsCreateModalOpen(true)}
                 onJoinWithCode={() => setIsAdminModalOpen(true)}
               />
@@ -476,7 +536,7 @@ export function LabDivWorkspaceClient({
         </div>
 
         {/* Botão constante no canto direito na mesma altura e tom de Pedir Boost */}
-        {!isEmbed && isOrgAdmin && (
+        {!isEmbed && isOrgAdmin && !isPersonalStudioActive && (
           <button
             type="button"
             onClick={() => setIsAdminModalOpen(true)}
@@ -490,7 +550,14 @@ export function LabDivWorkspaceClient({
       )}
 
       {activeMacroView === 'studio' ? (
-        <OrganizationPostStudio organizationId={currentOrg.id} orgSlug={currentOrg.slug} onStageChange={setStudioStage} />
+        <OrganizationPostStudio
+          key={isPersonalStudio ? 'personal' : currentOrg?.id}
+          organizationId={isPersonalStudio ? null : currentOrg.id}
+          orgSlug={isPersonalStudio ? 'personal' : currentOrg.slug}
+          scope={isPersonalStudio ? 'personal' : 'org'}
+          userId={isPersonalStudio ? currentUserId : undefined}
+          onStageChange={setStudioStage}
+        />
       ) : (
       <div className="space-y-6">
       {/* Bento Grid Operacional (Nível 1 - 8px Grid) + Navigation Bar M3 (Seleção Única - 5 Módulos) */}

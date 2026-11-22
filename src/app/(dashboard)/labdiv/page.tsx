@@ -8,6 +8,17 @@ import { OrganizationBrandProvider } from '@/components/organizacoes/Organizatio
 import { OrgRestrictedAccessView } from '@/components/organizacoes/OrgRestrictedAccessView';
 import { normalizeOrgBrandSlug } from '@/lib/org-brand-tokens';
 import { isUuid } from '@/lib/validators';
+import { PRIMARY_ADMIN_UUID } from '@/lib/edge-ticket';
+
+/** Aceita apenas URLs exibíveis com segurança; caminhos crus do Cofre caem no fallback de iniciais. */
+function sanitizeAvatarUrl(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const v = raw.trim();
+  if (!v) return null;
+  if (/^https:\/\//i.test(v) || /^http:\/\/localhost/i.test(v)) return v;
+  if (v.startsWith('/') && !v.startsWith('//')) return v;
+  return null;
+}
 import type {
   Organization,
   OrganizationMember,
@@ -18,7 +29,7 @@ import type {
 export const dynamic = 'force-dynamic';
 
 interface LabDivPageProps {
-  searchParams?: Promise<{ org?: string; view?: string }>;
+  searchParams?: Promise<{ org?: string; view?: string; scope?: string }>;
 }
 
 export default async function LabDivPage({ searchParams }: LabDivPageProps) {
@@ -316,6 +327,50 @@ export default async function LabDivPage({ searchParams }: LabDivPageProps) {
     normalizedEmail === 'hublabdiv@gmail.com' ||
     user.app_metadata?.role === 'admin';
 
+  const userAvatarUrl =
+    sanitizeAvatarUrl(profile?.avatar_url) ||
+    sanitizeAvatarUrl(user.user_metadata?.avatar_url) ||
+    sanitizeAvatarUrl(user.user_metadata?.picture) ||
+    (user.id === PRIMARY_ADMIN_UUID &&
+    profile?.features_config?.advanced_settings?.sync_curriculum_photo !== false
+      ? '/perfil.jpeg'
+      : null);
+
+  const isPersonalStudioRequest = params?.view === 'studio' && params?.scope === 'personal';
+
+  // Studio Pessoal disponível para todos, inclusive usuários com 0 organizações (sem carregar dados de org)
+  if (isPersonalStudioRequest && !myMember && !isConfirmedAdmin && !isOrgInHub) {
+    const columns = await getTaskColumns();
+    return (
+      <LabDivWorkspaceClient
+        organization={organization}
+        subteams={[]}
+        members={[]}
+        initialTasks={[]}
+        initialMeetings={[]}
+        columns={columns}
+        currentUserId={user.id}
+        myMember={{
+          id: user.id,
+          organization_id: organization.id,
+          user_id: user.id,
+          full_name: profile?.display_name || user.user_metadata?.full_name || profile?.username || 'Meu Perfil',
+          email: user.email || '',
+          org_role: 'member',
+          can_upload_org_vault: false,
+          cognitive_capacity: 'normal',
+          is_placeholder: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }}
+        userOrganizations={[]}
+        initialView="studio"
+        userAvatarUrl={userAvatarUrl}
+        personalOnly
+      />
+    );
+  }
+
   if (!myMember && !isConfirmedAdmin && !isOrgInHub) {
     return (
       <OrganizationBrandProvider
@@ -446,6 +501,7 @@ export default async function LabDivPage({ searchParams }: LabDivPageProps) {
       isDbMigrationPending={isDbMigrationPending}
       userOrganizations={finalUserOrganizations}
       initialView={params?.view === 'studio' ? 'studio' : 'organizacoes'}
+      userAvatarUrl={userAvatarUrl}
     />
   );
 }

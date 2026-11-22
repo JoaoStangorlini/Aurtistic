@@ -454,15 +454,6 @@ export default function AurtisticNavbar() {
                     {/* Seletor Compacto de Tema */}
                     <ThemeDropdownSection userId={user?.id} />
 
-                    <Link
-                      href="/studio"
-                      onClick={() => setIsSettingsOpen(false)}
-                      className="w-full text-left px-4 py-2 text-xs text-fg-secondary hover:bg-surface-hover hover:text-[var(--accent-primary)] transition-colors flex items-center gap-2.5 font-medium group"
-                    >
-                      <span className="material-symbols-outlined text-[18px] text-[var(--accent-primary)]">brush</span>
-                      <span>Studio Visual &amp; Publicações</span>
-                    </Link>
-
                     <Link 
                       href="/configuracoes-avancadas"
                       onClick={() => setIsSettingsOpen(false)}

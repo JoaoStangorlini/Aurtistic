@@ -6,6 +6,9 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSwipeTabs } from '@/hooks/useSwipeTabs';
+import { VaultFolderSyncModal, type AffectedShortcutInfo } from './VaultFolderSyncModal';
+import { extractLocalSyncFiles, type LocalSyncFile, type RemoteFolderManifest } from '@/lib/vault/folder-sync-diff';
+import { getTenantFolderManifestDirect } from '@/lib/edge-client';
 import type {
   EdgeTrashItem,
   EdgeVaultEntry,
@@ -228,6 +231,171 @@ export function UserVaultWorkspace({
   const [expandedShortcutTreePaths, setExpandedShortcutTreePaths] = useState<string[]>([]);
   const [loadingTreePath, setLoadingTreePath] = useState<string | null>(null);
   const scopeTicketCacheRef = useRef<Record<string, string>>({});
+  const syncFolderInputRef = useRef<HTMLInputElement | null>(null);
+  const [syncTargetFolder, setSyncTargetFolder] = useState<{ relPath: string; name: string } | null>(null);
+  const [syncPreparing, setSyncPreparing] = useState<string | null>(null);
+  const [syncPrepError, setSyncPrepError] = useState<string | null>(null);
+  const [syncModalData, setSyncModalData] = useState<{
+    folderRelPath: string;
+    folderName: string;
+    localRootName: string;
+    localFiles: LocalSyncFile[];
+    remoteManifest: RemoteFolderManifest;
+    affectedShortcuts: AffectedShortcutInfo[];
+  } | null>(null);
+
+  const prepareSyncFromFiles = async (
+    target: { relPath: string; name: string },
+    localRootName: string,
+    files: LocalSyncFile[]
+  ) => {
+    setSyncPreparing('Consultando manifesto da pasta no servidor...');
+    const freshTicketRaw = await refreshTicket();
+    const freshTicket = typeof freshTicketRaw === 'string' ? freshTicketRaw : freshTicketRaw?.ticket || activeTicket;
+    const remoteManifest = await getTenantFolderManifestDirect({
+      folder: target.relPath,
+      ticket: freshTicket,
+      serverUrl,
+    });
+
+    setSyncPreparing('Verificando atalhos vinculados...');
+    const { createClient } = await import('@/utils/supabase/client');
+    const supabase = createClient();
+    const { data: scRows } = await supabase
+      .from('user_files_index')
+      .select('id, relative_path, filename, organization_id, exif_data')
+      .eq('mime_type', 'inode/directory+shortcut');
+
+    const normTarget = target.relPath.normalize('NFC').replace(/^\/+|\/+$/g, '');
+    const affectedShortcuts: AffectedShortcutInfo[] = (scRows || [])
+      .filter((r: { exif_data?: Record<string, unknown> | null }) => {
+        const t = String(r.exif_data?.shortcutTarget || '').normalize('NFC').replace(/^\/+|\/+$/g, '');
+        return t === normTarget || t.startsWith(`${normTarget}/`);
+      })
+      .map((r: { id: string; relative_path: string; filename: string; organization_id: string | null; exif_data?: Record<string, unknown> | null }) => ({
+        id: r.id,
+        relativePath: r.relative_path,
+        filename: r.filename,
+        shortcutTarget: String(r.exif_data?.shortcutTarget || ''),
+        organizationId: r.organization_id,
+        shortcutOwner: String(r.exif_data?.shortcutOwner || 'Membro'),
+      }));
+
+    setSyncPreparing(null);
+    setSyncModalData({
+      folderRelPath: target.relPath,
+      folderName: target.name,
+      localRootName,
+      localFiles: files,
+      remoteManifest,
+      affectedShortcuts,
+    });
+  };
+
+  const handleTriggerUploadFolder = async () => {
+    const win = window as Window & {
+      showDirectoryPicker?: (opts?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle>;
+    };
+    if (typeof win.showDirectoryPicker === 'function') {
+      try {
+        const dirHandle = await win.showDirectoryPicker({ mode: 'read' });
+        setSyncPrepError(null);
+        setSyncPreparing(`Lendo pasta "${dirHandle.name}"...`);
+        const items: UploadItem[] = [];
+
+        const walkHandle = async (handle: FileSystemDirectoryHandle, prefix: string) => {
+          const iterable = handle as unknown as AsyncIterable<[string, FileSystemHandle]>;
+          for await (const [name, entry] of iterable) {
+            const rel = prefix ? `${prefix}/${name}` : name;
+            if (entry.kind === 'directory') {
+              if (name === '.trash' || name.startsWith('.tmp')) continue;
+              await walkHandle(entry as FileSystemDirectoryHandle, rel);
+            } else if (entry.kind === 'file') {
+              const file = await (entry as FileSystemFileHandle).getFile();
+              items.push({ file, relativePath: `${dirHandle.name}/${rel}`.normalize('NFC') });
+              if (items.length % 100 === 0) {
+                setSyncPreparing(`Lendo pasta "${dirHandle.name}" (${items.length} arquivos)...`);
+              }
+            }
+          }
+        };
+
+        await walkHandle(dirHandle, '');
+        setSyncPreparing(null);
+        if (items.length > 0) {
+          handleUploadItems(items);
+        }
+      } catch (err) {
+        if ((err as { name?: string })?.name === 'AbortError') return;
+        setSyncPreparing(null);
+        setSyncPrepError(err instanceof Error ? err.message : 'Falha ao ler pasta selecionada.');
+      }
+      return;
+    }
+    folderInputRef.current?.click();
+  };
+
+  const handleTriggerSyncFolder = async (folderRelPath: string, folderName: string) => {
+    const win = window as Window & {
+      showDirectoryPicker?: (opts?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle>;
+    };
+    if (typeof win.showDirectoryPicker === 'function') {
+      try {
+        const dirHandle = await win.showDirectoryPicker({ mode: 'read' });
+        setSyncPrepError(null);
+        setSyncPreparing(`Lendo pasta "${dirHandle.name}"...`);
+        const files: LocalSyncFile[] = [];
+
+        const walkHandle = async (handle: FileSystemDirectoryHandle, prefix: string) => {
+          const iterable = handle as unknown as AsyncIterable<[string, FileSystemHandle]>;
+          for await (const [name, entry] of iterable) {
+            const rel = prefix ? `${prefix}/${name}` : name;
+            if (entry.kind === 'directory') {
+              if (name === '.trash' || name.startsWith('.tmp')) continue;
+              await walkHandle(entry as FileSystemDirectoryHandle, rel);
+            } else if (entry.kind === 'file') {
+              const file = await (entry as FileSystemFileHandle).getFile();
+              files.push({ file, relPath: rel.normalize('NFC'), size: file.size });
+              if (files.length % 100 === 0) {
+                setSyncPreparing(`Lendo pasta "${dirHandle.name}" (${files.length} arquivos)...`);
+              }
+            }
+          }
+        };
+
+        await walkHandle(dirHandle, '');
+        await prepareSyncFromFiles({ relPath: folderRelPath, name: folderName }, dirHandle.name, files);
+      } catch (err) {
+        if ((err as { name?: string })?.name === 'AbortError') return;
+        setSyncPreparing(null);
+        setSyncPrepError(err instanceof Error ? err.message : 'Falha ao ler pasta selecionada.');
+      }
+      return;
+    }
+
+    const input = syncFolderInputRef.current;
+    if (!input || !('webkitdirectory' in input)) {
+      setDirError('Seu navegador/WebView não suporta seleção de pasta.');
+      return;
+    }
+    setSyncTargetFolder({ relPath: folderRelPath, name: folderName });
+    input.value = '';
+    input.click();
+  };
+
+  const handleSyncFolderSelected = async (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0 || !syncTargetFolder) return;
+    setSyncPrepError(null);
+    setSyncPreparing(`Lendo ${fileList.length} arquivo(s) da pasta local...`);
+    try {
+      await new Promise((r) => setTimeout(r, 20));
+      const { localRootName, files } = extractLocalSyncFiles(fileList);
+      await prepareSyncFromFiles(syncTargetFolder, localRootName, files);
+    } catch (err) {
+      setSyncPreparing(null);
+      setSyncPrepError(err instanceof Error ? err.message : 'Falha ao preparar sincronização da pasta.');
+    }
+  };
 
   // Solicitação de Acesso ao Cofre de Organização
   const [requestingOrgAccess, setRequestingOrgAccess] = useState(false);
@@ -2108,10 +2276,26 @@ export function UserVaultWorkspace({
       // Reconcilia silenciosamente
       await loadDirectory(currentFolder, activeTicket, true);
     } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao mover para lixeira.';
+      if (/não encontrad|404/i.test(msg)) {
+        // Item fantasma (só existia no índice Supabase, não no disco): limpa do índice antes de recarregar
+        await syncUserFileIndexAction({
+          mutation: { success: true, action: 'delete', item: entry },
+          organizationId: selectedOrgId || undefined,
+        }).catch(() => {});
+        setIndexedFiles((prev) =>
+          prev.filter((r) => r.relative_path !== targetPath && !r.relative_path.startsWith(`${targetPath}/`))
+        );
+        if (entry.kind === 'folder') {
+          await cascadeFolderUpdateAction({ oldPath: targetPath, isDelete: true }).catch(() => {});
+        }
+        await loadDirectory(currentFolder, activeTicket, true);
+        return;
+      }
       // Reverte se houve erro real no servidor de arquivos
       setFolders(prevFolders);
       setFiles(prevFiles);
-      setDirError(err instanceof Error ? err.message : 'Erro ao mover para lixeira.');
+      setDirError(msg);
     }
   };
 
@@ -2463,13 +2647,18 @@ export function UserVaultWorkspace({
     });
   };
 
+  const [purgingTrash, setPurgingTrash] = useState(false);
+
   const executeEmptyTrash = async (trashId?: string) => {
+    setPurgingTrash(true);
     try {
       const res = await emptyTenantTrashDirect({ trashId, ticket: activeTicket, serverUrl });
       setUsedBytes(res.total_used_bytes);
       await loadTrash();
     } catch (err: unknown) {
       setDirError(err instanceof Error ? err.message : 'Erro ao esvaziar lixeira.');
+    } finally {
+      setPurgingTrash(false);
     }
   };
 
@@ -2581,7 +2770,7 @@ export function UserVaultWorkspace({
               <span>Organizações</span>
             </Link>
             <Link
-              href={selectedOrg ? `/labdiv?org=${encodeURIComponent(selectedOrg.slug)}&view=studio` : '/studio'}
+              href={selectedOrg ? `/labdiv?org=${encodeURIComponent(selectedOrg.slug)}&view=studio` : '/labdiv?view=studio&scope=personal'}
               prefetch={true}
               className="flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold text-fg-secondary hover:text-fg transition-colors"
               title="Abrir HUB Studio (Criador Visual)"
@@ -3046,7 +3235,7 @@ export function UserVaultWorkspace({
                   {isAddMenuOpen && (
                     <div
                       role="menu"
-                      className="absolute right-0 mt-2 w-72 rounded-2xl bg-surface border border-border-subtle shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-md"
+                      className="absolute left-0 lg:left-auto lg:right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl bg-surface border border-border-subtle shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-md"
                     >
                       <div className="px-3 py-2 border-b border-border-subtle/60 mb-1">
                         <p className="text-[11px] font-bold text-fg-muted uppercase tracking-wider">
@@ -3112,7 +3301,7 @@ export function UserVaultWorkspace({
                         disabled={uploading}
                         onClick={() => {
                           setIsAddMenuOpen(false);
-                          folderInputRef.current?.click();
+                          void handleTriggerUploadFolder();
                         }}
                         className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-fg hover:bg-surface-hover flex items-center gap-2.5 transition-colors group"
                       >
@@ -3745,7 +3934,7 @@ export function UserVaultWorkspace({
                         </button>
                         <button
                           type="button"
-                          onClick={() => folderInputRef.current?.click()}
+                          onClick={() => void handleTriggerUploadFolder()}
                           className="px-2.5 py-1.5 rounded-lg bg-app hover:bg-surface-hover text-fg border border-border-subtle text-[11px] font-bold flex items-center gap-1.5 cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-[15px] text-cyan-600 dark:text-[#00E5FF]">drive_folder_upload</span>
@@ -3821,7 +4010,7 @@ export function UserVaultWorkspace({
 
                         <button
                           type="button"
-                          onClick={() => folderInputRef.current?.click()}
+                          onClick={() => void handleTriggerUploadFolder()}
                           className="px-3.5 py-2 rounded-xl bg-surface hover:bg-surface-hover text-fg border border-border-subtle text-xs font-bold transition-all flex items-center gap-2 shadow-sm hover:border-[#00E5FF]"
                           title="Subir pasta completa preservando subpastas"
                         >
@@ -4338,11 +4527,14 @@ export function UserVaultWorkspace({
             {trashItems.length > 0 && (
               <button
                 type="button"
+                disabled={purgingTrash}
                 onClick={() => void handleEmptyTrash()}
-                className="px-4 py-2 rounded-xl bg-[#F14343] hover:bg-[#d93636] text-white text-xs font-bold flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl bg-[#F14343] hover:bg-[#d93636] disabled:opacity-60 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[18px]">delete_forever</span>
-                Esvaziar Lixeira
+                <span className={`material-symbols-outlined text-[18px] ${purgingTrash ? 'animate-spin' : ''}`}>
+                  {purgingTrash ? 'sync' : 'delete_forever'}
+                </span>
+                {purgingTrash ? 'Esvaziando lixeira...' : 'Esvaziar Lixeira'}
               </button>
             )}
           </div>
@@ -4762,6 +4954,91 @@ export function UserVaultWorkspace({
         />
       )}
 
+      {/* Input oculto para Atualização/Sincronização de Pasta */}
+      <input
+        ref={syncFolderInputRef}
+        type="file"
+        // @ts-expect-error webkitdirectory suportado em navegadores modernos
+        webkitdirectory=""
+        multiple
+        className="hidden"
+        onChange={(e) => void handleSyncFolderSelected(e.target.files)}
+      />
+
+      {(syncPreparing || syncPrepError) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-surface border border-border-subtle p-5 shadow-2xl text-fg space-y-3">
+            <div className="flex items-center gap-2.5 text-sm font-black">
+              <span className={`material-symbols-outlined text-[20px] ${syncPrepError ? 'text-rose-400' : 'text-emerald-400 animate-spin'}`}>
+                {syncPrepError ? 'error' : 'sync'}
+              </span>
+              <span>{syncPrepError ? 'Erro ao preparar atualização' : 'Analisando pasta...'}</span>
+            </div>
+            <p className="text-xs text-fg-secondary">
+              {syncPrepError || syncPreparing}
+            </p>
+            {syncPrepError && (
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => setSyncPrepError(null)}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-app border border-border-subtle hover:bg-surface-hover cursor-pointer"
+                >
+                  Fechar
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {syncModalData && (
+        <VaultFolderSyncModal
+          isOpen={true}
+          folderRelPath={syncModalData.folderRelPath}
+          folderName={syncModalData.folderName}
+          localRootName={syncModalData.localRootName}
+          localFiles={syncModalData.localFiles}
+          remoteManifest={syncModalData.remoteManifest}
+          affectedShortcuts={syncModalData.affectedShortcuts}
+          ticket={activeTicket}
+          ensureFreshTicket={async () => {
+            const t = await refreshTicket();
+            return typeof t === 'string' ? t : t?.ticket || activeTicket;
+          }}
+          serverUrl={serverUrl}
+          organizationId={selectedOrgId || null}
+          quotaRemainingBytes={0}
+          onClose={() => setSyncModalData(null)}
+          onCompleted={() => {
+            void loadDirectory(currentFolder);
+          }}
+          onQueueSyncUploads={(uploadItems, removePaths) => {
+            if (uploadItems.length > 0) {
+              uploadCtx.openModal(uploadItems, syncModalData.folderRelPath, selectedOrgId);
+            }
+            if (removePaths.length > 0) {
+              void (async () => {
+                try {
+                  const tRaw = await refreshTicket();
+                  const freshTkt = typeof tRaw === 'string' ? tRaw : tRaw?.ticket || activeTicket;
+                  const { applyTenantFolderSyncDirect } = await import('@/lib/edge-client');
+                  await applyTenantFolderSyncDirect({
+                    folder: syncModalData.folderRelPath,
+                    removePaths,
+                    ticket: freshTkt,
+                    serverUrl,
+                  });
+                  void loadDirectory(currentFolder);
+                } catch (err) {
+                  setDirError(err instanceof Error ? err.message : 'Erro ao mover arquivos removidos para a Lixeira.');
+                }
+              })();
+            }
+          }}
+        />
+      )}
+
       {/* Menu de Contexto (Botão Direito & 3 Pontinhos) */}
       {contextMenu && (
         <VaultContextMenu
@@ -4800,6 +5077,11 @@ export function UserVaultWorkspace({
               preselectedSourceName: folderName,
             });
           }}
+          onSyncFolder={
+            isApprovedForStorage && (!selectedOrgId || localOrgs.find((o) => o.id === selectedOrgId)?.can_upload_vault !== false)
+              ? (folderPath, folderName) => handleTriggerSyncFolder(folderPath, folderName)
+              : undefined
+          }
           onRename={(entry) => void handleRenameEntry(entry)}
           onDelete={(entry) => void handleDeleteEntry(entry)}
           onBatchDelete={() => void handleBatchDelete()}
@@ -4864,7 +5146,7 @@ export function UserVaultWorkspace({
             setNoteDrawerOpen(true);
           }}
           onUploadFiles={() => fileInputRef.current?.click()}
-          onUploadFolder={() => folderInputRef.current?.click()}
+          onUploadFolder={() => void handleTriggerUploadFolder()}
           onUploadZip={() => zipInputRef.current?.click()}
           onRefresh={() => void loadDirectory(currentFolder)}
           onClearSelection={() => setSelectedPaths(new Set())}

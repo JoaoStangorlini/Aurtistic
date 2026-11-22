@@ -2,7 +2,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import Link from 'next/link';
 import { useStudio } from './StudioContext';
 import { useOrganizationBrand } from '../OrganizationBrandProvider';
 import { getOrgStudioTemplates } from './studio-presets';
@@ -120,25 +119,6 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
           <span className="text-xs font-mono font-bold uppercase tracking-wider text-fg">
             {scope === 'personal' ? 'Studio Pessoal' : `${tokens.displayName || 'Organização'}`}
           </span>
-        </div>
-        <div className="flex items-center gap-2">
-          {scope === 'personal' ? (
-            <Link
-              href="/labdiv"
-              className="text-[11px] font-bold text-fg-muted hover:text-accent-primary transition-colors flex items-center gap-1"
-            >
-              <span>Ver Organizações</span>
-              <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-            </Link>
-          ) : (
-            <Link
-              href="/studio"
-              className="text-[11px] font-bold text-fg-muted hover:text-accent-primary transition-colors flex items-center gap-1"
-            >
-              <span>Meu Studio Pessoal</span>
-              <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-            </Link>
-          )}
         </div>
       </div>
 
@@ -296,10 +276,12 @@ export function StudioLauncherView({ orgSlug }: { orgSlug?: string | null }) {
               </span>
               <div>
                 <span className="text-xs sm:text-sm font-black uppercase tracking-wider block">
-                  Modelos da Organização
+                  {scope === 'personal' ? 'Modelos Base' : 'Modelos da Organização'}
                 </span>
                 <span className="text-[10px] font-normal text-fg-muted">
-                  Predefinições com a IDV oficial (@{effectiveSlug})
+                  {scope === 'personal'
+                    ? 'Predefinições neutras com a sua paleta atual'
+                    : `Predefinições com a IDV oficial (@${effectiveSlug})`}
                 </span>
               </div>
             </div>

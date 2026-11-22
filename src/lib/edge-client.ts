@@ -99,17 +99,105 @@ export function computeUnindexedDiskEntries(
   return missing;
 }
 
+export async function getTenantFolderManifestDirect(input: {
+  folder: string;
+  ticket: string;
+  serverUrl?: string;
+  includeHash?: boolean;
+}): Promise<{
+  folder: string;
+  files: Array<{ relPath: string; sizeBytes: number; mtimeMs?: number; sha256?: string | null }>;
+  lockedSubfolders?: string[];
+}> {
+  const base = resolveClientEdgeServerUrl(input.serverUrl);
+  const qs = new URLSearchParams({ folder: input.folder });
+  if (input.includeHash) qs.set('includeHash', '1');
+  const res = await fetch(`${base}/api/tenant/manifest?${qs.toString()}`, {
+    headers: { 'x-tenant-ticket': input.ticket },
+    cache: 'no-store',
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 404) {
+    // Fallback automático quando o Edge Server ainda não foi reiniciado com /api/tenant/manifest
+    const files: Array<{ relPath: string; sizeBytes: number; mtimeMs?: number; sha256?: string | null }> = [];
+    const lockedSubfolders: string[] = [];
+    const walkList = async (currentPath: string, prefix: string) => {
+      const listQs = new URLSearchParams({ folder: currentPath });
+      const lr = await fetch(`${base}/api/tenant/list?${listQs.toString()}`, {
+        headers: { 'x-tenant-ticket': input.ticket },
+        cache: 'no-store',
+      });
+      if (!lr.ok) return;
+      const ld = await lr.json().catch(() => ({}));
+      if (ld?.isLocked) {
+        if (prefix) lockedSubfolders.push(prefix);
+        return;
+      }
+      for (const f of ld?.files || []) {
+        const inner = prefix ? `${prefix}/${f.name}` : f.name;
+        files.push({
+          relPath: inner,
+          sizeBytes: Number(f.sizeBytes) || 0,
+          mtimeMs: f.modifiedAt ? new Date(f.modifiedAt).getTime() : undefined,
+          sha256: null,
+        });
+      }
+      for (const sub of ld?.folders || []) {
+        if (sub.isShortcut) continue;
+        const nextPrefix = prefix ? `${prefix}/${sub.name}` : sub.name;
+        if (sub.hasPin && !sub.isUnlocked) {
+          lockedSubfolders.push(nextPrefix);
+          continue;
+        }
+        await walkList(sub.relativePath, nextPrefix);
+      }
+    };
+    await walkList(input.folder, '');
+    return { folder: input.folder, files, lockedSubfolders };
+  }
+  if (!res.ok || !data?.success) {
+    throw new Error(data?.error || `Falha ao ler manifesto (${res.status}).`);
+  }
+  return data;
+}
+
+export async function applyTenantFolderSyncDirect(input: {
+  folder: string;
+  removePaths: string[];
+  ticket: string;
+  serverUrl?: string;
+}): Promise<{ success: boolean; movedToTrash: string[]; total_used_bytes: number }> {
+  const base = resolveClientEdgeServerUrl(input.serverUrl);
+  const res = await fetch(`${base}/api/tenant/folder-sync/apply`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-tenant-ticket': input.ticket,
+    },
+    body: JSON.stringify({ folder: input.folder, removePaths: input.removePaths }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.success) {
+    throw new Error(data?.error || `Falha ao aplicar sincronização (${res.status}).`);
+  }
+  return data;
+}
+
 export async function uploadTenantFileDirect(input: {
   file: File;
   folderPath: string;
   ticket: string;
   serverUrl?: string;
+  overwrite?: boolean;
   signal?: AbortSignal;
   onProgress?: (percent: number, loadedBytes?: number, totalBytes?: number) => void;
 }): Promise<EdgeMutationResponse> {
   const base = resolveClientEdgeServerUrl(input.serverUrl);
   const formData = new FormData();
   formData.append('folderPath', input.folderPath);
+  if (input.overwrite) {
+    formData.append('overwrite', '1');
+  }
   formData.append('file', input.file);
 
   if (input.onProgress && typeof window !== 'undefined' && typeof XMLHttpRequest !== 'undefined') {

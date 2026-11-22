@@ -92,6 +92,16 @@ export async function syncUserFileIndexAction(input: {
       p_target_path: relRes.data,
       p_organization_id: organizationId || null,
     });
+    let delQuery = supabase
+      .from('user_files_index')
+      .delete()
+      .or(`relative_path.eq.${relRes.data},relative_path.like.${relRes.data}/%`);
+    if (organizationId) {
+      delQuery = delQuery.eq('organization_id', organizationId);
+    } else {
+      delQuery = delQuery.eq('user_id', user.id).is('organization_id', null);
+    }
+    await delQuery;
   } else if (
     (mutation.action === 'rename' || mutation.action === 'move') &&
     mutation.old_relative_path

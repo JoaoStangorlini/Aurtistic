@@ -26,6 +26,8 @@ interface OrganizationBrandProviderProps {
   brandConfig?: Record<string, unknown> | null;
   children: React.ReactNode;
   className?: string;
+  /** Modo neutro (Studio Pessoal): não aplica tema de org e herda a paleta/modo atuais do usuário. */
+  neutral?: boolean;
 }
 
 export function OrganizationBrandProvider({
@@ -33,19 +35,26 @@ export function OrganizationBrandProvider({
   brandConfig,
   children,
   className = '',
+  neutral = false,
 }: OrganizationBrandProviderProps) {
-  const { setActiveOrgPalette, overrideOrgTheme, resolvedMode, isStudioActive } = useTheme();
+  const { setActiveOrgPalette, overrideOrgTheme, resolvedMode, isStudioActive, paletteDef } = useTheme();
   const isLight = resolvedMode === 'light';
+  const userPrimary = paletteDef?.preview?.primary;
+  const userSecondary = paletteDef?.preview?.secondary;
 
   const baseTokens = useMemo(() => {
+    if (neutral) {
+      const accents = [userPrimary, userSecondary].filter((c): c is string => Boolean(c));
+      return resolvePersonalStudioTokens(accents.length > 0 ? accents : undefined, resolvedMode);
+    }
     if (orgSlug === 'personal') {
       return resolvePersonalStudioTokens(undefined, resolvedMode);
     }
     return resolveOrgBrandTokens(orgSlug, brandConfig);
-  }, [orgSlug, brandConfig, resolvedMode]);
+  }, [neutral, userPrimary, userSecondary, orgSlug, brandConfig, resolvedMode]);
 
   const tokens = useMemo<OrgBrandTokens>(() => {
-    if (!isLight) return baseTokens;
+    if (neutral || !isLight) return baseTokens;
     const lightMap: Record<string, { bgApp: string; bgSurface: string; primaryColor?: string }> = {
       'show-da-fisica': { bgApp: '#F2F6FF', bgSurface: '#FFFFFF', primaryColor: '#0052CC' },
       hs: { bgApp: '#F2FBF6', bgSurface: '#FFFFFF', primaryColor: '#059669' },
@@ -60,14 +69,15 @@ export function OrganizationBrandProvider({
       textMuted: '#475569',
       primaryColor: override.primaryColor || baseTokens.primaryColor,
     };
-  }, [baseTokens, isLight]);
+  }, [baseTokens, isLight, neutral]);
 
   useLayoutEffect(() => {
-    setActiveOrgPalette(tokens.themeId);
+    // Neutro: libera o tema da org para que a paleta escolhida pelo usuário volte a valer
+    setActiveOrgPalette(neutral ? null : tokens.themeId);
     return () => {
       setActiveOrgPalette(null);
     };
-  }, [tokens.themeId, setActiveOrgPalette]);
+  }, [neutral, tokens.themeId, setActiveOrgPalette]);
 
   const studioFlexStyle = isStudioActive
     ? ({ flex: '1 1 0%', minHeight: 0, display: 'flex', flexDirection: 'column' } as React.CSSProperties)
@@ -76,7 +86,7 @@ export function OrganizationBrandProvider({
   return (
     <OrganizationBrandContext.Provider value={{ tokens }}>
       <div
-        data-org-brand={overrideOrgTheme ? undefined : tokens.themeId}
+        data-org-brand={overrideOrgTheme || neutral ? undefined : tokens.themeId}
         data-theme-mode={resolvedMode}
         style={studioFlexStyle}
         className={`relative overflow-x-hidden transition-colors duration-300 ${isStudioActive ? 'flex-1 min-h-0 flex flex-col overflow-hidden' : 'min-h-full'

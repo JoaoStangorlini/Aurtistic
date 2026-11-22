@@ -7247,20 +7247,7 @@ async function getTenantUsedBytes(namespaceId, userRoot, forceRecalc = false, sc
   let total = await computeDirectoryBytesRecursive(userRoot, new Set(['.trash']));
 
   if (scopeType !== 'org' && namespaceId === PRIMARY_ADMIN_UUID) {
-    const catalogItems = Array.isArray(memoryCatalog?.items) ? memoryCatalog.items : [];
-    if (catalogItems.length > 0) {
-      let legacyCatalogBytes = 0;
-      for (const item of catalogItems) {
-        if (item.isShortcut) continue;
-        const itemRel = String(item.relativePath || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-        const shadowInUserRoot = itemRel ? path.join(userRoot, 'Portfolio', itemRel) : null;
-        if (shadowInUserRoot && fs.existsSync(shadowInUserRoot)) {
-          continue; // Já contabilizado em userRoot
-        }
-        legacyCatalogBytes += Math.max(0, Number(item.sizeBytes) || 0);
-      }
-      total += legacyCatalogBytes;
-    } else if (
+    if (
       fs.existsSync(PORTFOLIO_DIR) &&
       path.resolve(PORTFOLIO_DIR) !== path.resolve(path.join(userRoot, 'Portfolio'))
     ) {
@@ -7703,7 +7690,8 @@ app.get('/api/tenant/list', verifyTenantTicket, async (req, res) => {
           d.name.startsWith('.tmp') ||
           IGNORED_PORTFOLIO_DIRS.has(d.name) ||
           d.name === 'catalog.json' ||
-          d.name === 'sig_index.json'
+          d.name === 'sig_index.json' ||
+          d.name === '.sync-journal.json'
         ) {
           continue;
         }
@@ -7835,6 +7823,167 @@ app.get('/api/tenant/list', verifyTenantTicket, async (req, res) => {
       total_used_bytes: totalUsedBytes,
       hdConnected: isExternalStorageMounted(),
       storageDir: STORAGE_DIR,
+    });
+  } catch (err) {
+    return res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
+
+// 11.5.1.1. GET /api/tenant/manifest — Manifesto recursivo para sincronização de pasta
+app.get('/api/tenant/manifest', verifyTenantTicket, async (req, res) => {
+  try {
+    const rawFolder = req.query.folder ? String(req.query.folder) : '';
+    const cleanRel = normalizeTenantRelPath(rawFolder);
+    if (!cleanRel) return res.status(400).json({ error: 'Parâmetro folder obrigatório.' });
+    assertFolderPinUnlockedIfRequired(req, cleanRel);
+
+    const includeHash = req.query.includeHash === '1' || req.query.includeHash === 'true';
+    const dirTargets = resolveTenantListingDirs(
+      req.tenant.userId,
+      req.tenant.userRoot,
+      cleanRel,
+      req.tenant.scopeType,
+      req.tenant.role,
+      req.tenant.allowedOrgSlugs
+    );
+    if (STORAGE_VOLUMES_POOL.length > 1) {
+      const nsSub = path.relative(STORAGE_DIR, req.tenant.userRoot);
+      for (const vol of STORAGE_VOLUMES_POOL) {
+        if (!vol.online || path.resolve(vol.rootDir) === path.resolve(STORAGE_DIR)) continue;
+        const extraDir = path.join(vol.tenantBaseDir, nsSub, cleanRel);
+        if (fs.existsSync(extraDir) && !dirTargets.some((t) => path.resolve(t.dirPath) === path.resolve(extraDir))) {
+          dirTargets.push({ dirPath: extraDir, isLegacyBridge: false });
+        }
+      }
+    }
+
+    const fileMap = new Map();
+    const lockedSubfolders = new Set();
+
+    async function walkDir(absDir, relPrefix) {
+      const dirents = await fs.promises.readdir(absDir, { withFileTypes: true }).catch(() => []);
+      for (const d of dirents) {
+        if (
+          d.name === '.trash' ||
+          d.name.startsWith('.tmp') ||
+          IGNORED_PORTFOLIO_DIRS.has(d.name) ||
+          d.name === 'catalog.json' ||
+          d.name === 'sig_index.json' ||
+          d.name === '.sync-journal.json' ||
+          d.name.endsWith('.shortcut.json') ||
+          d.name.endsWith('.shortcut')
+        ) {
+          continue;
+        }
+        const fullPath = path.join(absDir, d.name);
+        const st = await fs.promises.lstat(fullPath).catch(() => null);
+        if (!st || st.isSymbolicLink()) continue;
+
+        const innerRel = relPrefix ? `${relPrefix}/${d.name}` : d.name;
+        const tenantRel = `${cleanRel}/${innerRel}`;
+
+        if (st.isDirectory()) {
+          const lockInfo = isTenantPathPinProtected(req.tenant.userId, tenantRel);
+          if (lockInfo && !req.tenant.unlockedPinsSet.has(lockInfo.lockedScope)) {
+            lockedSubfolders.add(innerRel);
+            continue;
+          }
+          await walkDir(fullPath, innerRel);
+        } else if (st.isFile()) {
+          if (fileMap.has(innerRel)) continue;
+          const hdr = await vaultCrypto.readEncryptedHeader(fullPath).catch(() => null);
+          let sha256 = hdr?.plaintextSha256 ? hdr.plaintextSha256.toString('hex') : null;
+          if (!hdr && includeHash) {
+            sha256 = await computeFileSha256(fullPath);
+          }
+          fileMap.set(innerRel, {
+            relPath: innerRel,
+            sizeBytes: hdr ? hdr.plaintextSize : st.size,
+            mtimeMs: st.mtimeMs,
+            sha256,
+          });
+        }
+      }
+    }
+
+    for (const { dirPath } of dirTargets) {
+      await walkDir(dirPath, '');
+    }
+
+    return res.json({
+      success: true,
+      folder: cleanRel,
+      files: Array.from(fileMap.values()),
+      lockedSubfolders: Array.from(lockedSubfolders),
+    });
+  } catch (err) {
+    return res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
+
+// 11.5.1.2. POST /api/tenant/folder-sync/apply — Move arquivos removidos para a Lixeira (.trash) e registra journal
+app.post('/api/tenant/folder-sync/apply', verifyTenantTicket, async (req, res) => {
+  try {
+    if (req.tenant.readOnly || req.tenant.purpose === 'public_media' || req.tenant.quotaLimitBytes <= 0) {
+      return res.status(403).json({ error: 'Sem permissão para sincronizar pastas.' });
+    }
+    const cleanFolder = normalizeTenantRelPath(req.body?.folder || '');
+    if (!cleanFolder) return res.status(400).json({ error: 'Parâmetro folder obrigatório.' });
+    assertFolderPinUnlockedIfRequired(req, cleanFolder);
+
+    const removePaths = Array.isArray(req.body?.removePaths) ? req.body.removePaths : [];
+    const { trashDir } = getTenantTrashDirAndManifest(req.tenant.userRoot);
+    await fs.promises.mkdir(trashDir, { recursive: true });
+    const manifest = await readTenantTrashManifest(req.tenant.userRoot);
+    const movedToTrash = [];
+
+    for (const rawInner of removePaths) {
+      const innerRel = normalizeTenantRelPath(String(rawInner || ''));
+      if (!innerRel) continue;
+      const fullRel = `${cleanFolder}/${innerRel}`;
+      assertFolderPinUnlockedIfRequired(req, fullRel);
+      const targetFull = req.tenant.resolveSafePath(fullRel, { forWrite: false });
+      const st = await fs.promises.lstat(targetFull).catch(() => null);
+      if (!st || st.isSymbolicLink() || !st.isFile()) continue;
+
+      const hdr = await vaultCrypto.readEncryptedHeader(targetFull).catch(() => null);
+      const sizeBytes = hdr ? hdr.plaintextSize : st.size;
+      const trashId = `tr_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+      const storedName = `${trashId}_${path.basename(targetFull)}`;
+      await moveFileSafe(targetFull, path.join(trashDir, storedName));
+      manifest.unshift({
+        trashId,
+        storedName,
+        name: path.basename(targetFull),
+        originalRelativePath: fullRel,
+        isDirectory: false,
+        sizeBytes,
+        mimeType: 'application/octet-stream',
+        deletedAt: new Date().toISOString(),
+      });
+      movedToTrash.push(fullRel);
+    }
+
+    if (movedToTrash.length > 0) {
+      await writeTenantTrashManifest(req.tenant.userRoot, manifest);
+    }
+
+    const journalPath = path.join(req.tenant.userRoot, '.sync-journal.json');
+    await fs.promises.writeFile(
+      journalPath,
+      JSON.stringify({ folder: cleanFolder, movedToTrash, syncedAt: new Date().toISOString() }, null, 2),
+      'utf8'
+    ).catch(() => {});
+
+    const totalUsedBytes = await req.tenant.getUsedBytes(true);
+    if (isPortfolioRelatedRelPath(cleanFolder)) {
+      void syncPortfolioFromDiskAsync({ force: true }).catch(() => {});
+    }
+
+    return res.json({
+      success: true,
+      movedToTrash,
+      total_used_bytes: totalUsedBytes,
     });
   } catch (err) {
     return res.status(err.statusCode || 500).json({ error: err.message });
@@ -8396,6 +8545,11 @@ app.post(
       }
 
       const totalUsedBytes = await req.tenant.adjustUsedBytes(deltaBytes);
+      if (req.body?.overwrite === '1' || req.query?.overwrite === '1') {
+        const nfcRel = relPath.normalize('NFC').replace(/\\/g, '/');
+        const thumbKey = crypto.createHash('md5').update(`${req.tenant.pinNamespaceId}:${nfcRel}`).digest('hex');
+        await fs.promises.unlink(path.join(INTERNAL_THUMBS_DIR, `tthumb_${thumbKey}.webp`)).catch(() => {});
+      }
       queueTenantImageThumbnail(req.tenant.pinNamespaceId, relPath, targetPath, 480);
       const item = await buildTenantEntryDescriptorAsync(
         req.tenant.userId,
@@ -8782,9 +8936,15 @@ app.delete('/api/tenant/entry', verifyTenantTicket, async (req, res) => {
       });
     }
 
-    const targetFull = req.tenant.resolveSafePath(relPath, { forWrite: false });
+    let targetFull = req.tenant.resolveSafePath(relPath, { forWrite: false });
     if (!fs.existsSync(targetFull)) {
-      return res.status(404).json({ error: 'Arquivo ou pasta não encontrado.' });
+      const listingCandidates = req.tenant.resolveListingDirs ? req.tenant.resolveListingDirs(relPath) : [];
+      const foundCandidate = listingCandidates.find((c) => c?.dirPath && fs.existsSync(c.dirPath));
+      if (foundCandidate) {
+        targetFull = foundCandidate.dirPath;
+      } else {
+        return res.status(404).json({ error: 'Arquivo ou pasta não encontrado.' });
+      }
     }
 
     const descriptor = await buildTenantEntryDescriptorAsync(
@@ -8827,6 +8987,18 @@ app.delete('/api/tenant/entry', verifyTenantTicket, async (req, res) => {
       }
     } else {
       await moveFileSafe(targetFull, trashDest);
+    }
+
+    // Garante remoção em volumes secundários do pool para que a pasta não reapareça na listagem
+    if (STORAGE_VOLUMES_POOL.length > 1) {
+      const nsSub = path.relative(STORAGE_DIR, req.tenant.userRoot);
+      for (const vol of STORAGE_VOLUMES_POOL) {
+        if (!vol.online || path.resolve(vol.rootDir) === path.resolve(STORAGE_DIR)) continue;
+        const extraTarget = path.join(vol.tenantBaseDir, nsSub, relPath);
+        if (fs.existsSync(extraTarget)) {
+          await fs.promises.rm(extraTarget, { recursive: true, force: true }).catch(() => {});
+        }
+      }
     }
 
     const manifest = await readTenantTrashManifest(req.tenant.userRoot);
