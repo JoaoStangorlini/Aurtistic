@@ -32,8 +32,10 @@ jobs:
           cache: "npm"
           cache-dependency-path: desktop/package-lock.json
 
-      - name: Instalar dependências do desktop
-        run: npm --prefix desktop ci || npm --prefix desktop install
+      - name: Instalar dependências do desktop e servidor (testes core)
+        run: |
+          npm --prefix desktop ci || npm --prefix desktop install
+          npm --prefix servidor ci || npm --prefix servidor install --no-audit --no-fund
 
       - name: Compilar TypeScript (desktop)
         run: npx --prefix desktop tsc -p desktop/tsconfig.json
@@ -58,7 +60,7 @@ jobs:
             platform_flag: --win nsis
             artifact_name: desktop-windows
           - os: macos-latest
-            platform_flag: --mac dmg
+            platform_flag: --mac dmg zip
             artifact_name: desktop-macos
     steps:
       - name: Checkout
@@ -95,6 +97,7 @@ jobs:
         run: npm --prefix desktop run build
 
       - name: Empacotar com electron-builder
+        working-directory: desktop
         shell: bash
         env:
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
@@ -115,7 +118,7 @@ jobs:
             export CSC_IDENTITY_AUTO_DISCOVERY=false
           fi
 
-          npx --prefix desktop electron-builder --config desktop/electron-builder.yml ${{ matrix.platform_flag }} --publish never
+          npx electron-builder --config electron-builder.yml ${{ matrix.platform_flag }} --publish never
 
       - name: Upload dos artefatos de build
         uses: actions/upload-artifact@v4

@@ -103,19 +103,19 @@ PYEOF
     trap 'rm -rf "$GNUPG_TMP"' EXIT
 
     export GNUPGHOME="$GNUPG_TMP"
-    printf '%s\n' "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
-
-    KEY_ID="$(gpg --list-secret-keys --with-colons | awk -F: '/^sec/{print $5; exit}')"
-    if [ -z "$KEY_ID" ]; then
-      echo "Falha ao localizar chave secreta GPG importada." >&2
-      exit 1
-    fi
-
     PASSPHRASE_ARGS=()
     if [ -n "${APT_GPG_PASSPHRASE:-}" ]; then
       PASSPHRASE_ARGS=(--pinentry-mode loopback --passphrase "$APT_GPG_PASSPHRASE")
     else
       PASSPHRASE_ARGS=(--pinentry-mode loopback --passphrase "")
+    fi
+
+    printf '%s\n' "$APT_GPG_PRIVATE_KEY" | gpg --batch "${PASSPHRASE_ARGS[@]}" --import
+
+    KEY_ID="$(gpg --list-secret-keys --with-colons | awk -F: '/^sec/{print $5; exit}')"
+    if [ -z "$KEY_ID" ]; then
+      echo "Falha ao localizar chave secreta GPG importada." >&2
+      exit 1
     fi
 
     gpg --batch --yes --export "$KEY_ID" > KEY.gpg
