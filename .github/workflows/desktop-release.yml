@@ -57,7 +57,7 @@ jobs:
             platform_flag: --linux deb AppImage
             artifact_name: desktop-linux
           - os: windows-latest
-            platform_flag: --win nsis
+            platform_flag: --win nsis appx
             artifact_name: desktop-windows
           - os: macos-latest
             platform_flag: --mac dmg zip
@@ -126,6 +126,8 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: |
             desktop/release/*.exe
+            desktop/release/*.appx
+            desktop/release/*.msix
             desktop/release/*.blockmap
             desktop/release/*.deb
             desktop/release/*.AppImage

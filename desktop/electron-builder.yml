@@ -34,6 +34,20 @@ win:
     - target: nsis
       arch:
         - x64
+    - target: appx
+      arch:
+        - x64
+
+appx:
+  applicationId: Aurtistic
+  identityName: JooStangorlini.aurtistic
+  publisher: CN=B4F0EDDB-3261-4276-8056-5EDB60A56FBA
+  publisherDisplayName: João Stangorlini
+  displayName: Aurtistic
+  artifactName: Aurtistic-${version}-${arch}.${ext}
+  languages:
+    - pt-BR
+    - en-US
 
 nsis:
   oneClick: false
