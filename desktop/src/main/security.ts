@@ -31,8 +31,17 @@ export function isAllowedAppNavigationUrl(
     const u = new URL(rawUrl);
     if (u.protocol === 'https:') {
       const host = u.hostname.toLowerCase();
-      // Preserva fluxos legítimos de login OAuth / Supabase
-      if (host.endsWith('.supabase.co') || host === 'accounts.google.com' || host === 'github.com') {
+      // Preserva fluxos legítimos de login OAuth / Supabase / HUB SSO
+      if (
+        host.endsWith('.supabase.co') ||
+        host === 'accounts.google.com' ||
+        host === 'github.com' ||
+        host === 'hub-lab-div.vercel.app' ||
+        host === 'hublabdiv.com.br' ||
+        host.endsWith('.hublabdiv.com.br') ||
+        host === 'aurtistic.com.br' ||
+        host === 'www.aurtistic.com.br'
+      ) {
         return true;
       }
     }

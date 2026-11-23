@@ -40,6 +40,8 @@ async function run() {
     assert.equal(security.isTrustedAppUrl('http://localhost:3000/servidor', { isPackaged: true, allowDev: true }), false);
     assert.equal(security.isTrustedAppUrl('http://localhost:3000/servidor', { isPackaged: false, allowDev: true }), true);
     assert.equal(security.isAllowedAppNavigationUrl('https://xyz.supabase.co/auth/v1/callback', { isPackaged: true }), true);
+    assert.equal(security.isAllowedAppNavigationUrl('https://hub-lab-div.vercel.app/auth/sso/authorize?next=%2Flabdiv', { isPackaged: true }), true);
+    assert.equal(security.isAllowedAppNavigationUrl('https://hublabdiv.com.br/auth/sso/authorize', { isPackaged: true }), true);
     assert.equal(security.isAllowedAppNavigationUrl('https://evil.com', { isPackaged: true }), false);
 
     assert.throws(

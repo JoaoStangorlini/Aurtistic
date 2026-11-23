@@ -1,6 +1,6 @@
 appId: com.aurtistic.desktop
 productName: Aurtistic
-copyright: Copyright © 2026 Aurtistic (AGPLv3)
+copyright: Copyright © 2026 João Stangorlini (AGPLv3)
 asar: true
 asarUnpack:
   - build/*.png
@@ -43,7 +43,7 @@ nsis:
   shortcutName: Aurtistic
 
 linux:
-  maintainer: Aurtistic <contato@aurtistic.com.br>
+  maintainer: João Stangorlini <joaopaulostangorlini@gmail.com>
   executableName: aurtistic
   icon: build/icon.png
   category: Utility;Productivity;

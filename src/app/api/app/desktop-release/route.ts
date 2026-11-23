@@ -23,6 +23,7 @@ export interface DesktopReleasePayload {
   publishedAt: string | null;
   releasePageUrl: string;
   aptInstallCommand: string;
+  aptManualCommand: string;
   assets: {
     windowsExe: { url: string; filename: string; sizeBytes: number } | null;
     linuxDeb: { url: string; filename: string; sizeBytes: number } | null;
@@ -54,8 +55,10 @@ export async function GET() {
   const token = String(process.env.GITHUB_RELEASE_TOKEN || process.env.GITHUB_TOKEN || '').trim();
   const releasePageUrl = `https://github.com/${repo}/releases/latest`;
   const owner = repo.split('/')[0] || 'JoaoStangorlini';
-  const aptRepoUrl = `https://${owner.toLowerCase()}.github.io/${(repo.split('/')[1] || 'Aurtistic').toLowerCase()}/apt`;
-  const aptInstallCommand = `curl -fsSL ${aptRepoUrl}/KEY.gpg | sudo gpg --dearmor -o /usr/share/keyrings/aurtistic.gpg && echo "deb [signed-by=/usr/share/keyrings/aurtistic.gpg] ${aptRepoUrl} ./" | sudo tee /etc/apt/sources.list.d/aurtistic.list && sudo apt update && sudo apt install -y aurtistic`;
+  const repoName = repo.split('/')[1] || 'Aurtistic';
+  const aptRepoUrl = `https://${owner.toLowerCase()}.github.io/${repoName}/apt`;
+  const aptInstallCommand = `curl -fsSL ${aptRepoUrl}/install.sh | sudo bash`;
+  const aptManualCommand = `curl -fsSL ${aptRepoUrl}/KEY.gpg | sudo gpg --yes --dearmor -o /usr/share/keyrings/aurtistic.gpg && echo "deb [signed-by=/usr/share/keyrings/aurtistic.gpg] ${aptRepoUrl} ./" | sudo tee /etc/apt/sources.list.d/aurtistic.list && sudo apt update && sudo apt install -y aurtistic`;
 
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github+json',
@@ -83,6 +86,7 @@ export async function GET() {
         publishedAt: null,
         releasePageUrl,
         aptInstallCommand,
+        aptManualCommand,
         assets: {
           windowsExe: null,
           linuxDeb: null,
@@ -102,6 +106,7 @@ export async function GET() {
       publishedAt: release.published_at || null,
       releasePageUrl: release.html_url || releasePageUrl,
       aptInstallCommand,
+      aptManualCommand,
       assets: {
         windowsExe: pickAsset(assets, (n) => n.endsWith('.exe')),
         linuxDeb: pickAsset(assets, (n) => n.endsWith('.deb')),
@@ -118,6 +123,7 @@ export async function GET() {
         publishedAt: null,
         releasePageUrl,
         aptInstallCommand,
+        aptManualCommand,
         assets: {
           windowsExe: null,
           linuxDeb: null,

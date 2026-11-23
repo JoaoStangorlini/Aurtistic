@@ -125,4 +125,23 @@ PYEOF
   else
     echo "APT_GPG_PRIVATE_KEY não definida: repositório gerado sem assinatura GPG (Release.gpg/InRelease omitidos)."
   fi
+
+  APT_PUBLIC_URL="${APT_PUBLIC_URL:-https://joaostangorlini.github.io/Aurtistic/apt}"
+  cat > install.sh <<EOF_INSTALL
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "\$(id -u)" -ne 0 ]; then
+  echo "Execute com sudo: curl -fsSL ${APT_PUBLIC_URL}/install.sh | sudo bash" >&2
+  exit 1
+fi
+
+install -d -m 0755 /usr/share/keyrings
+curl -fsSL "${APT_PUBLIC_URL}/KEY.gpg" | gpg --yes --dearmor -o /usr/share/keyrings/aurtistic.gpg
+chmod 0644 /usr/share/keyrings/aurtistic.gpg
+echo "deb [signed-by=/usr/share/keyrings/aurtistic.gpg] ${APT_PUBLIC_URL} ./" > /etc/apt/sources.list.d/aurtistic.list
+apt-get update
+apt-get install -y aurtistic
+EOF_INSTALL
+  chmod 0644 install.sh
 )

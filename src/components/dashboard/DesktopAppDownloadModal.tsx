@@ -101,7 +101,7 @@ export function DesktopAppDownloadModal({
     release?.releasePageUrl || 'https://github.com/JoaoStangorlini/Aurtistic/releases/latest';
   const aptCmd =
     release?.aptInstallCommand ||
-    'curl -fsSL https://joaostangorlini.github.io/aurtistic/apt/KEY.gpg | sudo gpg --dearmor -o /usr/share/keyrings/aurtistic.gpg && echo "deb [signed-by=/usr/share/keyrings/aurtistic.gpg] https://joaostangorlini.github.io/aurtistic/apt ./" | sudo tee /etc/apt/sources.list.d/aurtistic.list && sudo apt update && sudo apt install -y aurtistic';
+    'curl -fsSL https://joaostangorlini.github.io/Aurtistic/apt/install.sh | sudo bash';
 
   const handleInstallPwa = async () => {
     if (deferredPwaPrompt) {

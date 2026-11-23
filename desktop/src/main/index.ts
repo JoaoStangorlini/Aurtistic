@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   BrowserWindow,
+  Menu,
   Notification,
   app,
   powerMonitor,
@@ -45,6 +46,14 @@ if (!gotSingleInstanceLock) {
 
 async function bootstrap(): Promise<void> {
   if (!gotSingleInstanceLock) return;
+
+  if (process.platform !== 'darwin') {
+    Menu.setApplicationMenu(null);
+  } else {
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }])
+    );
+  }
 
   const userDataDir = app.getPath('userData');
   const authorizedPaths = new AuthorizedPathsRegistry();
@@ -153,6 +162,7 @@ async function bootstrap(): Promise<void> {
     minWidth: 920,
     minHeight: 620,
     title: 'Aurtistic',
+    autoHideMenuBar: true,
     icon: windowIcon,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
@@ -162,6 +172,9 @@ async function bootstrap(): Promise<void> {
       webSecurity: true,
     },
   });
+  if (process.platform !== 'darwin') {
+    mainWindow.setMenuBarVisibility(false);
+  }
 
   const navSecOpts = { isPackaged: app.isPackaged, allowDev: !app.isPackaged };
 
