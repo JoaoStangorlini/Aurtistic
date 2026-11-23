@@ -2,12 +2,12 @@
 > **Instrução ao Agente:** Use os números de linha `L<num>` abaixo para ler apenas o trecho necessário com `startLine` e `endLine`. NUNCA leia arquivos >120 linhas inteiros.
 
 - **`src/app/(dashboard)/actions.ts`** (1108L): L15:updateTaskOrders | L32:saveTask | L184:resolveSubteams | L191:resolveMembers | L196:saveTaskWithSubtasksAction | L266:toggleSubtaskCompletionAction | L285:deleteTask | L298:updateMultipleTasks | L353:deleteMultipleTasks | L369:getTaskColumns | L383:saveTaskColumn | L408:updateOptionNameCascade | L430:getUserProfile | L605:saveQuickLinks | L620:saveQuickPreferences | L641:saveUserProfileData | L672:mergeUserFeaturesConfigServer | L718:updateNotificationConfig | L732:savePortfolioLayoutOrderAction | L758:createEvent | L778:createEventsBatch | L801:updateEvent | L823:deleteEvent | L845:updateAdvancedConfig | L870:updateThemePreferencesAction | L919:updateModulesConfigAction | L961:getPortfolioAlbumZipUrlAction | L1023:syncPortfolioAction
-- **`src/app/(dashboard)/aurtistic/actions.ts`** (168L): L8:loginAurtistic | L44:signupAurtistic | L93:logoutAurtistic | L100:deleteAurtisticProfile | L127:deleteAllTasks | L143:checkAurtisticUser
+- **`src/app/(dashboard)/aurtistic/actions.ts`** (91L): L11:loginAurtistic | L18:signupAurtistic | L25:logoutAurtistic | L32:deleteAurtisticProfile | L58:deleteAllTasks | L75:checkAurtisticUser
 - **`src/app/(dashboard)/aurtistic/curriculo/page.tsx`** (56L): L13:CurriculoPage
 - **`src/app/(dashboard)/aurtistic/delete-account/page.tsx`** (97L): L9:DeleteAccountPage
 - **`src/app/(dashboard)/aurtistic/page.tsx`** (103L): L10:AurtisticPage
 - **`src/app/(dashboard)/aurtistic/portfolio/page.tsx`** (58L): L14:PortfolioPage
-- **`src/app/(dashboard)/aurtistic/privacy-policy/page.tsx`** (81L): L4:PrivacyPolicyPage
+- **`src/app/(dashboard)/aurtistic/privacy-policy/page.tsx`** (7L): L4:AurtisticPrivacyPolicyPage
 - **`src/app/(dashboard)/aurtistic/resumo/page.tsx`** (56L): L13:ResumoPage
 - **`src/app/(dashboard)/labdiv/page.tsx`** (508L): L14:sanitizeAvatarUrl | L35:LabDivPage
 - **`src/app/(dashboard)/loading.tsx`** (7L): L4:DashboardLoading
@@ -20,6 +20,7 @@
 - **`src/app/[username]/SharedWorkspaceClient.tsx`** (248L): L21:SharedWorkspaceClient
 - **`src/app/[username]/page.tsx`** (120L): L20:SharedProfilePage
 - **`src/app/api/app/desktop-release/route.ts`** (138L): L20:DesktopReleasePayload | L37:pickAsset | L50:GET
+- **`src/app/api/auth/check-identifier/route.ts`** (128L): L14:RateLimitStore | L51:extractClientIp | L60:POST
 - **`src/app/api/auth/hub-embed/route.ts`** (408L): L25:normalizeOrgSlug | L33:corsHeaders | L48:OPTIONS | L55:POST
 - **`src/app/api/auth/hublabdiv/route.ts`** (91L): L9:GET | L42:POST
 - **`src/app/api/feedback/route.ts`** (91L): L10:checkFeedbackRateLimit | L22:POST
@@ -53,22 +54,23 @@
 - **`src/app/layout.tsx`** (227L): L65:RootLayout
 - **`src/app/loading.tsx`** (27L): L4:Loading
 - **`src/app/login/LoginForm.tsx`** (59L): L8:LoginForm
-- **`src/app/login/actions.ts`** (169L): L13:login | L86:signup
+- **`src/app/login/actions.ts`** (30L): L13:login | L20:signup | L27:requestPasswordReset
 - **`src/app/login/page.tsx`** (24L): L6:LoginPage
 - **`src/app/page.tsx`** (129L): L12:AurtisticPage
 - **`src/app/portfolio/[username]/page.tsx`** (122L): L20:PublicPortfolioPage
 - **`src/app/portfolio/page.tsx`** (63L): L18:PortfolioPage
-- **`src/app/privacy-policy/page.tsx`** (81L): L4:PrivacyPolicyPage
+- **`src/app/privacy-policy/page.tsx`** (7L): L4:PrivacyPolicyPage
 - **`src/app/relatar-bug/BugReportClient.tsx`** (115L): L7:BugReportClient
 - **`src/app/relatar-bug/page.tsx`** (24L): L8:BugReportPage
 - **`src/app/resumo/page.tsx`** (57L): L13:ResumoPage
 - **`src/app/s/[token]/actions.ts`** (488L): L16:VerifySharePinResult | L30:SubmitProofingResult | L49:computeShareTicketTtl | L58:signShareTicketForLink | L80:verifyLegacyScryptWithServiceRole | L128:resolveUnlockedShareLink | L242:verifySharePinAction | L292:refreshShareTicketAction | L332:submitClientProofingAction | L453:getShareLinkZipUrlAction
 - **`src/app/s/[token]/page.tsx`** (226L): L38:fetchSharePublicMeta | L97:generateMetadata | L118:ClientProofingPage | L202:ExpiredOrNotFoundView
 - **`src/app/sw.ts`** (40L): Sem exports diretos
+- **`src/app/terms/page.tsx`** (7L): L4:TermsOfUsePage
 - **`src/components/GlobalHighlighter.tsx`** (65L): L7:GlobalHighlighter
 - **`src/components/Navbar.tsx`** (242L): L12:Navbar
 - **`src/components/auth/HubLinkCard.tsx`** (202L): L10:HubLinkCardProps | L15:HubLinkCard
-- **`src/components/auth/UnifiedAuthCard.tsx`** (247L): L10:UnifiedAuthCardProps | L17:UnifiedAuthCard
+- **`src/components/auth/UnifiedAuthCard.tsx`** (627L): L12:UnifiedAuthCardProps | L20:UnifiedAuthCard
 - **`src/components/cuidados/EyeRest202020Overlay.tsx`** (125L): L6:EyeRest202020OverlayProps | L13:EyeRest202020Overlay
 - **`src/components/cuidados/HealthMedicalRemindersPanel.tsx`** (491L): L6:HealthItemType | L8:HealthReminderItem | L30:HealthMedicalRemindersPanel
 - **`src/components/cuidados/SelfCareAlarmProvider.tsx`** (673L): L29:SelfCareAlarmContextType | L52:useSelfCareAlarms | L65:getSharedAudioContext | L99:synthesizeAudioTone | L152:SelfCareAlarmProvider
@@ -97,6 +99,7 @@
 - **`src/components/embed/EmbedAuthBridge.tsx`** (147L): L20:EmbedAuthBridge
 - **`src/components/galeria/GooglePhotosTimelineView.tsx`** (764L): L29:TimelineSkeletonRow | L46:GooglePhotosTimelineViewProps | L52:GooglePhotosTimelineView
 - **`src/components/galeria/SmartBackupSettingsModal.tsx`** (208L): L17:loadSmartBackupPreferences | L28:saveSmartBackupPreferences | L41:SmartBackupSettingsModal
+- **`src/components/legal/LegalDocumentView.tsx`** (130L): L12:LegalDocumentViewProps | L19:getAccentClasses | L25:LegalDocumentView
 - **`src/components/media/AurtisticMediaContext.tsx`** (612L): L19:MediaTrack | L31:InPlaceNoteState | L39:InPlacePreviewState | L49:AurtisticMediaContextType | L110:useAurtisticMedia | L118:AurtisticMediaProviderProps | L125:AurtisticMediaProvider
 - **`src/components/media/GlobalAudioDock.tsx`** (233L): L7:formatTime | L14:GlobalAudioDock
 - **`src/components/media/InPlaceFilePreviewModal.tsx`** (165L): L8:InPlaceFilePreviewModalProps | L20:InPlaceFilePreviewModal
@@ -197,6 +200,8 @@
 - **`src/idv/labdiv.ts`** (45L): Sem exports diretos
 - **`src/idv/show-da-fisica.ts`** (44L): Sem exports diretos
 - **`src/idv/types.ts`** (74L): L4:InitiativeIdvDefinition
+- **`src/lib/auth-actions-core.ts`** (180L): L13:sanitizeNextRoute | L21:performLogin | L81:performSignup | L150:performPasswordReset
+- **`src/lib/auth-identifier.ts`** (175L): L5:NormalizedAuthIdentifier | L21:normalizeAuthIdentifier | L100:validateSignupInputs | L137:formatSupabaseAuthError
 - **`src/lib/canvas-tokenized-text.ts`** (415L): L14:StyledWordToken | L30:TokenizedTextRenderOptions | L65:blockScale | L72:buildStyledTokensForLine | L193:renderTokenizedRichTextCanvas
 - **`src/lib/client-cache-cleanup.ts`** (63L): L10:clearAllUserClientCaches
 - **`src/lib/coach-marks-steps.ts`** (491L): L3:CoachMarkStep | L12:CoachMarksTour | L451:getCoachMarksForPathname
@@ -205,6 +210,7 @@
 - **`src/lib/edge-urls.ts`** (71L): L6:resolveClientEdgeServerUrl | L15:buildTenantStreamUrl | L31:buildTenantThumbUrl | L47:buildTenantZipUrl | L63:formatStorageBytes
 - **`src/lib/file-upload-helpers.ts`** (306L): L6:UploadItem | L30:readAllDirectoryEntries | L65:traverseEntryRecursive | L105:extractFilesFromDataTransfer | L172:extractFilesFromFileList | L194:resolveItemTargetFolder | L216:getMimeTypeFromFilename | L263:extractFilesFromZip
 - **`src/lib/hub-sso.ts`** (128L): L5:HubSsoPayload | L19:HubConnectionData | L37:signHubSsoTicket | L59:verifyHubSsoTicket | L99:encryptLinkSecret | L112:decryptLinkSecret
+- **`src/lib/legal-documents.ts`** (163L): L12:LegalSection
 - **`src/lib/modules-config.ts`** (132L): L2:ModulesConfig | L24:ModulePreset | L110:getInitialModulesConfig
 - **`src/lib/native-bridge.ts`** (579L): L4:ClientPlatform | L5:DetectedOsPlatform | L7:LanConfig | L12:NativeTransferEnqueueUploadInput | L24:NativeTransferEnqueueDownloadInput | L35:NativeTransferStatus | L45:DesktopMirrorFolderItem | L55:DesktopCredentialSecurityStatus | L94:invalidateLanProbeCache | L98:bindNetworkInvalidationListeners | L107:isAllowedLanUrl | L128:getWindowAny | L133:getPlatform | L142:isDesktopApp | L146:isAndroidNative | L150:isWebDesktopBrowser | L158:detectClientPlatform | L183:shouldShowNavbarDownloadButton | L212:getLanConfig | L229:setLanConfig | L255:getVaultTransferPlugin | L261:getDesktopBridge | L270:probeLanServer | L326:PickedNativeFile | L332:pickNativeUploadFiles | L339:hasAndroidDeviceCredential | L350:ensureAndroidDeviceCredential | L372:resolveOptimalServerUrl | L383:saveAndroidDeviceCredential | L400:clearAndroidDeviceCredential | L411:enqueueNativeUpload | L425:enqueueNativeDownload | L439:pauseNativeTransfer | L453:resumeNativeTransfer | L467:cancelNativeTransfer | L481:listNativeTransfers | L494:scheduleTaskNotifications | L501:syncSelfCareAlarms | L508:getDesktopCredentialStatus | L514:saveDesktopCredential | L528:selectDesktopMirrorFolder | L539:listDesktopMirrorFolders | L545:removeDesktopMirrorFolder | L552:triggerDesktopMirrorSync | L558:subscribeDesktopEvents
 - **`src/lib/notifications.ts`** (130L): L17:syncTaskNotifications
@@ -284,6 +290,7 @@
 - **`supabase/migrations/newsqls/15_events_meetings_invites_and_boost.sql`** (248L): L20:public.protect_storage_profile_privileges | L41:public.request_personal_storage_boost | L100:public.get_organization_invite_preview | L154:public.accept_organization_invite
 - **`supabase/migrations/newsqls/16_org_goals_requests_and_delete_profile.sql`** (121L): L7:public.organization_goals | L34:public.organization_requests
 - **`supabase/migrations/newsqls/17_studio_personal_drafts_scope.sql`** (80L): Sem exports diretos
+- **`supabase/migrations/newsqls/18_fix_auth_provisioning_and_terms.sql`** (288L): L20:public.handle_auth_user_provisioning | L197:on_auth_user_created_provisioning | L203:public.protect_user_profile_terms | L237:trg_protect_user_profile_terms | L243:public.check_auth_identifier_exists
 - **`supabase/migrations/newsqls/1_dynamic_columns.sql`** (84L): L4:public.task_columns
 - **`supabase/migrations/newsqls/2_aurtistic_planner.sql`** (42L): L4:public.user_profiles
 - **`supabase/migrations/newsqls/tabela inicial.sql`** (324L): L9:tasks

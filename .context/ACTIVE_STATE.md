@@ -1,9 +1,9 @@
 # Active State — Aurtistic
-Atualizado em: 2026-11-23T03:29Z
+Atualizado em: 2026-11-23T19:11Z
 
-## Ciclo Módulos 1 a 4 + Botão Adaptativo Concluído e Verde
-- **Deploy Edge:** `scripts/servidor/deploy-firestick.sh` agora empacota `servidor/lib/` (incl. `chunked-upload.js`) e `servidor/scripts/encrypt-vault-migration.js`. `bash -n` OK.
-- **Botão Adaptativo & PWA (`AurtisticNavbar.tsx`, `DesktopAppDownloadModal.tsx`, `native-bridge.ts`, `layout.tsx`):** `detectClientPlatform()` (`ios`/iPadOS, `android`, `windows`, `linux`, `macos`, `unknown`) e `shouldShowNavbarDownloadButton()` (oculta em Electron, Capacitor e PWA `standalone`; exibe em Web PC e Mobile sem *hydration mismatch*). Modal com guia iOS 3 passos (+ `appleWebApp`), Play Store + `beforeinstallprompt` no Android, SmartScreen Windows, `.deb`/`.AppImage`/APT plano Linux, Gatekeeper macOS e "Outras plataformas".
-- **Módulo 4 & Repo:** `desktop/build/icon.png` `512x512`, `desktop/release/` & `desktop/dist/` no `.gitignore`, nota sobre `GITHUB_RELEASE_TOKEN` vs. downloads públicos em `desktop-release/route.ts`.
-- **Validação Final (`task-1299`, exit 0):** `bash -n deploy-firestick.sh`, `server:check`, `transfer-client.test.mjs` (`ALL_TRANSFER_CLIENT_TESTS_PASSED`), `npm run map` (305 arquivos), `npm run verify:full` (`0 erros`), `cap sync android` + `gradlew :app:compileDebugKotlin :app:assembleDebug` (`BUILD SUCCESSFUL in 2s`).
-- **Backlog Android (opcional):** fallback `423 PIN_LOCKED` em `content://` URI, `releasePersistableUriPermission`, loop `InputStream.skip()`.
+## Correção de Cadastro, Fluxo Unificado 2 Etapas e Legal v2026-11
+- **Migration (`supabase/migrations/newsqls/18_fix_auth_provisioning_and_terms.sql`):** corrige `handle_auth_user_provisioning` para `public.user_profiles` (removendo `public.profiles` e `on_auth_user_created_storage`), blinda `public_slug`, gera `terms_accepted_at = NOW()` no Postgres (tolerando `NULL` em SSO), adiciona `trg_protect_user_profile_terms` e cria `check_auth_identifier_exists` (`deleted_at IS NULL`, `GRANT EXECUTE TO service_role` exclusivo).
+- **Backend (`src/lib/auth-identifier.ts`, `src/lib/auth-actions-core.ts`, `src/app/api/auth/check-identifier/route.ts`):** `MIN_PASSWORD_LENGTH = 8`, validação estrita no cadastro, `createAdminClient()` server-side + `RateLimitStore`, eliminação de duplicação entre `login/actions.ts` e `aurtistic/actions.ts`, sem escrita dupla em `user_profiles`.
+- **UI (`src/components/auth/UnifiedAuthCard.tsx`):** fluxo em 2 etapas sem abas/Nome Completo, input `readOnly autoComplete="username"`, recuperação por e-mail, aviso HUB SSO, microcopy pré-criação e modal de Termos/Privacidade.
+- **Legal (`src/lib/legal-documents.ts`, `src/components/legal/LegalDocumentView.tsx`, `/terms`, `/privacy-policy`):** versão `2026-11` com LGPD Art. 11/18/33, subprocessadores, `.trash` 15 dias, PIN `scrypt` e AGPLv3 vs. Termos.
+- **Pendente manual:** executar `18_fix_auth_provisioning_and_terms.sql` no SQL Editor do Supabase, confirmar `SUPABASE_SERVICE_ROLE_KEY` na Vercel e criar/remover conta demo `jorge` após certificação.
