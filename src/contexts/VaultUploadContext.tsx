@@ -13,7 +13,26 @@ import React, {
 import { usePathname } from 'next/navigation';
 import type { UploadItem } from '@/lib/file-upload-helpers';
 import { resolveItemTargetFolder } from '@/lib/file-upload-helpers';
-import { uploadTenantFileDirect } from '@/lib/edge-client';
+import {
+  createWebdavTokenDirect,
+  downloadTenantFileResumable,
+  getTenantFolderManifestDirect,
+  uploadTenantFileSmart,
+} from '@/lib/edge-client';
+import { resolveClientEdgeServerUrl } from '@/lib/edge-urls';
+import {
+  cancelNativeTransfer,
+  ensureAndroidDeviceCredential,
+  enqueueNativeDownload,
+  enqueueNativeUpload,
+  getLanConfig,
+  isAndroidNative,
+  listNativeTransfers,
+  pauseNativeTransfer,
+  type PickedNativeFile,
+  resolveOptimalServerUrl,
+  resumeNativeTransfer,
+} from '@/lib/native-bridge';
 import {
   refreshTenantTicketAction,
   refreshOrganizationTicketAction,
@@ -33,8 +52,23 @@ export interface QueuedUploadItem {
   relativePath: string;
   targetFolder: string;
   status: 'idle' | 'uploading' | 'success' | 'error';
+  phase?: 'uploading' | 'finalizing' | 'completed';
+  resumeUploadId?: string;
   error?: string;
   progressPercent?: number;
+}
+
+export interface QueuedDownloadItem {
+  id: string;
+  relativePath: string;
+  filename: string;
+  sizeBytes: number;
+  status: 'idle' | 'downloading' | 'paused' | 'verifying' | 'success' | 'error';
+  progressPercent: number;
+  loadedBytes: number;
+  etag?: string | null;
+  nativeManaged?: boolean;
+  error?: string;
 }
 
 export interface UploadFinishedResults {
@@ -114,6 +148,15 @@ interface VaultUploadContextType {
   removeItem: (id: string) => void;
   clearFinished: () => void;
   updateTicket: (ticket: string) => void;
+  downloadQueue: QueuedDownloadItem[];
+  isDownloading: boolean;
+  enqueueNativeUploadFiles: (files: PickedNativeFile[], targetFolder?: string, orgId?: string | null) => Promise<number>;
+  enqueueDownload: (file: { relativePath: string; name: string; sizeBytes?: number }) => void;
+  enqueueFolderDownload: (folderPath: string) => Promise<void>;
+  pauseDownload: (id: string) => void;
+  resumeDownload: (id: string) => void;
+  cancelDownload: (id: string) => void;
+  clearFinishedDownloads: () => void;
 }
 
 const VaultUploadContext = createContext<VaultUploadContextType | null>(null);
@@ -159,6 +202,14 @@ export function VaultUploadProvider({
   const lastProgressUpdateRef = useRef(0);
   const speedSampleRef = useRef<{ time: number; loaded: number } | null>(null);
   const emaSpeedRef = useRef<number>(0);
+
+  const [downloadQueue, setDownloadQueue] = useState<QueuedDownloadItem[]>([]);
+  const downloadQueueRef = useRef<QueuedDownloadItem[]>([]);
+  useEffect(() => {
+    downloadQueueRef.current = downloadQueue;
+  }, [downloadQueue]);
+  const downloadControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const downloadBuffersRef = useRef<Map<string, { parts: Uint8Array[]; loadedBytes: number; etag: string | null }>>(new Map());
 
   useEffect(() => {
     if (initialVaultTicket && !activeTicket) {
@@ -379,6 +430,7 @@ export function VaultUploadProvider({
     }
 
     setIsUploading(true);
+    const effectiveServerUrl = await resolveOptimalServerUrl(resolveClientEdgeServerUrl(serverUrl));
     cancelRequestedRef.current = false;
     cancelledIdsRef.current.clear();
     speedSampleRef.current = null;
@@ -403,19 +455,20 @@ export function VaultUploadProvider({
         .slice(0, i)
         .reduce((acc, it) => acc + (it.status === 'success' ? it.file.size : 0), 0);
 
-      // Proteção Anti-Loop: ignora proxy comprimido local ou hash já conhecido
+      // Proteção Anti-Loop: ignora proxy comprimido local ou hash já conhecido (somente <= 64 MB para evitar OOM)
       let itemSha256 = '';
-      try {
-        const isProxy = await hasProxySignatureMarker(currentItem.file);
-        if (isProxy) {
-          setQueue((prev) =>
-            prev.map((it, idx) => (idx === i ? { ...it, status: 'success', progressPercent: 100 } : it))
-          );
-          successCount++;
-          continue;
-        }
-        itemSha256 = await computeFileSha256(currentItem.file);
-        const hashRes = await checkBackupHashesAction([itemSha256], selectedOrgId);
+      if (currentItem.file.size <= 64 * 1024 * 1024) {
+        try {
+          const isProxy = await hasProxySignatureMarker(currentItem.file);
+          if (isProxy) {
+            setQueue((prev) =>
+              prev.map((it, idx) => (idx === i ? { ...it, status: 'success', progressPercent: 100 } : it))
+            );
+            successCount++;
+            continue;
+          }
+          itemSha256 = await computeFileSha256(currentItem.file);
+          const hashRes = await checkBackupHashesAction([itemSha256], selectedOrgId);
         if (hashRes.ok && hashRes.knownHashes.includes(itemSha256)) {
           setQueue((prev) =>
             prev.map((it, idx) => (idx === i ? { ...it, status: 'success', progressPercent: 100 } : it))
@@ -423,7 +476,8 @@ export function VaultUploadProvider({
           successCount++;
           continue;
         }
-      } catch {}
+        } catch {}
+      }
 
       setQueue((prev) =>
         prev.map((it, idx) =>
@@ -443,12 +497,24 @@ export function VaultUploadProvider({
         try {
           const ticketToUse = await ensureFreshTicket(attempt > 1);
 
-          const mutation = await uploadTenantFileDirect({
+          const mutation = await uploadTenantFileSmart({
             file: currentItem.file,
             folderPath: currentItem.targetFolder,
             ticket: ticketToUse,
-            serverUrl,
+            ensureFreshTicket,
+            serverUrl: effectiveServerUrl,
+            resumeUploadId: currentItem.resumeUploadId,
             signal: abortController.signal,
+            onSessionCreated: (uploadId) => {
+              setQueue((prev) =>
+                prev.map((it, idx) => (idx === i ? { ...it, resumeUploadId: uploadId } : it))
+              );
+            },
+            onPhaseChange: (phase) => {
+              setQueue((prev) =>
+                prev.map((it, idx) => (idx === i ? { ...it, phase } : it))
+              );
+            },
             onProgress: (pct, loadedBytes) => {
               const now = Date.now();
               const currentLoaded = loadedBytes ?? Math.round((currentItem.file.size * pct) / 100);
@@ -653,6 +719,338 @@ export function VaultUploadProvider({
 
   const overallPercent = totalBytes > 0 ? Math.min(100, Math.round((uploadedBytes / totalBytes) * 100)) : 0;
 
+  const runDownloadItem = useCallback(
+    async (item: QueuedDownloadItem) => {
+      const ctrl = new AbortController();
+      downloadControllersRef.current.set(item.id, ctrl);
+      const cached = downloadBuffersRef.current.get(item.id) || { parts: [], loadedBytes: 0, etag: null };
+      downloadBuffersRef.current.set(item.id, cached);
+
+      setDownloadQueue((prev) =>
+        prev.map((d) => (d.id === item.id ? { ...d, status: 'downloading', error: undefined } : d))
+      );
+
+      try {
+        const ticket = await ensureFreshTicket();
+        const effectiveUrl = await resolveOptimalServerUrl(resolveClientEdgeServerUrl(serverUrl));
+        const res = await downloadTenantFileResumable({
+          relativePath: item.relativePath,
+          ticket,
+          ensureFreshTicket,
+          serverUrl: effectiveUrl,
+          signal: ctrl.signal,
+          initialBytes: cached.loadedBytes,
+          initialParts: cached.parts,
+          initialEtag: cached.etag,
+          onReset: () => {
+            cached.parts = [];
+            cached.loadedBytes = 0;
+          },
+          onMeta: ({ totalBytes, etag }) => {
+            if (cached.etag && etag && cached.etag !== etag) {
+              cached.parts = [];
+              cached.loadedBytes = 0;
+            }
+            cached.etag = etag;
+            setDownloadQueue((prev) =>
+              prev.map((d) =>
+                d.id === item.id ? { ...d, sizeBytes: totalBytes || d.sizeBytes, etag } : d
+              )
+            );
+          },
+          onProgress: (pct, loadedBytes, totalBytes, chunk, etag) => {
+            if (etag && cached.etag && etag !== cached.etag) {
+              cached.parts = [];
+              cached.loadedBytes = 0;
+            }
+            if (etag) cached.etag = etag;
+            if (chunk && chunk.byteLength > 0) {
+              cached.parts.push(chunk);
+              cached.loadedBytes = loadedBytes;
+            }
+            setDownloadQueue((prev) =>
+              prev.map((d) =>
+                d.id === item.id
+                  ? {
+                      ...d,
+                      progressPercent: pct,
+                      loadedBytes,
+                      sizeBytes: totalBytes || d.sizeBytes,
+                      status: pct >= 100 ? 'verifying' : 'downloading',
+                    }
+                  : d
+              )
+            );
+          },
+        });
+
+        downloadBuffersRef.current.delete(item.id);
+        downloadControllersRef.current.delete(item.id);
+
+        if (typeof window !== 'undefined') {
+          const url = URL.createObjectURL(res.blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = item.filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 10000);
+        }
+
+        setDownloadQueue((prev) =>
+          prev.map((d) =>
+            d.id === item.id
+              ? { ...d, status: 'success', progressPercent: 100, loadedBytes: res.totalBytes }
+              : d
+          )
+        );
+      } catch (err) {
+        downloadControllersRef.current.delete(item.id);
+        if (ctrl.signal.aborted) {
+          return;
+        }
+        const msg = err instanceof Error ? err.message : 'Falha no download';
+        setDownloadQueue((prev) =>
+          prev.map((d) => (d.id === item.id ? { ...d, status: 'error', error: msg } : d))
+        );
+      }
+    },
+    [ensureFreshTicket, serverUrl]
+  );
+
+  const getCredentialScopeKey = useCallback(
+    (orgIdOverride?: string | null) => {
+      const org = orgIdOverride !== undefined ? orgIdOverride : selectedOrgId;
+      return org ? `org:${org}` : 'personal';
+    },
+    [selectedOrgId]
+  );
+
+  const enqueueNativeUploadFiles = useCallback(
+    async (files: PickedNativeFile[], targetFolder?: string, orgId?: string | null): Promise<number> => {
+      if (!isAndroidNative() || !files || files.length === 0) return 0;
+      const ticket = await ensureFreshTicket();
+      const remoteUrl = resolveClientEdgeServerUrl(serverUrl);
+      const scopeKey = getCredentialScopeKey(orgId);
+      const okCred = await ensureAndroidDeviceCredential({
+        credentialScopeKey: scopeKey,
+        remoteServerUrl: remoteUrl,
+        provisionToken: () =>
+          createWebdavTokenDirect({
+            ticket,
+            serverUrl: remoteUrl,
+            label: 'App Android (Segundo Plano)',
+            readOnly: false,
+            ttlDays: 90,
+          }),
+      });
+      if (!okCred) return 0;
+
+      const folder = String(targetFolder !== undefined ? targetFolder : overrideFolder || currentFolder || '')
+        .replace(/^\/+|\/+$/g, '');
+      const lanUrl = getLanConfig().lanServerUrl;
+      let count = 0;
+      for (const f of files) {
+        const id = `nup-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const relPath = folder ? `${folder}/${f.name}` : f.name;
+        const ok = await enqueueNativeUpload({
+          id,
+          localUri: f.uri,
+          relativePath: relPath,
+          filename: f.name,
+          totalSize: Math.max(0, Number(f.sizeBytes) || 0),
+          credentialScopeKey: scopeKey,
+          remoteServerUrl: remoteUrl,
+          lanServerUrl: lanUrl,
+          overwrite: false,
+        });
+        if (ok) count++;
+      }
+      return count;
+    },
+    [ensureFreshTicket, serverUrl, getCredentialScopeKey, overrideFolder, currentFolder]
+  );
+
+  // Polling leve para sincronizar progresso/pausa/PIN de transferências nativas no WorkManager
+  useEffect(() => {
+    if (!isAndroidNative()) return;
+    const hasNative = downloadQueue.some((d) => d.nativeManaged && (d.status === 'downloading' || d.status === 'idle'));
+    if (!hasNative) return;
+    const timer = setInterval(async () => {
+      const list = await listNativeTransfers().catch(() => []);
+      if (list.length === 0) return;
+      const byId = new Map(list.map((t) => [t.id, t]));
+      for (const dl of downloadQueueRef.current) {
+        if (!dl.nativeManaged) continue;
+        const st = byId.get(dl.id) as (typeof list[number] & { errorCode?: string }) | undefined;
+        if (!st) continue;
+        if (st.state === 'failed' && st.errorCode === 'PIN_LOCKED') {
+          // Pasta com PIN desbloqueada no app: fallback limpo para WebView usando x-tenant-ticket
+          setDownloadQueue((prev) =>
+            prev.map((d) => (d.id === dl.id ? { ...d, nativeManaged: false } : d))
+          );
+          void runDownloadItem(dl);
+          continue;
+        }
+        setDownloadQueue((prev) =>
+          prev.map((d) => {
+            if (d.id !== dl.id) return d;
+            const mappedStatus: QueuedDownloadItem['status'] =
+              st.state === 'completed'
+                ? 'success'
+                : st.state === 'paused'
+                  ? 'paused'
+                  : st.state === 'failed'
+                    ? 'error'
+                    : st.state === 'running' || st.state === 'finalizing'
+                      ? 'downloading'
+                      : 'idle';
+            return {
+              ...d,
+              status: mappedStatus,
+              progressPercent: st.progressPercent ?? d.progressPercent,
+              error: st.error || d.error,
+            };
+          })
+        );
+      }
+    }, 1500);
+    return () => clearInterval(timer);
+  }, [downloadQueue, runDownloadItem]);
+
+  const enqueueDownload = useCallback(
+    (file: { relativePath: string; name: string; sizeBytes?: number }) => {
+      const id = `dl-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const filename = file.name || file.relativePath.split('/').pop() || 'arquivo';
+      const next: QueuedDownloadItem = {
+        id,
+        relativePath: file.relativePath,
+        filename,
+        sizeBytes: Math.max(0, Number(file.sizeBytes) || 0),
+        status: 'idle',
+        progressPercent: 0,
+        loadedBytes: 0,
+      };
+
+      if (isAndroidNative()) {
+        setDownloadQueue((prev) => [...prev, { ...next, nativeManaged: true, status: 'downloading' }]);
+        void (async () => {
+          try {
+            const ticket = await ensureFreshTicket();
+            const remoteUrl = resolveClientEdgeServerUrl(serverUrl);
+            const scopeKey = getCredentialScopeKey();
+            const okCred = await ensureAndroidDeviceCredential({
+              credentialScopeKey: scopeKey,
+              remoteServerUrl: remoteUrl,
+              provisionToken: () =>
+                createWebdavTokenDirect({
+                  ticket,
+                  serverUrl: remoteUrl,
+                  label: 'App Android (Segundo Plano)',
+                  readOnly: false,
+                  ttlDays: 90,
+                }),
+            });
+            if (okCred) {
+              const parts = file.relativePath.split('/');
+              parts.pop();
+              const ok = await enqueueNativeDownload({
+                id,
+                relativePath: file.relativePath,
+                filename,
+                subfolder: parts.join('/'),
+                sizeBytes: file.sizeBytes,
+                credentialScopeKey: scopeKey,
+                remoteServerUrl: remoteUrl,
+                lanServerUrl: getLanConfig().lanServerUrl,
+              });
+              if (ok) return;
+            }
+          } catch {}
+          setDownloadQueue((prev) => prev.map((d) => (d.id === id ? { ...d, nativeManaged: false } : d)));
+          void runDownloadItem(next);
+        })();
+        return;
+      }
+
+      setDownloadQueue((prev) => [...prev, next]);
+      void runDownloadItem(next);
+    },
+    [runDownloadItem, ensureFreshTicket, serverUrl, getCredentialScopeKey]
+  );
+
+  const enqueueFolderDownload = useCallback(
+    async (folderPath: string) => {
+      const ticket = await ensureFreshTicket();
+      const effectiveUrl = await resolveOptimalServerUrl(resolveClientEdgeServerUrl(serverUrl));
+      const manifest = await getTenantFolderManifestDirect({
+        folder: folderPath,
+        ticket,
+        serverUrl: effectiveUrl,
+        includeHash: false,
+      });
+      const cleanFolder = folderPath.replace(/^\/+|\/+$/g, '');
+      for (const f of manifest.files || []) {
+        const fullRel = cleanFolder ? `${cleanFolder}/${f.relPath}` : f.relPath;
+        const name = f.relPath.split('/').pop() || f.relPath;
+        enqueueDownload({ relativePath: fullRel, name, sizeBytes: f.sizeBytes });
+      }
+    },
+    [ensureFreshTicket, serverUrl, enqueueDownload]
+  );
+
+  const pauseDownload = useCallback((id: string) => {
+    const target = downloadQueueRef.current.find((d) => d.id === id);
+    if (target?.nativeManaged) {
+      void pauseNativeTransfer(id);
+    } else {
+      const ctrl = downloadControllersRef.current.get(id);
+      if (ctrl) ctrl.abort();
+    }
+    setDownloadQueue((prev) =>
+      prev.map((d) => (d.id === id && d.status === 'downloading' ? { ...d, status: 'paused' } : d))
+    );
+  }, []);
+
+  const resumeDownload = useCallback(
+    (id: string) => {
+      const item = downloadQueueRef.current.find((d) => d.id === id);
+      if (!item) return;
+      if (item.nativeManaged) {
+        setDownloadQueue((prev) =>
+          prev.map((d) => (d.id === id ? { ...d, status: 'downloading', error: undefined } : d))
+        );
+        void resumeNativeTransfer(id);
+      } else {
+        void runDownloadItem(item);
+      }
+    },
+    [runDownloadItem]
+  );
+
+  const cancelDownload = useCallback((id: string) => {
+    const target = downloadQueueRef.current.find((d) => d.id === id);
+    if (target?.nativeManaged) {
+      void cancelNativeTransfer(id);
+    } else {
+      const ctrl = downloadControllersRef.current.get(id);
+      if (ctrl) ctrl.abort();
+    }
+    downloadControllersRef.current.delete(id);
+    downloadBuffersRef.current.delete(id);
+    setDownloadQueue((prev) => prev.filter((d) => d.id !== id));
+  }, []);
+
+  const clearFinishedDownloads = useCallback(() => {
+    setDownloadQueue((prev) => prev.filter((d) => d.status !== 'success'));
+  }, []);
+
+  const isDownloading = useMemo(
+    () => downloadQueue.some((d) => d.status === 'downloading' || d.status === 'verifying'),
+    [downloadQueue]
+  );
+
   const value = useMemo(
     () => ({
       queue,
@@ -691,6 +1089,15 @@ export function VaultUploadProvider({
       removeItem,
       clearFinished,
       updateTicket,
+      downloadQueue,
+      isDownloading,
+      enqueueNativeUploadFiles,
+      enqueueDownload,
+      enqueueFolderDownload,
+      pauseDownload,
+      resumeDownload,
+      cancelDownload,
+      clearFinishedDownloads,
     }),
     [
       queue,
@@ -726,6 +1133,15 @@ export function VaultUploadProvider({
       removeItem,
       clearFinished,
       updateTicket,
+      downloadQueue,
+      isDownloading,
+      enqueueNativeUploadFiles,
+      enqueueDownload,
+      enqueueFolderDownload,
+      pauseDownload,
+      resumeDownload,
+      cancelDownload,
+      clearFinishedDownloads,
     ]
   );
 

@@ -358,6 +358,175 @@ async function decryptBuffer(filePath, tenantNamespaceId) {
   return Buffer.concat(chunks);
 }
 
+/**
+ * Criptografa diretamente uma sequência ordenada de arquivos-parte (*.part) em formato AURTENC2
+ * sem criar nenhum arquivo plaintext concatenado intermediário no disco (máx. 2x espaço).
+ * Passo 1: leitura sequencial verificando soma de tamanhos e SHA-256 final do plaintext.
+ * Passo 2: criptografia AES-256-GCM em streaming por blocos de 64 KB gravando em
+ * `<destPath>.<pid>.<ts>.enc.tmp` no mesmo diretório/volume de `destPath`, seguida de rename atômico.
+ */
+async function encryptPartFilesAtomic(
+  partPaths,
+  expectedTotalSize,
+  expectedSha256Hex,
+  destPath,
+  tenantNamespaceId
+) {
+  const list = Array.isArray(partPaths) ? partPaths : [];
+  const totalSize = Number(expectedTotalSize);
+  if (!Number.isInteger(totalSize) || totalSize < 0) {
+    const err = new Error('expectedTotalSize inválido para encryptPartFilesAtomic.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const normalizedExpectedSha =
+    typeof expectedSha256Hex === 'string' && expectedSha256Hex.trim().length > 0
+      ? expectedSha256Hex.trim().toLowerCase()
+      : null;
+  if (normalizedExpectedSha && !/^[a-f0-9]{64}$/.test(normalizedExpectedSha)) {
+    const err = new Error('expectedSha256Hex malformado.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const masterKey = getMasterKey();
+  const tenantKey = deriveTenantKey(masterKey, tenantNamespaceId);
+
+  // Passo 1: validar soma exata dos tamanhos e calcular SHA-256 em streaming sem escrita temporária
+  let observedSize = 0;
+  const hash = crypto.createHash('sha256');
+  for (const partPath of list) {
+    const st = await fs.promises.stat(partPath);
+    if (!st.isFile()) {
+      const err = new Error(`Parte inválida ou ausente: ${partPath}`);
+      err.statusCode = 400;
+      throw err;
+    }
+    observedSize += st.size;
+    if (st.size > 0) {
+      await new Promise((resolve, reject) => {
+        const rs = fs.createReadStream(partPath, { highWaterMark: DEFAULT_CHUNK_SIZE });
+        rs.on('data', (chunk) => hash.update(chunk));
+        rs.on('end', resolve);
+        rs.on('error', reject);
+      });
+    }
+  }
+
+  if (observedSize !== totalSize) {
+    const err = new Error(`Soma das partes (${observedSize}) diverge do tamanho esperado (${totalSize}).`);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const plaintextSha256 = hash.digest();
+  const plaintextSha256Hex = plaintextSha256.toString('hex');
+  if (normalizedExpectedSha && normalizedExpectedSha !== plaintextSha256Hex) {
+    const err = new Error('SHA-256 final do plaintext não confere com fileSha256 declarado.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const fileSalt = crypto.randomBytes(16);
+  const noncePrefix = crypto.randomBytes(4);
+  const fileKey = deriveFileKey(tenantKey, fileSalt);
+
+  const headerBuf = buildHeader({
+    chunkSize: DEFAULT_CHUNK_SIZE,
+    plaintextSize: totalSize,
+    fileSalt,
+    noncePrefix,
+    plaintextSha256,
+  });
+
+  const path = require('path');
+  await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
+  // Sempre no mesmo diretório/volume de destPath para rename atômico sem EXDEV
+  const tmpDest = `${destPath}.${process.pid}.${Date.now()}.enc.tmp`;
+  const outFd = await fs.promises.open(tmpDest, 'w', 0o600);
+
+  const writePlainChunk = async (plainSlice, chunkIdx, isFinal, outPos) => {
+    const nonce = buildChunkNonce(noncePrefix, chunkIdx);
+    const aad = buildChunkAad(headerBuf, chunkIdx, isFinal);
+    const cipher = crypto.createCipheriv('aes-256-gcm', fileKey, nonce);
+    cipher.setAAD(aad);
+    const enc = plainSlice.length > 0
+      ? Buffer.concat([cipher.update(plainSlice), cipher.final()])
+      : cipher.final();
+    const tag = cipher.getAuthTag();
+    let nextPos = outPos;
+    if (enc.length > 0) {
+      await outFd.write(enc, 0, enc.length, nextPos);
+      nextPos += enc.length;
+    }
+    await outFd.write(tag, 0, AUTH_TAG_SIZE, nextPos);
+    nextPos += AUTH_TAG_SIZE;
+    return nextPos;
+  };
+
+  try {
+    await outFd.write(headerBuf, 0, HEADER_SIZE, 0);
+    let outPos = HEADER_SIZE;
+
+    if (totalSize === 0) {
+      // Arquivo vazio: grava exatamente 1 chunk vazio autenticado conforme parser AURTENC2
+      outPos = await writePlainChunk(Buffer.alloc(0), 0, true, outPos);
+    } else {
+      const totalChunks = Math.ceil(totalSize / DEFAULT_CHUNK_SIZE);
+      const readBuf = Buffer.alloc(DEFAULT_CHUNK_SIZE);
+      let chunkIdx = 0;
+      let carry = Buffer.alloc(0);
+
+      for (const partPath of list) {
+        const inFd = await fs.promises.open(partPath, 'r');
+        let inPos = 0;
+        try {
+          while (true) {
+            const { bytesRead } = await inFd.read(readBuf, 0, DEFAULT_CHUNK_SIZE, inPos);
+            if (bytesRead <= 0) break;
+            inPos += bytesRead;
+
+            const incoming = readBuf.subarray(0, bytesRead);
+            let combined = carry.length > 0 ? Buffer.concat([carry, incoming]) : Buffer.from(incoming);
+            let offset = 0;
+
+            while (combined.length - offset >= DEFAULT_CHUNK_SIZE) {
+              const slice = combined.subarray(offset, offset + DEFAULT_CHUNK_SIZE);
+              const isFinal = chunkIdx === totalChunks - 1;
+              outPos = await writePlainChunk(slice, chunkIdx, isFinal, outPos);
+              chunkIdx++;
+              offset += DEFAULT_CHUNK_SIZE;
+            }
+            carry = offset < combined.length ? Buffer.from(combined.subarray(offset)) : Buffer.alloc(0);
+          }
+        } finally {
+          await inFd.close().catch(() => {});
+        }
+      }
+
+      if (carry.length > 0) {
+        outPos = await writePlainChunk(carry, chunkIdx, true, outPos);
+        chunkIdx++;
+      }
+
+      if (chunkIdx !== totalChunks) {
+        throw new Error(`Contagem de chunks inconsistente na criptografia (${chunkIdx} != ${totalChunks}).`);
+      }
+    }
+
+    await outFd.sync();
+  } catch (err) {
+    await outFd.close().catch(() => {});
+    await fs.promises.unlink(tmpDest).catch(() => {});
+    throw err;
+  }
+
+  await outFd.close();
+  await fs.promises.rename(tmpDest, destPath);
+  return { plaintextSize: totalSize, plaintextSha256Hex };
+}
+
 module.exports = {
   MAGIC,
   VERSION,
@@ -372,6 +541,7 @@ module.exports = {
   readEncryptedHeaderSync,
   encryptFileAtomic,
   encryptBufferToFile,
+  encryptPartFilesAtomic,
   createDecryptStream,
   decryptBuffer,
   computeFileSha256,

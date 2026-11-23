@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Permite HTTP local para IPs privados configurados dinamicamente (192.168.x.x / 10.x.x.x);
+         VaultTransferWorker/Plugin valida em runtime que apenas hosts privados/locais usam http:// -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

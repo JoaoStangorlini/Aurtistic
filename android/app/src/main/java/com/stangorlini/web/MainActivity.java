@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(WidgetPlugin.class);
         registerPlugin(SmartBackupPlugin.class);
+        registerPlugin(VaultTransferPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

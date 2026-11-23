@@ -1,0 +1,222 @@
+name: Desktop App Release
+
+on:
+  push:
+    tags:
+      - "desktop-v*"
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag da release (ex.: desktop-v1.0.0)"
+        required: false
+        default: "desktop-v1.0.0"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validar TypeScript & Testes Core
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Instalar dependências do desktop
+        run: npm --prefix desktop ci || npm --prefix desktop install
+
+      - name: Compilar TypeScript (desktop)
+        run: npx --prefix desktop tsc -p desktop/tsconfig.json
+
+      - name: Executar suíte desktop-core
+        run: node tests/desktop-core.test.mjs
+
+  build:
+    name: Empacotar (${{ matrix.os }})
+    needs: validate
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform_flag: --linux deb AppImage
+            artifact_name: desktop-linux
+          - os: windows-latest
+            platform_flag: --win nsis
+            artifact_name: desktop-windows
+          - os: macos-latest
+            platform_flag: --mac dmg
+            artifact_name: desktop-macos
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Instalar dependências do desktop
+        run: npm --prefix desktop ci || npm --prefix desktop install
+
+      - name: Sincronizar versão com a tag da Release
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.tag }}" ]; then
+            RAW_TAG="${{ inputs.tag }}"
+          else
+            RAW_TAG="${GITHUB_REF_NAME}"
+          fi
+          CLEAN_VER="${RAW_TAG#desktop-v}"
+          CLEAN_VER="${CLEAN_VER#v}"
+          if [[ ! "$CLEAN_VER" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Tag '$RAW_TAG' não contém semver válido (esperado ex.: desktop-v1.0.0 ou v1.0.0)." >&2
+            exit 1
+          fi
+          npm --prefix desktop version "$CLEAN_VER" --no-git-tag-version --allow-same-version
+          echo "Versão sincronizada para empacotamento: $CLEAN_VER"
+
+      - name: Compilar TypeScript (desktop)
+        run: npm --prefix desktop run build
+
+      - name: Empacotar com electron-builder
+        shell: bash
+        env:
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ] && [ -n "${WIN_CSC_LINK:-}" ]; then
+            export CSC_LINK="$WIN_CSC_LINK"
+            export CSC_KEY_PASSWORD="${WIN_CSC_KEY_PASSWORD:-}"
+          elif [ "${{ matrix.os }}" = "macos-latest" ] && [ -n "${MAC_CSC_LINK:-}" ]; then
+            export CSC_LINK="$MAC_CSC_LINK"
+            export CSC_KEY_PASSWORD="${MAC_CSC_KEY_PASSWORD:-}"
+          else
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+          fi
+
+          npx --prefix desktop electron-builder --config desktop/electron-builder.yml ${{ matrix.platform_flag }} --publish never
+
+      - name: Upload dos artefatos de build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            desktop/release/*.exe
+            desktop/release/*.blockmap
+            desktop/release/*.deb
+            desktop/release/*.AppImage
+            desktop/release/*.dmg
+            desktop/release/*.zip
+            desktop/release/latest*.yml
+          if-no-files-found: error
+
+  release:
+    name: Publicar GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Baixar artefatos
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Gerar SHA256SUMS.txt
+        working-directory: release-artifacts
+        run: sha256sum * > SHA256SUMS.txt
+
+      - name: Determinar tag da release
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.tag }}" ]; then
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Criar ou atualizar Release no GitHub
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.name }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release-artifacts/* --clobber
+          else
+            gh release create "$TAG" release-artifacts/* \
+              --title "Aurtistic Desktop $TAG" \
+              --notes "Instaladores oficiais do Aurtistic Desktop (Windows .exe, Linux .deb/.AppImage, macOS .dmg) e SHA256SUMS.txt."
+          fi
+
+  publish-apt:
+    name: Publicar Repositório APT (GitHub Pages)
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Baixar pacote .deb
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-linux
+          path: linux-artifacts
+
+      - name: Instalar dpkg-dev
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev
+
+      - name: Montar e assinar repositório APT
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        run: |
+          mkdir -p _site/apt
+          chmod +x desktop/scripts/build-apt-repo.sh
+          ./desktop/scripts/build-apt-repo.sh linux-artifacts _site/apt
+          if [ -z "${APT_GPG_PRIVATE_KEY:-}" ]; then
+            echo "::warning::APT_GPG_PRIVATE_KEY não configurada — KEY.gpg e assinatura InRelease/Release.gpg não foram geradas."
+          fi
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

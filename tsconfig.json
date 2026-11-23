@@ -35,6 +35,7 @@
     "servidor/**",
     "edge-daemon/**",
     "android/**",
+    "desktop/**",
     "Aurtistic/**",
     "public/sw.js"
   ]

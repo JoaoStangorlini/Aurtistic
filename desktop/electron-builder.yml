@@ -1,0 +1,92 @@
+appId: com.aurtistic.desktop
+productName: Aurtistic
+copyright: Copyright © 2026 Aurtistic (AGPLv3)
+asar: true
+asarUnpack:
+  - build/*.png
+  - build/*.ico
+
+directories:
+  buildResources: build
+  output: release
+
+files:
+  - dist/**/*
+  - src/renderer/offline.html
+  - build/icon.png
+  - build/icon.ico
+  - build/tray.png
+  - build/trayTemplate.png
+  - build/trayTemplate@2x.png
+  - package.json
+  - "!**/*.map"
+
+publish:
+  provider: github
+  owner: JoaoStangorlini
+  repo: Aurtistic
+  releaseType: release
+
+win:
+  icon: build/icon.ico
+  artifactName: Aurtistic-Setup-${version}.${ext}
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Aurtistic
+
+linux:
+  maintainer: Aurtistic <contato@aurtistic.com.br>
+  executableName: aurtistic
+  icon: build/icon.png
+  category: Utility;Productivity;
+  desktop:
+    entry:
+      Name: Aurtistic
+      Comment: Aurtistic Desktop — Cofre e Bem-Estar
+      StartupWMClass: aurtistic
+      Categories: Utility;Productivity;
+  target:
+    - target: deb
+      arch:
+        - x64
+    - target: AppImage
+      arch:
+        - x64
+
+deb:
+  packageName: aurtistic
+  artifactName: aurtistic_${version}_${arch}.${ext}
+  depends:
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0
+
+appImage:
+  artifactName: Aurtistic-${version}-${arch}.${ext}
+
+mac:
+  icon: build/icon.png
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch:
+        - universal
+    - target: zip
+      arch:
+        - universal
+
+dmg:
+  artifactName: Aurtistic-${version}-${arch}.${ext}

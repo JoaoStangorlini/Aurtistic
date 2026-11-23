@@ -32,6 +32,8 @@ const { findDuplicates } = require('./lib/deduplicator');
 const ShareManager = require('./lib/share-manager');
 const { streamDirectoryAsZip } = require('./lib/zip-exporter');
 const WebdavServer = require('./lib/webdav-server');
+const { WebdavTokenManager, extractClientIpForRateLimit } = require('./lib/webdav-tokens');
+const { ChunkedUploadManager } = require('./lib/chunked-upload');
 let fflate;
 try {
   fflate = require('fflate');
@@ -74,10 +76,10 @@ try {
   const osTmpDir = require('os').tmpdir();
   for (const tmpName of fs.readdirSync(osTmpDir)) {
     if (tmpName.startsWith('aurt-dec-') && tmpName.endsWith('.tmp')) {
-      try { fs.unlinkSync(path.join(osTmpDir, tmpName)); } catch {}
+      try { fs.unlinkSync(path.join(osTmpDir, tmpName)); } catch { }
     }
   }
-} catch {}
+} catch { }
 const PORT = Number(process.env.PORT) || 8080;
 const BIND_HOST = process.env.BIND_HOST || '127.0.0.1';
 
@@ -131,7 +133,7 @@ function resolveActiveStorageDir() {
             console.log(`[StorageDiscovery] HD USB inicializado com sucesso em: ${candidateHub}`);
             return candidateHub;
           }
-        } catch {}
+        } catch { }
 
         const candidateRoot = path.join('/storage', mountName, 'hub_data');
         try {
@@ -139,19 +141,19 @@ function resolveActiveStorageDir() {
           if (fs.existsSync(candidateRoot)) {
             return candidateRoot;
           }
-        } catch {}
+        } catch { }
 
         try {
           fs.accessSync(path.join('/storage', mountName), fs.constants.R_OK);
           return path.join('/storage', mountName);
-        } catch {}
+        } catch { }
       }
     }
-  } catch {}
+  } catch { }
 
   // 3. Fallback seguro para contingência local ou ambiente dev
   const fallback = path.join(__dirname, 'storage');
-  try { fs.mkdirSync(fallback, { recursive: true }); } catch {}
+  try { fs.mkdirSync(fallback, { recursive: true }); } catch { }
   return fallback;
 }
 
@@ -180,17 +182,17 @@ function getTenantBaseDir(storageDir = STORAGE_DIR) {
     try {
       fs.accessSync(base, fs.constants.W_OK);
       return base;
-    } catch {}
+    } catch { }
   }
   const fallback = path.join(__dirname, 'storage');
-  try { fs.mkdirSync(fallback, { recursive: true }); } catch {}
+  try { fs.mkdirSync(fallback, { recursive: true }); } catch { }
   return fallback;
 }
 
 function resolvePortfolioDir(storageDir = STORAGE_DIR) {
   if (process.env.PORTFOLIO_DIR) {
     const custom = path.resolve(process.env.PORTFOLIO_DIR);
-    try { fs.mkdirSync(custom, { recursive: true }); } catch {}
+    try { fs.mkdirSync(custom, { recursive: true }); } catch { }
     if (fs.existsSync(custom)) return custom;
   }
   const userImagensPortifolio = '/home/stangorlini/Imagens/Portifólio';
@@ -207,7 +209,7 @@ function resolvePortfolioDir(storageDir = STORAGE_DIR) {
   if (fs.existsSync(vaultPortE)) return vaultPortE;
 
   const defaultPort = path.join(storageDir, 'portfolio');
-  try { fs.mkdirSync(defaultPort, { recursive: true }); } catch {}
+  try { fs.mkdirSync(defaultPort, { recursive: true }); } catch { }
   return defaultPort;
 }
 
@@ -217,6 +219,7 @@ const SHARES_FILE_PATH = path.join(INTERNAL_DATA_DIR, 'shares.json');
 const shareManager = new ShareManager(SHARES_FILE_PATH);
 const trashManager = new TrashManager(STORAGE_DIR);
 let webdavServer = null;
+let chunkedUploadManager = null;
 
 // Diretórios dinâmicos atualizados em syncDerivedStoragePaths() durante hotplug USB ou alterações admin
 let MEDIA_DIR = path.resolve(process.env.MEDIA_DIR || path.join(STORAGE_DIR, 'media'));
@@ -249,15 +252,33 @@ function syncDerivedStoragePaths() {
   for (const d of [USERS_ROOT_DIR, ORGS_ROOT_DIR, TENANT_UPLOAD_STAGING_DIR]) {
     try {
       if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
-    } catch {}
+    } catch { }
   }
+  // Varredura de órfãos antigos no staging (arquivos abortados de sessões anteriores)
+  try {
+    if (fs.existsSync(TENANT_UPLOAD_STAGING_DIR)) {
+      const cutoff = Date.now() - 60 * 60 * 1000;
+      for (const f of fs.readdirSync(TENANT_UPLOAD_STAGING_DIR)) {
+        if (f.startsWith('.aurt_tmp_') || f.startsWith('stage_')) {
+          const full = path.join(TENANT_UPLOAD_STAGING_DIR, f);
+          const st = fs.statSync(full);
+          if (st.mtimeMs < cutoff) {
+            try { fs.unlinkSync(full); } catch { }
+          }
+        }
+      }
+    }
+  } catch { }
 
   try {
     trashManager?.setBaseDir?.(STORAGE_DIR);
-  } catch {}
+  } catch { }
   try {
     webdavServer?.setRootDir?.(STORAGE_DIR);
-  } catch {}
+  } catch { }
+  try {
+    chunkedUploadManager?.sweepExpiredSessions?.().catch(() => { });
+  } catch { }
 }
 
 function refreshStorageDir() {
@@ -314,7 +335,7 @@ for (const dir of [
   PORTFOLIO_THUMBS_DIR,
   VAULT_DIR,
 ]) {
-  try { fs.mkdirSync(dir, { recursive: true }); } catch {}
+  try { fs.mkdirSync(dir, { recursive: true }); } catch { }
 }
 
 // Índice Primário no ext4 interno rápido do Termux (evita spin-up do HD e bugs FUSE)
@@ -451,7 +472,7 @@ async function moveFileSafe(src, dest) {
   } catch (err) {
     if (err && (err.code === 'EXDEV' || err.code === 'EPERM' || err.code === 'EBUSY')) {
       await fs.promises.copyFile(src, dest);
-      await fs.promises.unlink(src).catch(() => {});
+      await fs.promises.unlink(src).catch(() => { });
     } else {
       throw err;
     }
@@ -466,12 +487,12 @@ async function moveDirectoryContentsRecursive(srcDir, destDir) {
     const destPath = path.join(destDir, ent.name);
     if (ent.isDirectory()) {
       await moveDirectoryContentsRecursive(srcPath, destPath);
-      await fs.promises.rm(srcPath, { recursive: true, force: true }).catch(() => {});
+      await fs.promises.rm(srcPath, { recursive: true, force: true }).catch(() => { });
     } else if (ent.isFile()) {
       await moveFileSafe(srcPath, destPath);
     }
   }
-  await fs.promises.rm(srcDir, { recursive: true, force: true }).catch(() => {});
+  await fs.promises.rm(srcDir, { recursive: true, force: true }).catch(() => { });
 }
 
 // Renomeação segura em sistemas FAT32/exFAT case-insensitive e Android FUSE
@@ -501,7 +522,7 @@ async function renameDirectorySafeFAT32(oldDir, newDir) {
     try {
       await fs.promises.rename(oldDir, newDir);
       return;
-    } catch {}
+    } catch { }
   }
 
   await moveDirectoryContentsRecursive(oldDir, newDir);
@@ -901,7 +922,7 @@ async function readImageDimensionsAndOrientation(filePath) {
   } catch {
     return null;
   } finally {
-    if (fd) await fd.close().catch(() => {});
+    if (fd) await fd.close().catch(() => { });
   }
 }
 
@@ -989,7 +1010,7 @@ except Exception:
   } catch {
     return false;
   } finally {
-    await fs.promises.unlink(tmpTarget).catch(() => {});
+    await fs.promises.unlink(tmpTarget).catch(() => { });
     releaseThumbWorker();
   }
 }
@@ -1194,7 +1215,7 @@ async function migrateThumbCacheKey(oldHash, newHash, fileSig = null) {
         if (fs.existsSync(oldPath) && !fs.existsSync(newPath)) {
           try {
             await fs.promises.copyFile(oldPath, newPath);
-          } catch {}
+          } catch { }
         }
       }
     }
@@ -1395,12 +1416,11 @@ function buildMockSvg(item, isOriginal) {
       <path d="M 80 0 L 0 0 0 80" fill="none" stroke="${gold}" stroke-opacity="0.14" stroke-width="1.2"/>
       <circle cx="0" cy="0" r="2" fill="${gold}" fill-opacity="0.3"/>
     </pattern>
-    ${
-      isOriginal
-        ? `<pattern id="gridMinor" width="16" height="16" patternUnits="userSpaceOnUse">
+    ${isOriginal
+      ? `<pattern id="gridMinor" width="16" height="16" patternUnits="userSpaceOnUse">
       <path d="M 16 0 L 0 0 0 16" fill="none" stroke="${accent}" stroke-opacity="0.08" stroke-width="0.6"/>
     </pattern>`
-        : ''
+      : ''
     }
   </defs>
 
@@ -1592,12 +1612,12 @@ async function syncPortfolioFromDiskAsync(options = {}) {
               sizeBytes = st.size;
               createdAt = st.mtime.toISOString();
               mtimeMs = st.mtimeMs || st.mtime.getTime();
-            } catch {}
+            } catch { }
           } else if (existing) {
             try {
               const st = await fs.promises.stat(fullPath);
               mtimeMs = st.mtimeMs || st.mtime.getTime();
-            } catch {}
+            } catch { }
           }
 
           const fileSig = sizeBytes > 0 ? `${ent.name}_${sizeBytes}` : null;
@@ -1653,7 +1673,7 @@ async function syncPortfolioFromDiskAsync(options = {}) {
                 const datePart = parts[0].replace(/:/g, '-');
                 itemCreatedAt = new Date(`${datePart}T${parts[1]}Z`).toISOString();
               }
-            } catch {}
+            } catch { }
           }
           if (!itemCreatedAt) {
             itemCreatedAt = new Date(mtimeMs).toISOString();
@@ -1714,7 +1734,7 @@ async function syncPortfolioFromDiskAsync(options = {}) {
             if (existing.album) discoveredAlbums.add(existing.album);
           }
         }
-      } catch {}
+      } catch { }
     }
 
     // Proteção contra perda acidental do catálogo: só limpa catálogo existente se force === true E houver montagem externa válida
@@ -1860,7 +1880,7 @@ function checkUsbMountFromProcMounts() {
       }
       return false;
     }
-  } catch {}
+  } catch { }
   return fs.existsSync(PORTFOLIO_DIR);
 }
 
@@ -1958,7 +1978,7 @@ function initCatalogStore() {
         fs.writeFileSync(PRIMARY_CATALOG_PATH, JSON.stringify(memoryCatalog, null, 2), 'utf8');
         console.log(`[CatalogStore] ${memoryCatalog.items.length} itens gravados em PRIMARY_CATALOG_PATH.`);
       }
-    } catch {}
+    } catch { }
   }
 
   // Sincroniza automaticamente com as pastas presentes no disco se montado
@@ -2040,7 +2060,7 @@ async function scanDirectoryRecursiveAsync(targetDir, ignoreFilename = null) {
           const st = await fs.promises.stat(fullPath);
           totalBytes += st.size;
           totalCount += 1;
-        } catch {}
+        } catch { }
       }
     }
   }
@@ -2098,14 +2118,14 @@ try {
   if (fs.existsSync(DISK_SNAPSHOT_FILE)) {
     lastKnownDiskCapacity = JSON.parse(fs.readFileSync(DISK_SNAPSHOT_FILE, 'utf8'));
   }
-} catch {}
+} catch { }
 
 function saveDiskCapacitySnapshot(cap) {
   if (cap && cap.totalBytes > 0) {
     lastKnownDiskCapacity = { ...cap, cachedAt: new Date().toISOString() };
     try {
       fs.writeFileSync(DISK_SNAPSHOT_FILE, JSON.stringify(lastKnownDiskCapacity), 'utf8');
-    } catch {}
+    } catch { }
   }
 }
 
@@ -2141,7 +2161,7 @@ function getRealMemInfo() {
         isProcMemInfo: true,
       };
     }
-  } catch {}
+  } catch { }
 
   const totalMem = os.totalmem();
   const freeMem = os.freemem();
@@ -2159,7 +2179,7 @@ function getDiskCapacitySync(targetPath) {
   try {
     // Garante que o diretório alvo ou seu pai exista para evitar ENOENT
     if (!fs.existsSync(targetPath)) {
-      try { fs.mkdirSync(targetPath, { recursive: true }); } catch {}
+      try { fs.mkdirSync(targetPath, { recursive: true }); } catch { }
     }
 
     if (typeof fs.statfsSync === 'function') {
@@ -2182,7 +2202,7 @@ function getDiskCapacitySync(targetPath) {
         return res;
       }
     }
-  } catch {}
+  } catch { }
 
   // Fallback via comando POSIX df -k caso FUSE/Termux bloqueie statfsSync
   try {
@@ -2206,7 +2226,7 @@ function getDiskCapacitySync(targetPath) {
         return res;
       }
     }
-  } catch {}
+  } catch { }
 
   // Se o disco estiver desconectado temporariamente, usa o snapshot real persistido
   if (lastKnownDiskCapacity && lastKnownDiskCapacity.totalBytes > 0) {
@@ -2252,6 +2272,10 @@ async function streamFileWithRange(req, res, filePath, options = {}) {
   res.setHeader('Accept-Ranges', 'bytes');
   res.setHeader('Content-Type', mimeType);
   res.setHeader('Cache-Control', options.cacheControl || 'private, max-age=0, must-revalidate');
+  // Emite X-Plaintext-Sha256 estritamente em O(1) do cabeçalho AURTENC2 (nunca bloqueia plaintext grande)
+  if (encHdr && encHdr.plaintextSha256) {
+    res.setHeader('X-Plaintext-Sha256', encHdr.plaintextSha256.toString('hex'));
+  }
 
   const dispositionType = options.download ? 'attachment' : 'inline';
   res.setHeader(
@@ -2287,11 +2311,19 @@ async function streamFileWithRange(req, res, filePath, options = {}) {
     res.status(206);
     res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
     res.setHeader('Content-Length', String(chunkLength));
+    if (req.method === 'HEAD') {
+      return res.end();
+    }
 
     const stream = encHdr
       ? vaultCrypto.createDecryptStream(filePath, ownerNs, start, end)
       : fs.createReadStream(filePath, { start, end, highWaterMark: 64 * 1024 });
-    req.on('close', () => stream.destroy());
+    const destroyStream = () => {
+      if (!stream.destroyed) stream.destroy();
+    };
+    req.on('aborted', destroyStream);
+    req.on('close', destroyStream);
+    res.on('close', destroyStream);
     stream.on('error', () => {
       if (!res.headersSent) res.status(500).end();
       else res.destroy();
@@ -2301,10 +2333,18 @@ async function streamFileWithRange(req, res, filePath, options = {}) {
 
   res.status(200);
   res.setHeader('Content-Length', String(fileSize));
+  if (req.method === 'HEAD') {
+    return res.end();
+  }
   const stream = encHdr
     ? vaultCrypto.createDecryptStream(filePath, ownerNs)
     : fs.createReadStream(filePath, { highWaterMark: 64 * 1024 });
-  req.on('close', () => stream.destroy());
+  const destroyStream = () => {
+    if (!stream.destroyed) stream.destroy();
+  };
+  req.on('aborted', destroyStream);
+  req.on('close', destroyStream);
+  res.on('close', destroyStream);
   stream.on('error', () => {
     if (!res.headersSent) res.status(500).end();
     else res.destroy();
@@ -2318,11 +2358,173 @@ async function streamFileWithRange(req, res, filePath, options = {}) {
 const app = express();
 app.disable('x-powered-by');
 
-webdavServer = new WebdavServer(STORAGE_DIR, {
-  authenticate: (_user, pass) => pass === ADMIN_PASSWORD,
-  trashManager,
+async function notifyNextVaultIndexSync({
+  tenant,
+  action = 'upsert',
+  relPath,
+  item = null,
+  sha256 = null,
+  totalUsedBytes,
+}) {
+  const appUrl = String(process.env.AURTISTIC_APP_URL || '').trim().replace(/\/+$/, '');
+  if (!appUrl || !tenant || !relPath) return;
+  const ts = String(Date.now());
+  const body = JSON.stringify({
+    userId: tenant.userId,
+    scopeType: tenant.scopeType === 'org' ? 'org' : 'user',
+    organizationId: tenant.organizationId || null,
+    orgSlug: tenant.orgSlug || null,
+    action,
+    relPath,
+    item,
+    sha256,
+    totalUsedBytes,
+  });
+  const sig = crypto
+    .createHmac('sha256', resolveTenantHmacSecret())
+    .update(`${ts}.${body}`)
+    .digest('hex');
+  try {
+    await fetch(`${appUrl}/api/internal/vault-index-sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-edge-timestamp': ts,
+        'x-edge-signature': sig,
+      },
+      body,
+      signal: AbortSignal.timeout(4000),
+    });
+  } catch { }
+}
+
+const webdavTokenManager = new WebdavTokenManager({
+  storePath: path.join(INTERNAL_DATA_DIR, 'webdav_tokens.json'),
+  resolveEntitlement: async (tokenRec) => {
+    const appUrl = String(process.env.AURTISTIC_APP_URL || '').trim().replace(/\/+$/, '');
+    if (!appUrl) {
+      return { ok: false, offline: true };
+    }
+    const ts = String(Date.now());
+    const body = JSON.stringify({
+      userId: tokenRec.userId,
+      scopeType: tokenRec.scopeType,
+      organizationId: tokenRec.organizationId,
+      orgSlug: tokenRec.orgSlug,
+    });
+    const sig = crypto
+      .createHmac('sha256', resolveTenantHmacSecret())
+      .update(`${ts}.${body}`)
+      .digest('hex');
+    try {
+      const resp = await fetch(`${appUrl}/api/internal/webdav-entitlement`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-edge-timestamp': ts,
+          'x-edge-signature': sig,
+        },
+        body,
+        signal: AbortSignal.timeout(3000),
+      });
+      if (!resp.ok) {
+        if (resp.status === 403 || resp.status === 404) return { ok: true, active: false };
+        return { ok: false, offline: true };
+      }
+      const data = await resp.json().catch(() => null);
+      if (!data || typeof data.active !== 'boolean') return { ok: false, offline: true };
+      return { ok: true, ...data };
+    } catch {
+      return { ok: false, offline: true };
+    }
+  },
+});
+
+webdavServer = new WebdavServer({
+  basePath: '/webdav/cofre',
+  tokenManager: webdavTokenManager,
+  allowedOriginHosts: new Set(['storage.hublabdiv.com.br', 'localhost', '127.0.0.1']),
+  buildTenantContext: ({ token, effective }) => {
+    const scopeType = token.scopeType === 'org' ? 'org' : 'user';
+    const orgSlug = scopeType === 'org' ? token.orgSlug : null;
+    const pinNamespaceId = scopeType === 'org' ? `org:${orgSlug}` : token.userId;
+    const userRoot =
+      scopeType === 'org'
+        ? resolveSafeChildPath(ORGS_ROOT_DIR, orgSlug)
+        : resolveSafeChildPath(USERS_ROOT_DIR, token.userId);
+    try {
+      if (!fs.existsSync(userRoot)) fs.mkdirSync(userRoot, { recursive: true });
+    } catch { }
+    return {
+      userId: token.userId,
+      scopeType,
+      orgSlug,
+      organizationId: token.organizationId,
+      pinNamespaceId,
+      ownerNs: scopeType === 'org' ? `org:${orgSlug}` : `user:${token.userId}`,
+      role: effective.role,
+      quotaLimitBytes: effective.quotaLimitBytes,
+      readOnly: effective.readOnly,
+      userRoot,
+      resolveSafePath: (relPath, opts) =>
+        resolveTenantSafePath(token.userId, userRoot, relPath, opts, scopeType, effective.role, null),
+      resolveListingDirs: (cleanRel) =>
+        resolveTenantListingDirs(token.userId, userRoot, cleanRel, scopeType, effective.role, null),
+      getUsedBytes: (force) => getTenantUsedBytes(pinNamespaceId, userRoot, force, scopeType),
+      adjustUsedBytes: (delta) => adjustTenantUsedBytes(pinNamespaceId, userRoot, delta, scopeType),
+    };
+  },
+  getStorageDir: () => STORAGE_DIR,
+  getStagingDir: () => TENANT_UPLOAD_STAGING_DIR,
+  getVolumesPool: () => STORAGE_VOLUMES_POOL,
+  getDiskCapacitySync,
+  isExternalStorageMounted,
+  isStagingOnExternalStorage: () => {
+    try {
+      const stg = path.resolve(TENANT_UPLOAD_STAGING_DIR);
+      const sto = path.resolve(STORAGE_DIR);
+      return stg === sto || stg.startsWith(`${sto}${path.sep}`);
+    } catch {
+      return false;
+    }
+  },
+  getMimeType,
+  isPortfolioRelatedRelPath,
+  isTenantPathPinProtected,
+  hasAnyPinUnderPrefix: (pinNamespaceId, prefixRel) => {
+    const pins = tenantFolderPinsStore[pinNamespaceId];
+    if (!pins || typeof pins !== 'object') return false;
+    const clean = normalizeTenantRelPath(prefixRel);
+    return Object.entries(pins).some(([k, rec]) => {
+      if (!rec || !rec.pinHash) return false;
+      if (!clean) return true;
+      return k === clean || k.startsWith(`${clean}/`);
+    });
+  },
+  moveFileSafe,
+  renameDirectorySafeFAT32,
+  getTenantTrashDirAndManifest,
+  readTenantTrashManifest,
+  writeTenantTrashManifest,
+  invalidateThumb: async (pinNamespaceId, relPath) => {
+    const nfcRel = String(relPath || '').normalize('NFC').replace(/\\/g, '/');
+    const thumbKey = crypto.createHash('md5').update(`${pinNamespaceId}:${nfcRel}`).digest('hex');
+    await fs.promises.unlink(path.join(INTERNAL_THUMBS_DIR, `tthumb_${thumbKey}.webp`)).catch(() => { });
+  },
+  queueThumb: (pinNamespaceId, relPath, fullPath) => queueTenantImageThumbnail(pinNamespaceId, relPath, fullPath, 480),
+  onPortfolioMutated: () => {
+    tenantUsedBytesCache.clear();
+    void syncPortfolioFromDiskAsync({ force: true }).catch(() => { });
+  },
+  onUploadCompleted: (info) => notifyNextVaultIndexSync(info),
 });
 app.use(webdavServer.middleware());
+if (process.env.ALLOW_LEGACY_RAW_WEBDAV !== 'true') {
+  app.use('/webdav', (req, res, next) => {
+    if (req.path.startsWith('/cofre')) return next();
+    return res.status(404).send('WebDAV legado desativado. Use /webdav/cofre com credencial de dispositivo.');
+  });
+}
 
 const ENV_ALLOWED_CORS_ORIGINS = String(process.env.ALLOWED_CORS_ORIGINS || '')
   .split(',')
@@ -2363,7 +2565,8 @@ function applyTenantMediaCorsHeaders(req, res) {
 function handleTenantMediaPreflight(req, res) {
   applyTenantMediaCorsHeaders(req, res);
   res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Range, x-tenant-ticket');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Range, x-tenant-ticket, x-chunk-sha256');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, Content-Disposition, X-Plaintext-Sha256');
   return res.status(204).end();
 }
 
@@ -2380,6 +2583,7 @@ app.use(
       'Authorization',
       'Range',
       'x-tenant-ticket',
+      'x-chunk-sha256',
       'x-deploy-key',
       'x-storage-key',
     ],
@@ -2388,6 +2592,7 @@ app.use(
       'Accept-Ranges',
       'Content-Length',
       'Content-Disposition',
+      'X-Plaintext-Sha256',
     ],
   })
 );
@@ -2530,7 +2735,7 @@ app.get(['/api/status', '/health'], (_req, res) => {
       const ents = fs.readdirSync('/storage');
       storageEntries.push(...ents);
     }
-  } catch {}
+  } catch { }
 
   res.json({
     status: 'ok',
@@ -2562,7 +2767,7 @@ app.post('/api/admin/set-portfolio-dir', async (req, res) => {
   // Lê o .env atual, substitui/adiciona PORTFOLIO_DIR
   const envPath = path.join(__dirname, '.env');
   let envContent = '';
-  try { envContent = await fs.promises.readFile(envPath, 'utf8'); } catch {}
+  try { envContent = await fs.promises.readFile(envPath, 'utf8'); } catch { }
   if (/^PORTFOLIO_DIR=/m.test(envContent)) {
     envContent = envContent.replace(/^PORTFOLIO_DIR=.*/m, `PORTFOLIO_DIR=${targetDir}`);
   } else {
@@ -2573,7 +2778,7 @@ app.post('/api/admin/set-portfolio-dir', async (req, res) => {
   // Aplica em runtime sem reiniciar — recarrega caminhos derivados e ressincroniza catálogo
   process.env.PORTFOLIO_DIR = targetDir;
   syncDerivedStoragePaths();
-  try { await fs.promises.unlink(PORTFOLIO_BACKUP_CATALOG); } catch {}
+  try { await fs.promises.unlink(PORTFOLIO_BACKUP_CATALOG); } catch { }
   memoryCatalog = {
     version: memoryCatalog?.version || 1,
     updatedAt: new Date().toISOString(),
@@ -2585,7 +2790,7 @@ app.post('/api/admin/set-portfolio-dir', async (req, res) => {
     subalbums: {},
     items: [],
   };
-  await syncPortfolioFromDiskAsync({ force: true }).catch(() => {});
+  await syncPortfolioFromDiskAsync({ force: true }).catch(() => { });
 
   const fileCount = (await fs.promises.readdir(targetDir)).length;
   return res.json({ success: true, portfolioDir: targetDir, rootEntries: fileCount, envUpdated: true });
@@ -2635,7 +2840,7 @@ app.post('/api/admin/remote-deploy', async (req, res) => {
       aborted = true;
       req.destroy();
       writeStream.destroy();
-      try { fs.unlinkSync(bundlePath); } catch {}
+      try { fs.unlinkSync(bundlePath); } catch { }
       if (!res.headersSent) {
         return res.status(413).json({ error: 'Pacote de deploy excede o limite de 98 MB.' });
       }
@@ -2648,7 +2853,7 @@ app.post('/api/admin/remote-deploy', async (req, res) => {
     if (aborted) return;
     try {
       if (totalBytes === 0) {
-        try { fs.unlinkSync(bundlePath); } catch {}
+        try { fs.unlinkSync(bundlePath); } catch { }
         return res.status(400).json({ error: 'Nenhum dado recebido no pacote de deploy.' });
       }
 
@@ -2660,7 +2865,7 @@ app.post('/api/admin/remote-deploy', async (req, res) => {
       try {
         await execFileAsync('tar', ['-tzf', bundlePath]);
       } catch (err) {
-        try { fs.unlinkSync(bundlePath); } catch {}
+        try { fs.unlinkSync(bundlePath); } catch { }
         return res.status(400).json({
           error: 'Pacote tar.gz corrompido ou formato inválido.',
           details: err.message,
@@ -2678,14 +2883,14 @@ app.post('/api/admin/remote-deploy', async (req, res) => {
 
       // 3. Extrai os arquivos atualizados na raiz da aplicação
       await execFileAsync('tar', ['-xzf', bundlePath, '-C', __dirname]);
-      try { await fs.promises.unlink(bundlePath); } catch {}
+      try { await fs.promises.unlink(bundlePath); } catch { }
 
       if (skipRestart) {
         loadThumbSigIndex();
         if (fs.existsSync(PRIMARY_CATALOG_PATH)) {
           try {
             memoryCatalog = normalizeCatalogShape(JSON.parse(fs.readFileSync(PRIMARY_CATALOG_PATH, 'utf8')));
-          } catch {}
+          } catch { }
         }
         res.setHeader('Cache-Control', 'no-store');
         return res.json({
@@ -2800,6 +3005,15 @@ app.delete('/api/media/:filename', requireHubOrAdmin, async (req, res) => {
 // ============================================================================
 // 8. GRUPO B: AUTENTICAÇÃO DO CONSOLE ADMIN (COOKIE HTTPONLY HMAC)
 // ============================================================================
+app.get('/api/health', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.json({
+    ok: true,
+    service: 'aurtistic-edge',
+    version: '4.1.0-multi-tenant',
+  });
+});
+
 app.get('/api/auth/me', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json({
@@ -3072,7 +3286,7 @@ app.use('/portfolio-media/thumb', async (req, res, next) => {
         return fs.createReadStream(servePath).pipe(res);
       }
     }
-  } catch {}
+  } catch { }
 
   // 2. Resolve o arquivo original físico no disco
   let localOriginal;
@@ -3249,7 +3463,7 @@ app.use('/portfolio-media/content', async (req, res, next) => {
       res.setHeader('X-Content-Type-Options', 'nosniff');
       return express.static(PORTFOLIO_DIR, { acceptRanges: true, dotfiles: 'ignore' })(req, res, next);
     }
-  } catch {}
+  } catch { }
 
   // 2. Se for ambiente local no PC e o arquivo estiver no HD do Fire Stick, faz proxy streaming transparente
   if (process.platform !== 'android' && !fs.existsSync('/storage/31E0-19FD')) {
@@ -3310,7 +3524,7 @@ app.post(
     if (req.body.exif) {
       try {
         parsedExif = JSON.parse(req.body.exif);
-      } catch {}
+      } catch { }
     }
 
     const albumName = sanitizeAlbumName(req.body.album || 'Destaques');
@@ -3368,7 +3582,7 @@ app.post(
           thumbSize = st.size;
         }
       }
-    } catch {}
+    } catch { }
 
     let width = Math.max(1, parseInt(req.body.width, 10) || 1600);
     let height = Math.max(1, parseInt(req.body.height, 10) || 1067);
@@ -3917,7 +4131,7 @@ app.put('/api/portfolio/layout', requireAdminSession, async (req, res) => {
       try {
         const dirPath = resolveSafeChildPath(PORTFOLIO_DIR, cleanName);
         await fs.promises.mkdir(dirPath, { recursive: true });
-      } catch {}
+      } catch { }
     }
   }
 
@@ -4333,7 +4547,7 @@ app.patch('/api/portfolio/item/:id', requireAdminSession, async (req, res) => {
         item.id = `pf_${newHash.slice(0, 16)}`;
         item.originalUrl = `/portfolio-media/content/${encodeURIComponent(cleanAlbum)}/${encodeURIComponent(item.originalFile)}`;
         item.thumbUrl = `/portfolio-media/thumb/${encodeURIComponent(cleanAlbum)}/${encodeURIComponent(item.originalFile)}?v=${Date.now()}`;
-      } catch {}
+      } catch { }
     }
     item.album = cleanAlbum;
     if (!memoryCatalog.albums.includes(cleanAlbum)) {
@@ -4380,7 +4594,7 @@ app.delete('/api/portfolio/item/:id', requireAdminSession, async (req, res) => {
       await fs.promises.unlink(fullRelPath);
       freedBytes += st.size;
       freedCount += 1;
-    } catch {}
+    } catch { }
   }
 
   if (removed.originalFile) {
@@ -4390,7 +4604,7 @@ app.delete('/api/portfolio/item/:id', requireAdminSession, async (req, res) => {
       await fs.promises.unlink(origPath);
       freedBytes += st.size;
       freedCount += 1;
-    } catch {}
+    } catch { }
   }
 
   if (removed.thumbFile) {
@@ -4400,7 +4614,7 @@ app.delete('/api/portfolio/item/:id', requireAdminSession, async (req, res) => {
       await fs.promises.unlink(thumbPath);
       freedBytes += st.size;
       freedCount += 1;
-    } catch {}
+    } catch { }
   }
 
   adjustZoneStats('portfolio', -freedBytes, -freedCount);
@@ -4416,7 +4630,7 @@ try {
   sharpInstance = require('sharp');
   sharpInstance.cache(false);
   sharpInstance.concurrency(1);
-} catch {}
+} catch { }
 
 function discoverConnectedDrives() {
   const drives = [];
@@ -4510,7 +4724,7 @@ function discoverConnectedDrives() {
         });
       }
     }
-  } catch {}
+  } catch { }
 
   return drives;
 }
@@ -4739,7 +4953,7 @@ app.get('/api/vault/tree', requireAdminSession, async (req, res) => {
         if (!childMap.has('vault')) {
           const vaultDir = path.join(driveRoot, 'vault');
           if (!fs.existsSync(vaultDir)) {
-            try { fs.mkdirSync(vaultDir, { recursive: true }); } catch {}
+            try { fs.mkdirSync(vaultDir, { recursive: true }); } catch { }
           }
           const vaultScope = normalizeFolderScopeKey('vault');
           const vaultMeta = memoryCatalog?.settings?.layout?.folderMeta?.[vaultScope] || {};
@@ -4821,9 +5035,9 @@ app.get('/api/vault/list', requireAdminSession, async (req, res) => {
         { name: rootLabel, path: '' },
         ...(rawFolder
           ? rawFolder.split('/').map((seg, i, arr) => ({
-              name: seg,
-              path: arr.slice(0, i + 1).join('/'),
-            }))
+            name: seg,
+            path: arr.slice(0, i + 1).join('/'),
+          }))
           : []),
       ];
       return res.json({
@@ -4904,7 +5118,7 @@ app.get('/api/vault/list', requireAdminSession, async (req, res) => {
             targetId: portItem?.targetId || null,
           });
         }
-      } catch {}
+      } catch { }
     }
 
     let folders = Array.from(folderMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
@@ -4969,14 +5183,14 @@ app.get('/api/vault/list', requireAdminSession, async (req, res) => {
       { name: rootLabel, path: '' },
       ...(rawFolder
         ? rawFolder.split('/').map((seg, i, arr) => {
-            let displayName = seg;
-            if (i === 0 && seg === 'portfolio') displayName = 'Portfólio';
-            if (i === 0 && seg === 'vault') displayName = 'Cofre';
-            return {
-              name: displayName,
-              path: arr.slice(0, i + 1).join('/'),
-            };
-          })
+          let displayName = seg;
+          if (i === 0 && seg === 'portfolio') displayName = 'Portfólio';
+          if (i === 0 && seg === 'vault') displayName = 'Cofre';
+          return {
+            name: displayName,
+            path: arr.slice(0, i + 1).join('/'),
+          };
+        })
         : []),
     ];
 
@@ -5090,7 +5304,7 @@ app.post('/api/vault/folder', requireAdminSession, async (req, res) => {
 
     await fs.promises.mkdir(targetDir, { recursive: true });
     if (isPortfolioRelatedRelPath(relPath)) {
-      syncPortfolioFromDiskAsync().catch(() => {});
+      syncPortfolioFromDiskAsync().catch(() => { });
     }
     return res.status(201).json({ success: true, path: relPath, name: cleanName });
   } catch (err) {
@@ -5125,7 +5339,7 @@ app.post('/api/vault/move', requireAdminSession, async (req, res) => {
     }
 
     if (isPortfolioRelatedRelPath(srcRel) || isPortfolioRelatedRelPath(destFolderRel)) {
-      syncPortfolioFromDiskAsync().catch(() => {});
+      syncPortfolioFromDiskAsync().catch(() => { });
     }
 
     return res.json({ success: true, newPath: destFolderRel ? `${destFolderRel}/${fileName}` : fileName });
@@ -5181,7 +5395,7 @@ app.post('/api/vault/upload', requireAdminSession, uploadVault.single('file'), (
   const relPath = folder ? `${folder}/${req.file.filename}` : req.file.filename;
 
   if (isPortfolioRelatedRelPath(relPath)) {
-    syncPortfolioFromDiskAsync().catch(() => {});
+    syncPortfolioFromDiskAsync().catch(() => { });
   }
 
   const kind = classifyFileKind(req.file.filename);
@@ -5263,7 +5477,7 @@ app.patch('/api/vault/rename', requireAdminSession, async (req, res) => {
     }
 
     if (isPortfolioRelatedRelPath(relPath)) {
-      syncPortfolioFromDiskAsync().catch(() => {});
+      syncPortfolioFromDiskAsync().catch(() => { });
     }
 
     return res.json({ success: true, newName });
@@ -5287,7 +5501,7 @@ app.delete('/api/vault/entry', requireAdminSession, async (req, res) => {
       // Sprint 2: Move para a Lixeira Centralizada (.trash) com retenção de 15 dias
       const trashEntry = await trashManager.moveToTrash(targetPath, relPath, req.session?.user || 'admin');
       if (isPortfolioRelatedRelPath(relPath)) {
-        syncPortfolioFromDiskAsync().catch(() => {});
+        syncPortfolioFromDiskAsync().catch(() => { });
       }
       return res.json({ success: true, movedToTrash: true, trashEntry });
     }
@@ -5304,7 +5518,7 @@ app.delete('/api/vault/entry', requireAdminSession, async (req, res) => {
     }
 
     if (isPortfolioRelatedRelPath(relPath)) {
-      syncPortfolioFromDiskAsync().catch(() => {});
+      syncPortfolioFromDiskAsync().catch(() => { });
     }
 
     return res.json({ success: true, permanent: true });
@@ -5331,7 +5545,7 @@ app.post('/api/trash/restore', requireAdminSession, async (req, res) => {
     if (!id) return res.status(400).json({ error: 'ID da lixeira obrigatório.' });
     const result = await trashManager.restore(id);
     if (isPortfolioRelatedRelPath(result.originalRelPath)) {
-      syncPortfolioFromDiskAsync({ force: true }).catch(() => {});
+      syncPortfolioFromDiskAsync({ force: true }).catch(() => { });
     }
     return res.json({ success: true, result });
   } catch (err) {
@@ -5980,7 +6194,7 @@ app.post('/api/vault/curate', requireAdminSession, async (req, res) => {
         const encodedRel = cleanPath.split('/').map(encodeURIComponent).join('/');
         const fullPath = path.join(STORAGE_DIR, cleanPath);
         let sizeBytes = 0;
-        try { sizeBytes = fs.statSync(fullPath).size; } catch {}
+        try { sizeBytes = fs.statSync(fullPath).size; } catch { }
         const newItem = normalizeItemVisualProps({
           id: `curated_${crypto.createHash('md5').update(cleanPath).digest('hex').slice(0, 10)}`,
           title: baseName,
@@ -6145,7 +6359,7 @@ function resolvePortfolioItemDiskFile(item) {
     if (fs.existsSync(c)) {
       try {
         if (fs.statSync(c).isFile()) return c;
-      } catch {}
+      } catch { }
     }
   }
 
@@ -6160,7 +6374,7 @@ function resolvePortfolioItemDiskFile(item) {
     if (fs.existsSync(tc)) {
       try {
         if (fs.statSync(tc).isFile()) return tc;
-      } catch {}
+      } catch { }
     }
   }
 
@@ -6262,7 +6476,7 @@ async function collectFolderFiles(rawFolder, driveId, isAdmin) {
                 sizeBytes: st.size,
                 streamUrl: `/api/vault/stream?path=${encodeURIComponent(rawFolder ? `${rawFolder}/${fileRel}` : fileRel)}${driveId ? `&drive=${encodeURIComponent(driveId)}` : ''}`,
               });
-            } catch {}
+            } catch { }
           }
         }
       }
@@ -6271,7 +6485,7 @@ async function collectFolderFiles(rawFolder, driveId, isAdmin) {
     if (fs.existsSync(targetDir) && fs.statSync(targetDir).isDirectory()) {
       await walk(targetDir);
     }
-  } catch {}
+  } catch { }
 
   return files;
 }
@@ -6420,7 +6634,7 @@ function buildTelemetryPayload() {
         const p = path.join('/storage', ent.name);
         let cap = null;
         let contents = [];
-        try { cap = getDiskCapacitySync(p); } catch {}
+        try { cap = getDiskCapacitySync(p); } catch { }
         try { contents = fs.readdirSync(p).slice(0, 10); } catch (e) { contents = [e.message]; }
         storageDevices.push({ name: ent.name, isDir: ent.isDirectory(), path: p, cap, contents });
       }
@@ -6438,10 +6652,10 @@ function buildTelemetryPayload() {
       for (const sf of sFiles) {
         try {
           stagingTotalBytes += fs.statSync(path.join(TENANT_UPLOAD_STAGING_DIR, sf)).size;
-        } catch {}
+        } catch { }
       }
     }
-  } catch {}
+  } catch { }
 
   let procMounts = [];
   try {
@@ -6621,7 +6835,7 @@ app.get('/api/hub-media/list', requireAdminSession, async (req, res) => {
           mimeType: getMimeType(d.name),
           modifiedAt: st.mtime.toISOString(),
         });
-      } catch {}
+      } catch { }
     }
 
     if (sortBy === 'largest') {
@@ -6682,7 +6896,7 @@ async function readBetaListSafe() {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) return parsed;
       }
-    } catch {}
+    } catch { }
   }
   return [];
 }
@@ -6692,12 +6906,12 @@ async function writeBetaListSafe(list) {
   try {
     await fs.promises.mkdir(path.dirname(BETA_LIST_PATH), { recursive: true });
     await fs.promises.writeFile(BETA_LIST_PATH, payload, 'utf8');
-  } catch {}
+  } catch { }
   try {
     if (fs.existsSync(STORAGE_DIR)) {
       await fs.promises.writeFile(BETA_BACKUP_PATH, payload, 'utf8');
     }
-  } catch {}
+  } catch { }
 }
 
 app.post('/api/beta-signup', express.json(), async (req, res) => {
@@ -6761,12 +6975,12 @@ try {
     const rawPins = JSON.parse(fs.readFileSync(TENANT_PINS_FILE, 'utf8'));
     if (rawPins && typeof rawPins === 'object') tenantFolderPinsStore = rawPins;
   }
-} catch {}
+} catch { }
 
 async function persistTenantFolderPins() {
   try {
     await atomicWriteFile(TENANT_PINS_FILE, JSON.stringify(tenantFolderPinsStore, null, 2), 'utf8');
-  } catch {}
+  } catch { }
 }
 
 function resolveTenantHmacSecret() {
@@ -6812,7 +7026,7 @@ async function ensureTenantRootProvisioned(userId) {
   for (const folderName of DEFAULT_TENANT_SUBFOLDERS) {
     const subDir = path.join(userRoot, folderName);
     if (!fs.existsSync(subDir)) {
-      await fs.promises.mkdir(subDir, { recursive: true }).catch(() => {});
+      await fs.promises.mkdir(subDir, { recursive: true }).catch(() => { });
     }
   }
   return userRoot;
@@ -6843,7 +7057,7 @@ function findCaseInsensitiveFileOrDir(parentDir, childName) {
         return path.join(parentDir, ent);
       }
     }
-  } catch {}
+  } catch { }
   return null;
 }
 
@@ -6871,7 +7085,7 @@ function resolveResilientPhysicalFile(targetBase, remainder, options = {}) {
   try {
     const direct = resolveSafeChildPath(resolvedBase, remainder);
     if (fs.existsSync(direct)) return direct;
-  } catch {}
+  } catch { }
 
   const walked = walkCaseInsensitiveSubpath(resolvedBase, remainder);
   if (walked && fs.existsSync(walked)) return walked;
@@ -6886,13 +7100,13 @@ function resolveResilientPhysicalFile(targetBase, remainder, options = {}) {
     path.join(targetBase, '11-04/JPG'),
     ...(allowAdminPortfolioFallback
       ? [
-          PORTFOLIO_ORIGINALS_DIR,
-          path.join(PORTFOLIO_DIR, 'SHOW DE FISICA'),
-          path.join(PORTFOLIO_DIR, 'show da fisica'),
-          '/home/stangorlini/Imagens/show da fisica/11-04/JPG',
-          '/home/stangorlini/Imagens/show da fisica',
-          '/home/stangorlini/HUB LabDiv/public/show',
-        ]
+        PORTFOLIO_ORIGINALS_DIR,
+        path.join(PORTFOLIO_DIR, 'SHOW DE FISICA'),
+        path.join(PORTFOLIO_DIR, 'show da fisica'),
+        '/home/stangorlini/Imagens/show da fisica/11-04/JPG',
+        '/home/stangorlini/Imagens/show da fisica',
+        '/home/stangorlini/HUB LabDiv/public/show',
+      ]
       : []),
   ];
 
@@ -7004,9 +7218,9 @@ function findShortcutFileInDir(parentDir, baseName) {
         ) {
           matched.push(full);
         }
-      } catch {}
+      } catch { }
     }
-  } catch {}
+  } catch { }
   return matched;
 }
 
@@ -7064,8 +7278,8 @@ function resolveOrgPersonalShortcutTarget(rootDir, cleanRel, options = {}, _hop 
             );
             const finalPhysicalPath = remainder
               ? resolveResilientPhysicalFile(resolvedTargetBase, remainder, {
-                  allowAdminPortfolioFallback: allowFallbackForTarget,
-                })
+                allowAdminPortfolioFallback: allowFallbackForTarget,
+              })
               : resolvedTargetBase;
             const resolvedFinal = path.resolve(finalPhysicalPath);
             if (resolvedFinal !== resolvedTargetBase && !resolvedFinal.startsWith(resolvedTargetBase + path.sep)) {
@@ -7204,7 +7418,7 @@ function resolveTenantListingDirs(userId, userRoot, cleanRel, scopeType = 'user'
       ) {
         dirs.push({ dirPath: legacyDir, isLegacyBridge: true });
       }
-    } catch {}
+    } catch { }
   }
 
   return dirs;
@@ -7228,7 +7442,7 @@ async function computeDirectoryBytesRecursive(dirPath, ignoreTopNames = new Set(
           const st = await fs.promises.stat(full);
           total += st.size;
         }
-      } catch {}
+      } catch { }
     }
   }
   return total;
@@ -7452,7 +7666,7 @@ async function verifyTenantTicket(req, res, next) {
     try {
       if (!fs.existsSync(reqUsersRootDir)) fs.mkdirSync(reqUsersRootDir, { recursive: true });
       if (!fs.existsSync(reqOrgsRootDir)) fs.mkdirSync(reqOrgsRootDir, { recursive: true });
-    } catch {}
+    } catch { }
 
     const scopeType = payload.scopeType === 'org' ? 'org' : 'user';
     let userRoot;
@@ -7533,6 +7747,137 @@ async function verifyTenantTicket(req, res, next) {
   }
 }
 
+async function verifyTenantAuthOrDeviceToken(req, res, next) {
+  const hasTicket = Boolean(
+    String(req.headers['x-tenant-ticket'] || req.query?.ticket || '').trim()
+  );
+  if (hasTicket) {
+    return verifyTenantTicket(req, res, next);
+  }
+
+  const rawAuth = String(req.headers.authorization || '').trim();
+  const basicMatch = /^Basic\s+(.+)$/i.exec(rawAuth);
+  if (!basicMatch) {
+    return res.status(401).json({
+      error: 'Autenticação ausente (x-tenant-ticket ou Authorization Basic).',
+    });
+  }
+
+  let decoded = '';
+  try {
+    decoded = Buffer.from(basicMatch[1], 'base64').toString('utf8');
+  } catch {
+    return res.status(401).json({ error: 'Cabeçalho Authorization Basic inválido.' });
+  }
+  const sepIdx = decoded.indexOf(':');
+  if (sepIdx <= 0) {
+    return res.status(401).json({ error: 'Formato de credencial Basic inválido.' });
+  }
+  const tokenId = decoded.slice(0, sepIdx).trim();
+  const secret = decoded.slice(sepIdx + 1);
+
+  const clientIp = extractClientIpForRateLimit(req);
+  const authRes = await webdavTokenManager.verifyBasicCredentials(tokenId, secret, clientIp);
+  if (!authRes.ok) {
+    return res.status(authRes.status || 401).json({ error: authRes.error || 'Credencial inválida.' });
+  }
+
+  const { token, effective } = authRes;
+  const scopeType = token.scopeType === 'org' ? 'org' : 'user';
+  const orgSlug = scopeType === 'org' ? String(token.orgSlug || '').trim().toLowerCase() : null;
+  if (scopeType === 'org' && !/^[a-z0-9][a-z0-9_-]{1,62}$/.test(orgSlug)) {
+    return res.status(400).json({ error: 'Slug de organização inválido na credencial.' });
+  }
+  const pinNamespaceId = scopeType === 'org' ? `org:${orgSlug}` : token.userId;
+
+  const reqStorageDir = STORAGE_DIR;
+  const reqBaseDir = getTenantBaseDir(reqStorageDir);
+  const reqUsersRootDir = path.join(reqBaseDir, 'users');
+  const reqOrgsRootDir = path.join(reqBaseDir, 'orgs');
+  try {
+    if (!fs.existsSync(reqUsersRootDir)) fs.mkdirSync(reqUsersRootDir, { recursive: true });
+    if (!fs.existsSync(reqOrgsRootDir)) fs.mkdirSync(reqOrgsRootDir, { recursive: true });
+  } catch { }
+
+  const userRoot =
+    scopeType === 'org'
+      ? resolveSafeChildPath(reqOrgsRootDir, orgSlug)
+      : resolveSafeChildPath(reqUsersRootDir, token.userId);
+  if (!fs.existsSync(userRoot)) {
+    await fs.promises.mkdir(userRoot, { recursive: true }).catch(() => { });
+  }
+
+  // Basic Token nunca desbloqueia pastas protegidas por PIN
+  const unlockedPinsSet = new Set();
+
+  req.tenant = {
+    userId: token.userId,
+    scopeType,
+    orgSlug,
+    organizationId: token.organizationId || null,
+    allowedOrgSlugs: null,
+    pinNamespaceId,
+    ownerNs: scopeType === 'org' ? `org:${orgSlug}` : `user:${token.userId}`,
+    role: effective.role,
+    purpose: 'device_token',
+    quotaLimitBytes: Math.max(0, Number(effective.quotaLimitBytes) || 0),
+    usedBytes: 0,
+    allowedPrefix: null,
+    allowedPathsSet: new Set(),
+    allowedPathsNormSet: new Set(),
+    readOnly: Boolean(effective.readOnly),
+    allowDownload: true,
+    unlockedPinsSet,
+    storageDir: reqStorageDir,
+    baseDir: reqBaseDir,
+    userRoot,
+    resolveSafePath: (relPath, opts) =>
+      resolveTenantSafePath(token.userId, userRoot, relPath, opts, scopeType, effective.role, null),
+    resolveListingDirs: (cleanRel) =>
+      resolveTenantListingDirs(token.userId, userRoot, cleanRel, scopeType, effective.role, null),
+    getUsedBytes: (force) => getTenantUsedBytes(pinNamespaceId, userRoot, force, scopeType),
+    adjustUsedBytes: (delta) => adjustTenantUsedBytes(pinNamespaceId, userRoot, delta, scopeType),
+  };
+
+  return next();
+}
+
+chunkedUploadManager = new ChunkedUploadManager({
+  getStagingDir: () => TENANT_UPLOAD_STAGING_DIR,
+  getStorageDir: () => STORAGE_DIR,
+  getVolumesPool: () => STORAGE_VOLUMES_POOL,
+  getDiskCapacitySync,
+  isExternalStorageMounted,
+  isStagingOnExternalStorage: () => {
+    try {
+      const stg = path.resolve(TENANT_UPLOAD_STAGING_DIR);
+      const sto = path.resolve(STORAGE_DIR);
+      return stg === sto || stg.startsWith(`${sto}${path.sep}`);
+    } catch {
+      return false;
+    }
+  },
+  normalizeTenantRelPath,
+  sanitizeFilename,
+  isPortfolioRelatedRelPath,
+  assertFolderPinUnlockedIfRequired,
+  assertPublicMediaPathAllowed,
+  buildTenantEntryDescriptorAsync,
+  computeFileSha256,
+  invalidateThumb: async (pinNamespaceId, relPath) => {
+    const nfcRel = String(relPath || '').normalize('NFC').replace(/\\/g, '/');
+    const thumbKey = crypto.createHash('md5').update(`${pinNamespaceId}:${nfcRel}`).digest('hex');
+    await fs.promises.unlink(path.join(INTERNAL_THUMBS_DIR, `tthumb_${thumbKey}.webp`)).catch(() => { });
+  },
+  queueThumb: (pinNamespaceId, relPath, fullPath) =>
+    queueTenantImageThumbnail(pinNamespaceId, relPath, fullPath, 480),
+  onPortfolioMutated: () => {
+    tenantUsedBytesCache.clear();
+    void syncPortfolioFromDiskAsync({ force: true }).catch(() => { });
+  },
+  onUploadCompleted: (info) => notifyNextVaultIndexSync(info),
+});
+
 /**
  * Reaproveita 100% das 2.369 miniaturas .avif pré-geradas em INTERNAL_THUMBS_DIR (ext4)
  * e do índice de assinaturas thumbSigIndex (data/thumbs/sig_index.json) ANTES de tocar no HD USB!
@@ -7579,7 +7924,7 @@ async function resolveExistingPrebuiltThumbnail(relPath, fullPath, scopeType = '
       try {
         const st = fs.statSync(fullPath);
         if (st.isFile()) sig = `${fileName}_${st.size}`;
-      } catch {}
+      } catch { }
     }
 
     if (!sig) {
@@ -7609,7 +7954,7 @@ async function resolveExistingPrebuiltThumbnail(relPath, fullPath, scopeType = '
         }
       }
     }
-  } catch {}
+  } catch { }
 
   return null;
 }
@@ -7639,9 +7984,9 @@ app.get('/api/tenant/list', verifyTenantTicket, async (req, res) => {
       { name: 'Meus Arquivos', path: '' },
       ...(effectiveRel
         ? effectiveRel.split('/').map((seg, idx, arr) => ({
-            name: seg,
-            path: arr.slice(0, idx + 1).join('/'),
-          }))
+          name: seg,
+          path: arr.slice(0, idx + 1).join('/'),
+        }))
         : []),
     ];
 
@@ -7688,9 +8033,13 @@ app.get('/api/tenant/list', verifyTenantTicket, async (req, res) => {
         if (
           d.name === '.trash' ||
           d.name.startsWith('.tmp') ||
+          d.name.startsWith('.aurt_tmp_') ||
+          d.name.startsWith('.aurt_chunk_') ||
+          d.name.endsWith('.enc.tmp') ||
           IGNORED_PORTFOLIO_DIRS.has(d.name) ||
           d.name === 'catalog.json' ||
           d.name === 'sig_index.json' ||
+          d.name === 'webdav_tokens.json' ||
           d.name === '.sync-journal.json'
         ) {
           continue;
@@ -7745,7 +8094,7 @@ app.get('/api/tenant/list', verifyTenantTicket, async (req, res) => {
                 isUnlocked: true,
               });
             }
-          } catch {}
+          } catch { }
           continue;
         }
 
@@ -7768,7 +8117,7 @@ app.get('/api/tenant/list', verifyTenantTicket, async (req, res) => {
           } else {
             fileMap.set(d.name, descriptor);
           }
-        } catch {}
+        } catch { }
       }
     }
 
@@ -7830,7 +8179,7 @@ app.get('/api/tenant/list', verifyTenantTicket, async (req, res) => {
 });
 
 // 11.5.1.1. GET /api/tenant/manifest — Manifesto recursivo para sincronização de pasta
-app.get('/api/tenant/manifest', verifyTenantTicket, async (req, res) => {
+app.get('/api/tenant/manifest', verifyTenantAuthOrDeviceToken, async (req, res) => {
   try {
     const rawFolder = req.query.folder ? String(req.query.folder) : '';
     const cleanRel = normalizeTenantRelPath(rawFolder);
@@ -7866,9 +8215,13 @@ app.get('/api/tenant/manifest', verifyTenantTicket, async (req, res) => {
         if (
           d.name === '.trash' ||
           d.name.startsWith('.tmp') ||
+          d.name.startsWith('.aurt_tmp_') ||
+          d.name.startsWith('.aurt_chunk_') ||
+          d.name.endsWith('.enc.tmp') ||
           IGNORED_PORTFOLIO_DIRS.has(d.name) ||
           d.name === 'catalog.json' ||
           d.name === 'sig_index.json' ||
+          d.name === 'webdav_tokens.json' ||
           d.name === '.sync-journal.json' ||
           d.name.endsWith('.shortcut.json') ||
           d.name.endsWith('.shortcut')
@@ -7922,7 +8275,7 @@ app.get('/api/tenant/manifest', verifyTenantTicket, async (req, res) => {
 });
 
 // 11.5.1.2. POST /api/tenant/folder-sync/apply — Move arquivos removidos para a Lixeira (.trash) e registra journal
-app.post('/api/tenant/folder-sync/apply', verifyTenantTicket, async (req, res) => {
+app.post('/api/tenant/folder-sync/apply', verifyTenantAuthOrDeviceToken, async (req, res) => {
   try {
     if (req.tenant.readOnly || req.tenant.purpose === 'public_media' || req.tenant.quotaLimitBytes <= 0) {
       return res.status(403).json({ error: 'Sem permissão para sincronizar pastas.' });
@@ -7973,11 +8326,19 @@ app.post('/api/tenant/folder-sync/apply', verifyTenantTicket, async (req, res) =
       journalPath,
       JSON.stringify({ folder: cleanFolder, movedToTrash, syncedAt: new Date().toISOString() }, null, 2),
       'utf8'
-    ).catch(() => {});
+    ).catch(() => { });
 
     const totalUsedBytes = await req.tenant.getUsedBytes(true);
+    for (const deletedRel of movedToTrash) {
+      void notifyNextVaultIndexSync({
+        tenant: req.tenant,
+        action: 'delete',
+        relPath: deletedRel,
+        totalUsedBytes,
+      }).catch(() => {});
+    }
     if (isPortfolioRelatedRelPath(cleanFolder)) {
-      void syncPortfolioFromDiskAsync({ force: true }).catch(() => {});
+      void syncPortfolioFromDiskAsync({ force: true }).catch(() => { });
     }
 
     return res.json({
@@ -8055,8 +8416,10 @@ const tenantMediaCorsMiddleware = (req, res, next) => {
 app.options('/api/tenant/stream', handleTenantMediaPreflight);
 app.options('/api/tenant/download', handleTenantMediaPreflight);
 app.options('/api/tenant/thumb', handleTenantMediaPreflight);
-app.get('/api/tenant/stream', tenantMediaCorsMiddleware, verifyTenantTicket, (req, res) => handleTenantStreamRequest(req, res, false));
-app.get('/api/tenant/download', tenantMediaCorsMiddleware, verifyTenantTicket, (req, res) => handleTenantStreamRequest(req, res, true));
+app.head('/api/tenant/stream', tenantMediaCorsMiddleware, verifyTenantAuthOrDeviceToken, (req, res) => handleTenantStreamRequest(req, res, false));
+app.head('/api/tenant/download', tenantMediaCorsMiddleware, verifyTenantAuthOrDeviceToken, (req, res) => handleTenantStreamRequest(req, res, true));
+app.get('/api/tenant/stream', tenantMediaCorsMiddleware, verifyTenantAuthOrDeviceToken, (req, res) => handleTenantStreamRequest(req, res, false));
+app.get('/api/tenant/download', tenantMediaCorsMiddleware, verifyTenantAuthOrDeviceToken, (req, res) => handleTenantStreamRequest(req, res, true));
 
 const TENANT_THUMB_QUEUE_CONCURRENCY = 2;
 const pendingTenantThumbJobs = new Map();
@@ -8129,7 +8492,7 @@ function queueTenantImageThumbnail(pinNamespaceId, relPath, sourceFullPath, targ
     `${tenantThumbKey}:${targetW}`,
     () => generateThumbnailWebP(sourceFullPath, tenantThumbPath, targetW, 'webp'),
     { priority: 'low', timeoutMs: 25000 }
-  ).catch(() => {});
+  ).catch(() => { });
 }
 
 // 11.5.3. GET /api/tenant/thumb — Miniatura ultra-rápida (reaproveita 100% dos 2.369 .avif + sig_index.json)
@@ -8194,7 +8557,7 @@ app.get('/api/tenant/thumb', tenantMediaCorsMiddleware, verifyTenantTicket, asyn
             const st = fs.statSync(tenantThumbPath);
             validCached = st.isFile() && st.size > 256;
           }
-        } catch {}
+        } catch { }
       }
       if (validCached) {
         if (cachedEncHdr) {
@@ -8212,7 +8575,7 @@ app.get('/api/tenant/thumb', tenantMediaCorsMiddleware, verifyTenantTicket, asyn
         res.setHeader('Content-Type', 'image/webp');
         return fs.createReadStream(tenantThumbPath).pipe(res);
       }
-      try { fs.unlinkSync(tenantThumbPath); } catch {}
+      try { fs.unlinkSync(tenantThumbPath); } catch { }
     }
 
     if (!fs.existsSync(fullPath)) {
@@ -8261,8 +8624,8 @@ app.get('/api/tenant/thumb', tenantMediaCorsMiddleware, verifyTenantTicket, asyn
           generated = true;
         }
       } finally {
-        await fs.promises.unlink(decTmpPath).catch(() => {});
-        await fs.promises.unlink(plainThumbTmp).catch(() => {});
+        await fs.promises.unlink(decTmpPath).catch(() => { });
+        await fs.promises.unlink(plainThumbTmp).catch(() => { });
       }
     } else {
       generated = await enqueueTenantThumbnailJob(
@@ -8283,13 +8646,13 @@ app.get('/api/tenant/thumb', tenantMediaCorsMiddleware, verifyTenantTicket, asyn
       try {
         const st = fs.statSync(tenantThumbPath);
         validGen = st.isFile() && st.size > 256;
-      } catch {}
+      } catch { }
       if (validGen) {
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         res.setHeader('Content-Type', 'image/webp');
         return fs.createReadStream(tenantThumbPath).pipe(res);
       }
-      try { fs.unlinkSync(tenantThumbPath); } catch {}
+      try { fs.unlinkSync(tenantThumbPath); } catch { }
     }
 
     return await streamFileWithRange(req, res, fullPath, { cacheControl: 'private, max-age=3600' });
@@ -8358,7 +8721,7 @@ app.post('/api/tenant/note', verifyTenantTicket, async (req, res) => {
         const prevStat = await fs.promises.stat(targetPath);
         if (prevStat.isFile()) prevBytes = prevStat.size;
       }
-    } catch {}
+    } catch { }
 
     const deltaBytes = newBytes - prevBytes;
     const currentUsed = await req.tenant.getUsedBytes();
@@ -8416,7 +8779,7 @@ const tenantStagingUpload = multer({
         if (!fs.existsSync(TENANT_UPLOAD_STAGING_DIR)) {
           fs.mkdirSync(TENANT_UPLOAD_STAGING_DIR, { recursive: true });
         }
-      } catch {}
+      } catch { }
       cb(null, TENANT_UPLOAD_STAGING_DIR);
     },
     filename: (_req, file, cb) => {
@@ -8454,7 +8817,7 @@ app.post(
       // Verificação de espaço livre físico no disco
       const diskCap = getDiskCapacitySync(STORAGE_DIR);
       if (diskCap.freeBytes < req.file.size + 30 * 1024 * 1024) {
-        await fs.promises.unlink(stagedPath).catch(() => {});
+        await fs.promises.unlink(stagedPath).catch(() => { });
         return res.status(507).json({
           error: `Espaço em disco insuficiente no Fire TV Stick (${Math.round(diskCap.freeBytes / (1024 * 1024))} MB livres). Conecte o HD USB de 750 GB ou libere espaço na Lixeira.`,
         });
@@ -8464,8 +8827,8 @@ app.post(
         req.body?.folderPath !== undefined
           ? req.body.folderPath
           : req.query.folder !== undefined
-          ? req.query.folder
-          : '';
+            ? req.query.folder
+            : '';
       const folderRel = normalizeTenantRelPath(rawFolder || '');
       const cleanName = sanitizeFilename(req.file.originalname || 'arquivo');
       const relPath = folderRel ? `${folderRel}/${cleanName}` : cleanName;
@@ -8490,11 +8853,11 @@ app.post(
             }
           }
         }
-      } catch {}
+      } catch { }
 
       if (isExactDuplicate) {
         // [DEDUPLICAÇÃO O(1)]: Descarte seguro do arquivo em staging sem reescrever no disco
-        await fs.promises.unlink(stagedPath).catch(() => {});
+        await fs.promises.unlink(stagedPath).catch(() => { });
         queueTenantImageThumbnail(req.tenant.pinNamespaceId, relPath, targetPath, 480);
         const item = await buildTenantEntryDescriptorAsync(
           req.tenant.userId,
@@ -8519,7 +8882,7 @@ app.post(
       const remainingBytes = Math.max(0, req.tenant.quotaLimitBytes - effectiveUsed);
 
       if (deltaBytes > 0 && deltaBytes > remainingBytes) {
-        await fs.promises.unlink(stagedPath).catch(() => {});
+        await fs.promises.unlink(stagedPath).catch(() => { });
         return res.status(413).json({
           error: 'Limite de armazenamento atingido. Libere espaço na Lixeira ou solicite ampliação de quota.',
         });
@@ -8532,9 +8895,9 @@ app.post(
             ? `org:${req.tenant.orgSlug}`
             : `user:${req.tenant.userId}`;
           await vaultCrypto.encryptFileAtomic(stagedPath, targetPath, ownerNs);
-          await fs.promises.unlink(stagedPath).catch(() => {});
+          await fs.promises.unlink(stagedPath).catch(() => { });
         } catch (cryptoErr) {
-          await fs.promises.unlink(stagedPath).catch(() => {});
+          await fs.promises.unlink(stagedPath).catch(() => { });
           if (cryptoErr?.statusCode === 503 || cryptoErr?.code === 'VAULT_KEY_MISSING' || cryptoErr?.code === 'VAULT_KEY_INVALID') {
             return res.status(503).json({ error: cryptoErr.message });
           }
@@ -8548,7 +8911,7 @@ app.post(
       if (req.body?.overwrite === '1' || req.query?.overwrite === '1') {
         const nfcRel = relPath.normalize('NFC').replace(/\\/g, '/');
         const thumbKey = crypto.createHash('md5').update(`${req.tenant.pinNamespaceId}:${nfcRel}`).digest('hex');
-        await fs.promises.unlink(path.join(INTERNAL_THUMBS_DIR, `tthumb_${thumbKey}.webp`)).catch(() => {});
+        await fs.promises.unlink(path.join(INTERNAL_THUMBS_DIR, `tthumb_${thumbKey}.webp`)).catch(() => { });
       }
       queueTenantImageThumbnail(req.tenant.pinNamespaceId, relPath, targetPath, 480);
       const item = await buildTenantEntryDescriptorAsync(
@@ -8560,7 +8923,7 @@ app.post(
       );
 
       if (isPortfolioRelatedRelPath(relPath)) {
-        void syncPortfolioFromDiskAsync().catch(() => {});
+        void syncPortfolioFromDiskAsync().catch(() => { });
       }
 
       return res.json({
@@ -8571,11 +8934,28 @@ app.post(
       });
     } catch (err) {
       if (stagedPath && fs.existsSync(stagedPath)) {
-        await fs.promises.unlink(stagedPath).catch(() => {});
+        await fs.promises.unlink(stagedPath).catch(() => { });
       }
       return res.status(err.statusCode || 500).json({ error: err.message });
     }
   }
+);
+
+// 11.5.5.0. Rotas de Upload Resumível em Chunks Adaptativos (8-16 MB HTTPS / até 32 MB LAN)
+app.post('/api/tenant/upload/chunked/init', verifyTenantAuthOrDeviceToken, (req, res) =>
+  chunkedUploadManager.handleInit(req, res)
+);
+app.put('/api/tenant/upload/chunked/:uploadId/:chunkIndex', verifyTenantAuthOrDeviceToken, (req, res) =>
+  chunkedUploadManager.handlePutChunk(req, res)
+);
+app.get('/api/tenant/upload/chunked/:uploadId/status', verifyTenantAuthOrDeviceToken, (req, res) =>
+  chunkedUploadManager.handleStatus(req, res)
+);
+app.post('/api/tenant/upload/chunked/:uploadId/complete', verifyTenantAuthOrDeviceToken, (req, res) =>
+  chunkedUploadManager.handleComplete(req, res)
+);
+app.delete('/api/tenant/upload/chunked/:uploadId', verifyTenantAuthOrDeviceToken, (req, res) =>
+  chunkedUploadManager.handleAbort(req, res)
 );
 
 // 11.5.5.1. POST /api/tenant/check-existing — Verificação O(1) de Pré-existência de Arquivos (Deduplicação)
@@ -8596,7 +8976,7 @@ app.post('/api/tenant/check-existing', verifyTenantTicket, async (req, res) => {
         if (st.isFile() && (typeof f.size !== 'number' || st.size === f.size)) {
           existing.push({ name: f.name, size: st.size, relativePath: relPath });
         }
-      } catch {}
+      } catch { }
     }
 
     return res.json({ success: true, existing });
@@ -8720,7 +9100,7 @@ app.post('/api/tenant/shortcut', verifyTenantTicket, async (req, res) => {
       if (!fs.existsSync(symlinkTarget)) {
         await fs.promises.symlink(targetPhysicalDir, symlinkTarget, 'dir');
       }
-    } catch {}
+    } catch { }
 
     const relPath = parentFolder ? `${parentFolder}/${shortcutName}` : shortcutName;
     return res.json({
@@ -8780,7 +9160,7 @@ app.delete('/api/tenant/shortcut', verifyTenantTicket, async (req, res) => {
             await fs.promises.unlink(f);
             removed = true;
           }
-        } catch {}
+        } catch { }
       }
     }
 
@@ -8836,7 +9216,7 @@ app.post('/api/tenant/rename', verifyTenantTicket, async (req, res) => {
     );
 
     if (isPortfolioRelatedRelPath(oldRel) || isPortfolioRelatedRelPath(newRel)) {
-      void syncPortfolioFromDiskAsync({ force: true }).catch(() => {});
+      void syncPortfolioFromDiskAsync({ force: true }).catch(() => { });
     }
 
     return res.json({
@@ -8865,7 +9245,7 @@ async function readTenantTrashManifest(userRoot) {
       const parsed = JSON.parse(await fs.promises.readFile(manifestPath, 'utf8'));
       if (Array.isArray(parsed)) return parsed;
     }
-  } catch {}
+  } catch { }
   return [];
 }
 
@@ -8908,7 +9288,7 @@ app.delete('/api/tenant/entry', verifyTenantTicket, async (req, res) => {
             await fs.promises.unlink(symlinkCandidate);
           }
         }
-      } catch {}
+      } catch { }
       return res.json({
         success: true,
         action: 'delete_shortcut',
@@ -8963,7 +9343,7 @@ app.delete('/api/tenant/entry', verifyTenantTicket, async (req, res) => {
       await fs.promises.rm(targetFull, { recursive: true, force: true });
       const totalUsedBytes = await req.tenant.adjustUsedBytes(-entryBytes);
       if (isPortfolioRelatedRelPath(relPath)) {
-        void syncPortfolioFromDiskAsync({ force: true }).catch(() => {});
+        void syncPortfolioFromDiskAsync({ force: true }).catch(() => { });
       }
       return res.json({
         success: true,
@@ -8983,7 +9363,7 @@ app.delete('/api/tenant/entry', verifyTenantTicket, async (req, res) => {
       await renameDirectorySafeFAT32(targetFull, trashDest);
       // Assegura remoção limpa do diretório de origem caso o sistema de arquivos tenha bloqueado rmdir
       if (fs.existsSync(targetFull)) {
-        await fs.promises.rm(targetFull, { recursive: true, force: true }).catch(() => {});
+        await fs.promises.rm(targetFull, { recursive: true, force: true }).catch(() => { });
       }
     } else {
       await moveFileSafe(targetFull, trashDest);
@@ -8996,7 +9376,7 @@ app.delete('/api/tenant/entry', verifyTenantTicket, async (req, res) => {
         if (!vol.online || path.resolve(vol.rootDir) === path.resolve(STORAGE_DIR)) continue;
         const extraTarget = path.join(vol.tenantBaseDir, nsSub, relPath);
         if (fs.existsSync(extraTarget)) {
-          await fs.promises.rm(extraTarget, { recursive: true, force: true }).catch(() => {});
+          await fs.promises.rm(extraTarget, { recursive: true, force: true }).catch(() => { });
         }
       }
     }
@@ -9016,7 +9396,7 @@ app.delete('/api/tenant/entry', verifyTenantTicket, async (req, res) => {
 
     const totalUsedBytes = await req.tenant.getUsedBytes(true);
     if (isPortfolioRelatedRelPath(relPath)) {
-      void syncPortfolioFromDiskAsync({ force: true }).catch(() => {});
+      void syncPortfolioFromDiskAsync({ force: true }).catch(() => { });
     }
     return res.json({
       success: true,
@@ -9113,7 +9493,7 @@ app.delete('/api/tenant/trash', verifyTenantTicket, async (req, res) => {
     for (const item of manifest) {
       if (!targetTrashId || item.trashId === targetTrashId) {
         const full = path.join(trashDir, item.storedName);
-        await fs.promises.rm(full, { recursive: true, force: true }).catch(() => {});
+        await fs.promises.rm(full, { recursive: true, force: true }).catch(() => { });
         freedBytes += Math.max(0, Number(item.sizeBytes) || 0);
       } else {
         remaining.push(item);
@@ -9226,6 +9606,80 @@ app.delete('/api/tenant/pin', verifyTenantTicket, async (req, res) => {
   }
 });
 
+// 11.5.10. WebDAV Multi-Tenant — Gestão de Credenciais de Dispositivo & Invalidação Push
+app.get('/api/tenant/webdav-tokens', verifyTenantTicket, (req, res) => {
+  const tokens = webdavTokenManager.listTokens({
+    userId: req.tenant.userId,
+    scopeType: req.tenant.scopeType,
+    orgSlug: req.tenant.orgSlug,
+  });
+  return res.json({ success: true, tokens });
+});
+
+app.post('/api/tenant/webdav-tokens', verifyTenantTicket, async (req, res) => {
+  try {
+    if (req.tenant.purpose === 'public_media' || req.tenant.purpose === 'share') {
+      return res.status(403).json({ error: 'Ticket não autorizado para criar credenciais de disco.' });
+    }
+    const created = await webdavTokenManager.createToken({
+      userId: req.tenant.userId,
+      scopeType: req.tenant.scopeType,
+      organizationId: req.tenant.organizationId,
+      orgSlug: req.tenant.orgSlug,
+      callerReadOnly: req.tenant.readOnly,
+      readOnly: Boolean(req.body?.readOnly),
+      ttlDays: req.body?.ttlDays,
+      label: req.body?.label,
+      role: req.tenant.role,
+      quotaLimitBytes: req.tenant.quotaLimitBytes,
+    });
+    return res.json({
+      success: true,
+      ...created,
+      webdavPath: '/webdav/cofre',
+    });
+  } catch (err) {
+    return res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/tenant/webdav-tokens/:tokenId', verifyTenantTicket, async (req, res) => {
+  const removed = await webdavTokenManager.revokeToken(String(req.params.tokenId || '').trim(), {
+    userId: req.tenant.userId,
+    scopeType: req.tenant.scopeType,
+    orgSlug: req.tenant.orgSlug,
+  });
+  if (!removed) {
+    return res.status(404).json({ error: 'Credencial de dispositivo não encontrada.' });
+  }
+  return res.json({ success: true });
+});
+
+app.post('/api/internal/webdav-cache/invalidate', async (req, res) => {
+  try {
+    const ts = String(req.headers['x-edge-timestamp'] || '').trim();
+    const sig = String(req.headers['x-edge-signature'] || '').trim();
+    const tsNum = Number(ts);
+    if (!ts || !sig || Number.isNaN(tsNum) || Math.abs(Date.now() - tsNum) > 5 * 60 * 1000) {
+      return res.status(401).json({ error: 'Timestamp inválido.' });
+    }
+    const bodyStr = JSON.stringify(req.body || {});
+    const expected = crypto
+      .createHmac('sha256', resolveTenantHmacSecret())
+      .update(`${ts}.${bodyStr}`)
+      .digest('hex');
+    const a = Buffer.from(sig, 'utf8');
+    const b = Buffer.from(expected, 'utf8');
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      return res.status(401).json({ error: 'Assinatura HMAC inválida.' });
+    }
+    await webdavTokenManager.invalidateCache(req.body || {});
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // 11.5.10. GET /api/tenant/zip — Exportação ZIP sob demanda (fflate)
 app.get('/api/tenant/zip', verifyTenantTicket, async (req, res) => {
   try {
@@ -9258,7 +9712,7 @@ app.get('/api/tenant/zip', verifyTenantTicket, async (req, res) => {
               .filter(Boolean)
           );
         }
-      } catch {}
+      } catch { }
     }
 
     const isPathAllowedFn = (subRel) => {
@@ -9299,7 +9753,7 @@ app.get('/api/tenant/legacy-catalog-export', verifyTenantTicket, async (req, res
           if (Array.isArray(backup.albums)) memoryCatalog.albums = backup.albums;
           if (backup.subalbums) memoryCatalog.subalbums = backup.subalbums;
         }
-      } catch {}
+      } catch { }
     }
     if (rawItems.length === 0) {
       const immutableSeed = path.join(__dirname, 'lib', 'catalog_seed.json');
@@ -9312,7 +9766,7 @@ app.get('/api/tenant/legacy-catalog-export', verifyTenantTicket, async (req, res
             if (Array.isArray(s.albums)) memoryCatalog.albums = s.albums;
             if (s.subalbums) memoryCatalog.subalbums = s.subalbums;
           }
-        } catch {}
+        } catch { }
       }
     }
     const mapped = rawItems
@@ -9366,7 +9820,7 @@ app.get('/api/tenant/telemetry', verifyTenantTicket, async (req, res) => {
           tempCelsius = rawTemp > 1000 ? +(rawTemp / 1000).toFixed(1) : rawTemp;
         }
       }
-    } catch {}
+    } catch { }
 
     const tenantUsedBytes = await req.tenant.getUsedBytes();
     if (!STORAGE_VOLUMES_POOL || STORAGE_VOLUMES_POOL.length === 0) {
@@ -9436,13 +9890,50 @@ app.use((err, _req, res, _next) => {
 // ============================================================================
 // 13. BOOTSTRAP ASSÍNCRONO
 // ============================================================================
+async function cleanupOrphanTempFilesOnBoot() {
+  const roots = new Set([USERS_ROOT_DIR, ORGS_ROOT_DIR, PORTFOLIO_DIR].filter(Boolean));
+  if (Array.isArray(STORAGE_VOLUMES_POOL) && STORAGE_VOLUMES_POOL.length > 0) {
+    for (const vol of STORAGE_VOLUMES_POOL) {
+      if (vol?.online && vol?.rootDir) {
+        roots.add(vol.rootDir);
+      }
+    }
+  }
+  async function walkClean(dir, depth = 0) {
+    if (depth > 12 || !fs.existsSync(dir)) return;
+    const entries = await fs.promises.readdir(dir, { withFileTypes: true }).catch(() => []);
+    for (const ent of entries) {
+      if (ent.name === '.trash' || ent.name === 'node_modules') continue;
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) {
+        await walkClean(full, depth + 1);
+      } else if (
+        ent.isFile() &&
+        (ent.name.endsWith('.enc.tmp') || ent.name.startsWith('.aurt_tmp_'))
+      ) {
+        await fs.promises.unlink(full).catch(() => { });
+      }
+    }
+  }
+  for (const r of roots) {
+    await walkClean(r, 0).catch(() => { });
+  }
+}
+
 initCatalogStore();
 setImmediate(() => {
   recalculateAllZonesAsync();
+  chunkedUploadManager?.sweepExpiredSessions?.().catch(() => { });
 });
+setInterval(() => {
+  chunkedUploadManager?.sweepExpiredSessions?.().catch(() => { });
+}, 15 * 60 * 1000).unref();
 
-app.listen(PORT, BIND_HOST, () => {
+const httpServer = app.listen(PORT, BIND_HOST, () => {
   console.log(`[Portal Storage v2.0] Ativo em http://${BIND_HOST}:${PORT}`);
   console.log(`[Portal Storage v2.0] HD Externo: ${STORAGE_DIR}`);
   console.log(`[Portal Storage v2.0] Cache Interno ext4: ${PRIMARY_CATALOG_PATH}`);
 });
+httpServer.requestTimeout = 0;
+httpServer.headersTimeout = 60_000;
+httpServer.keepAliveTimeout = 65_000;

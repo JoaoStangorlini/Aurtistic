@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSwipeTabs } from '@/hooks/useSwipeTabs';
 import { VaultFolderSyncModal, type AffectedShortcutInfo } from './VaultFolderSyncModal';
+import { VaultMountDiskModal } from './VaultMountDiskModal';
 import { extractLocalSyncFiles, type LocalSyncFile, type RemoteFolderManifest } from '@/lib/vault/folder-sync-diff';
 import { getTenantFolderManifestDirect } from '@/lib/edge-client';
 import type {
@@ -235,6 +236,7 @@ export function UserVaultWorkspace({
   const [syncTargetFolder, setSyncTargetFolder] = useState<{ relPath: string; name: string } | null>(null);
   const [syncPreparing, setSyncPreparing] = useState<string | null>(null);
   const [syncPrepError, setSyncPrepError] = useState<string | null>(null);
+  const [mountDiskModalOpen, setMountDiskModalOpen] = useState(false);
   const [syncModalData, setSyncModalData] = useState<{
     folderRelPath: string;
     folderName: string;
@@ -2933,6 +2935,18 @@ export function UserVaultWorkspace({
             Lixeira
           </button>
 
+          {(isApprovedForStorage || profile.storage_role === 'admin' || Boolean(selectedOrgId)) && (
+            <button
+              type="button"
+              onClick={() => setMountDiskModalOpen(true)}
+              className="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors bg-surface text-fg-secondary hover:text-fg hover:bg-surface-hover border border-border-subtle cursor-pointer"
+              title="Montar este cofre descriptografado como disco no Linux, Windows ou macOS"
+            >
+              <span className="material-symbols-outlined text-[18px] text-[#FFCC00]">hard_drive</span>
+              Montar como Disco
+            </button>
+          )}
+
           {profile.storage_role === 'admin' && (
             <>
               <button
@@ -4158,8 +4172,18 @@ export function UserVaultWorkspace({
                                     </button>
                                     <a
                                       href={buildTenantStreamUrl(file.relativePath, activeTicket, { serverUrl, download: true })}
+                                      onClick={(e) => {
+                                        if (file.sizeBytes > 16 * 1024 * 1024) {
+                                          e.preventDefault();
+                                          uploadCtx.enqueueDownload({
+                                            relativePath: file.relativePath,
+                                            name: file.name,
+                                            sizeBytes: file.sizeBytes,
+                                          });
+                                        }
+                                      }}
                                       className="p-1 rounded text-fg-secondary hover:text-fg hover:bg-surface-hover"
-                                      title="Download direto"
+                                      title={file.sizeBytes > 16 * 1024 * 1024 ? "Download resumível em segundo plano" : "Download direto"}
                                     >
                                       <span className="material-symbols-outlined text-[16px]">download</span>
                                     </a>
@@ -4375,7 +4399,17 @@ export function UserVaultWorkspace({
                                   serverUrl,
                                   download: true,
                                 })}
-                                onClick={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (file.sizeBytes > 16 * 1024 * 1024) {
+                                    e.preventDefault();
+                                    uploadCtx.enqueueDownload({
+                                      relativePath: file.relativePath,
+                                      name: file.name,
+                                      sizeBytes: file.sizeBytes,
+                                    });
+                                  }
+                                }}
                                 className="p-1.5 rounded-lg text-fg-secondary hover:text-fg hover:bg-surface-hover"
                                 title="Baixar original"
                               >
@@ -4965,6 +4999,25 @@ export function UserVaultWorkspace({
         onChange={(e) => void handleSyncFolderSelected(e.target.files)}
       />
 
+      <VaultMountDiskModal
+        isOpen={mountDiskModalOpen}
+        onClose={() => setMountDiskModalOpen(false)}
+        ticket={activeTicket}
+        ensureFreshTicket={async () => {
+          const t = await refreshTicket();
+          return typeof t === 'string' ? t : t?.ticket || activeTicket;
+        }}
+        serverUrl={serverUrl}
+        scopeType={selectedOrgId ? 'org' : 'user'}
+        scopeSlug={selectedOrg ? selectedOrg.slug : 'pessoal'}
+        scopeLabel={selectedOrg ? selectedOrg.name : 'Cofre Pessoal'}
+        canWrite={
+          selectedOrgId
+            ? selectedOrg?.can_upload_vault !== false
+            : isApprovedForStorage || profile.storage_role === 'admin'
+        }
+      />
+
       {(syncPreparing || syncPrepError) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="w-full max-w-md rounded-2xl bg-surface border border-border-subtle p-5 shadow-2xl text-fg space-y-3">
@@ -5061,6 +5114,14 @@ export function UserVaultWorkspace({
           }}
           onPreviewFile={(entry) => handleSelectEntryForPreview(entry)}
           onDownload={(entry) => {
+            if (entry.sizeBytes > 16 * 1024 * 1024) {
+              uploadCtx.enqueueDownload({
+                relativePath: entry.relativePath,
+                name: entry.name,
+                sizeBytes: entry.sizeBytes,
+              });
+              return;
+            }
             const url = buildTenantStreamUrl(entry.relativePath, activeTicket, { serverUrl, download: true });
             window.open(url, '_blank');
           }}

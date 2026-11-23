@@ -15,6 +15,12 @@ import { ThemeDropdownSection } from '@/components/theme/ThemeDropdownSection';
 import { ThemedAurtisticLogo } from '@/components/theme/ThemedAurtisticLogo';
 import { ModulesConfig, getInitialModulesConfig } from '@/lib/modules-config';
 import { AurtisticSpotlightModal } from './AurtisticSpotlightModal';
+import { DesktopAppDownloadModal } from './DesktopAppDownloadModal';
+import {
+  detectClientPlatform,
+  shouldShowNavbarDownloadButton,
+  type DetectedOsPlatform,
+} from '@/lib/native-bridge';
 
 export default function AurtisticNavbar() {
   const { resolvedMode, paletteDef, isStudioActive } = useTheme();
@@ -24,6 +30,9 @@ export default function AurtisticNavbar() {
   const [loading, setLoading] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSpotlightOpen, setIsSpotlightOpen] = useState(false);
+  const [isDesktopDownloadOpen, setIsDesktopDownloadOpen] = useState(false);
+  const [showDownloadBtn, setShowDownloadBtn] = useState(false);
+  const [detectedPlatform, setDetectedPlatform] = useState<DetectedOsPlatform>('unknown');
   const [isIdentityDropdownOpen, setIsIdentityDropdownOpen] = useState(false);
   const [isMobileIdentityOpen, setIsMobileIdentityOpen] = useState(false);
   const identityDropdownRef = useRef<HTMLDivElement>(null);
@@ -34,6 +43,10 @@ export default function AurtisticNavbar() {
   const [supabase] = useState(() => createClient());
 
   useEffect(() => {
+    setShowDownloadBtn(
+      shouldShowNavbarDownloadButton({ isCapacitorNative: Capacitor.isNativePlatform() })
+    );
+    setDetectedPlatform(detectClientPlatform());
     const handleModulesChanged = (e: any) => {
       if (e?.detail) setModulesConfig(e.detail);
       else setModulesConfig(getInitialModulesConfig());
@@ -360,6 +373,33 @@ export default function AurtisticNavbar() {
             </kbd>
           </button>
 
+          {/* Ícone adaptativo de Download / Instalação do App (Web PC e Mobile; oculto se já instalado) */}
+          {showDownloadBtn && (() => {
+            const meta =
+              detectedPlatform === 'ios'
+                ? { icon: 'install_mobile', title: 'Instalar WebApp no iOS', aria: 'Instalar WebApp no iOS' }
+                : detectedPlatform === 'android'
+                  ? { icon: 'install_mobile', title: 'Baixar App na Google Play', aria: 'Baixar App na Google Play' }
+                  : detectedPlatform === 'windows'
+                    ? { icon: 'install_desktop', title: 'Baixar Aurtistic para Windows', aria: 'Baixar Aurtistic para Windows' }
+                    : detectedPlatform === 'linux'
+                      ? { icon: 'install_desktop', title: 'Baixar Aurtistic para Linux', aria: 'Baixar Aurtistic para Linux' }
+                      : detectedPlatform === 'macos'
+                        ? { icon: 'install_desktop', title: 'Baixar Aurtistic para macOS', aria: 'Baixar Aurtistic para macOS' }
+                        : { icon: 'download', title: 'Baixar App Aurtistic', aria: 'Baixar App Aurtistic' };
+            return (
+              <button
+                type="button"
+                onClick={() => setIsDesktopDownloadOpen(true)}
+                className="flex w-8 h-8 rounded-full border border-border-subtle bg-surface hover:border-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 text-fg-muted hover:text-[var(--accent-primary)] transition-colors cursor-pointer shrink-0 items-center justify-center"
+                title={meta.title}
+                aria-label={meta.aria}
+              >
+                <span className="material-symbols-outlined text-[18px]">{meta.icon}</span>
+              </button>
+            );
+          })()}
+
           {/* Botão de Report Rápido Pulsante */}
           <Link
             href="/relatar-bug"
@@ -622,6 +662,11 @@ export default function AurtisticNavbar() {
         </div>
       </div>
       )}
+      <DesktopAppDownloadModal
+        isOpen={isDesktopDownloadOpen}
+        onClose={() => setIsDesktopDownloadOpen(false)}
+        detectedPlatform={detectedPlatform}
+      />
     </>
   );
 }

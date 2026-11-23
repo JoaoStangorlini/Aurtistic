@@ -23,6 +23,7 @@ import {
   issueOrganizationVaultSession,
   computeEffectiveQuotaBytes,
   getEdgeStorageServerUrl,
+  notifyEdgeWebdavCacheInvalidate,
   signEdgeTenantTicket,
   DEFAULT_ECOSYSTEM_ORGS_BY_ID,
   MEDIA_READONLY_TICKET_TTL_MS,
@@ -419,6 +420,12 @@ export async function adminUpdateGovernanceAction(input: {
   });
 
   if (error) return { ok: false, error: error.message };
+  if (input.targetUserId) {
+    void notifyEdgeWebdavCacheInvalidate({
+      userId: input.targetUserId,
+      revokeAll: input.approvalStatus === 'suspended',
+    });
+  }
   revalidatePath('/servidor');
   return { ok: true, data };
 }

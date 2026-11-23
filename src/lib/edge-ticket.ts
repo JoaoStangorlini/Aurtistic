@@ -393,6 +393,33 @@ export function getEdgeStorageServerUrl(): string {
   return url.replace(/\/+$/, '');
 }
 
+/** Notifica o Edge Server para invalidar cache WebDAV (push imediato de governança/membros). */
+export async function notifyEdgeWebdavCacheInvalidate(filter: {
+  userId?: string;
+  organizationId?: string;
+  orgSlug?: string;
+  revokeAll?: boolean;
+}): Promise<void> {
+  try {
+    const secret = resolveEdgeHmacSecret();
+    const ts = String(Date.now());
+    const body = JSON.stringify(filter || {});
+    const sig = crypto.createHmac('sha256', secret).update(`${ts}.${body}`).digest('hex');
+    await fetch(`${getEdgeStorageServerUrl()}/api/internal/webdav-cache/invalidate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-edge-timestamp': ts,
+        'x-edge-signature': sig,
+      },
+      body,
+      signal: AbortSignal.timeout(2000),
+    });
+  } catch {
+    // Best-effort push; Edge revalida no próximo cache TTL
+  }
+}
+
 export function resolveEdgeHmacSecret(): string {
   const configured =
     process.env.EDGE_HMAC_SECRET ||

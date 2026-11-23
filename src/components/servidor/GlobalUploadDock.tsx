@@ -1,7 +1,7 @@
 // Este programa é um software livre (Licença AGPLv3)
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useVaultUpload, formatEta, formatSpeed } from '@/contexts/VaultUploadContext';
 
 function formatBytes(bytes: number): string {
@@ -31,10 +31,47 @@ export function GlobalUploadDock() {
     startUpload,
     cancelAll,
     clearFinished,
+    downloadQueue,
+    pauseDownload,
+    resumeDownload,
+    cancelDownload,
+    clearFinishedDownloads,
   } = useVaultUpload();
 
-  // Oculta se a fila estiver vazia ou se o modal já estiver aberto e maximizado
-  if (queue.length === 0 || (isModalOpen && !isMinimized)) {
+  // Mantém a tela ativa (Screen Wake Lock API) durante uploads ativos (minimizado ou no painel)
+  useEffect(() => {
+    if (!isUploading || typeof navigator === 'undefined' || !('wakeLock' in navigator)) return;
+    let sentinel: WakeLockSentinel | null = null;
+    let cancelled = false;
+
+    const acquire = async () => {
+      try {
+        sentinel = await navigator.wakeLock.request('screen');
+      } catch {
+        // Ignora se o navegador/sistema negar o wake lock
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !cancelled) {
+        void acquire();
+      }
+    };
+
+    void acquire();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (sentinel) {
+        void sentinel.release().catch(() => {});
+      }
+    };
+  }, [isUploading]);
+
+  // Oculta se ambas as filas (upload e download) estiverem vazias ou se o modal já estiver aberto e maximizado
+  if ((queue.length === 0 && downloadQueue.length === 0) || (isModalOpen && !isMinimized)) {
     return null;
   }
 
@@ -99,7 +136,9 @@ export function GlobalUploadDock() {
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-bold text-fg truncate">
                   {isUploading
-                    ? activeItem?.file.name || 'Enviando arquivos...'
+                    ? activeItem?.phase === 'finalizing'
+                      ? 'Finalizando e criptografando no servidor...'
+                      : activeItem?.file.name || 'Enviando arquivos...'
                     : isAllDone
                       ? 'Uploads concluídos!'
                       : hasErrors
@@ -179,6 +218,76 @@ export function GlobalUploadDock() {
             </button>
           </div>
         </div>
+
+        {/* Fila de Downloads Resumíveis em Segundo Plano */}
+        {downloadQueue.length > 0 && (
+          <div className="mt-2.5 pt-2.5 border-t border-border-subtle space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] font-bold text-fg-muted">
+              <span>Downloads ({downloadQueue.length})</span>
+              {downloadQueue.some((d) => d.status === 'success') && (
+                <button
+                  type="button"
+                  onClick={clearFinishedDownloads}
+                  className="text-[10px] hover:text-fg cursor-pointer"
+                >
+                  Limpar concluídos
+                </button>
+              )}
+            </div>
+            <div className="max-h-32 overflow-y-auto space-y-1.5">
+              {downloadQueue.map((dl) => (
+                <div key={dl.id} className="flex items-center justify-between gap-2 text-[11px] bg-app/70 px-2 py-1.5 rounded-lg">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-fg truncate">{dl.filename}</p>
+                    <p className="text-[10px] text-fg-muted font-mono">
+                      {dl.status === 'downloading'
+                        ? `Baixando ${dl.progressPercent}%`
+                        : dl.status === 'verifying'
+                          ? 'Verificando SHA-256...'
+                          : dl.status === 'paused'
+                            ? `Pausado (${dl.progressPercent}%)`
+                            : dl.status === 'success'
+                              ? 'Concluído'
+                              : dl.status === 'error'
+                                ? dl.error || 'Erro'
+                                : 'Na fila'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {dl.status === 'downloading' && (
+                      <button
+                        type="button"
+                        onClick={() => pauseDownload(dl.id)}
+                        className="p-1 rounded hover:bg-surface-hover text-fg-muted hover:text-fg cursor-pointer"
+                        title="Pausar download"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">pause</span>
+                      </button>
+                    )}
+                    {(dl.status === 'paused' || dl.status === 'error') && (
+                      <button
+                        type="button"
+                        onClick={() => resumeDownload(dl.id)}
+                        className="p-1 rounded hover:bg-surface-hover text-[var(--accent-primary)] cursor-pointer"
+                        title="Retomar download"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">play_arrow</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => cancelDownload(dl.id)}
+                      className="p-1 rounded hover:bg-surface-hover text-rose-400 cursor-pointer"
+                      title="Cancelar / Remover download"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">close</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </aside>
   );

@@ -75,6 +75,10 @@ prepare_staging() {
   [ -d "$SERVER_DIR/public" ] && cp -r "$SERVER_DIR/public" "$staging/"
   [ -d "$SERVER_DIR/lib" ] && cp -r "$SERVER_DIR/lib" "$staging/"
   [ -d "$SERVER_DIR/node_modules/fflate" ] && mkdir -p "$staging/node_modules" && cp -r "$SERVER_DIR/node_modules/fflate" "$staging/node_modules/"
+  if [ -d "$SERVER_DIR/scripts" ]; then
+    mkdir -p "$staging/scripts"
+    cp -r "$SERVER_DIR/scripts"/* "$staging/scripts/"
+  fi
   if [ -d "$SCRIPTS_DIR" ]; then
     mkdir -p "$staging/scripts"
     cp -r "$SCRIPTS_DIR"/* "$staging/scripts/"
@@ -252,6 +256,10 @@ prepare_staging() {
   [ -d "$SERVER_DIR/public" ] && cp -r "$SERVER_DIR/public" "$staging/"
   [ -d "$SERVER_DIR/lib" ] && cp -r "$SERVER_DIR/lib" "$staging/"
   [ -d "$SERVER_DIR/node_modules/fflate" ] && mkdir -p "$staging/node_modules" && cp -r "$SERVER_DIR/node_modules/fflate" "$staging/node_modules/"
+  if [ -d "$SERVER_DIR/scripts" ]; then
+    mkdir -p "$staging/scripts"
+    cp -r "$SERVER_DIR/scripts"/* "$staging/scripts/"
+  fi
   if [ -d "$SCRIPTS_DIR" ]; then
     mkdir -p "$staging/scripts"
     cp -r "$SCRIPTS_DIR"/* "$staging/scripts/"

@@ -33,6 +33,11 @@ export const metadata: Metadata = {
   title: "Aurtistic",
   description: "Gerenciador de Tarefas e Projetos",
   manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    title: "Aurtistic",
+    statusBarStyle: "black-translucent",
+  },
   icons: {
     icon: "/aurtistic_app_icon_v12.png",
     shortcut: "/aurtistic_app_icon_v12.png",

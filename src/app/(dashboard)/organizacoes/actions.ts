@@ -1552,6 +1552,13 @@ export async function createOrganizationRequestAction(input: {
     .single();
 
   if (error) return { ok: false, error: error.message };
+  if (data?.organization_id) {
+    const { notifyEdgeWebdavCacheInvalidate } = await import('@/lib/edge-ticket');
+    void notifyEdgeWebdavCacheInvalidate({
+      organizationId: String(data.organization_id),
+      userId: data.requester_id ? String(data.requester_id) : undefined,
+    });
+  }
   revalidatePath('/organizacoes');
   return { ok: true, request: data };
 }
@@ -1582,6 +1589,13 @@ export async function updateOrganizationRequestStatusAction(input: {
     .single();
 
   if (error) return { ok: false, error: error.message };
+  if (data?.organization_id) {
+    const { notifyEdgeWebdavCacheInvalidate } = await import('@/lib/edge-ticket');
+    void notifyEdgeWebdavCacheInvalidate({
+      organizationId: String(data.organization_id),
+      userId: data.requester_id ? String(data.requester_id) : undefined,
+    });
+  }
   revalidatePath('/organizacoes');
   return { ok: true, request: data };
 }

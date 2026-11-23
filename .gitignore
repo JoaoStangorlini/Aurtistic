@@ -53,3 +53,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# desktop electron app
+desktop/node_modules/
+desktop/dist/
+desktop/release/

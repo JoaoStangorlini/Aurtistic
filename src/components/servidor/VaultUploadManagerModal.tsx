@@ -15,6 +15,25 @@ import {
   formatEta,
   formatSpeed,
 } from '@/contexts/VaultUploadContext';
+import {
+  type DesktopCredentialSecurityStatus,
+  type DesktopMirrorFolderItem,
+  getDesktopCredentialStatus,
+  getLanConfig,
+  isAndroidNative,
+  isDesktopApp,
+  listDesktopMirrorFolders,
+  pickNativeUploadFiles,
+  probeLanServer,
+  removeDesktopMirrorFolder,
+  selectDesktopMirrorFolder,
+  setLanConfig,
+  triggerDesktopMirrorSync,
+} from '@/lib/native-bridge';
+import {
+  createWebdavTokenDirect,
+} from '@/lib/edge-client';
+import { resolveClientEdgeServerUrl } from '@/lib/edge-urls';
 
 export type { QueuedUploadItem };
 
@@ -107,6 +126,90 @@ export function VaultUploadManagerModal({
   const handleRemoveItem = uploadCtx.removeItem;
   const handleClearIdle = uploadCtx.clearFinished;
   const cancelAll = uploadCtx.cancelAll;
+
+  const [androidNative, setAndroidNative] = useState(false);
+  const [desktopApp, setDesktopApp] = useState(false);
+  const [mirrorFolders, setMirrorFolders] = useState<DesktopMirrorFolderItem[]>([]);
+  const [credStatus, setCredStatus] = useState<DesktopCredentialSecurityStatus | null>(null);
+  const [lanExpanded, setLanExpanded] = useState(false);
+  const [lanUrl, setLanUrl] = useState('');
+  const [autoDetectLan, setAutoDetectLan] = useState(true);
+  const [lanStatus, setLanStatus] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle');
+  const [nativeFeedback, setNativeFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAndroidNative(isAndroidNative());
+    const isDesk = isDesktopApp();
+    setDesktopApp(isDesk);
+    const cfg = getLanConfig();
+    setLanUrl(cfg.lanServerUrl);
+    setAutoDetectLan(cfg.autoDetectLan);
+    if (isDesk && isModalOpen) {
+      void listDesktopMirrorFolders().then(setMirrorFolders);
+      void getDesktopCredentialStatus().then(setCredStatus);
+    }
+  }, [isModalOpen]);
+
+  const handleAddMirrorFolder = async () => {
+    setNativeFeedback(null);
+    const scopeKey = selectedOrgId ? `org:${selectedOrgId}` : 'personal';
+    const remoteServerUrl = resolveClientEdgeServerUrl();
+
+    // Garante provisionamento automático de credencial no safeStorage antes de espelhar
+    try {
+      const freshTicket = ticket || uploadCtx.activeTicket || '';
+      const status = await getDesktopCredentialStatus();
+      if (status && !status.secureAvailable) {
+        setNativeFeedback(status.reason || 'Desbloqueie o chaveiro do sistema (GNOME Keyring/DPAPI) para salvar a credencial.');
+        return;
+      }
+      if (freshTicket) {
+        const created = await createWebdavTokenDirect({
+          ticket: freshTicket,
+          serverUrl: remoteServerUrl,
+          label: 'App Desktop (Espelhamento)',
+          readOnly: false,
+          ttlDays: selectedOrgId ? 90 : null,
+        });
+        const { saveDesktopCredential } = await import('@/lib/native-bridge');
+        await saveDesktopCredential({ scopeKey, tokenId: created.tokenId, secret: created.secret });
+      }
+    } catch {}
+
+    const createdMirror = await selectDesktopMirrorFolder({
+      remoteFolder: currentFolder || 'Arquivos',
+      scopeKey,
+      remoteServerUrl,
+      lanServerUrl: getLanConfig().lanServerUrl,
+    });
+    if (createdMirror) {
+      setMirrorFolders(await listDesktopMirrorFolders());
+    }
+  };
+
+  const handlePickNativeFiles = async () => {
+    setNativeFeedback(null);
+    const picked = await pickNativeUploadFiles();
+    if (picked.length === 0) return;
+    const count = await uploadCtx.enqueueNativeUploadFiles(picked, currentFolder, selectedOrgId);
+    setNativeFeedback(
+      count > 0
+        ? `${count} arquivo(s) grandes enfileirados em segundo plano (Android WorkManager).`
+        : 'Não foi possível iniciar o envio nativo. Verifique sua conexão ou pasta com PIN.'
+    );
+  };
+
+  const handleSaveLan = async () => {
+    const saved = await setLanConfig({ lanServerUrl: lanUrl, autoDetectLan });
+    setLanUrl(saved.lanServerUrl);
+    if (!saved.lanServerUrl) {
+      setLanStatus('idle');
+      return;
+    }
+    setLanStatus('testing');
+    const res = await probeLanServer(saved.lanServerUrl, 1500);
+    setLanStatus(res.reachable ? 'ok' : 'fail');
+  };
 
   const effectiveTargetFolder =
     uploadCtx.overrideFolder !== null
@@ -543,7 +646,11 @@ export function VaultUploadManagerModal({
                             <span className="material-symbols-outlined text-[15px] animate-spin">
                               sync
                             </span>
-                            <span>{item.progressPercent || 0}%</span>
+                            <span>
+                              {item.phase === 'finalizing'
+                                ? 'Finalizando e criptografando no servidor...'
+                                : `${item.progressPercent || 0}%`}
+                            </span>
                           </div>
                         )}
 
@@ -585,6 +692,118 @@ export function VaultUploadManagerModal({
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Painel Rápido: Seletor Nativo Android (sem OOM) & Configuração de Rede Local (LAN) */}
+        <div className="px-4 py-2 border-t border-border-subtle bg-surface/60 space-y-2 shrink-0">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {androidNative && (
+              <button
+                type="button"
+                onClick={() => void handlePickNativeFiles()}
+                className="px-3 py-1.5 rounded-lg bg-[var(--accent-primary)]/15 border border-[var(--accent-primary)]/40 text-[var(--accent-primary)] text-[11px] font-bold flex items-center gap-1.5 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[15px]">drive_folder_upload</span>
+                <span>Selecionar Arquivos Grandes (Segundo Plano Nativo)</span>
+              </button>
+            )}
+            {desktopApp && (
+              <button
+                type="button"
+                onClick={() => void handleAddMirrorFolder()}
+                className="px-3 py-1.5 rounded-lg bg-[var(--accent-primary)]/15 border border-[var(--accent-primary)]/40 text-[var(--accent-primary)] text-[11px] font-bold flex items-center gap-1.5 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[15px]">folder_copy</span>
+                <span>Espelhar Pasta Local ({currentFolder || 'Arquivos'})</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setLanExpanded((v) => !v)}
+              className="text-[11px] font-semibold text-fg-muted hover:text-fg flex items-center gap-1 cursor-pointer ml-auto"
+            >
+              <span className="material-symbols-outlined text-[15px]">router</span>
+              <span>{lanExpanded ? 'Ocultar Rede Local (LAN)' : 'Configurar Rede Local (LAN)'}</span>
+            </button>
+          </div>
+          {nativeFeedback && (
+            <p className="text-[11px] text-emerald-400 font-semibold">{nativeFeedback}</p>
+          )}
+          {desktopApp && credStatus && !credStatus.secureAvailable && (
+            <p className="text-[11px] text-amber-400 font-semibold">
+              {credStatus.reason || 'Chaveiro do sistema bloqueado: desbloqueie o GNOME Keyring / DPAPI para salvar credenciais.'}
+            </p>
+          )}
+          {desktopApp && mirrorFolders.length > 0 && (
+            <div className="space-y-1.5 pt-1">
+              {mirrorFolders.map((mf) => (
+                <div key={mf.id} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-app border border-border-subtle text-[11px]">
+                  <div className="min-w-0">
+                    <p className="font-bold text-fg truncate">{mf.localDir} ↔ {mf.remoteFolder || 'Raiz'}</p>
+                    <p className="text-[10px] text-fg-muted">
+                      {mf.status === 'paused_missing_root'
+                        ? 'Pausado: pasta/disco local desconectado'
+                        : mf.status === 'pin_locked'
+                          ? 'Bloqueado por PIN'
+                          : mf.status === 'error'
+                            ? mf.lastError || 'Erro na sincronização'
+                            : mf.status === 'syncing'
+                              ? 'Sincronizando...'
+                              : 'Sincronização ativa'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => void triggerDesktopMirrorSync(mf.id).then(() => listDesktopMirrorFolders().then(setMirrorFolders))}
+                      className="px-2 py-0.5 rounded border border-border-subtle hover:border-[var(--accent-primary)] cursor-pointer"
+                    >
+                      Sincronizar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void removeDesktopMirrorFolder(mf.id).then(() => listDesktopMirrorFolders().then(setMirrorFolders))}
+                      className="px-2 py-0.5 rounded text-rose-400 hover:bg-rose-500/10 cursor-pointer"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {lanExpanded && (
+            <div className="p-2.5 rounded-xl border border-border-subtle bg-app space-y-2">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="url"
+                  value={lanUrl}
+                  onChange={(e) => setLanUrl(e.target.value)}
+                  placeholder="Ex.: http://192.168.0.100:8080"
+                  className="flex-1 px-2.5 py-1.5 rounded-lg border border-border-subtle bg-surface text-xs text-fg"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleSaveLan()}
+                  className="px-3 py-1.5 rounded-lg bg-surface border border-border-subtle hover:border-[var(--accent-primary)] text-xs font-bold cursor-pointer shrink-0"
+                >
+                  {lanStatus === 'testing' ? 'Testando...' : 'Salvar e Testar'}
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-fg-muted">
+                <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoDetectLan}
+                    onChange={(e) => setAutoDetectLan(e.target.checked)}
+                  />
+                  <span>Usar LAN automaticamente em casa</span>
+                </label>
+                {lanStatus === 'ok' && <span className="text-emerald-500 font-semibold">LAN acessível!</span>}
+                {lanStatus === 'fail' && <span className="text-amber-400">LAN inacessível — usando HTTPS.</span>}
               </div>
             </div>
           )}

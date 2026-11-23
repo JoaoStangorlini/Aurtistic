@@ -9,13 +9,22 @@ const vaultCrypto = require('../lib/vault-crypto');
 const CONTROL_FILENAMES = new Set([
   '.shortcut.json',
   '.pins.json',
+  '.sync-journal.json',
+  'webdav_tokens.json',
   'catalog.json',
   'sig_index.json',
 ]);
 
 function isControlOrTempFile(name) {
   if (CONTROL_FILENAMES.has(name)) return true;
-  if (name.endsWith('.tmp') || name.endsWith('.enc.tmp')) return true;
+  if (
+    name.startsWith('.aurt_tmp_') ||
+    name.startsWith('.aurt_chunk_') ||
+    name.endsWith('.tmp') ||
+    name.endsWith('.enc.tmp')
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -41,6 +50,10 @@ async function migrateDirectory(rootDir, tenantNamespaceId, options = {}) {
         continue;
       }
       if (lst.isDirectory()) {
+        if (name.startsWith('.aurt_chunk_')) {
+          stats.skippedControlOrSymlink++;
+          continue;
+        }
         if (name === '.trash') {
           // Pula metadados JSON da lixeira dentro de .trash mas cifra arquivos reais
           await walk(fullPath);

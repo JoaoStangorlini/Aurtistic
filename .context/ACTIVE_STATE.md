@@ -1,11 +1,10 @@
 # Active State — Aurtistic
-Atualizado em: 2026-11-20T23:01Z
+Atualizado em: 2026-11-23T03:23Z
 
-## Todas as 5 Ondas Concluídas e Validadas (0 Erros)
-- **Parte 1 (Fechamento Onda 4 & Passo 0):** `isIndeterminate` em `TasksView.tsx:2602` + regras explícitas `.org-task-checkbox` para todas as 4 paletas em `globals.css:922-955`; mesclagem + hidratação + remoção de `studio_default_template` via `p_patch` em `StudioLauncherView.tsx`; `?embed=1` movido para `useEffect` em `Navbar.tsx`.
-- **Parte 2 (Onda 5 — Criptografia AEAD `AURTENC2`):**
-  - `servidor/lib/vault-crypto.js` implementado com cabeçalho 76 B, chunks 64 KB AES-256-GCM, HKDF por dono físico, AAD autenticando cabeçalho, arquivo vazio `0 B` com 1 chunk autenticado, HTTP Range/Seek O(1) e recusa *fail-closed* (`503`) sem `VAULT_MASTER_KEY`.
-  - `servidor/server.js`: `computeFileSha256` lê `plaintextSha256` direto do cabeçalho `AURTENC2` (dedup `A18` O(1)) e varredura de `aurt-dec-*.tmp` no boot.
-  - `servidor/scripts/encrypt-vault-migration.js`: migração atômica sem seguir symlinks, pulando arquivos de controle e verificando `sha256_after === sha256_before`.
-  - `servidor/.env`: `VAULT_MASTER_KEY` gerada e `VAULT_ENCRYPTION_ENABLED=true` gravados com `chmod 600` (protegido por `.gitignore`).
-- **Validações (9/9 Verdes):** `verify:full` (0 erros), `vault-crypto.test.mjs` (5/5 PASS), `wave4_idv_and_a26.test.mjs` (8/8 PASS), `wave3_studio.test.mjs` (10/10 PASS), `wave2_workflows_and_tasks.test.mjs` (8/8 PASS), `verify_v4_orgs_meetings_and_security.mjs` (15/15 PASS), `verify_v4_architecture.mjs` (100% PASS), `latex-canvas-renderer` + `stroke-simplify` (9/9 PASS), `server:check` (0 erros).
+## Módulos 1 a 4 Concluídos, Polidos e Validados
+- **Módulo 1 (Edge):** `servidor/lib/vault-crypto.js` (`encryptPartFilesAtomic`), `chunked-upload.js` (`202` + mutex), `server.js` (`verifyTenantAuthOrDeviceToken`, `GET /api/health`, `X-Plaintext-Sha256`, `folder-sync/apply`), `vault-index-sync/route.ts`.
+- **Módulo 2 (Web + Android):** `native-bridge.ts`, `edge-client.ts` (chunked `> 100 MB` + Range), `VaultUploadContext.tsx`, `GlobalUploadDock.tsx`, `VaultMountDiskModal.tsx`, `AurtisticNavbar.tsx`, `DesktopAppDownloadModal.tsx`, `/api/app/desktop-release`, `VaultTransferPlugin.kt` + `VaultTransferWorker.kt` (`content://` stream, `WorkManager`, `MediaStore`).
+- **Módulo 3 (Desktop Electron):** `desktop/src/main/` (`index.ts`, `security.ts`, `ipc.ts`, `credentials.ts`, `transfer-engine.ts`, `sync-mirror.ts`, `scheduler.ts`, `tray.ts`, `preload/index.ts`, `offline.html`).
+- **Módulo 4 (Pacotes, APT & CI):** `desktop/electron-builder.yml` (`asarUnpack` ícones, macOS `dmg`+`zip`), `updater.ts` (auto-update `.AppImage`/Win/Mac + aviso APT `.deb`), `build-apt-repo.sh` (`signed-by`), `.github/workflows/desktop-release.yml` (sync versão da tag + `latest*.yml` + `.zip` + `SHA256SUMS.txt` + GitHub Pages APT).
+- **Validação Final (`task-1245`, exit 0):** `server:check`, desktop `tsc`, `YAML_VALID`, `pack:linux` (`.deb` 75M + `.AppImage` 108M + `app.asar.unpacked`), `chunked-upload`, `webdav-tenant` (11/11), `vault-crypto` (11/11), `transfer-client`, `desktop-core`, `cap sync android` + `gradlew :app:compileDebugKotlin :app:assembleDebug`, `npm run map` (305 arquivos), `npm run verify:full` (0 erros).
+- **Backlog Android (opcional):** fallback `423 PIN_LOCKED` em `content://` URI, `releasePersistableUriPermission`, loop `InputStream.skip()`.

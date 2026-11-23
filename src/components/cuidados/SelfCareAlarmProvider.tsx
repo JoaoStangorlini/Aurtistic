@@ -24,6 +24,7 @@ import {
   saveDailySelfCareLog,
 } from '@/lib/self-care-config';
 import { EyeRest202020Overlay } from './EyeRest202020Overlay';
+import { isDesktopApp, subscribeDesktopEvents, syncSelfCareAlarms } from '@/lib/native-bridge';
 
 export interface SelfCareAlarmContextType {
   configs: SelfCareAlarmConfig[];
@@ -73,7 +74,7 @@ function getSharedAudioContext(): AudioContext | null {
       sharedAudioCtx = new AudioContextClass();
     }
     if (sharedAudioCtx.state === 'suspended') {
-      sharedAudioCtx.resume().catch(() => {});
+      sharedAudioCtx.resume().catch(() => { });
     }
     return sharedAudioCtx;
   } catch (err) {
@@ -87,7 +88,7 @@ if (typeof window !== 'undefined') {
   const unlockAudio = () => {
     const ctx = getSharedAudioContext();
     if (ctx && ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
+      ctx.resume().catch(() => { });
     }
   };
   window.addEventListener('click', unlockAudio, { passive: true, once: false });
@@ -150,7 +151,7 @@ const HYPERFOCUS_STORAGE_KEY = 'aurtistic_self_care_hyperfocus_until';
 
 export function SelfCareAlarmProvider({ children }: { children: React.ReactNode }) {
   const isClient = useSyncExternalStore(
-    () => () => {},
+    () => () => { },
     () => true,
     () => false
   );
@@ -167,7 +168,7 @@ export function SelfCareAlarmProvider({ children }: { children: React.ReactNode 
         const val = parseInt(saved, 10);
         return val > Date.now() ? val : null;
       }
-    } catch {}
+    } catch { }
     return null;
   });
 
@@ -207,7 +208,7 @@ export function SelfCareAlarmProvider({ children }: { children: React.ReactNode 
     setHyperfocusUntil(until);
     try {
       localStorage.setItem(HYPERFOCUS_STORAGE_KEY, until.toString());
-    } catch {}
+    } catch { }
 
     // Fecha alarme ativo se for alarme leve
     if (activeAlarm && activeAlarm.key !== 'medication' && activeAlarm.key !== 'nutrition_meals') {
@@ -219,7 +220,7 @@ export function SelfCareAlarmProvider({ children }: { children: React.ReactNode 
     setHyperfocusUntil(null);
     try {
       localStorage.removeItem(HYPERFOCUS_STORAGE_KEY);
-    } catch {}
+    } catch { }
   }, []);
 
   const updateConfig = useCallback((id: string, updates: Partial<SelfCareAlarmConfig>) => {
@@ -441,6 +442,26 @@ export function SelfCareAlarmProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     if (!isClient) return;
 
+    // No App Desktop Electron, os timers e alertas nativos rodam exclusivamente no processo Main (scheduler.ts)
+    if (isDesktopApp()) {
+      void syncSelfCareAlarms({
+        configs,
+        hyperfocusUntil,
+        dailyLog,
+      });
+      return subscribeDesktopEvents({
+        onTriggerEyeRest: () => setIsEyeRestOpen(true),
+        onQuickWater: () => addWaterGlass(),
+        onToggleHyperfocus: () => {
+          if (hyperfocusRef.current && hyperfocusRef.current > Date.now()) {
+            deactivateHyperfocus();
+          } else {
+            activateHyperfocus(60);
+          }
+        },
+      });
+    }
+
     const interval = setInterval(() => {
       const now = Date.now();
       const today = getTodayKey();
@@ -513,7 +534,7 @@ export function SelfCareAlarmProvider({ children }: { children: React.ReactNode 
                 icon: '/aurtistic_app_icon_v12.png',
                 tag: cfg.id,
               });
-            } catch {}
+            } catch { }
           }
           break;
         }
