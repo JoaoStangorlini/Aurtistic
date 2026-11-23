@@ -434,9 +434,13 @@ export default function AurtisticNavbar() {
                 className="flex items-center gap-2 pl-1 pr-3 py-1.5 rounded-full border border-border-subtle bg-surface hover:border-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 transition-colors cursor-pointer shrink-0"
               >
                 <div className="w-7 h-7 rounded-full overflow-hidden bg-surface-hover flex items-center justify-center border border-[var(--accent-secondary)] shrink-0">
-                  {profile?.avatar_url || user?.user_metadata?.avatar_url ? (
-                    <img src={profile?.avatar_url || user?.user_metadata?.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                  ) : profile?.features_config?.advanced_settings?.sync_curriculum_photo !== false ? (
+                  {profile?.avatar_url || user?.user_metadata?.avatar_url || profile?.features_config?.hub_connection?.hub_avatar_url ? (
+                    <img
+                      src={profile?.avatar_url || user?.user_metadata?.avatar_url || profile?.features_config?.hub_connection?.hub_avatar_url}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : user?.id === 'f2f1e6c9-a178-433f-9d87-37d6ce7ec94e' && profile?.features_config?.advanced_settings?.sync_curriculum_photo !== false ? (
                     <img src="/perfil.jpeg" alt="Profile" className="w-full h-full object-cover" />
                   ) : (
                     <span className="material-symbols-outlined text-[16px] text-fg">person</span>

@@ -73,10 +73,11 @@ export default function ResumoClient({
   }
 
   const [resumoData, setResumoData] = useState(initialResumoData);
+  const [failedImgUrl, setFailedImgUrl] = useState<string | null>(null);
 
   const resolvedProfileImageUrl = React.useMemo(() => {
     const raw = resumoData.profile_image_url;
-    if (!raw) return '/perfil.jpeg';
+    if (!raw) return null;
     if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('/')) {
       return raw;
     }
@@ -362,15 +363,18 @@ export default function ResumoClient({
             <div className="md:col-span-5 relative group w-full max-w-[300px] md:max-w-none mx-auto">
               <div className="absolute -inset-4 bg-[#FFCC00]/20 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
               <div className="aspect-square bg-surface border border-[#FFCC00] rounded-2xl overflow-hidden p-2 transform md:rotate-3 hover:rotate-0 transition-transform duration-500">
-                <img 
-                  className="w-full h-full object-cover rounded-xl saturate-[0.7] hover:saturate-100 transition-all duration-700" 
-                  alt="Profile Photo" 
-                  src={resolvedProfileImageUrl} 
-                  onError={(e) => {
-                    // Fallback to default
-                    (e.target as HTMLImageElement).src = '/perfil.jpeg';
-                  }}
-                />
+                {resolvedProfileImageUrl && failedImgUrl !== resolvedProfileImageUrl ? (
+                  <img 
+                    className="w-full h-full object-cover rounded-xl saturate-[0.7] hover:saturate-100 transition-all duration-700" 
+                    alt="Foto de perfil" 
+                    src={resolvedProfileImageUrl} 
+                    onError={() => setFailedImgUrl(resolvedProfileImageUrl)}
+                  />
+                ) : (
+                  <div className="w-full h-full rounded-xl bg-app flex items-center justify-center">
+                    <span className="material-symbols-outlined text-6xl text-fg-muted">person</span>
+                  </div>
+                )}
               </div>
             </div>
           </section>

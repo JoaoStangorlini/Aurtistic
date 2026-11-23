@@ -75,7 +75,7 @@
 - **`src/components/cuidados/HealthMedicalRemindersPanel.tsx`** (491L): L6:HealthItemType | L8:HealthReminderItem | L30:HealthMedicalRemindersPanel
 - **`src/components/cuidados/SelfCareAlarmProvider.tsx`** (673L): L29:SelfCareAlarmContextType | L52:useSelfCareAlarms | L65:getSharedAudioContext | L99:synthesizeAudioTone | L152:SelfCareAlarmProvider
 - **`src/components/cuidados/SelfCareHub.tsx`** (808L): L9:getInitialNotificationState | L18:getStoredExpanded | L27:SelfCareHub
-- **`src/components/dashboard/AurtisticNavbar.tsx`** (674L): L25:AurtisticNavbar
+- **`src/components/dashboard/AurtisticNavbar.tsx`** (678L): L25:AurtisticNavbar
 - **`src/components/dashboard/AurtisticQuickLinks.tsx`** (284L): L9:QuickLink | L17:getStoredExpanded | L26:AurtisticQuickLinks
 - **`src/components/dashboard/AurtisticSpotlightModal.tsx`** (128L): L31:AurtisticSpotlightModal
 - **`src/components/dashboard/AurtisticWorkspaceClient.tsx`** (387L): L26:AurtisticWorkspaceClient
@@ -90,7 +90,7 @@
 - **`src/components/dashboard/OptionsEditorModal.tsx`** (213L): L14:OptionsEditorModal
 - **`src/components/dashboard/PortfolioClient.tsx`** (1135L): L21:PortfolioClientProps | L46:PortfolioClient
 - **`src/components/dashboard/QuickLinks.tsx`** (180L): L5:HubIcon | L6:NotionIcon | L7:DriveIcon | L8:DiscordIcon | L9:ClarityIcon | L10:SupabaseIcon | L11:CloudinaryIcon | L12:VercelIcon | L13:CanvaIcon | L14:GlobeIcon | L16:SystemLinkDef | L80:CopyableQuickLink | L164:QuickLinks
-- **`src/components/dashboard/ResumoClient.tsx`** (603L): L20:ResumoClientProps | L28:ResumoClient
+- **`src/components/dashboard/ResumoClient.tsx`** (607L): L20:ResumoClientProps | L28:ResumoClient
 - **`src/components/dashboard/TaskCalendar.tsx`** (336L): L18:TaskCalendar
 - **`src/components/dashboard/TaskDelegationBadges.tsx`** (102L): L20:TaskDelegationBadges
 - **`src/components/dashboard/TaskFormModal.tsx`** (1330L): L36:TaskFormModal
