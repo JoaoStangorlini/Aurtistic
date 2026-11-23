@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag da release (ex.: desktop-v1.0.0)"
+        description: "Tag da release (ex.: desktop-v1.0.2)"
         required: false
-        default: "desktop-v1.0.0"
+        default: "desktop-v1.0.2"
 
 permissions:
   contents: read

@@ -19,7 +19,7 @@
 - **`src/app/(dashboard)/studio/page.tsx`** (10L): L7:PersonalStudioPage
 - **`src/app/[username]/SharedWorkspaceClient.tsx`** (248L): L21:SharedWorkspaceClient
 - **`src/app/[username]/page.tsx`** (120L): L20:SharedProfilePage
-- **`src/app/api/app/desktop-release/route.ts`** (132L): L20:DesktopReleasePayload | L36:pickAsset | L49:GET
+- **`src/app/api/app/desktop-release/route.ts`** (138L): L20:DesktopReleasePayload | L37:pickAsset | L50:GET
 - **`src/app/api/auth/hub-embed/route.ts`** (408L): L25:normalizeOrgSlug | L33:corsHeaders | L48:OPTIONS | L55:POST
 - **`src/app/api/auth/hublabdiv/route.ts`** (91L): L9:GET | L42:POST
 - **`src/app/api/feedback/route.ts`** (91L): L10:checkFeedbackRateLimit | L22:POST
@@ -67,8 +67,8 @@
 - **`src/app/sw.ts`** (40L): Sem exports diretos
 - **`src/components/GlobalHighlighter.tsx`** (65L): L7:GlobalHighlighter
 - **`src/components/Navbar.tsx`** (242L): L12:Navbar
-- **`src/components/auth/HubLinkCard.tsx`** (195L): L10:HubLinkCardProps | L15:HubLinkCard
-- **`src/components/auth/UnifiedAuthCard.tsx`** (243L): L10:UnifiedAuthCardProps | L17:UnifiedAuthCard
+- **`src/components/auth/HubLinkCard.tsx`** (202L): L10:HubLinkCardProps | L15:HubLinkCard
+- **`src/components/auth/UnifiedAuthCard.tsx`** (247L): L10:UnifiedAuthCardProps | L17:UnifiedAuthCard
 - **`src/components/cuidados/EyeRest202020Overlay.tsx`** (125L): L6:EyeRest202020OverlayProps | L13:EyeRest202020Overlay
 - **`src/components/cuidados/HealthMedicalRemindersPanel.tsx`** (491L): L6:HealthItemType | L8:HealthReminderItem | L30:HealthMedicalRemindersPanel
 - **`src/components/cuidados/SelfCareAlarmProvider.tsx`** (673L): L29:SelfCareAlarmContextType | L52:useSelfCareAlarms | L65:getSharedAudioContext | L99:synthesizeAudioTone | L152:SelfCareAlarmProvider
