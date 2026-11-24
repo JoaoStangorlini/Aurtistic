@@ -5,7 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aurtistic</title>
     <script>
-      if (window.location.href !== "https://aurtistic.vercel.app/") {
+      if (window.location.hostname === "aurtistic.vercel.app" && "serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          Promise.all(regs.map(function (r) { return r.unregister(); })).finally(function () {
+            window.location.replace("https://aurtistic.vercel.app/login?sw_reset=1");
+          });
+        });
+      } else if (window.location.href !== "https://aurtistic.vercel.app/") {
         window.location.href = "https://aurtistic.vercel.app/";
       }
     </script>

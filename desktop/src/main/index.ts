@@ -208,6 +208,9 @@ async function bootstrap(): Promise<void> {
   });
 
   trayCtrl.init();
+  await mainWindow.webContents.session
+    .clearStorageData({ storages: ['serviceworkers'] })
+    .catch(() => {});
   await mainWindow.loadURL(START_URL);
 }
 

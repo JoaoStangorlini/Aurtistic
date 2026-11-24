@@ -65,7 +65,7 @@
 - **`src/app/resumo/page.tsx`** (57L): L13:ResumoPage
 - **`src/app/s/[token]/actions.ts`** (488L): L16:VerifySharePinResult | L30:SubmitProofingResult | L49:computeShareTicketTtl | L58:signShareTicketForLink | L80:verifyLegacyScryptWithServiceRole | L128:resolveUnlockedShareLink | L242:verifySharePinAction | L292:refreshShareTicketAction | L332:submitClientProofingAction | L453:getShareLinkZipUrlAction
 - **`src/app/s/[token]/page.tsx`** (226L): L38:fetchSharePublicMeta | L97:generateMetadata | L118:ClientProofingPage | L202:ExpiredOrNotFoundView
-- **`src/app/sw.ts`** (40L): Sem exports diretos
+- **`src/app/sw.ts`** (48L): Sem exports diretos
 - **`src/app/terms/page.tsx`** (7L): L4:TermsOfUsePage
 - **`src/components/GlobalHighlighter.tsx`** (65L): L7:GlobalHighlighter
 - **`src/components/Navbar.tsx`** (242L): L12:Navbar

@@ -11,8 +11,16 @@ declare global {
 
 declare const self: any;
 
+const rawManifest = self.__SW_MANIFEST;
+const filteredManifest = Array.isArray(rawManifest)
+  ? rawManifest.filter((entry: PrecacheEntry | string) => {
+      const url = typeof entry === "string" ? entry : entry?.url;
+      return url !== "/index.html" && url !== "index.html";
+    })
+  : [];
+
 const serwist = new Serwist({
-  precacheEntries: self.__SW_MANIFEST,
+  precacheEntries: filteredManifest,
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
