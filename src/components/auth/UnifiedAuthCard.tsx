@@ -52,13 +52,10 @@ export function UnifiedAuthCard({
       setErrorMsg(null);
       setInfoMsg(null);
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      const isLocalOrigin =
-        typeof window !== 'undefined' &&
-        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
       const hubBaseUrl = (
         process.env.NEXT_PUBLIC_HUB_LABDIV_URL ||
         process.env.NEXT_PUBLIC_HUB_URL ||
-        (isLocalOrigin ? 'http://localhost:3001' : 'https://hub-lab-div.vercel.app')
+        'https://hub-lab-div.vercel.app'
       ).replace(/\/+$/, '');
       const redirectUri = `${origin}/auth/hub-callback`;
       const sanitizedNext = next.startsWith('/') && !next.startsWith('//') ? next : '/labdiv';

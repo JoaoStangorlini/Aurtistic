@@ -250,7 +250,7 @@ async function run() {
 
     const builderYml = fs.readFileSync(path.resolve('desktop/electron-builder.yml'), 'utf8');
     assert.ok(builderYml.includes('packageName: aurtistic'));
-    assert.ok(builderYml.includes('StartupWMClass: aurtistic'));
+    assert.ok(builderYml.includes('StartupWMClass: Aurtistic'));
     assert.ok(builderYml.includes('src/renderer/offline.html'));
     assert.ok(builderYml.includes('asarUnpack:'));
     assert.ok(builderYml.includes('target: zip'));
@@ -266,6 +266,33 @@ async function run() {
     assert.ok(releaseRouteSrc.includes(".endsWith('.deb')"));
     assert.ok(releaseRouteSrc.includes(".endsWith('.appimage')"));
     assert.ok(releaseRouteSrc.includes(".endsWith('.dmg')"));
+
+    // 8. Descoberta e parse de scripts de montagem WebDAV (Linux/GVFS)
+    const {
+      parseVaultMountScript,
+      discoverLinuxVaultMountTargets,
+    } = require('../desktop/dist/main/vault-mount.js');
+    const parsedTarget = parseVaultMountScript(`#!/usr/bin/env bash
+DAV_URI="davs://wd_88119aaba518@storage.hublabdiv.com.br/webdav/cofre"
+MOUNT_LINK="/home/user/Cofre-Aurtistic-Pessoal"
+`);
+    assert.deepEqual(parsedTarget, {
+      davUri: 'davs://wd_88119aaba518@storage.hublabdiv.com.br/webdav/cofre',
+      mountLink: '/home/user/Cofre-Aurtistic-Pessoal',
+      host: 'storage.hublabdiv.com.br',
+    });
+    assert.equal(parseVaultMountScript('DAV_URI="https://not-dav.example.com"'), null);
+
+    const fakeBin = path.join(tmpRoot, 'local-bin');
+    fs.mkdirSync(fakeBin, { recursive: true });
+    fs.writeFileSync(
+      path.join(fakeBin, 'abrir-cofre-aurtistic-pessoal.sh'),
+      'DAV_URI="davs://wd_test@storage.hublabdiv.com.br/webdav/cofre"\nMOUNT_LINK="/tmp/cofre-link"\n'
+    );
+    fs.writeFileSync(path.join(fakeBin, 'outro-script.sh'), 'DAV_URI="davs://ignored@example.com/dav"\n');
+    const discovered = await discoverLinuxVaultMountTargets(fakeBin);
+    assert.equal(discovered.length, 1);
+    assert.equal(discovered[0].host, 'storage.hublabdiv.com.br');
 
     console.log('ALL_DESKTOP_CORE_TESTS_PASSED');
   } finally {

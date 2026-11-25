@@ -19,15 +19,12 @@ import {
   type DesktopCredentialSecurityStatus,
   type DesktopMirrorFolderItem,
   getDesktopCredentialStatus,
-  getLanConfig,
   isAndroidNative,
   isDesktopApp,
   listDesktopMirrorFolders,
   pickNativeUploadFiles,
-  probeLanServer,
   removeDesktopMirrorFolder,
   selectDesktopMirrorFolder,
-  setLanConfig,
   triggerDesktopMirrorSync,
 } from '@/lib/native-bridge';
 import {
@@ -131,19 +128,12 @@ export function VaultUploadManagerModal({
   const [desktopApp, setDesktopApp] = useState(false);
   const [mirrorFolders, setMirrorFolders] = useState<DesktopMirrorFolderItem[]>([]);
   const [credStatus, setCredStatus] = useState<DesktopCredentialSecurityStatus | null>(null);
-  const [lanExpanded, setLanExpanded] = useState(false);
-  const [lanUrl, setLanUrl] = useState('');
-  const [autoDetectLan, setAutoDetectLan] = useState(true);
-  const [lanStatus, setLanStatus] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle');
   const [nativeFeedback, setNativeFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     setAndroidNative(isAndroidNative());
     const isDesk = isDesktopApp();
     setDesktopApp(isDesk);
-    const cfg = getLanConfig();
-    setLanUrl(cfg.lanServerUrl);
-    setAutoDetectLan(cfg.autoDetectLan);
     if (isDesk && isModalOpen) {
       void listDesktopMirrorFolders().then(setMirrorFolders);
       void getDesktopCredentialStatus().then(setCredStatus);
@@ -180,7 +170,6 @@ export function VaultUploadManagerModal({
       remoteFolder: currentFolder || 'Arquivos',
       scopeKey,
       remoteServerUrl,
-      lanServerUrl: getLanConfig().lanServerUrl,
     });
     if (createdMirror) {
       setMirrorFolders(await listDesktopMirrorFolders());
@@ -197,18 +186,6 @@ export function VaultUploadManagerModal({
         ? `${count} arquivo(s) grandes enfileirados em segundo plano (Android WorkManager).`
         : 'Não foi possível iniciar o envio nativo. Verifique sua conexão ou pasta com PIN.'
     );
-  };
-
-  const handleSaveLan = async () => {
-    const saved = await setLanConfig({ lanServerUrl: lanUrl, autoDetectLan });
-    setLanUrl(saved.lanServerUrl);
-    if (!saved.lanServerUrl) {
-      setLanStatus('idle');
-      return;
-    }
-    setLanStatus('testing');
-    const res = await probeLanServer(saved.lanServerUrl, 1500);
-    setLanStatus(res.reachable ? 'ok' : 'fail');
   };
 
   const effectiveTargetFolder =
@@ -697,7 +674,8 @@ export function VaultUploadManagerModal({
           )}
         </div>
 
-        {/* Painel Rápido: Seletor Nativo Android (sem OOM) & Configuração de Rede Local (LAN) */}
+        {/* Painel Rápido: Seletor Nativo Android & Espelhamento Desktop */}
+        {(androidNative || desktopApp) && (
         <div className="px-4 py-2 border-t border-border-subtle bg-surface/60 space-y-2 shrink-0">
           <div className="flex flex-wrap items-center justify-between gap-2">
             {androidNative && (
@@ -720,14 +698,6 @@ export function VaultUploadManagerModal({
                 <span>Espelhar Pasta Local ({currentFolder || 'Arquivos'})</span>
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setLanExpanded((v) => !v)}
-              className="text-[11px] font-semibold text-fg-muted hover:text-fg flex items-center gap-1 cursor-pointer ml-auto"
-            >
-              <span className="material-symbols-outlined text-[15px]">router</span>
-              <span>{lanExpanded ? 'Ocultar Rede Local (LAN)' : 'Configurar Rede Local (LAN)'}</span>
-            </button>
           </div>
           {nativeFeedback && (
             <p className="text-[11px] text-emerald-400 font-semibold">{nativeFeedback}</p>
@@ -775,39 +745,8 @@ export function VaultUploadManagerModal({
               ))}
             </div>
           )}
-          {lanExpanded && (
-            <div className="p-2.5 rounded-xl border border-border-subtle bg-app space-y-2">
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  type="url"
-                  value={lanUrl}
-                  onChange={(e) => setLanUrl(e.target.value)}
-                  placeholder="Ex.: http://192.168.0.100:8080"
-                  className="flex-1 px-2.5 py-1.5 rounded-lg border border-border-subtle bg-surface text-xs text-fg"
-                />
-                <button
-                  type="button"
-                  onClick={() => void handleSaveLan()}
-                  className="px-3 py-1.5 rounded-lg bg-surface border border-border-subtle hover:border-[var(--accent-primary)] text-xs font-bold cursor-pointer shrink-0"
-                >
-                  {lanStatus === 'testing' ? 'Testando...' : 'Salvar e Testar'}
-                </button>
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-fg-muted">
-                <label className="inline-flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={autoDetectLan}
-                    onChange={(e) => setAutoDetectLan(e.target.checked)}
-                  />
-                  <span>Usar LAN automaticamente em casa</span>
-                </label>
-                {lanStatus === 'ok' && <span className="text-emerald-500 font-semibold">LAN acessível!</span>}
-                {lanStatus === 'fail' && <span className="text-amber-400">LAN inacessível — usando HTTPS.</span>}
-              </div>
-            </div>
-          )}
         </div>
+        )}
 
         {/* Rodapé: Barra Global de Progresso & Ações */}
         <div className="p-4 border-t border-border-subtle bg-elevated/40 space-y-3 shrink-0">

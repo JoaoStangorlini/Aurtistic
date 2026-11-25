@@ -46,7 +46,10 @@ declare module 'electron' {
     show(): void;
   }
   export const Menu: { buildFromTemplate(template: any[]): any };
-  export const nativeImage: { createEmpty(): any };
+  export const nativeImage: {
+    createEmpty(): any;
+    createFromPath(imagePath: string): any;
+  };
   export const dialog: {
     showOpenDialog(win: BrowserWindow | undefined | null, options: any): Promise<{ canceled: boolean; filePaths: string[] }>;
     showSaveDialog(win: BrowserWindow | undefined | null, options: any): Promise<{ canceled: boolean; filePath?: string }>;
@@ -56,6 +59,8 @@ declare module 'electron' {
   };
   export const app: {
     isPackaged: boolean;
+    setName?(name: string): void;
+    setAppUserModelId?(id: string): void;
     requestSingleInstanceLock(): boolean;
     getPath(name: string): string;
     whenReady(): Promise<void>;

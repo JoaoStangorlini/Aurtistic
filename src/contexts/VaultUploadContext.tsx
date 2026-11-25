@@ -438,6 +438,14 @@ export function VaultUploadProvider({
     setUploadSpeedMbps(0);
     setEtaSeconds(null);
 
+    let wakeLockSentinel: { release?: () => Promise<void> } | null = null;
+    try {
+      const navAny = typeof navigator !== 'undefined' ? (navigator as any) : null;
+      if (navAny?.wakeLock?.request) {
+        wakeLockSentinel = await navAny.wakeLock.request('screen').catch(() => null);
+      }
+    } catch {}
+
     await ensureFreshTicket(false);
 
     let successCount = 0;
@@ -445,15 +453,19 @@ export function VaultUploadProvider({
     let lastUsedBytes: number | undefined;
 
     const totalBatchBytes = queue.reduce((acc, item) => acc + item.file.size, 0);
+    const batchStartTime = Date.now();
+    let completedBytesSoFar = 0;
+    let bytesUploadedThisRun = 0;
 
     for (let i = 0; i < queue.length; i++) {
       if (cancelRequestedRef.current) break;
       const currentItem = queue[i];
-      if (currentItem.status === 'success' || cancelledIdsRef.current.has(currentItem.id)) continue;
-
-      const completedBytesBeforeThis = queue
-        .slice(0, i)
-        .reduce((acc, it) => acc + (it.status === 'success' ? it.file.size : 0), 0);
+      if (currentItem.status === 'success' || cancelledIdsRef.current.has(currentItem.id)) {
+        if (currentItem.status === 'success') {
+          completedBytesSoFar += currentItem.file.size;
+        }
+        continue;
+      }
 
       // Proteção Anti-Loop: ignora proxy comprimido local ou hash já conhecido (somente <= 64 MB para evitar OOM)
       let itemSha256 = '';
@@ -464,18 +476,20 @@ export function VaultUploadProvider({
             setQueue((prev) =>
               prev.map((it, idx) => (idx === i ? { ...it, status: 'success', progressPercent: 100 } : it))
             );
+            completedBytesSoFar += currentItem.file.size;
             successCount++;
             continue;
           }
           itemSha256 = await computeFileSha256(currentItem.file);
           const hashRes = await checkBackupHashesAction([itemSha256], selectedOrgId);
-        if (hashRes.ok && hashRes.knownHashes.includes(itemSha256)) {
-          setQueue((prev) =>
-            prev.map((it, idx) => (idx === i ? { ...it, status: 'success', progressPercent: 100 } : it))
-          );
-          successCount++;
-          continue;
-        }
+          if (hashRes.ok && hashRes.knownHashes.includes(itemSha256)) {
+            setQueue((prev) =>
+              prev.map((it, idx) => (idx === i ? { ...it, status: 'success', progressPercent: 100 } : it))
+            );
+            completedBytesSoFar += currentItem.file.size;
+            successCount++;
+            continue;
+          }
         } catch {}
       }
 
@@ -487,9 +501,11 @@ export function VaultUploadProvider({
 
       let uploadSuccess = false;
       let attempt = 0;
+      const maxAttempts = 4;
       let lastErr: unknown;
+      speedSampleRef.current = null;
 
-      while (!uploadSuccess && attempt < 2 && !cancelRequestedRef.current && !cancelledIdsRef.current.has(currentItem.id)) {
+      while (!uploadSuccess && attempt < maxAttempts && !cancelRequestedRef.current && !cancelledIdsRef.current.has(currentItem.id)) {
         attempt++;
         const abortController = new AbortController();
         activeAbortControllerRef.current = abortController;
@@ -517,15 +533,20 @@ export function VaultUploadProvider({
             },
             onProgress: (pct, loadedBytes) => {
               const now = Date.now();
-              const currentLoaded = loadedBytes ?? Math.round((currentItem.file.size * pct) / 100);
-              const totalUploadedNow = completedBytesBeforeThis + currentLoaded;
+              const currentLoaded = Math.min(
+                currentItem.file.size,
+                loadedBytes ?? Math.round((currentItem.file.size * pct) / 100)
+              );
+              const totalUploadedNow = completedBytesSoFar + currentLoaded;
+              const uploadedInThisRunNow = bytesUploadedThisRun + currentLoaded;
+              const elapsedSec = Math.max(0.1, (now - batchStartTime) / 1000);
 
-              // Amostragem de velocidade (EMA) e estimativa de tempo restante (ETA)
-              if (!speedSampleRef.current) {
+              // Amostragem de velocidade (EMA + média real do lote incluindo overhead entre arquivos)
+              if (!speedSampleRef.current || totalUploadedNow < speedSampleRef.current.loaded) {
                 speedSampleRef.current = { time: now, loaded: totalUploadedNow };
               } else {
                 const timeDelta = (now - speedSampleRef.current.time) / 1000;
-                if (timeDelta >= 0.25) {
+                if (timeDelta >= 0.8) {
                   const bytesDelta = totalUploadedNow - speedSampleRef.current.loaded;
                   if (bytesDelta >= 0) {
                     const instantSpeed = bytesDelta / timeDelta;
@@ -534,17 +555,21 @@ export function VaultUploadProvider({
                       emaSpeedRef.current === 0
                         ? instantSpeed
                         : alpha * instantSpeed + (1 - alpha) * emaSpeedRef.current;
-                    const mbps = (emaSpeedRef.current * 8) / 1_000_000;
-                    setUploadSpeedMbps(mbps);
-                    const remainingBytes = Math.max(0, totalBatchBytes - totalUploadedNow);
-                    const eta =
-                      emaSpeedRef.current > 512
-                        ? Math.max(0, Math.round(remainingBytes / emaSpeedRef.current))
-                        : null;
-                    setEtaSeconds(eta);
                   }
                   speedSampleRef.current = { time: now, loaded: totalUploadedNow };
                 }
+              }
+
+              const avgBatchSpeed = elapsedSec >= 2 && uploadedInThisRunNow > 0 ? uploadedInThisRunNow / elapsedSec : 0;
+              const effectiveSpeed =
+                emaSpeedRef.current > 0 && avgBatchSpeed > 0
+                  ? 0.35 * emaSpeedRef.current + 0.65 * avgBatchSpeed
+                  : avgBatchSpeed || emaSpeedRef.current;
+
+              if (effectiveSpeed > 512) {
+                setUploadSpeedMbps((effectiveSpeed * 8) / 1_000_000);
+                const remainingBytes = Math.max(0, totalBatchBytes - totalUploadedNow);
+                setEtaSeconds(remainingBytes === 0 ? 0 : Math.max(1, Math.round(remainingBytes / effectiveSpeed)));
               }
 
               if (now - lastProgressUpdateRef.current > 150 || pct === 100) {
@@ -650,6 +675,8 @@ export function VaultUploadProvider({
             }
           }
 
+          completedBytesSoFar += currentItem.file.size;
+          bytesUploadedThisRun += currentItem.file.size;
           successCount++;
           setQueue((prev) =>
             prev.map((it, idx) =>
@@ -659,14 +686,44 @@ export function VaultUploadProvider({
         } catch (err: unknown) {
           lastErr = err;
           const errMsg = err instanceof Error ? err.message : String(err);
+          const lowerMsg = errMsg.toLowerCase();
           const isAuthError =
             errMsg.includes('401') ||
-            errMsg.toLowerCase().includes('ticket') ||
-            errMsg.toLowerCase().includes('expirado') ||
-            errMsg.toLowerCase().includes('permissão');
+            lowerMsg.includes('ticket') ||
+            lowerMsg.includes('expirado') ||
+            lowerMsg.includes('permissão');
+          const isTransientNetworkError =
+            !cancelRequestedRef.current &&
+            !cancelledIdsRef.current.has(currentItem.id) &&
+            !lowerMsg.includes('cancelado') &&
+            (lowerMsg.includes('erro de conexão') ||
+              lowerMsg.includes('failed to fetch') ||
+              lowerMsg.includes('network') ||
+              lowerMsg.includes('timeout') ||
+              /\b(502|503|504|520|522|524|530)\b/.test(errMsg));
 
-          if (isAuthError && attempt < 2) {
-            await ensureFreshTicket(true);
+          if (attempt < maxAttempts && (isAuthError || isTransientNetworkError)) {
+            if (isAuthError) {
+              await ensureFreshTicket(true);
+            } else {
+              // Se navegador ficou offline ou aba suspensa, aguarda reconexão ou backoff exponencial
+              if (typeof navigator !== 'undefined' && !navigator.onLine && typeof window !== 'undefined') {
+                await new Promise<void>((resolve) => {
+                  const timer = setTimeout(() => {
+                    window.removeEventListener('online', onOnline);
+                    resolve();
+                  }, 15_000);
+                  const onOnline = () => {
+                    clearTimeout(timer);
+                    window.removeEventListener('online', onOnline);
+                    resolve();
+                  };
+                  window.addEventListener('online', onOnline);
+                });
+              } else {
+                await new Promise((r) => setTimeout(r, 1500 * attempt));
+              }
+            }
             continue;
           }
           break;
@@ -685,6 +742,9 @@ export function VaultUploadProvider({
       }
     }
 
+    try {
+      await wakeLockSentinel?.release?.();
+    } catch {}
     setIsUploading(false);
     setUploadSpeedMbps(0);
     setEtaSeconds(null);

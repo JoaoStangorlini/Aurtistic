@@ -47,8 +47,8 @@ async function fetchSharePublicMeta(
     return meta as SharePublicMeta;
   }
 
-  // Fallback controlado exclusivamente no servidor caso Migration 14 ainda não esteja no Supabase
-  if (error?.code === '42883' || error?.message?.includes('get_share_link_public_meta')) {
+  // Fallback controlado exclusivamente no servidor caso a RPC falhe (ex.: Migration pendente ou record v_org)
+  if (error) {
     const reader = createAdminClient() || supabase;
     const { data: linkRows } = await reader.rpc('get_share_link_by_token_internal', {
       p_token: cleanToken,

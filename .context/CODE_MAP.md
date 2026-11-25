@@ -69,8 +69,8 @@
 - **`src/app/terms/page.tsx`** (7L): L4:TermsOfUsePage
 - **`src/components/GlobalHighlighter.tsx`** (65L): L7:GlobalHighlighter
 - **`src/components/Navbar.tsx`** (242L): L12:Navbar
-- **`src/components/auth/HubLinkCard.tsx`** (202L): L10:HubLinkCardProps | L15:HubLinkCard
-- **`src/components/auth/UnifiedAuthCard.tsx`** (627L): L12:UnifiedAuthCardProps | L20:UnifiedAuthCard
+- **`src/components/auth/HubLinkCard.tsx`** (199L): L10:HubLinkCardProps | L15:HubLinkCard
+- **`src/components/auth/UnifiedAuthCard.tsx`** (624L): L12:UnifiedAuthCardProps | L20:UnifiedAuthCard
 - **`src/components/cuidados/EyeRest202020Overlay.tsx`** (125L): L6:EyeRest202020OverlayProps | L13:EyeRest202020Overlay
 - **`src/components/cuidados/HealthMedicalRemindersPanel.tsx`** (491L): L6:HealthItemType | L8:HealthReminderItem | L30:HealthMedicalRemindersPanel
 - **`src/components/cuidados/SelfCareAlarmProvider.tsx`** (673L): L29:SelfCareAlarmContextType | L52:useSelfCareAlarms | L65:getSharedAudioContext | L99:synthesizeAudioTone | L152:SelfCareAlarmProvider
@@ -179,7 +179,7 @@
 - **`src/components/servidor/VaultMountDiskModal.tsx`** (410L): L20:VaultMountDiskModalProps | L32:VaultMountDiskModal
 - **`src/components/servidor/VaultPreviewPanel.tsx`** (643L): L10:VaultPreviewPanelProps | L26:VaultPreviewPanel
 - **`src/components/servidor/VaultSortControl.tsx`** (158L): L15:VaultSortControl
-- **`src/components/servidor/VaultUploadManagerModal.tsx`** (955L): L40:VaultUploadManagerModalProps | L55:formatBytes | L63:getFileIcon | L96:VaultUploadManagerModal
+- **`src/components/servidor/VaultUploadManagerModal.tsx`** (894L): L37:VaultUploadManagerModalProps | L52:formatBytes | L60:getFileIcon | L93:VaultUploadManagerModal
 - **`src/components/share/ClientProofingView.tsx`** (979L): L22:ProofingPhotoItem | L28:ProofingMasonryCard | L195:ClientProofingViewProps | L211:ClientProofingView
 - **`src/components/tarefas/TaskFilePickerModal.tsx`** (805L): L20:TaskFilePickerModalProps | L35:TaskFilePickerModal
 - **`src/components/theme/GlobalOrgThemeBackdrop.tsx`** (113L): L26:isPublicShowcaseRoute | L47:GlobalOrgThemeBackdrop
@@ -187,7 +187,7 @@
 - **`src/components/theme/ThemeDropdownSection.tsx`** (236L): L10:ThemeDropdownSection
 - **`src/components/theme/ThemeProvider.tsx`** (351L): L57:getCookieValue | L63:getInitialPreferences | L97:resolveSystemLuminance | L102:ThemeProvider | L311:useTheme | L336:ThemedTopLoader
 - **`src/components/theme/ThemedAurtisticLogo.tsx`** (168L): L9:ThemedAurtisticLogoProps | L22:ThemedAurtisticLogo
-- **`src/contexts/VaultUploadContext.tsx`** (1151L): L49:QueuedUploadItem | L61:QueuedDownloadItem | L74:UploadFinishedResults | L80:formatEta | L98:formatSpeed | L164:useVaultUpload | L178:VaultUploadProvider
+- **`src/contexts/VaultUploadContext.tsx`** (1211L): L49:QueuedUploadItem | L61:QueuedDownloadItem | L74:UploadFinishedResults | L80:formatEta | L98:formatSpeed | L164:useVaultUpload | L178:VaultUploadProvider
 - **`src/hooks/useBackgroundSpeechTranscription.ts`** (215L): L7:UseBackgroundSpeechTranscriptionOptions | L14:useBackgroundSpeechTranscription
 - **`src/hooks/useEdgeUpload.ts`** (82L): L8:UseEdgeUploadOptions | L15:useEdgeUpload
 - **`src/hooks/useStudioAutoSave.ts`** (62L): L16:useStudioAutoSave
@@ -291,6 +291,7 @@
 - **`supabase/migrations/newsqls/16_org_goals_requests_and_delete_profile.sql`** (121L): L7:public.organization_goals | L34:public.organization_requests
 - **`supabase/migrations/newsqls/17_studio_personal_drafts_scope.sql`** (80L): Sem exports diretos
 - **`supabase/migrations/newsqls/18_fix_auth_provisioning_and_terms.sql`** (288L): L20:public.handle_auth_user_provisioning | L197:on_auth_user_created_provisioning | L203:public.protect_user_profile_terms | L237:trg_protect_user_profile_terms | L243:public.check_auth_identifier_exists
+- **`supabase/migrations/newsqls/19_fix_share_link_public_meta_v_org.sql`** (106L): L4:public.get_share_link_public_meta
 - **`supabase/migrations/newsqls/1_dynamic_columns.sql`** (84L): L4:public.task_columns
 - **`supabase/migrations/newsqls/2_aurtistic_planner.sql`** (42L): L4:public.user_profiles
 - **`supabase/migrations/newsqls/tabela inicial.sql`** (324L): L9:tasks

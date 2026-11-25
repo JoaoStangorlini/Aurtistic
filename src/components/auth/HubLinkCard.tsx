@@ -25,14 +25,11 @@ export function HubLinkCard({ hubConnection, userEmail }: HubLinkCardProps) {
     try {
       setIsRedirecting(true);
       setErrorMsg(null);
-      const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-      const isLocalOrigin =
-        typeof window !== 'undefined' &&
-        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://aurtistic.vercel.app';
       const hubBaseUrl = (
         process.env.NEXT_PUBLIC_HUB_LABDIV_URL ||
         process.env.NEXT_PUBLIC_HUB_URL ||
-        (isLocalOrigin ? 'http://localhost:3001' : 'https://hub-lab-div.vercel.app')
+        'https://hub-lab-div.vercel.app'
       ).replace(/\/+$/, '');
       const redirectUri = `${origin}/auth/hub-callback`;
       const next = '/configuracoes-avancadas';

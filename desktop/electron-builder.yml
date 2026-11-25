@@ -62,11 +62,10 @@ linux:
   icon: build/icon.png
   category: Utility;Productivity;
   desktop:
-    entry:
-      Name: Aurtistic
-      Comment: Aurtistic Desktop — Cofre e Bem-Estar
-      StartupWMClass: aurtistic
-      Categories: Utility;Productivity;
+    Name: Aurtistic
+    Comment: Aurtistic Desktop — Cofre e Bem-Estar
+    StartupWMClass: Aurtistic
+    Categories: Utility;Productivity;
   target:
     - target: deb
       arch:

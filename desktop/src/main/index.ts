@@ -24,6 +24,7 @@ import { SyncMirrorCoordinator } from './sync-mirror';
 import { DesktopTransferEngine } from './transfer-engine';
 import { DesktopTrayController } from './tray';
 import { DesktopUpdater } from './updater';
+import { mountLinuxVaultsOnStartup } from './vault-mount';
 
 let mainWindow: BrowserWindow | null = null;
 let powerSaveId: number | null = null;
@@ -31,6 +32,11 @@ let isQuitting = false;
 let shutdownHook: (() => Promise<void>) | null = null;
 
 const START_URL = process.env.AURTISTIC_DESKTOP_URL || PROD_APP_ORIGIN;
+
+app.setName?.('Aurtistic');
+if (process.platform === 'win32') {
+  app.setAppUserModelId?.('com.aurtistic.desktop');
+}
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
@@ -116,6 +122,9 @@ async function bootstrap(): Promise<void> {
   const updater = new DesktopUpdater();
   updater.start();
 
+  // Monta cofres WebDAV configurados (Linux/GVFS) em segundo plano para aparecerem no gerenciador de arquivos
+  void mountLinuxVaultsOnStartup();
+
   shutdownHook = async () => {
     updater.stop();
     scheduler.stop();
@@ -151,10 +160,14 @@ async function bootstrap(): Promise<void> {
     onTrayRefresh: () => trayCtrl?.refreshMenu(),
   });
 
-  const unpackedIcon = path.join(process.resourcesPath || '', 'app.asar.unpacked', 'build', 'icon.png');
-  const windowIcon = fs.existsSync(unpackedIcon)
-    ? unpackedIcon
-    : path.join(app.getAppPath(), 'build', 'icon.png');
+  const iconFilename = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
+  const iconCandidates = [
+    path.join(process.resourcesPath || '', 'app.asar.unpacked', 'build', iconFilename),
+    path.join(app.getAppPath(), 'build', iconFilename),
+    path.join(__dirname, '../../build', iconFilename),
+    path.join(process.resourcesPath || '', 'build', iconFilename),
+  ];
+  const windowIcon = iconCandidates.find((p) => p && fs.existsSync(p)) || iconCandidates[1];
 
   mainWindow = new BrowserWindow({
     width: 1280,
